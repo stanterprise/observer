@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "github.com/stanterprise/observer";
+
+
+service TestSignalObserver {
+    rpc SubmitSignal (Signal) returns (SignalResponse) {}
+}
+
+message Signal {
+    string signal = 1;
+}
+
+message SignalResponse {
+    string response = 1;
+}
