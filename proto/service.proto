@@ -1,8 +1,6 @@
 syntax = "proto3";
 
-package proto;
-
-option go_package = "github.com/stanterprise/observer";
+option go_package = "github.com/stanterprise/observer/test_signal_observer";
 
 
 service TestSignalObserver {

@@ -1,24 +1,21 @@
 package main
 
 import (
-	"context"
 	"log"
+	"net"
 
-	pb "github.com/stanterprise/observer/proto"
+	"github.com/stanterprise/observer/pkg/server"
 	"google.golang.org/grpc"
 )
 
 func main() {
-	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatalf("failed to listen: %v", err)
 	}
-	defer conn.Close()
-	client := pb.NewTestSignalObserverClient(conn)
-
-	response, err := client.SubmitSignal(context.Background(), &pb.Signal{Signal: "test"})
-	if err != nil {
-		log.Fatalf("could not submit signal: %v", err)
+	s := grpc.NewServer()
+	server.RegisterServices(s)
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
 	}
-	log.Printf("Response: %s", response.Response)
 }

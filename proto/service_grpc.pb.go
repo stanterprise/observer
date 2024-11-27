@@ -4,7 +4,7 @@
 // - protoc             v3.21.12
 // source: proto/service.proto
 
-package observer
+package test_signal_observer
 
 import (
 	context "context"
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TestSignalObserver_SubmitSignal_FullMethodName = "/proto.TestSignalObserver/SubmitSignal"
+	TestSignalObserver_SubmitSignal_FullMethodName = "/TestSignalObserver/SubmitSignal"
 )
 
 // TestSignalObserverClient is the client API for TestSignalObserver service.
@@ -108,7 +108,7 @@ func _TestSignalObserver_SubmitSignal_Handler(srv interface{}, ctx context.Conte
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var TestSignalObserver_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "proto.TestSignalObserver",
+	ServiceName: "TestSignalObserver",
 	HandlerType: (*TestSignalObserverServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
