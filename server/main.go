@@ -15,6 +15,7 @@ func main() {
 	}
 	s := grpc.NewServer()
 	server.RegisterServices(s)
+	log.Printf("Server listening on %s", lis.Addr().String())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
