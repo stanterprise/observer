@@ -1,22 +1,67 @@
 package main
 
 import (
-	"log"
+	"context"
+	"flag"
+	"log/slog"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/stanterprise/observer/pkg/server"
-	"google.golang.org/grpc"
 )
 
 func main() {
-	lis, err := net.Listen("tcp", ":50051")
+	var (
+		port = flag.String("port", envOr("PORT", "50051"), "TCP port to listen on")
+	)
+	flag.Parse()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	addr := ":" + *port
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		logger.Error("listen failed", "error", err, "addr", addr)
+		os.Exit(1)
 	}
-	s := grpc.NewServer()
-	server.RegisterServices(s)
-	log.Printf("Server listening on %s", lis.Addr().String())
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+
+	grpcServer := server.NewGRPCServer(logger)
+	server.RegisterServices(grpcServer, logger)
+	logger.Info("server starting", "addr", lis.Addr().String())
+
+	// Run server in separate goroutine.
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			logger.Error("serve failed", "error", err)
+		}
+	}()
+
+	// Graceful shutdown handling.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+	logger.Info("shutdown signal received")
+
+	// Allow up to 5s for graceful stop.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		grpcServer.GracefulStop()
+		close(done)
+	}()
+	select {
+	case <-ctx.Done():
+		logger.Warn("graceful stop timeout, forcing stop")
+		grpcServer.Stop()
+	case <-done:
+		logger.Info("server stopped gracefully")
 	}
+}
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" { return v }
+	return def
 }

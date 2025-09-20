@@ -1,43 +1,50 @@
 package main
 
 import (
+	"context"
+	"log/slog"
 	"os"
-	"os/exec"
 	"testing"
+	"time"
+
+	obsrv "github.com/stanterprise/observer/pkg/server"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
 )
 
-var testClientCmd *exec.Cmd
+var (
+	testBufListener *bufconn.Listener
+	testGRPCServer  *grpc.Server
+)
+
+const bufSize = 1024 * 1024
 
 func TestMain(m *testing.M) {
-	// Setup: Initialize resources
-	setup()
+	// Setup in-process server
+	testBufListener = bufconn.Listen(bufSize)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	testGRPCServer = obsrv.NewGRPCServer(logger)
+	obsrv.RegisterServices(testGRPCServer, logger)
+	go func() {
+		_ = testGRPCServer.Serve(&listenerWrapper{Listener: testBufListener})
+	}()
 
-	// Run tests
 	code := m.Run()
 
-	// Teardown: Cleanup resources
-	teardown()
-
-	// Exit with the code from `m.Run`
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		testGRPCServer.GracefulStop()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-shutdownCtx.Done():
+		testGRPCServer.Stop()
+	}
 	os.Exit(code)
 }
 
-func setup() {
-	// Start the test client as a separate process
-	testClientCmd = exec.Command("go", "run", "../server/main.go")
-	testClientCmd.Stdout = os.Stdout
-	testClientCmd.Stderr = os.Stderr
-
-	if err := testClientCmd.Start(); err != nil {
-		panic("Failed to start test client: " + err.Error())
-	}
-}
-
-func teardown() {
-	// Stop the test client process
-	if testClientCmd != nil && testClientCmd.Process != nil {
-		if err := testClientCmd.Process.Kill(); err != nil {
-			panic("Failed to stop test client: " + err.Error())
-		}
-	}
-}
+// listenerWrapper adapts bufconn to satisfy only the Accept / Close / Addr used by Serve.
+type listenerWrapper struct { *bufconn.Listener }
