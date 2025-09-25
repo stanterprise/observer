@@ -6,7 +6,7 @@ endif
 PROTOC_GEN_GO := $(GOBIN)/protoc-gen-go
 PROTOC_GEN_GO_GRPC := $(GOBIN)/protoc-gen-go-grpc
 
-.PHONY: all build run test lint proto tools clean
+.PHONY: all build run run-dev run-dev-split env-print test lint proto tools clean
  .PHONY: db-up db-down db-logs db-psql
 
 all: build
@@ -16,6 +16,33 @@ build:
 
 run: build
 	go run ./server
+
+# Defaults align with docker-compose.yml and .env.example
+POSTGRES_USER ?= postgres
+POSTGRES_PASSWORD ?= postgres
+POSTGRES_DB ?= observer
+POSTGRES_PORT ?= 5432
+APPLY_MIGRATIONS ?= 1
+
+# Construct a host DSN that talks to the Compose Postgres port on localhost
+DATABASE_URL := postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable
+
+# Run the API with DATABASE_URL and optional automigrate
+run-dev:
+	DATABASE_URL='$(DATABASE_URL)' APPLY_MIGRATIONS=$(APPLY_MIGRATIONS) go run ./server
+
+# Run the API using split PG* environment variables (ConnectFromEnv also supports these)
+run-dev-split:
+	PGHOST=localhost PGPORT=$(POSTGRES_PORT) PGUSER=$(POSTGRES_USER) PGPASSWORD=$(POSTGRES_PASSWORD) PGDATABASE=$(POSTGRES_DB) PGSSLMODE=disable APPLY_MIGRATIONS=$(APPLY_MIGRATIONS) go run ./server
+
+# Print resolved environment values for verification
+env-print:
+	@echo "POSTGRES_USER=$(POSTGRES_USER)"
+	@echo "POSTGRES_PASSWORD=$(POSTGRES_PASSWORD)"
+	@echo "POSTGRES_DB=$(POSTGRES_DB)"
+	@echo "POSTGRES_PORT=$(POSTGRES_PORT)"
+	@echo "APPLY_MIGRATIONS=$(APPLY_MIGRATIONS)"
+	@echo "DATABASE_URL=$(DATABASE_URL)"
 
 test:
 	go test ./...
