@@ -39,38 +39,50 @@ func validateTestID(id string) error {
 	return nil
 }
 
-func (s *EventServer) ReportTestStart(ctx context.Context, in *events.TestStartEventRequest) (*observer.AckResponse, error) {
+func (s *EventServer) ReportTestBegin(ctx context.Context, in *events.TestBeginEventRequest) (*observer.AckResponse, error) {
 	if in == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
 	}
-	if err := validateTestID(in.TestId); err != nil {
+	if err := validateTestID(in.TestCase.Id); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	s.logger.Info("test start", "test_id", in.TestId, "name", in.TestName, "metadata_count", len(in.Metadata))
-	return &observer.AckResponse{Success: true, Message: "start received: " + in.TestId}, nil
+	s.logger.Info("test start", "test_id", in.TestCase.Id, "name", in.TestCase.Name, "metadata_count", len(in.TestCase.Metadata))
+	return &observer.AckResponse{Success: true, Message: "start received: " + in.TestCase.Id}, nil
 }
 
-func (s *EventServer) ReportTestFinish(ctx context.Context, in *events.TestFinishEventRequest) (*observer.AckResponse, error) {
+func (s *EventServer) ReportTestEnd(ctx context.Context, in *events.TestEndEventRequest) (*observer.AckResponse, error) {
 	if in == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
 	}
-	if err := validateTestID(in.TestId); err != nil {
+	if err := validateTestID(in.TestCase.Id); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	s.logger.Info("test finish", "test_id", in.TestId, "end_time", tsToTime(in.EndTime))
-	return &observer.AckResponse{Success: true, Message: "finish received: " + in.TestId}, nil
+	s.logger.Info("test finish", "test_id", in.TestCase.Id, "status", in.TestCase.Status)
+	return &observer.AckResponse{Success: true, Message: "finish received: " + in.TestCase.Id}, nil
 }
 
-func (s *EventServer) ReportTestStep(ctx context.Context, in *events.TestStepEventRequest) (*observer.AckResponse, error) {
+func (s *EventServer) ReportStepBegin(ctx context.Context, in *events.StepBeginEventRequest) (*observer.AckResponse, error) {
 	if in == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
 	}
-	if err := validateTestID(in.TestId); err != nil {
+	if err := validateTestID(in.Step.TestId); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	// Logging limited fields (TestId); extend when proto adds step-specific identifiers.
-	s.logger.Info("test step", "test_id", in.TestId)
-	return &observer.AckResponse{Success: true, Message: "step received: " + in.TestId}, nil
+	s.logger.Info("test step", "test_id", in.Step.TestId)
+	return &observer.AckResponse{Success: true, Message: "step received: " + in.Step.TestId}, nil
+}
+
+func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if err := validateTestID(in.Step.TestId); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	// Logging limited fields (TestId); extend when proto adds step-specific identifiers.
+	s.logger.Info("test step end", "test_id", in.Step.TestId, "status", in.Step.Status)
+	return &observer.AckResponse{Success: true, Message: "step end received: " + in.Step.TestId}, nil
 }
 
 func tsToTime(ts interface{ GetSeconds() int64; GetNanos() int32 }) time.Time {

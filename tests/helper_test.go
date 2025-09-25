@@ -6,12 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stanterprise/proto-go/testsystem/v1/common"
+	entities "github.com/stanterprise/proto-go/testsystem/v1/entities"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	observer "github.com/stanterprise/proto-go/testsystem/v1/observer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // dialBufConn returns a client connection to the in-process gRPC server.
@@ -33,17 +34,23 @@ func TestReportLifecycle(t *testing.T) {
     ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
     defer cancel()
 
-    _, err := client.ReportTestStart(ctx, &events.TestStartEventRequest{
-        TestId:    "test-id",
-        TestName:  "test-name",
-        StartTime: timestamppb.New(time.Now()),
-        Metadata:  map[string]string{"k": "v"},
+    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{
+        TestCase: &entities.TestCase{
+            Id:      "test-id",
+            Name:    "test-name",
+            Metadata: map[string]string{"k": "v"},
+        },
+        
     })
     if err != nil { t.Fatalf("start failed: %v", err) }
 
-    _, err = client.ReportTestFinish(ctx, &events.TestFinishEventRequest{
-        TestId:  "test-id",
-        EndTime: timestamppb.New(time.Now()),
+    _, err = client.ReportTestEnd(ctx, &events.TestEndEventRequest{
+        TestCase: &entities.TestCase{
+            Id:     "test-id",
+            Status: common.TestStatus_PASSED,
+        },
+        // EndTime is optional; server uses current time if not provided.
+
     })
     if err != nil { t.Fatalf("finish failed: %v", err) }
 }
@@ -56,7 +63,7 @@ func TestReportStartInvalidID(t *testing.T) {
     ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
     defer cancel()
 
-    _, err := client.ReportTestStart(ctx, &events.TestStartEventRequest{ TestId: "" })
+    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCase{Id: ""}})
     if err == nil { t.Fatalf("expected error for empty id") }
     st, ok := status.FromError(err)
     if !ok { t.Fatalf("expected status error, got %v", err) }
@@ -71,16 +78,16 @@ func TestReportStep(t *testing.T) {
     defer cancel()
 
     // Must start test first
-    _, err := client.ReportTestStart(ctx, &events.TestStartEventRequest{TestId: "tid", TestName: "n"})
+    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCase{Id: "tid", Name: "n"}})
     if err != nil { t.Fatalf("start failed: %v", err) }
 
-    _, err = client.ReportTestStep(ctx, &events.TestStepEventRequest{TestId: "tid"})
+    _, err = client.ReportStepBegin(ctx, &events.StepBeginEventRequest{Step: &entities.Step{TestId: "tid"}})
     if err != nil { t.Fatalf("step failed: %v", err) }
 }
 
 func TestReportStartInvalidTable(t *testing.T) {
-    cases := []struct{ name string; req *events.TestStartEventRequest }{
-        {"empty-id", &events.TestStartEventRequest{TestId: ""}},
+    cases := []struct{ name string; req *events.TestBeginEventRequest }{
+        {"empty-id", &events.TestBeginEventRequest{TestCase: &entities.TestCase{Id: ""}}},
         {"nil-req", nil},
     }
     for _, c := range cases {
@@ -90,7 +97,7 @@ func TestReportStartInvalidTable(t *testing.T) {
             client := observer.NewTestEventCollectorClient(conn)
             ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
             defer cancel()
-            _, err := client.ReportTestStart(ctx, c.req)
+            _, err := client.ReportTestBegin(ctx, c.req)
             if err == nil { t.Fatalf("expected error for case %s", c.name) }
             st, ok := status.FromError(err)
             if !ok { t.Fatalf("expected status error") }
