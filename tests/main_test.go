@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 	testBufListener = bufconn.Listen(bufSize)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	testGRPCServer = obsrv.NewGRPCServer(logger)
-	obsrv.RegisterServices(testGRPCServer, logger)
+	obsrv.RegisterServices(testGRPCServer, logger, nil)
 	go func() {
 		_ = testGRPCServer.Serve(&listenerWrapper{Listener: testBufListener})
 	}()

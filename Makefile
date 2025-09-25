@@ -7,6 +7,7 @@ PROTOC_GEN_GO := $(GOBIN)/protoc-gen-go
 PROTOC_GEN_GO_GRPC := $(GOBIN)/protoc-gen-go-grpc
 
 .PHONY: all build run test lint proto tools clean
+ .PHONY: db-up db-down db-logs db-psql
 
 all: build
 
@@ -41,3 +42,17 @@ tools: $(PROTOC_GEN_GO) $(PROTOC_GEN_GO_GRPC)
 
 clean:
 	rm -rf dist
+
+# Docker Postgres helpers
+db-up:
+	docker compose up -d db
+
+db-down:
+	docker compose down -v
+
+db-logs:
+	docker compose logs -f db
+
+# Open psql in the container
+db-psql:
+	docker compose exec -e PGPASSWORD=$${POSTGRES_PASSWORD:-postgres} db psql -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-observer}

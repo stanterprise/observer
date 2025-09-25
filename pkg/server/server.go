@@ -13,19 +13,21 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 type EventServer struct {
 	observer.UnimplementedTestEventCollectorServer
 	logger *slog.Logger
+	db     *gorm.DB
 }
 
 // New returns a new EventServer. If logger is nil, a no-op logger is used.
-func New(logger *slog.Logger) *EventServer {
+func New(logger *slog.Logger, db *gorm.DB) *EventServer {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}
-	return &EventServer{logger: logger}
+	return &EventServer{logger: logger, db: db}
 }
 
 // noopWriter implements io.Writer but drops logs when no logger provided.
@@ -91,8 +93,8 @@ func tsToTime(ts interface{ GetSeconds() int64; GetNanos() int32 }) time.Time {
 }
 
 // RegisterServices keeps backward compatibility; returns the created server for further customization in callers.
-func RegisterServices(s *grpc.Server, logger *slog.Logger) *EventServer {
-	srv := New(logger)
+func RegisterServices(s *grpc.Server, logger *slog.Logger, db *gorm.DB) *EventServer {
+	srv := New(logger, db)
 	observer.RegisterTestEventCollectorServer(s, srv)
 	return srv
 }

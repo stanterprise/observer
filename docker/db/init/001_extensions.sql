@@ -1,0 +1,4 @@
+-- Initialization scripts in this folder are run automatically on first container start.
+-- Add database-level setup here (schemas, extensions, seed data, roles, etc.).
+-- Example: uncomment if you need UUID generation
+-- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
