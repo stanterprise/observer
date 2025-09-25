@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	m "github.com/stanterprise/observer/pkg/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	observer "github.com/stanterprise/proto-go/testsystem/v1/observer"
 	grpc "google.golang.org/grpc"
@@ -14,6 +15,7 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type EventServer struct {
@@ -45,10 +47,34 @@ func (s *EventServer) ReportTestBegin(ctx context.Context, in *events.TestBeginE
 	if in == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
 	}
+	if in.TestCase == nil {
+		return nil, status.Error(codes.InvalidArgument, "test_case is required")
+	}
 	if err := validateTestID(in.TestCase.Id); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	s.logger.Info("test start", "test_id", in.TestCase.Id, "name", in.TestCase.Name, "metadata_count", len(in.TestCase.Metadata))
+
+	// Persist or update TestCase if DB is configured.
+	if s.db != nil {
+		// Convert metadata map[string]string to datatypes.JSONMap (map[string]any)
+		md := map[string]any{}
+		for k, v := range in.TestCase.Metadata {
+			md[k] = v
+		}
+		tc := &m.TestCase{
+			ID:       in.TestCase.Id,
+			Name:     in.TestCase.Name,
+			Metadata: md,
+		}
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"name", "metadata", "updated_at"}),
+		}).Create(tc).Error; err != nil {
+			s.logger.Error("persist test start failed", "test_id", in.TestCase.Id, "error", err)
+			return nil, status.Error(codes.Internal, "database error")
+		}
+	}
 	return &observer.AckResponse{Success: true, Message: "start received: " + in.TestCase.Id}, nil
 }
 
@@ -56,10 +82,29 @@ func (s *EventServer) ReportTestEnd(ctx context.Context, in *events.TestEndEvent
 	if in == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
 	}
+	if in.TestCase == nil {
+		return nil, status.Error(codes.InvalidArgument, "test_case is required")
+	}
 	if err := validateTestID(in.TestCase.Id); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	s.logger.Info("test finish", "test_id", in.TestCase.Id, "status", in.TestCase.Status)
+
+	// Upsert status on finish if DB is configured.
+	if s.db != nil {
+		statusStr := in.TestCase.Status.String()
+		tc := &m.TestCase{
+			ID:     in.TestCase.Id,
+			Status: statusStr,
+		}
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "updated_at"}),
+		}).Create(tc).Error; err != nil {
+			s.logger.Error("persist test end failed", "test_id", in.TestCase.Id, "error", err)
+			return nil, status.Error(codes.Internal, "database error")
+		}
+	}
 	return &observer.AckResponse{Success: true, Message: "finish received: " + in.TestCase.Id}, nil
 }
 
@@ -67,11 +112,22 @@ func (s *EventServer) ReportStepBegin(ctx context.Context, in *events.StepBeginE
 	if in == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
 	}
+	if in.Step == nil {
+		return nil, status.Error(codes.InvalidArgument, "step is required")
+	}
 	if err := validateTestID(in.Step.TestId); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	// Logging limited fields (TestId); extend when proto adds step-specific identifiers.
 	s.logger.Info("test step", "test_id", in.Step.TestId)
+
+	if s.db != nil {
+		st := &m.Step{TestID: in.Step.TestId, Status: "RUNNING"}
+		if err := s.db.WithContext(ctx).Create(st).Error; err != nil {
+			s.logger.Error("persist step begin failed", "test_id", in.Step.TestId, "error", err)
+			return nil, status.Error(codes.Internal, "database error")
+		}
+	}
 	return &observer.AckResponse{Success: true, Message: "step received: " + in.Step.TestId}, nil
 }
 
@@ -79,18 +135,42 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 	if in == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
 	}
+	if in.Step == nil {
+		return nil, status.Error(codes.InvalidArgument, "step is required")
+	}
 	if err := validateTestID(in.Step.TestId); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	// Logging limited fields (TestId); extend when proto adds step-specific identifiers.
 	s.logger.Info("test step end", "test_id", in.Step.TestId, "status", in.Step.Status)
+
+	if s.db != nil {
+		// Update the most recent step for this test to the finished status.
+		var step m.Step
+		tx := s.db.WithContext(ctx).Where("test_id = ?", in.Step.TestId).Order("created_at DESC").Limit(1).Take(&step)
+		if tx.Error != nil {
+			if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+				// If no step exists, create one with the end status to ensure persistence.
+				st := &m.Step{TestID: in.Step.TestId, Status: in.Step.Status.String()}
+				if err := s.db.WithContext(ctx).Create(st).Error; err != nil {
+					s.logger.Error("persist step end (create) failed", "test_id", in.Step.TestId, "error", err)
+					return nil, status.Error(codes.Internal, "database error")
+				}
+			} else {
+				s.logger.Error("query latest step failed", "test_id", in.Step.TestId, "error", tx.Error)
+				return nil, status.Error(codes.Internal, "database error")
+			}
+		} else {
+			if err := s.db.WithContext(ctx).Model(&step).Update("status", in.Step.Status.String()).Error; err != nil {
+				s.logger.Error("update step end failed", "test_id", in.Step.TestId, "step_id", step.ID, "error", err)
+				return nil, status.Error(codes.Internal, "database error")
+			}
+		}
+	}
 	return &observer.AckResponse{Success: true, Message: "step end received: " + in.Step.TestId}, nil
 }
 
-func tsToTime(ts interface{ GetSeconds() int64; GetNanos() int32 }) time.Time {
-	if ts == nil { return time.Time{} }
-	return time.Unix(ts.GetSeconds(), int64(ts.GetNanos()))
-}
+// Note: timestamp conversion helpers will be added when timestamp fields are persisted.
 
 // RegisterServices keeps backward compatibility; returns the created server for further customization in callers.
 func RegisterServices(s *grpc.Server, logger *slog.Logger, db *gorm.DB) *EventServer {
