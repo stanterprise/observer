@@ -3,7 +3,7 @@ module github.com/stanterprise/observer
 go 1.23.0
 
 require (
-	github.com/stanterprise/proto-go v0.0.7
+	github.com/stanterprise/proto-go v0.0.8
 	google.golang.org/grpc v1.73.0
 )
 

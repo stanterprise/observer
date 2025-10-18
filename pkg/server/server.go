@@ -53,7 +53,7 @@ func (s *EventServer) ReportTestBegin(ctx context.Context, in *events.TestBeginE
 	if err := validateTestID(in.TestCase.Id); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	s.logger.Info("test start", "test_id", in.TestCase.Id, "name", in.TestCase.Name, "metadata_count", len(in.TestCase.Metadata))
+	s.logger.Info("test start", "run_id", in.TestCase.RunId, "title", in.TestCase.Title, "metadata_count", len(in.TestCase.Metadata))
 
 	// Persist or update TestCase if DB is configured.
 	if s.db != nil {
@@ -62,16 +62,17 @@ func (s *EventServer) ReportTestBegin(ctx context.Context, in *events.TestBeginE
 		for k, v := range in.TestCase.Metadata {
 			md[k] = v
 		}
-		tc := &m.TestCase{
-			ID:       in.TestCase.Id,
-			Name:     in.TestCase.Name,
+		tc := &m.TestCaseRun{
+			RunID:    in.TestCase.RunId,
+			Title:    in.TestCase.Title,
 			Metadata: md,
+			ID:       in.TestCase.Id,
 		}
 		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"name", "metadata", "updated_at"}),
+			DoUpdates: clause.AssignmentColumns([]string{"title", "metadata", "updated_at"}),
 		}).Create(tc).Error; err != nil {
-			s.logger.Error("persist test start failed", "test_id", in.TestCase.Id, "error", err)
+			s.logger.Error("persist test start failed", "id", in.TestCase.Id, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
 		}
 	}
@@ -85,27 +86,27 @@ func (s *EventServer) ReportTestEnd(ctx context.Context, in *events.TestEndEvent
 	if in.TestCase == nil {
 		return nil, status.Error(codes.InvalidArgument, "test_case is required")
 	}
-	if err := validateTestID(in.TestCase.Id); err != nil {
+	if err := validateTestID(in.TestCase.RunId); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	s.logger.Info("test finish", "test_id", in.TestCase.Id, "status", in.TestCase.Status)
+	s.logger.Info("test finish", "run_id", in.TestCase.RunId, "status", in.TestCase.Status)
 
 	// Upsert status on finish if DB is configured.
 	if s.db != nil {
 		statusStr := in.TestCase.Status.String()
-		tc := &m.TestCase{
-			ID:     in.TestCase.Id,
+		tc := &m.TestCaseRun{
+			RunID:  in.TestCase.RunId,
 			Status: statusStr,
 		}
 		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "id"}},
+			Columns:   []clause.Column{{Name: "run_id"}},
 			DoUpdates: clause.AssignmentColumns([]string{"status", "updated_at"}),
 		}).Create(tc).Error; err != nil {
-			s.logger.Error("persist test end failed", "test_id", in.TestCase.Id, "error", err)
+			s.logger.Error("persist test end failed", "run_id", in.TestCase.RunId, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
 		}
 	}
-	return &observer.AckResponse{Success: true, Message: "finish received: " + in.TestCase.Id}, nil
+	return &observer.AckResponse{Success: true, Message: "finish received: " + in.TestCase.RunId}, nil
 }
 
 func (s *EventServer) ReportStepBegin(ctx context.Context, in *events.StepBeginEventRequest) (*observer.AckResponse, error) {
@@ -115,20 +116,20 @@ func (s *EventServer) ReportStepBegin(ctx context.Context, in *events.StepBeginE
 	if in.Step == nil {
 		return nil, status.Error(codes.InvalidArgument, "step is required")
 	}
-	if err := validateTestID(in.Step.TestId); err != nil {
+	if err := validateTestID(in.Step.TestCaseRunId); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	// Logging limited fields (TestId); extend when proto adds step-specific identifiers.
-	s.logger.Info("test step", "test_id", in.Step.TestId)
+	// Logging limited fields (RunId); extend when proto adds step-specific identifiers.
+	s.logger.Info("test step", "run_id", in.Step.TestCaseRunId)
 
 	if s.db != nil {
-		st := &m.Step{TestID: in.Step.TestId, Status: "RUNNING"}
+		st := &m.StepRun{TestCaseRunID: in.Step.TestCaseRunId, Status: "RUNNING"}
 		if err := s.db.WithContext(ctx).Create(st).Error; err != nil {
-			s.logger.Error("persist step begin failed", "test_id", in.Step.TestId, "error", err)
+			s.logger.Error("persist step begin failed", "run_id", in.Step.TestCaseRunId, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
 		}
 	}
-	return &observer.AckResponse{Success: true, Message: "step received: " + in.Step.TestId}, nil
+	return &observer.AckResponse{Success: true, Message: "step received: " + in.Step.TestCaseRunId}, nil
 }
 
 func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEventRequest) (*observer.AckResponse, error) {
@@ -138,36 +139,36 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 	if in.Step == nil {
 		return nil, status.Error(codes.InvalidArgument, "step is required")
 	}
-	if err := validateTestID(in.Step.TestId); err != nil {
+	if err := validateTestID(in.Step.TestCaseRunId); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	// Logging limited fields (TestId); extend when proto adds step-specific identifiers.
-	s.logger.Info("test step end", "test_id", in.Step.TestId, "status", in.Step.Status)
+	// Logging limited fields (RunId); extend when proto adds step-specific identifiers.
+	s.logger.Info("test step end", "run_id", in.Step.TestCaseRunId, "status", in.Step.Status)
 
 	if s.db != nil {
 		// Update the most recent step for this test to the finished status.
-		var step m.Step
-		tx := s.db.WithContext(ctx).Where("test_id = ?", in.Step.TestId).Order("created_at DESC").Limit(1).Take(&step)
+		var step m.StepRun
+		tx := s.db.WithContext(ctx).Where("test_case_run_id = ?", in.Step.TestCaseRunId).Order("created_at DESC").Limit(1).Take(&step)
 		if tx.Error != nil {
 			if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 				// If no step exists, create one with the end status to ensure persistence.
-				st := &m.Step{TestID: in.Step.TestId, Status: in.Step.Status.String()}
+				st := &m.StepRun{TestCaseRunID: in.Step.TestCaseRunId, Status: in.Step.Status.String()}
 				if err := s.db.WithContext(ctx).Create(st).Error; err != nil {
-					s.logger.Error("persist step end (create) failed", "test_id", in.Step.TestId, "error", err)
+					s.logger.Error("persist step end (create) failed", "run_id", in.Step.TestCaseRunId, "error", err)
 					return nil, status.Error(codes.Internal, "database error")
 				}
 			} else {
-				s.logger.Error("query latest step failed", "test_id", in.Step.TestId, "error", tx.Error)
+				s.logger.Error("query latest step failed", "run_id", in.Step.TestCaseRunId, "error", tx.Error)
 				return nil, status.Error(codes.Internal, "database error")
 			}
 		} else {
 			if err := s.db.WithContext(ctx).Model(&step).Update("status", in.Step.Status.String()).Error; err != nil {
-				s.logger.Error("update step end failed", "test_id", in.Step.TestId, "step_id", step.ID, "error", err)
+				s.logger.Error("update step end failed", "run_id", in.Step.TestCaseRunId, "step_id", step.ID, "error", err)
 				return nil, status.Error(codes.Internal, "database error")
 			}
 		}
 	}
-	return &observer.AckResponse{Success: true, Message: "step end received: " + in.Step.TestId}, nil
+	return &observer.AckResponse{Success: true, Message: "step end received: " + in.Step.TestCaseRunId}, nil
 }
 
 // Note: timestamp conversion helpers will be added when timestamp fields are persisted.

@@ -35,9 +35,9 @@ func TestReportLifecycle(t *testing.T) {
     defer cancel()
 
     _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{
-        TestCase: &entities.TestCase{
-            Id:      "test-id",
-            Name:    "test-name",
+        TestCase: &entities.TestCaseRun{
+            RunId:      "test-id",
+            Title:    "test-name",
             Metadata: map[string]string{"k": "v"},
         },
         
@@ -45,8 +45,8 @@ func TestReportLifecycle(t *testing.T) {
     if err != nil { t.Fatalf("start failed: %v", err) }
 
     _, err = client.ReportTestEnd(ctx, &events.TestEndEventRequest{
-        TestCase: &entities.TestCase{
-            Id:     "test-id",
+        TestCase: &entities.TestCaseRun{
+            RunId:  "test-id",
             Status: common.TestStatus_PASSED,
         },
         // EndTime is optional; server uses current time if not provided.
@@ -63,7 +63,7 @@ func TestReportStartInvalidID(t *testing.T) {
     ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
     defer cancel()
 
-    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCase{Id: ""}})
+    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{Id: ""}})
     if err == nil { t.Fatalf("expected error for empty id") }
     st, ok := status.FromError(err)
     if !ok { t.Fatalf("expected status error, got %v", err) }
@@ -78,16 +78,16 @@ func TestReportStep(t *testing.T) {
     defer cancel()
 
     // Must start test first
-    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCase{Id: "tid", Name: "n"}})
+    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{RunId: "tid", Title: "n"}})
     if err != nil { t.Fatalf("start failed: %v", err) }
 
-    _, err = client.ReportStepBegin(ctx, &events.StepBeginEventRequest{Step: &entities.Step{TestId: "tid"}})
+    _, err = client.ReportStepBegin(ctx, &events.StepBeginEventRequest{Step: &entities.StepRun{RunId: "tid", TestCaseRunId: ""}})
     if err != nil { t.Fatalf("step failed: %v", err) }
 }
 
 func TestReportStartInvalidTable(t *testing.T) {
     cases := []struct{ name string; req *events.TestBeginEventRequest }{
-        {"empty-id", &events.TestBeginEventRequest{TestCase: &entities.TestCase{Id: ""}}},
+        {"empty-id", &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{RunId: ""}}},
         {"nil-req", nil},
     }
     for _, c := range cases {

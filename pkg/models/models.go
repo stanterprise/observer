@@ -6,21 +6,29 @@ import (
 	"gorm.io/datatypes"
 )
 
-// TestCase represents a collected test case entity.
-type TestCase struct {
-    ID        string             `gorm:"primaryKey;type:text"`
-    Name      string             `gorm:"type:text"`
-    Status    string             `gorm:"type:text"`
-    Metadata  datatypes.JSONMap  `gorm:"type:jsonb"`
-    CreatedAt time.Time
-    UpdatedAt time.Time
+// TestCaseRun corresponds to entities.TestCaseRun in protobuf definitions.
+// Primary key is the run_id coming from the client.
+type TestCaseRun struct {
+    ID         string            `gorm:"column:id;primaryKey;type:text"`
+    RunID      string            `gorm:"column:run_id;type:text"`
+    Title      string            `gorm:"column:title;type:text"`
+    Status     string            `gorm:"column:status;type:text"`
+    Metadata   datatypes.JSONMap `gorm:"column:metadata;type:jsonb"`
+    CreatedAt  time.Time         `gorm:"column:created_at"`
+    UpdatedAt  time.Time         `gorm:"column:updated_at"`
 }
 
-// Step represents a step inside a test case.
-type Step struct {
-    ID        uint      `gorm:"primaryKey"`
-    TestID    string    `gorm:"index;type:text"`
-    Status    string    `gorm:"type:text"`
-    CreatedAt time.Time
-    UpdatedAt time.Time
+func (TestCaseRun) TableName() string { return "test_case_runs" }
+
+// StepRun corresponds to entities.StepRun in protobuf definitions.
+// We persist an auto-increment ID for ordering, and link to the parent test case via test_case_run_id.
+type StepRun struct {
+    ID             string      `gorm:"column:id;primaryKey"`
+    RunID          string      `gorm:"column:run_id;type:text"`
+    TestCaseRunID  string      `gorm:"column:test_case_run_id;type:text"`
+    Status         string      `gorm:"column:status;type:text"`
+    CreatedAt      time.Time   `gorm:"column:created_at"`
+    UpdatedAt      time.Time   `gorm:"column:updated_at"`
 }
+
+func (StepRun) TableName() string { return "step_runs" }
