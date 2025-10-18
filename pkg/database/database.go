@@ -17,9 +17,6 @@ import (
 // Connect connects to Postgres using the provided DSN and returns a GORM DB.
 // Example DSN: postgres://user:pass@localhost:5432/app?sslmode=disable
 func Connect(dsn string, l *slog.Logger) (*gorm.DB, error) {
-    if l == nil {
-        l = slog.Default()
-    }
     newLogger := logger.New(
         log.New(os.Stdout, "gorm ", log.LstdFlags),
         logger.Config{
@@ -37,8 +34,8 @@ func Connect(dsn string, l *slog.Logger) (*gorm.DB, error) {
         return nil, fmt.Errorf("sql db: %w", err)
     }
     // Sensible pool defaults; callers can tune if needed.
-    sqlDB.SetMaxOpenConns(10)
-    sqlDB.SetMaxIdleConns(5)
+    sqlDB.SetMaxOpenConns(50)
+    sqlDB.SetMaxIdleConns(10)
     sqlDB.SetConnMaxLifetime(30 * time.Minute)
     if err := sqlDB.Ping(); err != nil {
         return nil, fmt.Errorf("ping: %w", err)
