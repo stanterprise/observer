@@ -1,21 +1,41 @@
 GOBIN ?= $(shell go env GOBIN)
 ifeq ($(GOBIN),)
-  GOBIN := $(shell go env GOPATH)/bin
+	GOBIN := $(shell go env GOPATH)/bin
 endif
 
+# Binaries and locations
+BIN_DIR := bin
+APP_BIN := $(BIN_DIR)/observer
+
+# Tooling
 PROTOC_GEN_GO := $(GOBIN)/protoc-gen-go
 PROTOC_GEN_GO_GRPC := $(GOBIN)/protoc-gen-go-grpc
+GOLANGCI_LINT := $(GOBIN)/golangci-lint
+PROTOC ?= protoc
+PROTO_DIR ?= proto
 
-.PHONY: all build run run-dev run-dev-split env-print test lint proto tools clean
- .PHONY: db-up db-down db-logs db-psql
+# Pinned tool versions (adjust as needed)
+PROTOC_GEN_GO_VERSION ?= v1.36.6
+PROTOC_GEN_GO_GRPC_VERSION ?= v1.5.1
+GOLANGCI_LINT_VERSION ?= v1.60.3
 
-all: build
+.PHONY: all help build run run-dev run-dev-split env-print test test-race test-cover cover-report fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset
 
-build:
-	go build ./...
+.DEFAULT_GOAL := help
 
-run: build
-	go run ./server
+all: build ## Build the application
+
+help: ## Show this help
+	@awk 'BEGIN {FS = ":.*##"}; /^[a-zA-Z0-9_.-]+:.*##/ { printf "\033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+
+$(APP_BIN): ## Build the server binary
+	@mkdir -p $(BIN_DIR)
+	go build -o $(APP_BIN) ./server
+
+build: $(APP_BIN) ## Build shortcut
+
+run: build ## Run the server using the built binary
+	./$(APP_BIN)
 
 # Defaults align with docker-compose.yml and .env.example
 POSTGRES_USER ?= postgres
@@ -28,15 +48,15 @@ APPLY_MIGRATIONS ?= 1
 DATABASE_URL := postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable
 
 # Run the API with DATABASE_URL and optional automigrate
-run-dev:
-	DATABASE_URL='$(DATABASE_URL)' APPLY_MIGRATIONS=$(APPLY_MIGRATIONS) go run ./server
+run-dev: build ## Run server with DATABASE_URL env
+	DATABASE_URL='$(DATABASE_URL)' APPLY_MIGRATIONS=$(APPLY_MIGRATIONS) ./$(APP_BIN)
 
 # Run the API using split PG* environment variables (ConnectFromEnv also supports these)
-run-dev-split:
-	PGHOST=localhost PGPORT=$(POSTGRES_PORT) PGUSER=$(POSTGRES_USER) PGPASSWORD=$(POSTGRES_PASSWORD) PGDATABASE=$(POSTGRES_DB) PGSSLMODE=disable APPLY_MIGRATIONS=$(APPLY_MIGRATIONS) go run ./server
+run-dev-split: build ## Run server with individual PG* env vars
+	PGHOST=localhost PGPORT=$(POSTGRES_PORT) PGUSER=$(POSTGRES_USER) PGPASSWORD=$(POSTGRES_PASSWORD) PGDATABASE=$(POSTGRES_DB) PGSSLMODE=disable APPLY_MIGRATIONS=$(APPLY_MIGRATIONS) ./$(APP_BIN)
 
 # Print resolved environment values for verification
-env-print:
+env-print: ## Print effective DB-related environment
 	@echo "POSTGRES_USER=$(POSTGRES_USER)"
 	@echo "POSTGRES_PASSWORD=$(POSTGRES_PASSWORD)"
 	@echo "POSTGRES_DB=$(POSTGRES_DB)"
@@ -44,42 +64,80 @@ env-print:
 	@echo "APPLY_MIGRATIONS=$(APPLY_MIGRATIONS)"
 	@echo "DATABASE_URL=$(DATABASE_URL)"
 
-test:
+test: ## Run unit tests
 	go test ./...
 
-lint:
-	@echo "(placeholder) integrate golangci-lint or staticcheck"
+test-race: ## Run tests with race detector
+	go test -race ./...
 
-proto: $(PROTOC_GEN_GO) $(PROTOC_GEN_GO_GRPC)
-	@echo "Generating protobuf stubs (proto/service.proto must exist)"
-	protoc \
-		--go_out=. \
-		--go_opt=paths=source_relative \
-		--go-grpc_out=. \
-		--go-grpc_opt=paths=source_relative \
-		proto/service.proto
+test-cover: ## Run tests with coverage and write coverage.out
+	go test -coverprofile=coverage.out ./...
 
-$(PROTOC_GEN_GO):
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+cover-report: ## Open an HTML coverage report (requires test-cover first)
+	@([ -f coverage.out ] && go tool cover -html=coverage.out || (echo "coverage.out not found; run 'make test-cover' first" && false))
 
-$(PROTOC_GEN_GO_GRPC):
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+fmt: ## Format code
+	go fmt ./...
 
-tools: $(PROTOC_GEN_GO) $(PROTOC_GEN_GO_GRPC)
+vet: ## Vet code
+	go vet ./...
 
-clean:
-	rm -rf dist
+tidy: ## Tidy go.mod/go.sum
+	go mod tidy
+
+generate: ## Run go generate
+	go generate ./...
+
+lint: $(GOLANGCI_LINT) ## Run golangci-lint
+	$(GOLANGCI_LINT) run ./...
+
+proto: $(PROTOC_GEN_GO) $(PROTOC_GEN_GO_GRPC) ## Generate protobuf stubs (if proto/*.proto exists)
+	@FILES=$$(find "$(PROTO_DIR)" -name '*.proto' 2>/dev/null || true); \
+	if [ -z "$$FILES" ]; then \
+	  echo "No .proto files found in $(PROTO_DIR); skipping."; \
+	else \
+	  if ! command -v $(PROTOC) >/dev/null 2>&1; then \
+	    echo "Error: protoc not found. Please install Protocol Buffers compiler."; exit 1; \
+	  fi; \
+	  echo "Generating protobuf stubs for:" $$FILES; \
+	  $(PROTOC) \
+	    --go_out=. \
+	    --go_opt=paths=source_relative \
+	    --go-grpc_out=. \
+	    --go-grpc_opt=paths=source_relative \
+	    $$FILES; \
+	fi
+
+$(PROTOC_GEN_GO): ## Install protoc-gen-go (pinned)
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@$(PROTOC_GEN_GO_VERSION)
+
+$(PROTOC_GEN_GO_GRPC): ## Install protoc-gen-go-grpc (pinned)
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@$(PROTOC_GEN_GO_GRPC_VERSION)
+
+$(GOLANGCI_LINT): ## Install golangci-lint (pinned)
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+tools: $(PROTOC_GEN_GO) $(PROTOC_GEN_GO_GRPC) $(GOLANGCI_LINT) ## Install dev tools
+
+clean: ## Remove build and coverage artifacts
+	rm -rf "$(BIN_DIR)" coverage.out
+
+clean-cache: ## Clean Go build and test caches
+	go clean -cache -testcache
 
 # Docker Postgres helpers
-db-up:
+db-up: ## Start Postgres container
 	docker compose up -d db
 
-db-down:
+db-down: ## Stop containers and remove volumes
 	docker compose down -v
 
-db-logs:
+db-logs: ## Tail Postgres logs
 	docker compose logs -f db
 
 # Open psql in the container
-db-psql:
+db-psql: ## Open psql against the db container
 	docker compose exec -e PGPASSWORD=$${POSTGRES_PASSWORD:-postgres} db psql -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-observer}
+
+db-reset: ## Reset database by recreating container and volume
+	docker compose down -v && docker compose up -d db
