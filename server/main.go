@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net"
 	"os"
@@ -47,18 +48,26 @@ func main() {
 	server.RegisterServices(grpcServer, logger, db)
 	logger.Info("server starting", "addr", lis.Addr().String())
 
-	// Run server in separate goroutine.
+	// Run server in separate goroutine and capture fatal serve errors.
+	errChan := make(chan error, 1)
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {
-			logger.Error("serve failed", "error", err)
+			errChan <- fmt.Errorf("serve failed: %w", err)
 		}
+		close(errChan)
 	}()
 
-	// Graceful shutdown handling.
+	// Graceful shutdown handling or fatal serve error.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
-	logger.Info("shutdown signal received")
+	select {
+	case sig := <-sigCh:
+		logger.Info("shutdown signal received", "signal", sig)
+	case err := <-errChan:
+		if err != nil {
+			logger.Error("server serve error", "error", err)
+		}
+	}
 
 	// Allow up to 5s for graceful stop.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -74,6 +83,15 @@ func main() {
 		grpcServer.Stop()
 	case <-done:
 		logger.Info("server stopped gracefully")
+	}
+
+	// If Serve returned an error earlier, exit non-zero.
+	select {
+	case err := <-errChan:
+		if err != nil {
+			os.Exit(1)
+		}
+	default:
 	}
 }
 

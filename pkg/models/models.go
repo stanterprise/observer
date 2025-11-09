@@ -7,7 +7,8 @@ import (
 )
 
 // TestCaseRun corresponds to entities.TestCaseRun in protobuf definitions.
-// Primary key is the run_id coming from the client.
+// Primary key is the server-side "id" provided by the client (authoritative).
+// RunID is a client-supplied external identifier and is NOT the primary key.
 type TestCaseRun struct {
     ID         string            `gorm:"column:id;primaryKey;type:text"`
     RunID      string            `gorm:"column:run_id;type:text"`

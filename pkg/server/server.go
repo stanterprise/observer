@@ -86,7 +86,7 @@ func (s *EventServer) ReportTestEnd(ctx context.Context, in *events.TestEndEvent
 	if in.TestCase == nil {
 		return nil, status.Error(codes.InvalidArgument, "test_case is required")
 	}
-	if err := validateTestID(in.TestCase.RunId); err != nil {
+	if err := validateTestID(in.TestCase.Id); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	s.logger.Info("test finish", "run_id", in.TestCase.RunId, "status", in.TestCase.Status)
@@ -95,18 +95,19 @@ func (s *EventServer) ReportTestEnd(ctx context.Context, in *events.TestEndEvent
 	if s.db != nil {
 		statusStr := in.TestCase.Status.String()
 		tc := &m.TestCaseRun{
+			ID:     in.TestCase.Id,
 			RunID:  in.TestCase.RunId,
 			Status: statusStr,
 		}
 		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "run_id"}},
+			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns([]string{"status", "updated_at"}),
 		}).Create(tc).Error; err != nil {
-			s.logger.Error("persist test end failed", "run_id", in.TestCase.RunId, "error", err)
+			s.logger.Error("persist test end failed", "id", in.TestCase.Id, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
 		}
 	}
-	return &observer.AckResponse{Success: true, Message: "finish received: " + in.TestCase.RunId}, nil
+	return &observer.AckResponse{Success: true, Message: "finish received: " + in.TestCase.Id}, nil
 }
 
 func (s *EventServer) ReportStepBegin(ctx context.Context, in *events.StepBeginEventRequest) (*observer.AckResponse, error) {
@@ -146,26 +147,30 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 	s.logger.Info("test step end", "run_id", in.Step.TestCaseRunId, "status", in.Step.Status)
 
 	if s.db != nil {
-		// Update the most recent step for this test to the finished status.
-		var step m.StepRun
-		tx := s.db.WithContext(ctx).Where("test_case_run_id = ?", in.Step.TestCaseRunId).Order("created_at DESC").Limit(1).Take(&step)
-		if tx.Error != nil {
-			if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-				// If no step exists, create one with the end status to ensure persistence.
-				st := &m.StepRun{TestCaseRunID: in.Step.TestCaseRunId, Status: in.Step.Status.String()}
-				if err := s.db.WithContext(ctx).Create(st).Error; err != nil {
-					s.logger.Error("persist step end (create) failed", "run_id", in.Step.TestCaseRunId, "error", err)
-					return nil, status.Error(codes.Internal, "database error")
+		// Make read+update atomic to avoid races among concurrent step-end reports.
+		err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			var step m.StepRun
+			// Lock the latest step row for this test case.
+			q := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("test_case_run_id = ?", in.Step.TestCaseRunId).
+				Order("created_at DESC").
+				Limit(1).Take(&step)
+			if q.Error != nil {
+				if errors.Is(q.Error, gorm.ErrRecordNotFound) {
+					// No step row exists; create one inside the tx.
+					st := &m.StepRun{TestCaseRunID: in.Step.TestCaseRunId, Status: in.Step.Status.String()}
+					if err := tx.Create(st).Error; err != nil { return err }
+					return nil
 				}
-			} else {
-				s.logger.Error("query latest step failed", "run_id", in.Step.TestCaseRunId, "error", tx.Error)
-				return nil, status.Error(codes.Internal, "database error")
+				return q.Error
 			}
-		} else {
-			if err := s.db.WithContext(ctx).Model(&step).Update("status", in.Step.Status.String()).Error; err != nil {
-				s.logger.Error("update step end failed", "run_id", in.Step.TestCaseRunId, "step_id", step.ID, "error", err)
-				return nil, status.Error(codes.Internal, "database error")
-			}
+			// Update the locked row.
+			if err := tx.Model(&step).Update("status", in.Step.Status.String()).Error; err != nil { return err }
+			return nil
+		})
+		if err != nil {
+			s.logger.Error("persist step end failed", "run_id", in.Step.TestCaseRunId, "error", err)
+			return nil, status.Error(codes.Internal, "database error")
 		}
 	}
 	return &observer.AckResponse{Success: true, Message: "step end received: " + in.Step.TestCaseRunId}, nil
