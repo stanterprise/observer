@@ -491,8 +491,8 @@ func TestReportStepEnd_UpdatesExistingStep(t *testing.T) {
 		t.Fatalf("Failed to find step: %v", err)
 	}
 
-	if step.Status != "STEP_STATUS_PASSED" {
-		t.Errorf("Step status = %v, want STEP_STATUS_PASSED", step.Status)
+	if step.Status != "PASSED" {
+		t.Errorf("Step status = %v, want PASSED", step.Status)
 	}
 }
 
@@ -520,8 +520,8 @@ func TestReportStepEnd_NoExistingStep(t *testing.T) {
 		t.Fatalf("Failed to find created step: %v", err)
 	}
 
-	if step.Status != "STEP_STATUS_PASSED" {
-		t.Errorf("Step status = %v, want STEP_STATUS_PASSED", step.Status)
+	if step.Status != "PASSED" {
+		t.Errorf("Step status = %v, want PASSED", step.Status)
 	}
 }
 

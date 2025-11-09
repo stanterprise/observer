@@ -165,7 +165,7 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 				return q.Error
 			}
 			// Update the locked row.
-			if err := tx.Model(&step).Update("status", in.Step.Status.String()).Error; err != nil { return err }
+			if err := tx.Model(&m.StepRun{}).Where("id = ?", step.ID).Update("status", in.Step.Status.String()).Error; err != nil { return err }
 			return nil
 		})
 		if err != nil {
