@@ -36,6 +36,7 @@ func TestReportLifecycle(t *testing.T) {
 
     _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{
         TestCase: &entities.TestCaseRun{
+            Id:        "test-id",
             RunId:      "test-id",
             Title:    "test-name",
             Metadata: map[string]string{"k": "v"},
@@ -46,6 +47,7 @@ func TestReportLifecycle(t *testing.T) {
 
     _, err = client.ReportTestEnd(ctx, &events.TestEndEventRequest{
         TestCase: &entities.TestCaseRun{
+            Id:     "test-id",
             RunId:  "test-id",
             Status: common.TestStatus_PASSED,
         },
@@ -78,10 +80,10 @@ func TestReportStep(t *testing.T) {
     defer cancel()
 
     // Must start test first
-    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{RunId: "tid", Title: "n"}})
+    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{Id: "test-id", RunId: "tid", Title: "n"}})
     if err != nil { t.Fatalf("start failed: %v", err) }
 
-    _, err = client.ReportStepBegin(ctx, &events.StepBeginEventRequest{Step: &entities.StepRun{RunId: "tid", TestCaseRunId: ""}})
+    _, err = client.ReportStepBegin(ctx, &events.StepBeginEventRequest{Step: &entities.StepRun{Id: "step-id", RunId: "tid", TestCaseRunId: "test-id"}})
     if err != nil { t.Fatalf("step failed: %v", err) }
 }
 
