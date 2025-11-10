@@ -1,0 +1,25 @@
+# Dockerfile for Ingestion service
+# gRPC endpoint that accepts test events and publishes to NATS
+
+FROM debian:bookworm-slim
+
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy ingestion binary
+COPY bin/ingestion /usr/local/bin/ingestion
+
+# Environment variables
+ENV PORT=50051 \
+    NATS_URL=nats://nats:4222 \
+    NATS_STREAM=tests_events \
+    NATS_SUBJECT_PREFIX=tests.events.v1
+
+# Expose gRPC port
+EXPOSE 50051
+
+# Run ingestion service
+CMD ["/usr/local/bin/ingestion"]

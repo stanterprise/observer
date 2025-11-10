@@ -1,0 +1,66 @@
+# Dockerfile for All-in-One (AIO) deployment mode
+# Single container with embedded NATS, ingestion, processor, and API services
+# Managed via s6-overlay process supervisor
+
+FROM debian:bookworm-slim
+
+# s6-overlay and NATS versions
+ARG S6_OVERLAY_VERSION=3.2.0.0
+ARG NATS_VERSION=2.10.24
+
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        sqlite3 \
+        wget \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/* && \
+    update-ca-certificates
+
+# Install NATS server
+RUN NATS_ARCH=$(dpkg --print-architecture | sed 's/amd64/amd64/; s/arm64/arm64/') && \
+    echo "Installing NATS server for architecture: ${NATS_ARCH}" && \
+    wget --no-check-certificate https://github.com/nats-io/nats-server/releases/download/v${NATS_VERSION}/nats-server-v${NATS_VERSION}-linux-${NATS_ARCH}.tar.gz && \
+    tar xzf nats-server-v${NATS_VERSION}-linux-${NATS_ARCH}.tar.gz && \
+    mv nats-server-v${NATS_VERSION}-linux-${NATS_ARCH}/nats-server /usr/local/bin/ && \
+    rm -rf nats-server-v${NATS_VERSION}-linux-${NATS_ARCH}* && \
+    chmod +x /usr/local/bin/nats-server
+
+# Install s6-overlay for process supervision
+RUN S6_ARCH=$(dpkg --print-architecture | sed 's/amd64/x86_64/; s/arm64/aarch64/') && \
+    echo "Installing s6-overlay for architecture: ${S6_ARCH}" && \
+    wget --no-check-certificate https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz && \
+    wget --no-check-certificate https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz && \
+    tar -C / -Jxpf s6-overlay-noarch.tar.xz && \
+    tar -C / -Jxpf s6-overlay-${S6_ARCH}.tar.xz && \
+    rm s6-overlay-*.tar.xz
+
+# Copy all service binaries
+COPY bin/ingestion /usr/local/bin/
+COPY bin/processor /usr/local/bin/
+COPY bin/api /usr/local/bin/
+
+# Copy s6-overlay service definitions
+COPY docker/s6-overlay/s6-rc.d /etc/s6-overlay/s6-rc.d/
+
+# Make s6 service run scripts executable
+RUN find /etc/s6-overlay/s6-rc.d -type f -name "run" -exec chmod +x {} \;
+
+# Create data directories
+RUN mkdir -p /data/artifacts /data/db && \
+    chmod -R 755 /data
+
+# Environment variables
+ENV DB_DRIVER=sqlite \
+    DATABASE_URL=/data/db/observer.db \
+    STORAGE_DRIVER=local \
+    ARTIFACTS_DIR=/data/artifacts \
+    NATS_URL=nats://localhost:4222 \
+    APPLY_MIGRATIONS=1
+
+# Expose ports
+EXPOSE 50051 8080 4222 8222
+
+# Use s6-overlay as init system
+ENTRYPOINT ["/init"]
