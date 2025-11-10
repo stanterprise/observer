@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	obsrv "github.com/stanterprise/observer/pkg/server"
 	"github.com/stanterprise/observer/pkg/publisher"
+	obsrv "github.com/stanterprise/observer/pkg/server"
 	"github.com/stanterprise/proto-go/testsystem/v1/common"
 	entities "github.com/stanterprise/proto-go/testsystem/v1/entities"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"

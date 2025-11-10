@@ -3,21 +3,23 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/stanterprise/observer/internal/database"
-	"github.com/stanterprise/observer/pkg/server"
+	"github.com/stanterprise/observer/pkg/consumer"
 )
 
 func main() {
 	var (
-		port = flag.String("port", envOr("PORT", "50052"), "TCP port to listen on")
+		natsURL      = flag.String("nats-url", envOr("NATS_URL", "nats://localhost:4222"), "NATS server URL")
+		streamName   = flag.String("stream", envOr("NATS_STREAM", "tests_events"), "NATS stream name")
+		consumerName = flag.String("consumer", envOr("NATS_CONSUMER", "processor"), "NATS consumer name")
+		batchSize    = flag.Int("batch-size", 10, "Number of messages to fetch per batch")
+		maxWait      = flag.Duration("max-wait", 5*time.Second, "Maximum wait time for messages")
 	)
 	flag.Parse()
 
@@ -40,61 +42,74 @@ func main() {
 		os.Exit(1)
 	}
 
-	addr := ":" + *port
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		logger.Error("listen failed", "error", err, "addr", addr)
-		os.Exit(1)
+	// Create NATS consumer configuration
+	cfg := consumer.NATSConsumerConfig{
+		URL:          *natsURL,
+		StreamName:   *streamName,
+		ConsumerName: *consumerName,
+		BatchSize:    *batchSize,
+		MaxWait:      *maxWait,
 	}
 
-	grpcServer := server.NewGRPCServer(logger)
-	server.RegisterServices(grpcServer, logger, db)
-	logger.Info("processor server starting", "addr", lis.Addr().String())
+	// Initialize NATS consumer
+	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, db)
+	if err != nil {
+		logger.Error("failed to create NATS consumer", "error", err)
+		os.Exit(1)
+	}
+	defer natsConsumer.Close()
 
-	// Run server in separate goroutine and capture fatal serve errors.
+	logger.Info("processor service starting",
+		"nats_url", *natsURL,
+		"stream", *streamName,
+		"consumer", *consumerName)
+
+	// Create context for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Run consumer in separate goroutine
 	errChan := make(chan error, 1)
 	go func() {
-		if err := grpcServer.Serve(lis); err != nil {
-			errChan <- fmt.Errorf("serve failed: %w", err)
+		if err := natsConsumer.Start(ctx, cfg); err != nil && err != context.Canceled {
+			errChan <- err
 		}
 		close(errChan)
 	}()
 
-	// Graceful shutdown handling or fatal serve error.
+	// Wait for shutdown signal
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
 	select {
 	case sig := <-sigCh:
 		logger.Info("shutdown signal received", "signal", sig)
 	case err := <-errChan:
 		if err != nil {
-			logger.Error("server serve error", "error", err)
-		}
-	}
-
-	// Allow up to 5s for graceful stop.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	done := make(chan struct{})
-	go func() {
-		grpcServer.GracefulStop()
-		close(done)
-	}()
-	select {
-	case <-ctx.Done():
-		logger.Warn("graceful stop timeout, forcing stop")
-		grpcServer.Stop()
-	case <-done:
-		logger.Info("processor server stopped gracefully")
-	}
-
-	// If Serve returned an error earlier, exit non-zero.
-	select {
-	case err := <-errChan:
-		if err != nil {
+			logger.Error("consumer error", "error", err)
 			os.Exit(1)
 		}
-	default:
+	}
+
+	// Cancel context to stop consumer
+	cancel()
+
+	// Allow up to 5s for graceful stop
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+
+	done := make(chan struct{})
+	go func() {
+		// Wait for consumer to finish
+		<-errChan
+		close(done)
+	}()
+
+	select {
+	case <-shutdownCtx.Done():
+		logger.Warn("graceful stop timeout")
+	case <-done:
+		logger.Info("processor service stopped gracefully")
 	}
 }
 
