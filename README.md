@@ -1,9 +1,13 @@
 # Observer Service
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/stanterprise/observer?quickstart=1)
+
 A test observability system that collects test execution events via gRPC. The system can operate in two modes:
 
 - 🧩 **All-in-One (AIO)** — Single container with embedded services for local/dev use
 - ⚙️ **Distributed Mode** — Multi-container deployment for production/CI
+
+> 💡 **Quick Start with Codespaces:** Click the badge above to launch a fully configured development environment in seconds! See [CODESPACES.md](CODESPACES.md) for details.
 
 ## Architecture
 
@@ -29,6 +33,38 @@ See detailed documentation in each component's README:
 - [Ingestion Service](./cmd/ingestion/README.md)
 - [Processor Service](./cmd/processor/README.md)
 - [API Service](./cmd/api/README.md)
+
+## Development Environment
+
+### GitHub Codespaces (Recommended)
+
+The fastest way to start developing is with GitHub Codespaces—a complete, pre-configured development environment in your browser:
+
+1. Click the **Open in Codespaces** badge at the top of this README
+2. Wait 2-3 minutes for automatic setup
+3. Start coding immediately!
+
+Codespaces includes:
+- ✅ Go 1.23 with all dev tools (gopls, golangci-lint, delve)
+- ✅ Docker and Docker Compose
+- ✅ PostgreSQL and NATS auto-started
+- ✅ VS Code with debugging and Go extensions
+- ✅ Pre-built binaries and passing tests
+
+See [CODESPACES.md](CODESPACES.md) for the complete guide.
+
+### Local Development
+
+For local development, ensure you have:
+- Go 1.23+
+- Docker and Docker Compose
+- Protocol Buffers compiler (for code generation)
+- Make
+
+Install development tools:
+```bash
+make tools
+```
 
 ## Quick Start
 
