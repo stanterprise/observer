@@ -29,7 +29,7 @@ func TestTestCaseRun_Fields(t *testing.T) {
 		"key1": "value1",
 		"key2": "value2",
 	}
-	
+
 	tc := TestCaseRun{
 		ID:        "test-123",
 		RunID:     "run-456",
@@ -59,7 +59,7 @@ func TestTestCaseRun_Fields(t *testing.T) {
 
 func TestStepRun_Fields(t *testing.T) {
 	now := time.Now()
-	
+
 	sr := StepRun{
 		ID:            "step-123",
 		RunID:         "run-456",

@@ -34,6 +34,7 @@ func New(logger *slog.Logger, db *gorm.DB) *EventServer {
 
 // noopWriter implements io.Writer but drops logs when no logger provided.
 type noopWriter struct{}
+
 func (n *noopWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 func validateTestID(id string) error {
@@ -159,13 +160,17 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 				if errors.Is(q.Error, gorm.ErrRecordNotFound) {
 					// No step row exists; create one inside the tx.
 					st := &m.StepRun{TestCaseRunID: in.Step.TestCaseRunId, Status: in.Step.Status.String()}
-					if err := tx.Create(st).Error; err != nil { return err }
+					if err := tx.Create(st).Error; err != nil {
+						return err
+					}
 					return nil
 				}
 				return q.Error
 			}
 			// Update the locked row.
-			if err := tx.Model(&m.StepRun{}).Where("id = ?", step.ID).Update("status", in.Step.Status.String()).Error; err != nil { return err }
+			if err := tx.Model(&m.StepRun{}).Where("id = ?", step.ID).Update("status", in.Step.Status.String()).Error; err != nil {
+				return err
+			}
 			return nil
 		})
 		if err != nil {
@@ -187,14 +192,18 @@ func RegisterServices(s *grpc.Server, logger *slog.Logger, db *gorm.DB) *EventSe
 
 // loggingInterceptor provides basic structured logging for unary calls.
 func loggingInterceptor(logger *slog.Logger) grpc.UnaryServerInterceptor {
-	if logger == nil { logger = slog.Default() }
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		start := time.Now()
 		p, _ := peer.FromContext(ctx)
 		resp, err = handler(ctx, req)
 		dur := time.Since(start)
 		attrs := []any{"method", info.FullMethod, "duration_ms", dur.Milliseconds()}
-		if p != nil { attrs = append(attrs, "peer", p.Addr.String()) }
+		if p != nil {
+			attrs = append(attrs, "peer", p.Addr.String())
+		}
 		if err != nil {
 			st, _ := status.FromError(err)
 			attrs = append(attrs, "code", st.Code(), "error", st.Message())
@@ -209,7 +218,9 @@ func loggingInterceptor(logger *slog.Logger) grpc.UnaryServerInterceptor {
 
 // recoveryInterceptor converts panics into Internal errors and logs stack trace.
 func recoveryInterceptor(logger *slog.Logger) grpc.UnaryServerInterceptor {
-	if logger == nil { logger = slog.Default() }
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 		defer func() {
 			if r := recover(); r != nil {

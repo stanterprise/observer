@@ -22,7 +22,7 @@ func main() {
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	
+
 	// Processor service requires database connection
 	db, err := database.ConnectFromEnv(logger)
 	if err != nil {
@@ -34,7 +34,7 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("database connected")
-	
+
 	if err := database.AutoMigrateSchema(db, logger); err != nil {
 		logger.Error("automigrate failed", "error", err)
 		os.Exit(1)

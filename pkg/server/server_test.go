@@ -658,11 +658,11 @@ func TestNoopWriter(t *testing.T) {
 func TestReportTestBegin_DBError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	db := setupTestDB(t)
-	
+
 	// Close the DB to force an error
 	sqlDB, _ := db.DB()
 	sqlDB.Close()
-	
+
 	srv := New(logger, db)
 	ctx := context.Background()
 
@@ -678,7 +678,7 @@ func TestReportTestBegin_DBError(t *testing.T) {
 	if err == nil {
 		t.Error("ReportTestBegin() with closed DB should return error")
 	}
-	
+
 	st, ok := status.FromError(err)
 	if !ok {
 		t.Errorf("ReportTestBegin() error is not a status error: %v", err)
@@ -692,11 +692,11 @@ func TestReportTestBegin_DBError(t *testing.T) {
 func TestReportTestEnd_DBError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	db := setupTestDB(t)
-	
+
 	// Close the DB to force an error
 	sqlDB, _ := db.DB()
 	sqlDB.Close()
-	
+
 	srv := New(logger, db)
 	ctx := context.Background()
 
@@ -712,7 +712,7 @@ func TestReportTestEnd_DBError(t *testing.T) {
 	if err == nil {
 		t.Error("ReportTestEnd() with closed DB should return error")
 	}
-	
+
 	st, ok := status.FromError(err)
 	if !ok {
 		t.Errorf("ReportTestEnd() error is not a status error: %v", err)
@@ -726,11 +726,11 @@ func TestReportTestEnd_DBError(t *testing.T) {
 func TestReportStepBegin_DBError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	db := setupTestDB(t)
-	
+
 	// Close the DB to force an error
 	sqlDB, _ := db.DB()
 	sqlDB.Close()
-	
+
 	srv := New(logger, db)
 	ctx := context.Background()
 
@@ -744,7 +744,7 @@ func TestReportStepBegin_DBError(t *testing.T) {
 	if err == nil {
 		t.Error("ReportStepBegin() with closed DB should return error")
 	}
-	
+
 	st, ok := status.FromError(err)
 	if !ok {
 		t.Errorf("ReportStepBegin() error is not a status error: %v", err)
@@ -758,11 +758,11 @@ func TestReportStepBegin_DBError(t *testing.T) {
 func TestReportStepEnd_DBTransactionError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	db := setupTestDB(t)
-	
+
 	// Close the DB to force an error
 	sqlDB, _ := db.DB()
 	sqlDB.Close()
-	
+
 	srv := New(logger, db)
 	ctx := context.Background()
 
@@ -777,7 +777,7 @@ func TestReportStepEnd_DBTransactionError(t *testing.T) {
 	if err == nil {
 		t.Error("ReportStepEnd() with closed DB should return error")
 	}
-	
+
 	st, ok := status.FromError(err)
 	if !ok {
 		t.Errorf("ReportStepEnd() error is not a status error: %v", err)
@@ -880,14 +880,14 @@ func TestReportTestEnd_Upsert(t *testing.T) {
 // Test interceptors indirectly by verifying they don't panic
 func TestInterceptors_NoError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	
+
 	// Test that creating a server with interceptors doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("Creating gRPC server with interceptors panicked: %v", r)
 		}
 	}()
-	
+
 	srv := NewGRPCServer(logger)
 	if srv == nil {
 		t.Error("NewGRPCServer() returned nil")

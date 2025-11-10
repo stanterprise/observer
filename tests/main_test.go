@@ -47,4 +47,4 @@ func TestMain(m *testing.M) {
 }
 
 // listenerWrapper adapts bufconn to satisfy only the Accept / Close / Addr used by Serve.
-type listenerWrapper struct { *bufconn.Listener }
+type listenerWrapper struct{ *bufconn.Listener }

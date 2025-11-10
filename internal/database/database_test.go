@@ -160,7 +160,7 @@ func TestConnectFromEnv_NoDatabaseURL(t *testing.T) {
 
 func TestConnect_InvalidDSN(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	
+
 	// Test with invalid DSN
 	_, err := Connect("invalid://dsn", logger)
 	if err == nil {
@@ -235,7 +235,7 @@ func TestAutoMigrateSchema_EnabledVariations(t *testing.T) {
 			}()
 
 			os.Setenv(tt.envVar, tt.value)
-			
+
 			// We can only test that it doesn't error with nil DB
 			// Real migration testing would require a test database
 			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -249,7 +249,7 @@ func TestAutoMigrateSchema_EnabledVariations(t *testing.T) {
 
 // Helper function
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
 		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
 }
 
