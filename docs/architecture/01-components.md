@@ -42,7 +42,7 @@
 - Serves UI and external integrations.
 - Provides authentication middleware.
 - Exposes `/api/graphql` and `/metrics` endpoints.
-- Exposes a websocket connection to the Web UI to have real time test execution updates.
+- Exposes a WebSocket connection to the Web UI to have real time test execution updates.
 
 ## 7. Web UI
 
