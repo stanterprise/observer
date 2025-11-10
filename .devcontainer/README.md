@@ -7,13 +7,22 @@ This directory contains the configuration for GitHub Codespaces and VS Code Dev 
 ### Container Features
 
 - **Go 1.23** (Debian Bookworm base)
+- **Node.js LTS** with npm and Yarn - For Web UI development
 - **Docker-in-Docker** - Full Docker and Docker Compose support
 - **Protocol Buffers** - `protoc` compiler for gRPC code generation
 - **Zsh with Oh My Zsh** - Enhanced shell experience
 
 ### VS Code Extensions
 
+**Go Development:**
 - **golang.go** - Go language support with IntelliSense, debugging, and testing
+
+**Web Development:**
+- **ms-vscode.vscode-typescript-next** - TypeScript and JavaScript language support
+- **dbaeumer.vscode-eslint** - JavaScript/TypeScript linting
+- **bradlc.vscode-tailwindcss** - Tailwind CSS IntelliSense
+
+**General:**
 - **ms-azuretools.vscode-docker** - Docker container management
 - **github.copilot** & **github.copilot-chat** - AI-powered coding assistance
 - **zxh404.vscode-proto3** - Protocol Buffers syntax highlighting
@@ -25,11 +34,17 @@ This directory contains the configuration for GitHub Codespaces and VS Code Dev 
 
 The setup script (`setup.sh`) automatically installs:
 
+**Go Tools:**
 - `protoc-gen-go` and `protoc-gen-go-grpc` - Protobuf code generators
 - `golangci-lint` - Go linter
 - `gopls` - Go language server
 - `delve` - Go debugger
 - `staticcheck` - Go static analyzer
+
+**Web Tools:**
+- `TypeScript` - TypeScript compiler and language tools
+- `npm` - Node package manager
+- `Yarn` - Alternative package manager
 
 ### Infrastructure Services
 

@@ -27,8 +27,8 @@ This repository is fully configured for [GitHub Codespaces](https://github.com/f
 ### Initial Setup
 
 The Codespace will automatically:
-1. ✅ Build the Go 1.23 development container
-2. ✅ Install development tools (golangci-lint, protoc, gopls, delve)
+1. ✅ Build the Go 1.23 development container with Node.js LTS
+2. ✅ Install development tools (golangci-lint, protoc, gopls, delve, TypeScript)
 3. ✅ Download Go dependencies
 4. ✅ Build all service components
 5. ✅ Run tests to verify setup
@@ -51,10 +51,17 @@ docker compose ps
 
 ### Development Tools
 
+**Backend:**
 - **Go 1.23** with gopls language server
 - **Delve** debugger
 - **golangci-lint** for code quality
 - **protoc** for gRPC code generation
+
+**Frontend:**
+- **Node.js LTS** with npm and Yarn
+- **TypeScript** compiler and language tools
+
+**Infrastructure:**
 - **Docker and Docker Compose**
 - **Make** for build automation
 
@@ -76,7 +83,10 @@ make env-print
 ### VS Code Extensions
 
 Pre-installed and configured:
-- Go language support
+- Go language support with debugging
+- TypeScript and JavaScript language support
+- ESLint for JavaScript/TypeScript linting
+- Tailwind CSS IntelliSense
 - Docker management
 - GitHub Copilot
 - Protobuf syntax

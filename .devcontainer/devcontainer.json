@@ -8,6 +8,11 @@
       "enableNonRootDocker": "true",
       "moby": "true"
     },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts",
+      "nodeGypDependencies": true,
+      "installYarnUsingApt": true
+    },
     "ghcr.io/devcontainers-extra/features/protoc:1": {
       "version": "latest"
     },
@@ -29,7 +34,10 @@
         "zxh404.vscode-proto3",
         "ms-vscode.makefile-tools",
         "esbenp.prettier-vscode",
-        "redhat.vscode-yaml"
+        "redhat.vscode-yaml",
+        "dbaeumer.vscode-eslint",
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss"
       ],
       "settings": {
         "go.useLanguageServer": true,
@@ -52,6 +60,41 @@
           "ui.semanticTokens": true,
           "ui.completion.usePlaceholders": true
         },
+        "[typescript]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "always",
+            "source.fixAll.eslint": "always"
+          }
+        },
+        "[typescriptreact]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "always",
+            "source.fixAll.eslint": "always"
+          }
+        },
+        "[javascript]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "always"
+          }
+        },
+        "[json]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "typescript.updateImportsOnFileMove.enabled": "always",
+        "javascript.updateImportsOnFileMove.enabled": "always",
+        "eslint.validate": [
+          "javascript",
+          "javascriptreact",
+          "typescript",
+          "typescriptreact"
+        ],
         "terminal.integrated.defaultProfile.linux": "zsh"
       }
     }

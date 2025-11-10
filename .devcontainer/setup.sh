@@ -13,6 +13,15 @@ go install -v golang.org/x/tools/gopls@latest
 go install -v github.com/go-delve/delve/cmd/dlv@latest
 go install -v honnef.co/go/tools/cmd/staticcheck@latest
 
+# Verify Node.js and npm installation
+echo "📦 Verifying Node.js and npm..."
+node --version
+npm --version
+
+# Install TypeScript globally
+echo "📦 Installing TypeScript globally..."
+npm install -g typescript
+
 # Download dependencies
 echo "📥 Downloading Go dependencies..."
 go mod download
@@ -49,3 +58,9 @@ echo "🎯 Service ports:"
 echo "  - Ingestion gRPC: 50051"
 echo "  - Processor gRPC: 50052"
 echo "  - API HTTP: 8080"
+echo ""
+echo "🌐 Web development tools:"
+echo "  - Node.js (LTS)"
+echo "  - npm"
+echo "  - TypeScript"
+echo "  - Yarn"
