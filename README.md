@@ -13,7 +13,7 @@ The Observer system is composed of three main components:
 - gRPC endpoint for test event collection
 - Stateless and horizontally scalable
 - Validates protobuf payloads
-- Future: Publishes to NATS JetStream
+- **Phase 1 Complete**: Publishes to NATS JetStream (dual-write with optional DB)
 
 ### 2. **Processor Service** (`cmd/processor`)
 - Consumes events and persists to database
@@ -47,14 +47,17 @@ This builds:
 ### Run Individual Components
 
 ```bash
-# Ingestion (stateless, no DB required)
-./bin/ingestion
+# Start infrastructure services
+make db-up    # Start PostgreSQL
+make nats-up  # Start NATS
+
+# Ingestion (stateless, publishes to NATS)
+NATS_URL='nats://localhost:4222' ./bin/ingestion
 
 # API (optional DB connection)
 ./bin/api
 
 # Processor (requires DB)
-make db-up  # Start PostgreSQL
 DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' ./bin/processor
 ```
 
@@ -93,10 +96,16 @@ The test suite uses an in-process `bufconn` listener (no external ports) and val
 - `make db-psql` – Open psql against the database
 - `make db-reset` – Reset database
 
+### NATS
+- `make nats-up` – Start NATS container
+- `make nats-down` – Stop NATS container
+- `make nats-logs` – Tail NATS logs
+
 ### Testing & Quality
 - `make test` – Run all tests
 - `make test-race` – Run tests with race detector
 - `make test-cover` – Run tests with coverage
+- `make test-nats-integration` – Run NATS integration tests (requires NATS running)
 - `make fmt` – Format code
 - `make vet` – Vet code
 - `make lint` – Run golangci-lint
@@ -112,6 +121,9 @@ The test suite uses an in-process `bufconn` listener (no external ports) and val
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `50051` | gRPC listening port |
+| `NATS_URL` | - | NATS server URL (optional, e.g., `nats://localhost:4222`) |
+| `NATS_STREAM` | `tests_events` | JetStream stream name |
+| `NATS_SUBJECT_PREFIX` | `tests.events.v1` | Subject prefix for events |
 
 ### Processor Service
 
@@ -143,7 +155,7 @@ The repository maintains backward compatibility with the monolithic `server/main
 1. **Legacy Mode**: Run `./bin/observer` for single-process deployment
 2. **Distributed Mode**: Run `ingestion`, `processor`, and `api` services independently
 
-Future enhancements will add NATS JetStream integration to enable true event-driven architecture.
+**Phase 1 Complete**: The ingestion service now supports NATS JetStream publishing (dual-write pattern with optional database persistence). Configure `NATS_URL` to enable event publishing.
 
 ## Architecture Documentation
 
@@ -156,7 +168,9 @@ Detailed architecture documentation is available in [`docs/architecture/`](./doc
 ## Roadmap
 
 - [x] Separate components into distinct services
-- [ ] NATS JetStream integration for event bus
+- [x] **Phase 1**: NATS JetStream publisher integration (dual-write)
+- [ ] **Phase 2**: Processor service NATS consumer
+- [ ] **Phase 3**: Remove DB from ingestion (NATS-only)
 - [ ] Object storage for artifacts (MinIO/S3)
 - [ ] GraphQL API implementation
 - [ ] Web UI (React + Tailwind + shadcn/ui)

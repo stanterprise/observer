@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"testing"
 	"time"
 
+	obsrv "github.com/stanterprise/observer/pkg/server"
+	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/stanterprise/proto-go/testsystem/v1/common"
 	entities "github.com/stanterprise/proto-go/testsystem/v1/entities"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
@@ -130,4 +133,11 @@ func TestReportStartInvalidTable(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newTestGRPCServerWithNATS creates a test gRPC server with NATS publisher
+func newTestGRPCServerWithNATS(logger *slog.Logger, pub *publisher.NATSPublisher) *grpc.Server {
+	grpcServer := obsrv.NewGRPCServer(logger)
+	obsrv.RegisterServicesWithPublisher(grpcServer, logger, nil, pub)
+	return grpcServer
 }
