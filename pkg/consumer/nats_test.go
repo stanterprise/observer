@@ -189,8 +189,8 @@ func TestNATSConsumer_Integration(t *testing.T) {
 
 // Test models for in-memory DB testing
 type testCaseRun struct {
-	ID        string    `gorm:"primaryKey"`
-	RunID     string    `gorm:"index"`
+	ID        string `gorm:"primaryKey"`
+	RunID     string `gorm:"index"`
 	Title     string
 	Status    string
 	Metadata  string
@@ -203,8 +203,8 @@ func (testCaseRun) TableName() string {
 }
 
 type stepRun struct {
-	ID            uint      `gorm:"primaryKey;autoIncrement"`
-	TestCaseRunID string    `gorm:"index"`
+	ID            uint   `gorm:"primaryKey;autoIncrement"`
+	TestCaseRunID string `gorm:"index"`
 	Status        string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
