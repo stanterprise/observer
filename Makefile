@@ -22,7 +22,7 @@ PROTOC_GEN_GO_VERSION ?= v1.36.6
 PROTOC_GEN_GO_GRPC_VERSION ?= v1.5.1
 GOLANGCI_LINT_VERSION ?= v1.60.3
 
-.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset nats-up nats-down nats-logs docker-build docker-build-aio docker-build-dist docker-up-aio docker-up-dist docker-down
+.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down
 
 .DEFAULT_GOAL := help
 
@@ -183,20 +183,32 @@ test-nats-integration: ## Run NATS integration tests (requires NATS running)
 IMAGE_NAME ?= observer
 IMAGE_TAG ?= latest
 
-docker-build: build-all ## Build Docker image (requires pre-built binaries)
-	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) .
+docker-build-all: build-all ## Build all Docker images
+	docker build -f Dockerfile.aio -t $(IMAGE_NAME):aio .
+	docker build -f Dockerfile.ingestion -t $(IMAGE_NAME):ingestion .
+	docker build -f Dockerfile.processor -t $(IMAGE_NAME):processor .
+	docker build -f Dockerfile.api -t $(IMAGE_NAME):api .
 
-docker-build-aio: build-all ## Build Docker image for AIO mode
-	docker build -t $(IMAGE_NAME):aio .
+docker-build-aio: build-all ## Build AIO Docker image
+	docker build -f Dockerfile.aio -t $(IMAGE_NAME):aio .
 
-docker-build-dist: build-all ## Build Docker image for distributed mode
-	docker build -t $(IMAGE_NAME):service .
+docker-build-ingestion: build-all ## Build ingestion Docker image
+	docker build -f Dockerfile.ingestion -t $(IMAGE_NAME):ingestion .
+
+docker-build-processor: build-all ## Build processor Docker image
+	docker build -f Dockerfile.processor -t $(IMAGE_NAME):processor .
+
+docker-build-api: build-all ## Build API Docker image
+	docker build -f Dockerfile.api -t $(IMAGE_NAME):api .
+
+# Backward compatibility
+docker-build: docker-build-all ## Build all Docker images (alias)
 
 # Docker Compose helpers
 docker-up-aio: docker-build-aio ## Start AIO profile with docker compose
 	docker compose --profile aio up -d
 
-docker-up-dist: docker-build-dist ## Start distributed profile with docker compose
+docker-up-dist: docker-build-ingestion docker-build-processor docker-build-api ## Start distributed profile with docker compose
 	docker compose --profile dist up -d
 
 docker-down: ## Stop all docker compose services

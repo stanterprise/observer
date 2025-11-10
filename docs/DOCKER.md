@@ -2,17 +2,28 @@
 
 This guide explains how to build and run Observer using Docker and Docker Compose.
 
+## Docker Images
+
+Observer provides separate Docker images for each deployment scenario:
+
+- **`Dockerfile.aio`** - All-in-one image with embedded NATS and all services
+- **`Dockerfile.ingestion`** - Ingestion service only
+- **`Dockerfile.processor`** - Processor service only
+- **`Dockerfile.api`** - API service only
+
 ## Quick Start
 
-### Build Docker Image
+### Build Docker Images
 
 ```bash
-# Build all binaries and Docker image
-make docker-build
+# Build all images
+make docker-build-all
 
-# Or build explicitly
-make build-all
-docker build -t observer:latest .
+# Or build individual images
+make docker-build-aio        # AIO image
+make docker-build-ingestion  # Ingestion service
+make docker-build-processor  # Processor service
+make docker-build-api        # API service
 ```
 
 ### Run with Docker Compose
@@ -22,7 +33,10 @@ docker build -t observer:latest .
 Single container with embedded NATS, ingestion, processor, and API:
 
 ```bash
-# Start AIO mode
+# Build and start AIO mode
+make docker-up-aio
+
+# Or manually
 docker compose --profile aio up -d
 
 # View logs
@@ -45,7 +59,10 @@ docker compose --profile aio down
 Multi-container deployment with separate services:
 
 ```bash
-# Start distributed mode
+# Build and start distributed mode
+make docker-up-dist
+
+# Or manually
 docker compose --profile dist up -d
 
 # View logs
@@ -153,16 +170,24 @@ environment:
 
 ## Building from Source
 
-The Dockerfile uses a multi-stage build:
+Each service has its own Dockerfile:
 
-1. **Builder stage:** Compiles Go binaries
-2. **Runtime stage:** Debian slim with s6-overlay, NATS server, and binaries
+- **`Dockerfile.aio`**: Includes s6-overlay, NATS server, and all service binaries
+- **`Dockerfile.ingestion`**: Minimal image with only the ingestion binary
+- **`Dockerfile.processor`**: Minimal image with only the processor binary
+- **`Dockerfile.api`**: Minimal image with only the API binary
 
-For environments with restricted network access, pre-build the binaries:
+All Dockerfiles require pre-built binaries in the `bin/` directory:
 
 ```bash
+# Build Go binaries
 make build-all
-docker build -t observer .
+
+# Build specific Docker image
+docker build -f Dockerfile.aio -t observer:aio .
+docker build -f Dockerfile.ingestion -t observer:ingestion .
+docker build -f Dockerfile.processor -t observer:processor .
+docker build -f Dockerfile.api -t observer:api .
 ```
 
 ## Healthchecks
@@ -179,12 +204,14 @@ All services include healthchecks:
 ## Makefile Targets
 
 ```bash
-make docker-build       # Build Docker image
-make docker-build-aio   # Build and tag for AIO mode
-make docker-build-dist  # Build and tag for distributed mode
-make docker-up-aio      # Start AIO profile
-make docker-up-dist     # Start distributed profile
-make docker-down        # Stop all services
+make docker-build-all        # Build all Docker images
+make docker-build-aio        # Build AIO image
+make docker-build-ingestion  # Build ingestion image
+make docker-build-processor  # Build processor image
+make docker-build-api        # Build API image
+make docker-up-aio           # Start AIO profile
+make docker-up-dist          # Start distributed profile
+make docker-down             # Stop all services
 ```
 
 ## Troubleshooting

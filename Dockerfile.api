@@ -1,0 +1,22 @@
+# Dockerfile for API service
+# HTTP API and web UI
+
+FROM debian:bookworm-slim
+
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy API binary
+COPY bin/api /usr/local/bin/api
+
+# Environment variables
+ENV PORT=8080
+
+# Expose HTTP port
+EXPOSE 8080
+
+# Run API service
+CMD ["/usr/local/bin/api"]
