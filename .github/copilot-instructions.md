@@ -13,8 +13,8 @@ Key directories:
 
 - `server/main.go` - Entrypoint with graceful shutdown and signal handling
 - `pkg/server/` - gRPC service implementation with structured logging and panic recovery interceptors
-- `pkg/database/` - GORM-based Postgres connection with dual DSN support (URL or PG\* env vars)
-- `pkg/models/` - GORM models mapping to protobuf entities (`TestCaseRun`, `StepRun`)
+- `internal/database/` - GORM-based Postgres connection with dual DSN support (URL or PG\* env vars)
+- `internal/models/` - GORM models mapping to protobuf entities (`TestCaseRun`, `StepRun`)
 - `tests/` - Integration tests using in-process `bufconn` (no external ports)
 
 ## Critical Dependencies
@@ -36,7 +36,7 @@ if db == nil {
 }
 ```
 
-**Two DSN formats supported** (see `pkg/database/database.go`):
+**Two DSN formats supported** (see `internal/database/database.go`):
 
 1. `DATABASE_URL=postgres://user:pass@host:5432/dbname?sslmode=disable`
 2. Split env vars: `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`, `PGSSLMODE`
@@ -135,7 +135,7 @@ Single service defined: `db` (Postgres 16 Alpine). Init scripts in `docker/db/in
 
 ### Import Aliases
 
-Use `m` for models: `import m "github.com/stanterprise/observer/pkg/models"`
+Use `m` for models: `import m "github.com/stanterprise/observer/internal/models"`
 
 ### Logger Nil-Safety
 
@@ -185,7 +185,7 @@ for k, v := range protoMetadata {
 - Subscribe to `tests.events.v1` stream
 - Implement same DB persistence logic from current `pkg/server/server.go`
 - Use NATS consumer groups for horizontal scaling
-- Reuse existing `pkg/models/` and `pkg/database/` packages
+- Reuse existing `internal/models/` and `internal/database/` packages
 
 #### Phase 3: Remove DB from Ingestion
 
@@ -197,7 +197,7 @@ for k, v := range protoMetadata {
 
 - New entrypoint: `cmd/api/main.go`
 - HTTP server with GraphQL endpoint (consider gqlgen)
-- Read-only DB access via `pkg/database/`
+- Read-only DB access via `internal/database/`
 - Serve static UI assets from `web/dist/`
 
 ### Docker Compose Profiles
@@ -323,7 +323,7 @@ When separating components:
 
 **Add DB migration**:
 
-1. Update GORM model in `pkg/models/models.go`
+1. Update GORM model in `internal/models/models.go`
 2. Test with `APPLY_MIGRATIONS=1 make run-dev`
 3. For production, consider switching to schema migration tool (Goose, golang-migrate)
 
