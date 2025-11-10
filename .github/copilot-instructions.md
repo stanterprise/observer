@@ -158,16 +158,159 @@ for k, v := range protoMetadata {
 }
 ```
 
-## Future Architecture (Not Yet Implemented)
+## Component Separation Strategy
 
-The `docs/architecture/` folder describes a distributed event-driven system with:
+### Current State → Target Architecture
 
-- NATS JetStream for event streaming
-- Separate processor service for DB persistence
-- REST/GraphQL API + Web UI
-- Artifact storage (S3/MinIO)
+**Now**: Monolithic `pkg/server/server.go` that does gRPC ingestion + direct DB writes.
 
-**Current scope**: This repo only implements the gRPC ingestion gateway. When adding processor/API components, follow the separation described in `docs/architecture/01-components.md`.
+**Target**: Three separate components per `docs/architecture/01-components.md`:
+
+1. **Ingestion Gateway** - gRPC → NATS publisher (no DB dependency)
+2. **Processor** - NATS consumer → DB + object storage
+3. **API** - HTTP/GraphQL server reading from DB and WebSocket for UI
+
+### Implementation Phases
+
+#### Phase 1: Extract NATS Publisher
+
+- Create `pkg/publisher/nats.go` wrapping NATS JetStream client
+- Add `NATS_URL` env var support (default: `nats://localhost:4222`)
+- Keep DB writes in `pkg/server/server.go` temporarily (dual-write for safety)
+- Pattern: gRPC handler validates → publishes to NATS → writes DB (if configured)
+
+#### Phase 2: Create Processor Service
+
+- New entrypoint: `cmd/processor/main.go`
+- Subscribe to `tests.events.v1` stream
+- Implement same DB persistence logic from current `pkg/server/server.go`
+- Use NATS consumer groups for horizontal scaling
+- Reuse existing `pkg/models/` and `pkg/database/` packages
+
+#### Phase 3: Remove DB from Ingestion
+
+- Remove `db` parameter from `RegisterServices()`
+- Delete DB persistence logic from `pkg/server/server.go`
+- Ingestion becomes stateless (scales horizontally without coordination)
+
+#### Phase 4: Add API Service
+
+- New entrypoint: `cmd/api/main.go`
+- HTTP server with GraphQL endpoint (consider gqlgen)
+- Read-only DB access via `pkg/database/`
+- Serve static UI assets from `web/dist/`
+
+### Docker Compose Profiles
+
+Per `docs/architecture/04-docker-compose.md`, support two profiles:
+
+**Profile: aio** (development)
+
+```yaml
+services:
+  aio:
+    build: .
+    environment:
+      - MODE=aio
+      - DB_DRIVER=sqlite
+      - STORAGE_DRIVER=local
+```
+
+**Profile: dist** (production)
+
+```yaml
+services:
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js"]
+
+  ingestion:
+    build: .
+    environment:
+      - MODE=service
+      - SERVICE_TYPE=ingestion
+      - NATS_URL=nats://nats:4222
+
+  processor:
+    build: .
+    environment:
+      - MODE=service
+      - SERVICE_TYPE=processor
+      - NATS_URL=nats://nats:4222
+      - DATABASE_URL=postgres://...
+
+  api:
+    build: .
+    environment:
+      - MODE=service
+      - SERVICE_TYPE=api
+      - DATABASE_URL=postgres://...
+```
+
+### Multi-Stage Dockerfile
+
+Per `docs/architecture/05-dockerfile.md`, use single Dockerfile with runtime switching:
+
+```dockerfile
+# Builder stage
+FROM golang:1.23-alpine AS builder
+WORKDIR /build
+COPY go.* ./
+RUN go mod download
+COPY . .
+RUN go build -o /bin/observer ./server
+RUN go build -o /bin/processor ./cmd/processor
+RUN go build -o /bin/api ./cmd/api
+
+# Runtime stage
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y ca-certificates sqlite3
+COPY --from=builder /bin/observer /bin/processor /bin/api /usr/local/bin/
+COPY docker/entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+```
+
+Entrypoint script routes by `SERVICE_TYPE` env var:
+
+- `ingestion` → exec `/usr/local/bin/observer`
+- `processor` → exec `/usr/local/bin/processor`
+- `api` → exec `/usr/local/bin/api`
+- `aio` → use s6-overlay to run all three + embedded NATS
+
+### NATS Integration Patterns
+
+**Publisher (Ingestion)**:
+
+```go
+js, _ := nats.Connect(natsURL)
+js.Publish("tests.events.v1", eventBytes)
+```
+
+**Consumer (Processor)**:
+
+```go
+sub, _ := js.PullSubscribe("tests.events.v1", "processors")
+for {
+    msgs, _ := sub.Fetch(10)
+    for _, m := range msgs {
+        // Persist to DB, handle idempotency via upsert
+        m.Ack()
+    }
+}
+```
+
+Use **JetStream** (not core NATS) for durability and replay. Configure stream retention and consumer delivery policies in NATS setup.
+
+### Migration Checklist
+
+When separating components:
+
+- [ ] Preserve existing `bufconn` tests (ingestion only, no DB)
+- [ ] Add NATS integration tests (use nats-server in-process or testcontainers)
+- [ ] Update `Makefile` with targets: `build-ingestion`, `build-processor`, `build-api`
+- [ ] Add `docker-compose.yml` profiles per architecture docs
+- [ ] Document environment variables in README
+- [ ] Keep backward compatibility: allow `observer` binary to run in legacy mode (direct DB writes) if `NATS_URL` not set
 
 ## Common Tasks
 
