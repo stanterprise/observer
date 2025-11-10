@@ -6,6 +6,9 @@ endif
 # Binaries and locations
 BIN_DIR := bin
 APP_BIN := $(BIN_DIR)/observer
+INGESTION_BIN := $(BIN_DIR)/ingestion
+PROCESSOR_BIN := $(BIN_DIR)/processor
+API_BIN := $(BIN_DIR)/api
 
 # Tooling
 PROTOC_GEN_GO := $(GOBIN)/protoc-gen-go
@@ -19,20 +22,40 @@ PROTOC_GEN_GO_VERSION ?= v1.36.6
 PROTOC_GEN_GO_GRPC_VERSION ?= v1.5.1
 GOLANGCI_LINT_VERSION ?= v1.60.3
 
-.PHONY: all help build run run-dev run-dev-split env-print test test-race test-cover cover-report fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset
+.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset
 
 .DEFAULT_GOAL := help
 
-all: build ## Build the application
+all: build-all ## Build all components
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"}; /^[a-zA-Z0-9_.-]+:.*##/ { printf "\033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-$(APP_BIN): ## Build the server binary
+$(APP_BIN): ## Build the server binary (legacy)
 	@mkdir -p $(BIN_DIR)
 	go build -o $(APP_BIN) ./server
 
-build: $(APP_BIN) ## Build shortcut
+$(INGESTION_BIN): ## Build the ingestion service binary
+	@mkdir -p $(BIN_DIR)
+	go build -o $(INGESTION_BIN) ./cmd/ingestion
+
+$(PROCESSOR_BIN): ## Build the processor service binary
+	@mkdir -p $(BIN_DIR)
+	go build -o $(PROCESSOR_BIN) ./cmd/processor
+
+$(API_BIN): ## Build the api service binary
+	@mkdir -p $(BIN_DIR)
+	go build -o $(API_BIN) ./cmd/api
+
+build: $(APP_BIN) ## Build legacy server (shortcut)
+
+build-ingestion: $(INGESTION_BIN) ## Build ingestion service
+
+build-processor: $(PROCESSOR_BIN) ## Build processor service
+
+build-api: $(API_BIN) ## Build api service
+
+build-all: $(APP_BIN) $(INGESTION_BIN) $(PROCESSOR_BIN) $(API_BIN) ## Build all components
 
 run: build ## Run the server using the built binary
 	./$(APP_BIN)

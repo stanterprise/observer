@@ -7,7 +7,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	m "github.com/stanterprise/observer/pkg/models"
+	m "github.com/stanterprise/observer/internal/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	observer "github.com/stanterprise/proto-go/testsystem/v1/observer"
 	grpc "google.golang.org/grpc"

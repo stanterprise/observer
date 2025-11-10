@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	m "github.com/stanterprise/observer/pkg/models"
+	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/proto-go/testsystem/v1/common"
 	"github.com/stanterprise/proto-go/testsystem/v1/entities"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"

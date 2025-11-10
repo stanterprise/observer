@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/stanterprise/observer/internal/database"
 	"github.com/stanterprise/observer/pkg/server"
 )
 
@@ -30,23 +29,10 @@ func main() {
 	}
 
 	grpcServer := server.NewGRPCServer(logger)
-	// Optional: connect DB if DATABASE_URL is provided.
-	db, err := database.ConnectFromEnv(logger)
-	if err != nil {
-		logger.Error("database connect failed", "error", err)
-		os.Exit(1)
-	}
-	if db != nil {
-		logger.Info("database connected")
-		if err := database.AutoMigrateSchema(db, logger); err != nil {
-			logger.Error("automigrate failed", "error", err)
-			os.Exit(1)
-		}
-	} else {
-		logger.Info("DATABASE_URL not set; running without DB")
-	}
-	server.RegisterServices(grpcServer, logger, db)
-	logger.Info("server starting", "addr", lis.Addr().String())
+	// Ingestion service does not use database directly - it publishes to NATS
+	// For now, we run without DB to maintain stateless ingestion pattern
+	server.RegisterServices(grpcServer, logger, nil)
+	logger.Info("ingestion server starting", "addr", lis.Addr().String())
 
 	// Run server in separate goroutine and capture fatal serve errors.
 	errChan := make(chan error, 1)
@@ -82,7 +68,7 @@ func main() {
 		logger.Warn("graceful stop timeout, forcing stop")
 		grpcServer.Stop()
 	case <-done:
-		logger.Info("server stopped gracefully")
+		logger.Info("ingestion server stopped gracefully")
 	}
 
 	// If Serve returned an error earlier, exit non-zero.
@@ -96,6 +82,8 @@ func main() {
 }
 
 func envOr(key, def string) string {
-	if v := os.Getenv(key); v != "" { return v }
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
 	return def
 }

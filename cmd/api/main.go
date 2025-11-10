@@ -5,32 +5,24 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
-	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/stanterprise/observer/internal/database"
-	"github.com/stanterprise/observer/pkg/server"
 )
 
 func main() {
 	var (
-		port = flag.String("port", envOr("PORT", "50051"), "TCP port to listen on")
+		port = flag.String("port", envOr("PORT", "8080"), "HTTP port to listen on")
 	)
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	addr := ":" + *port
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		logger.Error("listen failed", "error", err, "addr", addr)
-		os.Exit(1)
-	}
 
-	grpcServer := server.NewGRPCServer(logger)
-	// Optional: connect DB if DATABASE_URL is provided.
+	// API service connects to database for read queries
 	db, err := database.ConnectFromEnv(logger)
 	if err != nil {
 		logger.Error("database connect failed", "error", err)
@@ -38,20 +30,36 @@ func main() {
 	}
 	if db != nil {
 		logger.Info("database connected")
-		if err := database.AutoMigrateSchema(db, logger); err != nil {
-			logger.Error("automigrate failed", "error", err)
-			os.Exit(1)
-		}
 	} else {
 		logger.Info("DATABASE_URL not set; running without DB")
 	}
-	server.RegisterServices(grpcServer, logger, db)
-	logger.Info("server starting", "addr", lis.Addr().String())
+
+	// Create HTTP server with basic health endpoint
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "OK\n")
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "Observer API Service\n")
+		fmt.Fprintf(w, "Available endpoints:\n")
+		fmt.Fprintf(w, "  GET /health - Health check\n")
+		fmt.Fprintf(w, "  GET /api/graphql - GraphQL endpoint (coming soon)\n")
+	})
+
+	addr := ":" + *port
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
+	logger.Info("api server starting", "addr", addr)
 
 	// Run server in separate goroutine and capture fatal serve errors.
 	errChan := make(chan error, 1)
 	go func() {
-		if err := grpcServer.Serve(lis); err != nil {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errChan <- fmt.Errorf("serve failed: %w", err)
 		}
 		close(errChan)
@@ -72,18 +80,11 @@ func main() {
 	// Allow up to 5s for graceful stop.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	done := make(chan struct{})
-	go func() {
-		grpcServer.GracefulStop()
-		close(done)
-	}()
-	select {
-	case <-ctx.Done():
-		logger.Warn("graceful stop timeout, forcing stop")
-		grpcServer.Stop()
-	case <-done:
-		logger.Info("server stopped gracefully")
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Error("shutdown error", "error", err)
+		os.Exit(1)
 	}
+	logger.Info("api server stopped gracefully")
 
 	// If Serve returned an error earlier, exit non-zero.
 	select {
@@ -96,6 +97,8 @@ func main() {
 }
 
 func envOr(key, def string) string {
-	if v := os.Getenv(key); v != "" { return v }
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
 	return def
 }
