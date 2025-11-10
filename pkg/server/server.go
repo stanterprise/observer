@@ -8,6 +8,7 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
+	"github.com/stanterprise/observer/pkg/publisher"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	observer "github.com/stanterprise/proto-go/testsystem/v1/observer"
 	grpc "google.golang.org/grpc"
@@ -20,16 +21,27 @@ import (
 
 type EventServer struct {
 	observer.UnimplementedTestEventCollectorServer
-	logger *slog.Logger
-	db     *gorm.DB
+	logger    *slog.Logger
+	db        *gorm.DB
+	publisher *publisher.NATSPublisher
 }
 
 // New returns a new EventServer. If logger is nil, a no-op logger is used.
+// The publisher parameter is optional and can be nil.
 func New(logger *slog.Logger, db *gorm.DB) *EventServer {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}
-	return &EventServer{logger: logger, db: db}
+	return &EventServer{logger: logger, db: db, publisher: nil}
+}
+
+// NewWithPublisher returns a new EventServer with NATS publisher support.
+// If logger is nil, a no-op logger is used. The publisher parameter is optional.
+func NewWithPublisher(logger *slog.Logger, db *gorm.DB, pub *publisher.NATSPublisher) *EventServer {
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
+	}
+	return &EventServer{logger: logger, db: db, publisher: pub}
 }
 
 // noopWriter implements io.Writer but drops logs when no logger provided.
@@ -55,6 +67,14 @@ func (s *EventServer) ReportTestBegin(ctx context.Context, in *events.TestBeginE
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	s.logger.Info("test start", "run_id", in.TestCase.RunId, "title", in.TestCase.Title, "metadata_count", len(in.TestCase.Metadata))
+
+	// Publish to NATS if publisher is configured (Phase 1: dual-write)
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeTestBegin, in); err != nil {
+			s.logger.Error("publish to NATS failed", "id", in.TestCase.Id, "error", err)
+			// Continue with DB write even if NATS publish fails (best-effort)
+		}
+	}
 
 	// Persist or update TestCase if DB is configured.
 	if s.db != nil {
@@ -92,6 +112,14 @@ func (s *EventServer) ReportTestEnd(ctx context.Context, in *events.TestEndEvent
 	}
 	s.logger.Info("test finish", "run_id", in.TestCase.RunId, "status", in.TestCase.Status)
 
+	// Publish to NATS if publisher is configured (Phase 1: dual-write)
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeTestEnd, in); err != nil {
+			s.logger.Error("publish to NATS failed", "id", in.TestCase.Id, "error", err)
+			// Continue with DB write even if NATS publish fails (best-effort)
+		}
+	}
+
 	// Upsert status on finish if DB is configured.
 	if s.db != nil {
 		statusStr := in.TestCase.Status.String()
@@ -124,6 +152,14 @@ func (s *EventServer) ReportStepBegin(ctx context.Context, in *events.StepBeginE
 	// Logging limited fields (RunId); extend when proto adds step-specific identifiers.
 	s.logger.Info("test step", "run_id", in.Step.TestCaseRunId)
 
+	// Publish to NATS if publisher is configured (Phase 1: dual-write)
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeStepBegin, in); err != nil {
+			s.logger.Error("publish to NATS failed", "run_id", in.Step.TestCaseRunId, "error", err)
+			// Continue with DB write even if NATS publish fails (best-effort)
+		}
+	}
+
 	if s.db != nil {
 		st := &m.StepRun{TestCaseRunID: in.Step.TestCaseRunId, Status: "RUNNING"}
 		if err := s.db.WithContext(ctx).Create(st).Error; err != nil {
@@ -146,6 +182,14 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 	}
 	// Logging limited fields (RunId); extend when proto adds step-specific identifiers.
 	s.logger.Info("test step end", "run_id", in.Step.TestCaseRunId, "status", in.Step.Status)
+
+	// Publish to NATS if publisher is configured (Phase 1: dual-write)
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeStepEnd, in); err != nil {
+			s.logger.Error("publish to NATS failed", "run_id", in.Step.TestCaseRunId, "error", err)
+			// Continue with DB write even if NATS publish fails (best-effort)
+		}
+	}
 
 	if s.db != nil {
 		// Make read+update atomic to avoid races among concurrent step-end reports.
@@ -186,6 +230,13 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 // RegisterServices keeps backward compatibility; returns the created server for further customization in callers.
 func RegisterServices(s *grpc.Server, logger *slog.Logger, db *gorm.DB) *EventServer {
 	srv := New(logger, db)
+	observer.RegisterTestEventCollectorServer(s, srv)
+	return srv
+}
+
+// RegisterServicesWithPublisher registers the gRPC services with NATS publisher support.
+func RegisterServicesWithPublisher(s *grpc.Server, logger *slog.Logger, db *gorm.DB, pub *publisher.NATSPublisher) *EventServer {
+	srv := NewWithPublisher(logger, db, pub)
 	observer.RegisterTestEventCollectorServer(s, srv)
 	return srv
 }

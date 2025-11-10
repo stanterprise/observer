@@ -22,7 +22,7 @@ PROTOC_GEN_GO_VERSION ?= v1.36.6
 PROTOC_GEN_GO_GRPC_VERSION ?= v1.5.1
 GOLANGCI_LINT_VERSION ?= v1.60.3
 
-.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset
+.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset nats-up nats-down nats-logs
 
 .DEFAULT_GOAL := help
 
@@ -164,3 +164,17 @@ db-psql: ## Open psql against the db container
 
 db-reset: ## Reset database by recreating container and volume
 	docker compose down -v && docker compose up -d db
+
+# NATS helpers
+nats-up: ## Start NATS container
+	docker compose up -d nats
+
+nats-down: ## Stop NATS container
+	docker compose stop nats
+
+nats-logs: ## Tail NATS logs
+	docker compose logs -f nats
+
+# Integration tests
+test-nats-integration: ## Run NATS integration tests (requires NATS running)
+	NATS_TEST_URL=nats://localhost:4222 go test ./tests/... -v -run TestNATSIntegration
