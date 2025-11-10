@@ -1,0 +1,125 @@
+{
+  "name": "Observer Service Development",
+  "image": "mcr.microsoft.com/devcontainers/go:1.23-bookworm",
+
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "enableNonRootDocker": "true",
+      "moby": "true"
+    },
+    "ghcr.io/devcontainers-extra/features/protoc:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": "true",
+      "configureZshAsDefaultShell": "true",
+      "installOhMyZsh": "true",
+      "upgradePackages": "true"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-azuretools.vscode-docker",
+        "github.copilot",
+        "github.copilot-chat",
+        "zxh404.vscode-proto3",
+        "ms-vscode.makefile-tools",
+        "esbenp.prettier-vscode",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "go.useLanguageServer": true,
+        "go.toolsManagement.autoUpdate": true,
+        "go.lintTool": "golangci-lint",
+        "go.lintOnSave": "workspace",
+        "go.testFlags": ["-v"],
+        "go.buildTags": "",
+        "go.coverOnSave": false,
+        "go.coverageDecorator": {
+          "type": "gutter"
+        },
+        "[go]": {
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "always"
+          }
+        },
+        "gopls": {
+          "ui.semanticTokens": true,
+          "ui.completion.usePlaceholders": true
+        },
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+
+  "forwardPorts": [
+    50051,
+    50052,
+    8080,
+    5432,
+    4222,
+    8222
+  ],
+
+  "portsAttributes": {
+    "50051": {
+      "label": "gRPC Ingestion",
+      "onAutoForward": "notify"
+    },
+    "50052": {
+      "label": "gRPC Processor",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "HTTP API",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "ignore"
+    },
+    "4222": {
+      "label": "NATS",
+      "onAutoForward": "ignore"
+    },
+    "8222": {
+      "label": "NATS Monitoring",
+      "onAutoForward": "silent"
+    }
+  },
+
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  "postStartCommand": "docker compose up -d db nats",
+
+  "remoteEnv": {
+    "DATABASE_URL": "postgres://postgres:postgres@localhost:5432/observer?sslmode=disable",
+    "NATS_URL": "nats://localhost:4222",
+    "APPLY_MIGRATIONS": "1",
+    "POSTGRES_USER": "postgres",
+    "POSTGRES_PASSWORD": "postgres",
+    "POSTGRES_DB": "observer",
+    "POSTGRES_PORT": "5432",
+    "NATS_PORT": "4222",
+    "NATS_HTTP_PORT": "8222",
+    "NATS_STREAM": "tests_events",
+    "NATS_SUBJECT_PREFIX": "tests.events.v1"
+  },
+
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+
+  "runArgs": [
+    "--init"
+  ],
+
+  "postAttachCommand": {
+    "check-services": "echo 'Checking services...' && docker compose ps"
+  }
+}
