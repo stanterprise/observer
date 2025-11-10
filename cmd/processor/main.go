@@ -17,11 +17,29 @@ import (
 
 func main() {
 	var (
-		port = flag.String("port", envOr("PORT", "50051"), "TCP port to listen on")
+		port = flag.String("port", envOr("PORT", "50052"), "TCP port to listen on")
 	)
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	// Processor service requires database connection
+	db, err := database.ConnectFromEnv(logger)
+	if err != nil {
+		logger.Error("database connect failed", "error", err)
+		os.Exit(1)
+	}
+	if db == nil {
+		logger.Error("DATABASE_URL not set; processor requires database")
+		os.Exit(1)
+	}
+	logger.Info("database connected")
+
+	if err := database.AutoMigrateSchema(db, logger); err != nil {
+		logger.Error("automigrate failed", "error", err)
+		os.Exit(1)
+	}
+
 	addr := ":" + *port
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -30,23 +48,8 @@ func main() {
 	}
 
 	grpcServer := server.NewGRPCServer(logger)
-	// Optional: connect DB if DATABASE_URL is provided.
-	db, err := database.ConnectFromEnv(logger)
-	if err != nil {
-		logger.Error("database connect failed", "error", err)
-		os.Exit(1)
-	}
-	if db != nil {
-		logger.Info("database connected")
-		if err := database.AutoMigrateSchema(db, logger); err != nil {
-			logger.Error("automigrate failed", "error", err)
-			os.Exit(1)
-		}
-	} else {
-		logger.Info("DATABASE_URL not set; running without DB")
-	}
 	server.RegisterServices(grpcServer, logger, db)
-	logger.Info("server starting", "addr", lis.Addr().String())
+	logger.Info("processor server starting", "addr", lis.Addr().String())
 
 	// Run server in separate goroutine and capture fatal serve errors.
 	errChan := make(chan error, 1)
@@ -82,7 +85,7 @@ func main() {
 		logger.Warn("graceful stop timeout, forcing stop")
 		grpcServer.Stop()
 	case <-done:
-		logger.Info("server stopped gracefully")
+		logger.Info("processor server stopped gracefully")
 	}
 
 	// If Serve returned an error earlier, exit non-zero.

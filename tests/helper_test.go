@@ -17,93 +17,117 @@ import (
 
 // dialBufConn returns a client connection to the in-process gRPC server.
 func dialBufConn(t *testing.T) *grpc.ClientConn {
-    t.Helper()
-    ctx := context.Background()
-    conn, err := grpc.DialContext(ctx, "bufnet", grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
-        return testBufListener.Dial()
-    }), grpc.WithInsecure())
-    if err != nil { t.Fatalf("failed to dial bufnet: %v", err) }
-    return conn
+	t.Helper()
+	ctx := context.Background()
+	conn, err := grpc.DialContext(ctx, "bufnet", grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+		return testBufListener.Dial()
+	}), grpc.WithInsecure())
+	if err != nil {
+		t.Fatalf("failed to dial bufnet: %v", err)
+	}
+	return conn
 }
 
 // TestReportLifecycle tests start and finish flow.
 func TestReportLifecycle(t *testing.T) {
-    conn := dialBufConn(t)
-    defer conn.Close()
-    client := observer.NewTestEventCollectorClient(conn)
-    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-    defer cancel()
+	conn := dialBufConn(t)
+	defer conn.Close()
+	client := observer.NewTestEventCollectorClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{
-        TestCase: &entities.TestCaseRun{
-            Id:        "test-id",
-            RunId:      "test-id",
-            Title:    "test-name",
-            Metadata: map[string]string{"k": "v"},
-        },
-        
-    })
-    if err != nil { t.Fatalf("start failed: %v", err) }
+	_, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{
+		TestCase: &entities.TestCaseRun{
+			Id:       "test-id",
+			RunId:    "test-id",
+			Title:    "test-name",
+			Metadata: map[string]string{"k": "v"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
 
-    _, err = client.ReportTestEnd(ctx, &events.TestEndEventRequest{
-        TestCase: &entities.TestCaseRun{
-            Id:     "test-id",
-            RunId:  "test-id",
-            Status: common.TestStatus_PASSED,
-        },
-        // EndTime is optional; server uses current time if not provided.
+	_, err = client.ReportTestEnd(ctx, &events.TestEndEventRequest{
+		TestCase: &entities.TestCaseRun{
+			Id:     "test-id",
+			RunId:  "test-id",
+			Status: common.TestStatus_PASSED,
+		},
+		// EndTime is optional; server uses current time if not provided.
 
-    })
-    if err != nil { t.Fatalf("finish failed: %v", err) }
+	})
+	if err != nil {
+		t.Fatalf("finish failed: %v", err)
+	}
 }
 
 // TestReportStartInvalidID ensures empty test ID is rejected.
 func TestReportStartInvalidID(t *testing.T) {
-    conn := dialBufConn(t)
-    defer conn.Close()
-    client := observer.NewTestEventCollectorClient(conn)
-    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-    defer cancel()
+	conn := dialBufConn(t)
+	defer conn.Close()
+	client := observer.NewTestEventCollectorClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{Id: ""}})
-    if err == nil { t.Fatalf("expected error for empty id") }
-    st, ok := status.FromError(err)
-    if !ok { t.Fatalf("expected status error, got %v", err) }
-    if st.Code() != codes.InvalidArgument { t.Fatalf("expected InvalidArgument, got %v", st.Code()) }
+	_, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{Id: ""}})
+	if err == nil {
+		t.Fatalf("expected error for empty id")
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", st.Code())
+	}
 }
 
 func TestReportStep(t *testing.T) {
-    conn := dialBufConn(t)
-    defer conn.Close()
-    client := observer.NewTestEventCollectorClient(conn)
-    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-    defer cancel()
+	conn := dialBufConn(t)
+	defer conn.Close()
+	client := observer.NewTestEventCollectorClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-    // Must start test first
-    _, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{Id: "test-id", RunId: "tid", Title: "n"}})
-    if err != nil { t.Fatalf("start failed: %v", err) }
+	// Must start test first
+	_, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{Id: "test-id", RunId: "tid", Title: "n"}})
+	if err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
 
-    _, err = client.ReportStepBegin(ctx, &events.StepBeginEventRequest{Step: &entities.StepRun{Id: "step-id", RunId: "tid", TestCaseRunId: "test-id"}})
-    if err != nil { t.Fatalf("step failed: %v", err) }
+	_, err = client.ReportStepBegin(ctx, &events.StepBeginEventRequest{Step: &entities.StepRun{Id: "step-id", RunId: "tid", TestCaseRunId: "test-id"}})
+	if err != nil {
+		t.Fatalf("step failed: %v", err)
+	}
 }
 
 func TestReportStartInvalidTable(t *testing.T) {
-    cases := []struct{ name string; req *events.TestBeginEventRequest }{
-        {"empty-id", &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{RunId: ""}}},
-        {"nil-req", nil},
-    }
-    for _, c := range cases {
-        t.Run(c.name, func(t *testing.T) {
-            conn := dialBufConn(t)
-            defer conn.Close()
-            client := observer.NewTestEventCollectorClient(conn)
-            ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-            defer cancel()
-            _, err := client.ReportTestBegin(ctx, c.req)
-            if err == nil { t.Fatalf("expected error for case %s", c.name) }
-            st, ok := status.FromError(err)
-            if !ok { t.Fatalf("expected status error") }
-            if st.Code() != codes.InvalidArgument { t.Fatalf("expected InvalidArgument, got %v", st.Code()) }
-        })
-    }
+	cases := []struct {
+		name string
+		req  *events.TestBeginEventRequest
+	}{
+		{"empty-id", &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{RunId: ""}}},
+		{"nil-req", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			conn := dialBufConn(t)
+			defer conn.Close()
+			client := observer.NewTestEventCollectorClient(conn)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_, err := client.ReportTestBegin(ctx, c.req)
+			if err == nil {
+				t.Fatalf("expected error for case %s", c.name)
+			}
+			st, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("expected status error")
+			}
+			if st.Code() != codes.InvalidArgument {
+				t.Fatalf("expected InvalidArgument, got %v", st.Code())
+			}
+		})
+	}
 }
