@@ -3,6 +3,7 @@ module github.com/stanterprise/observer
 go 1.23.0
 
 require (
+	github.com/nats-io/nats.go v1.47.0
 	github.com/stanterprise/proto-go v0.0.8
 	google.golang.org/grpc v1.73.0
 	gorm.io/datatypes v1.2.7
@@ -23,7 +24,6 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
-	github.com/nats-io/nats.go v1.47.0 // indirect
 	github.com/nats-io/nkeys v0.4.11 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
