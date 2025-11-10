@@ -3,6 +3,30 @@ set -e
 
 echo "🚀 Setting up Observer Service development environment..."
 
+# Repair docker socket group membership if bind-mounted from host (fixes permission denied "connect: permission denied")
+# This creates a local group matching the socket GID and adds the 'vscode' user to it.
+# Note: a reopen / reattach may be required for the new group membership to take effect.
+if [ -S "/var/run/docker.sock" ]; then
+    sock_gid=$(stat -c "%g" /var/run/docker.sock || true)
+    if [ -n "$sock_gid" ]; then
+        existing_group=$(getent group "$sock_gid" | cut -d: -f1 || true)
+        if [ -z "$existing_group" ]; then
+            groupname="dockersock${sock_gid}"
+            echo "🛠 Detected docker.sock gid=$sock_gid, creating group '$groupname'..."
+            if ! getent group "$groupname" >/dev/null; then
+                groupadd -g "$sock_gid" "$groupname" || true
+            fi
+            target_group="$groupname"
+        else
+            target_group="$existing_group"
+        fi
+
+        echo "➕ Adding user 'vscode' to group '$target_group'..."
+        usermod -aG "$target_group" vscode || true
+        echo "⚠️  If you still see docker permission errors, please reopen the Codespace (Reload Window) to pick up new group membership."
+    fi
+fi
+
 # Install development tools
 echo "📦 Installing development tools..."
 make tools
