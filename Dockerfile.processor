@@ -1,0 +1,22 @@
+# Dockerfile for Processor service
+# Consumes events from NATS and writes to database
+
+FROM debian:bookworm-slim
+
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy processor binary
+COPY bin/processor /usr/local/bin/processor
+
+# Environment variables
+ENV NATS_URL=nats://nats:4222 \
+    NATS_STREAM=tests_events \
+    NATS_CONSUMER=processor \
+    APPLY_MIGRATIONS=1
+
+# Run processor service
+CMD ["/usr/local/bin/processor"]

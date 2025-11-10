@@ -1,4 +1,127 @@
 services:
+  # ============================================================================
+  # AIO Profile - All-in-One single container deployment
+  # Usage: docker compose --profile aio up -d
+  # ============================================================================
+  aio:
+    build:
+      context: .
+      dockerfile: Dockerfile.aio
+    image: observer:aio
+    container_name: observer-aio
+    profiles: ["aio"]
+    restart: unless-stopped
+    environment:
+      DB_DRIVER: sqlite
+      DATABASE_URL: /data/db/observer.db
+      STORAGE_DRIVER: local
+      ARTIFACTS_DIR: /data/artifacts
+      APPLY_MIGRATIONS: "1"
+    ports:
+      - "${AIO_GRPC_PORT:-50051}:50051"   # gRPC ingestion
+      - "${AIO_API_PORT:-8080}:8080"       # API/UI
+      - "${AIO_NATS_PORT:-4222}:4222"      # NATS client
+      - "${AIO_NATS_HTTP_PORT:-8222}:8222" # NATS monitoring
+    volumes:
+      - aio-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observer-net
+
+  # ============================================================================
+  # Distributed Profile - Multi-container deployment
+  # Usage: docker compose --profile dist up -d
+  # ============================================================================
+  
+  # Ingestion service - gRPC endpoint for test reporters
+  ingestion:
+    build:
+      context: .
+      dockerfile: Dockerfile.ingestion
+    image: observer:ingestion
+    container_name: observer-ingestion
+    profiles: ["dist"]
+    restart: unless-stopped
+    environment:
+      PORT: "50051"
+      NATS_URL: nats://nats:4222
+      NATS_STREAM: tests_events
+      NATS_SUBJECT_PREFIX: tests.events.v1
+    ports:
+      - "${INGESTION_PORT:-50051}:50051"
+    depends_on:
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "ingestion"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observer-net
+
+  # Processor service - Consumes events from NATS and writes to database
+  processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.processor
+    image: observer:processor
+    container_name: observer-processor
+    profiles: ["dist"]
+    restart: unless-stopped
+    environment:
+      NATS_URL: nats://nats:4222
+      NATS_STREAM: tests_events
+      NATS_CONSUMER: processor
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-observer}?sslmode=disable
+      APPLY_MIGRATIONS: "1"
+    depends_on:
+      nats:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "processor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observer-net
+
+  # API service - HTTP API and UI
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: observer:api
+    container_name: observer-api
+    profiles: ["dist"]
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-observer}?sslmode=disable
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observer-net
+
+  # ============================================================================
+  # Shared Infrastructure Services
+  # Used by distributed profile and available for development
+  # ============================================================================
+  
   db:
     image: postgres:16-alpine
     container_name: observer-postgres
@@ -45,6 +168,7 @@ services:
 volumes:
   postgres-data:
   nats-data:
+  aio-data:
 
 networks:
   observer-net:
