@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/stanterprise/observer/pkg/server"
 )
 
@@ -28,10 +29,33 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize NATS publisher if NATS_URL is configured
+	var pub *publisher.NATSPublisher
+	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
+		cfg := publisher.NATSConfig{
+			URL:           natsURL,
+			StreamName:    envOr("NATS_STREAM", publisher.DefaultStreamName),
+			SubjectPrefix: envOr("NATS_SUBJECT_PREFIX", publisher.DefaultSubjectPrefix),
+		}
+		pub, err = publisher.NewNATSPublisher(cfg, logger)
+		if err != nil {
+			logger.Error("failed to initialize NATS publisher", "error", err)
+			os.Exit(1)
+		}
+		defer pub.Close()
+		logger.Info("NATS publisher enabled", "url", natsURL)
+	} else {
+		logger.Info("NATS publisher disabled - NATS_URL not set")
+	}
+
 	grpcServer := server.NewGRPCServer(logger)
 	// Ingestion service does not use database directly - it publishes to NATS
 	// For now, we run without DB to maintain stateless ingestion pattern
-	server.RegisterServices(grpcServer, logger, nil)
+	if pub != nil {
+		server.RegisterServicesWithPublisher(grpcServer, logger, nil, pub)
+	} else {
+		server.RegisterServices(grpcServer, logger, nil)
+	}
 	logger.Info("ingestion server starting", "addr", lis.Addr().String())
 
 	// Run server in separate goroutine and capture fatal serve errors.
