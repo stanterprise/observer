@@ -44,7 +44,7 @@ func Connect(dsn string, l *slog.Logger) (*gorm.DB, error) {
 				return nil, fmt.Errorf("create db directory: %w", err)
 			}
 		}
-		dialector = sqlite.Open(dsn)
+		dialector = sqlite.Open(dbPath)
 	}
 
 	db, err := gorm.Open(dialector, &gorm.Config{Logger: newLogger})
