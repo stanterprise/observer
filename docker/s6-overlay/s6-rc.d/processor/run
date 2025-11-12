@@ -1,2 +1,2 @@
-#!/command/execlineb -P
-/usr/local/bin/processor
+#!/command/with-contenv sh
+exec /usr/local/bin/processor

@@ -1,16 +1,37 @@
 # Dockerfile for Ingestion service
 # gRPC endpoint that accepts test events and publishes to NATS
 
+# ============================================================================
+# Builder stage
+# ============================================================================
+FROM golang:1.23-bookworm AS builder
+
+WORKDIR /build
+
+# Copy go mod files and download dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build ingestion binary for Linux
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/ingestion ./cmd/ingestion
+
+# ============================================================================
+# Runtime stage
+# ============================================================================
 FROM debian:bookworm-slim
 
 # Install runtime dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
+        procps \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy ingestion binary
-COPY bin/ingestion /usr/local/bin/ingestion
+# Copy ingestion binary from builder
+COPY --from=builder /bin/ingestion /usr/local/bin/ingestion
 
 # Environment variables
 ENV PORT=50051 \

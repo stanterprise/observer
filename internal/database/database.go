@@ -6,16 +6,21 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
 	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-// Connect connects to Postgres using the provided DSN and returns a GORM DB.
-// Example DSN: postgres://user:pass@localhost:5432/app?sslmode=disable
+// Connect connects to a database using the provided DSN and returns a GORM DB.
+// Supports both PostgreSQL and SQLite based on the DSN format:
+//   - PostgreSQL: postgres://user:pass@localhost:5432/app?sslmode=disable
+//   - SQLite: /path/to/database.db or file:/path/to/database.db
 func Connect(dsn string, l *slog.Logger) (*gorm.DB, error) {
 	newLogger := logger.New(
 		log.New(os.Stdout, "gorm ", log.LstdFlags),
@@ -25,21 +30,44 @@ func Connect(dsn string, l *slog.Logger) (*gorm.DB, error) {
 			IgnoreRecordNotFoundError: true,
 		},
 	)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: newLogger})
+
+	// Determine database driver based on DSN format
+	var dialector gorm.Dialector
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		dialector = postgres.Open(dsn)
+	} else {
+		// Assume SQLite for file paths
+		// Ensure parent directory exists for SQLite
+		dbPath := strings.TrimPrefix(dsn, "file:")
+		if dir := filepath.Dir(dbPath); dir != "" && dir != "." {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return nil, fmt.Errorf("create db directory: %w", err)
+			}
+		}
+		dialector = sqlite.Open(dbPath)
+	}
+
+	db, err := gorm.Open(dialector, &gorm.Config{Logger: newLogger})
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
+
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("sql db: %w", err)
 	}
-	// Sensible pool defaults; callers can tune if needed.
-	sqlDB.SetMaxOpenConns(50)
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+
+	// Only set pool settings for PostgreSQL (not applicable to SQLite)
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		sqlDB.SetMaxOpenConns(50)
+		sqlDB.SetMaxIdleConns(10)
+		sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	}
+
 	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("ping: %w", err)
 	}
+
 	return db, nil
 }
 

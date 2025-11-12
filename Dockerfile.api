@@ -1,16 +1,46 @@
 # Dockerfile for API service
 # HTTP API and web UI
 
+# ============================================================================
+# Builder stage
+# ============================================================================
+FROM golang:1.23-bookworm AS builder
+
+# Install build dependencies for CGO (required for SQLite support)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc \
+        libc6-dev \
+        libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy go mod files and download dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build API binary for Linux with CGO enabled (for potential SQLite use)
+RUN CGO_ENABLED=1 GOOS=linux go build -o /bin/api ./cmd/api
+
+# ============================================================================
+# Runtime stage
+# ============================================================================
 FROM debian:bookworm-slim
 
 # Install runtime dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
+        procps \
+        wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy API binary
-COPY bin/api /usr/local/bin/api
+# Copy API binary from builder
+COPY --from=builder /bin/api /usr/local/bin/api
 
 # Environment variables
 ENV PORT=8080

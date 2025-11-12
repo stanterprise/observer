@@ -1,2 +1,2 @@
-#!/command/execlineb -P
-/usr/local/bin/ingestion
+#!/command/with-contenv sh
+exec /usr/local/bin/ingestion
