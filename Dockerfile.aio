@@ -42,6 +42,7 @@ ARG NATS_VERSION=2.10.24
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
+        procps \
         sqlite3 \
         wget \
         xz-utils \
