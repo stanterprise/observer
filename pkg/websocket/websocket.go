@@ -157,7 +157,7 @@ func (h *Hub) ensureConsumer(ctx context.Context, consumerName string) (jetstrea
 	consumerCfg := jetstream.ConsumerConfig{
 		Durable:       consumerName,
 		AckPolicy:     jetstream.AckExplicitPolicy,
-		DeliverPolicy: jetstream.DeliverNewPolicy, // Only deliver new events for WebSocket
+		DeliverPolicy: jetstream.DeliverAllPolicy, // Start from beginning for WebSocket (can be customized)
 		MaxDeliver:    3,
 		AckWait:       10 * time.Second,
 		Description:   "WebSocket event relay consumer",

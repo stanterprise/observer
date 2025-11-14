@@ -34,3 +34,7 @@ tests/test_*
 *.db
 *.sqlite
 *.sqlite3
+
+# Node.js dependencies for WebSocket tests
+tests/node_modules/
+tests/package*.json
