@@ -3,6 +3,7 @@ module github.com/stanterprise/observer
 go 1.23.0
 
 require (
+	github.com/gorilla/websocket v1.5.3
 	github.com/nats-io/nats.go v1.47.0
 	github.com/stanterprise/proto-go v0.0.8
 	google.golang.org/grpc v1.73.0
@@ -16,7 +17,6 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.6.0 // indirect
