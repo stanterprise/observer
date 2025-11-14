@@ -28,3 +28,9 @@ go.work.sum
 bin/
 observer
 coverage.out
+
+# Test database files
+tests/test_*
+*.db
+*.sqlite
+*.sqlite3
