@@ -14,6 +14,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/stanterprise/observer/internal/database"
+	"github.com/stanterprise/observer/pkg/api"
 	"github.com/stanterprise/observer/pkg/api/graph"
 )
 
@@ -34,13 +35,16 @@ func main() {
 	if db != nil {
 		logger.Info("database connected")
 	} else {
-		logger.Warn("DATABASE_URL not set; GraphQL queries will fail without database")
+		logger.Warn("DATABASE_URL not set; API queries will fail without database")
 	}
 
 	// Create GraphQL resolver and handler
 	resolver := graph.NewResolver(db, logger)
 	gqlHandler := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))
 	playgroundHandler := playground.Handler("GraphQL Playground", "/api/graphql")
+
+	// Create REST API handler
+	restHandler := api.NewHandler(db, logger)
 
 	// Create HTTP server with endpoints
 	mux := http.NewServeMux()
@@ -59,15 +63,24 @@ func main() {
 		}
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Observer API Service\n")
-		fmt.Fprintf(w, "Available endpoints:\n")
-		fmt.Fprintf(w, "  GET  /health          - Health check\n")
-		fmt.Fprintf(w, "  POST /api/graphql     - GraphQL API endpoint\n")
-		fmt.Fprintf(w, "  GET  /api/playground  - GraphQL Playground (interactive query tool)\n")
+		fmt.Fprintf(w, "\nAvailable endpoints:\n")
+		fmt.Fprintf(w, "  GET  /health              - Health check\n")
+		fmt.Fprintf(w, "\nGraphQL API:\n")
+		fmt.Fprintf(w, "  POST /api/graphql         - GraphQL API endpoint\n")
+		fmt.Fprintf(w, "  GET  /api/playground      - GraphQL Playground (interactive query tool)\n")
+		fmt.Fprintf(w, "\nREST API:\n")
+		fmt.Fprintf(w, "  GET  /api/tests           - List test cases (supports ?runId, ?status, ?search, ?limit, ?offset)\n")
+		fmt.Fprintf(w, "  GET  /api/tests/{id}      - Get specific test case with steps\n")
+		fmt.Fprintf(w, "  GET  /api/runs            - List all test runs\n")
+		fmt.Fprintf(w, "  GET  /api/runs/{runId}    - Get run details with statistics\n")
 	})
 
 	// GraphQL endpoints
 	mux.Handle("/api/graphql", gqlHandler)
 	mux.Handle("/api/playground", playgroundHandler)
+
+	// REST API endpoints
+	restHandler.RegisterRoutes(mux)
 
 	addr := ":" + *port
 	srv := &http.Server{
@@ -75,7 +88,11 @@ func main() {
 		Handler: mux,
 	}
 
-	logger.Info("api server starting", "addr", addr, "graphql", "/api/graphql", "playground", "/api/playground")
+	logger.Info("api server starting", 
+		"addr", addr, 
+		"graphql", "/api/graphql", 
+		"playground", "/api/playground",
+		"rest_api", "/api/tests, /api/runs")
 
 	// Run server in separate goroutine and capture fatal serve errors.
 	errChan := make(chan error, 1)
