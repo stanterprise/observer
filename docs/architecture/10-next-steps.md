@@ -44,6 +44,15 @@
 - ✅ Playwright reporter validation
 - ✅ Test documentation and guides
 
+### 7. WebSocket Real-Time Events ✅
+
+- ✅ WebSocket hub with connection management
+- ✅ NATS JetStream consumer for event relay
+- ✅ Integration into API service
+- ✅ Support for distributed and AIO modes
+- ✅ HTML test client for validation
+- ✅ Documentation and examples
+
 ## Remaining Work 🚧
 
 ### Phase 3: Full Event-Driven Architecture
@@ -56,14 +65,14 @@
 
 - [ ] GraphQL schema design
 - [ ] Query resolvers for test data
-- [ ] Real-time subscriptions (WebSocket)
+- [ ] ~~Real-time subscriptions (WebSocket)~~ ✅ Completed
 - [ ] Pagination and filtering
 
 ### Phase 5: UI Development
 
 - [ ] React dashboard setup (Vite + TypeScript)
 - [ ] Test run listing and detail views
-- [ ] Real-time updates via GraphQL subscriptions
+- [ ] ~~Real-time updates via WebSocket~~ ✅ Completed (infrastructure ready)
 - [ ] Artifact viewer (screenshots, videos, traces)
 - [ ] Tailwind CSS + shadcn/ui components
 
@@ -110,7 +119,7 @@
 
 1. Phase 3: Remove DB from ingestion
 2. Phase 4: Basic GraphQL API
-3. Phase 5: Minimal UI for viewing tests
+3. Phase 5: Minimal UI for viewing tests (WebSocket infrastructure ready ✅)
 
 **Medium Priority:** 4. Phase 6: Object storage for artifacts 5. Phase 8: Basic observability (metrics)
 
@@ -118,5 +127,5 @@
 
 ---
 
-**Last Updated**: November 13, 2025  
-**Current Phase**: Phase 2 Complete
+**Last Updated**: November 14, 2025  
+**Current Phase**: Phase 2 Complete + WebSocket Component ✅

@@ -31,8 +31,10 @@ The Observer system is composed of three main components:
 ### 3. **API Service** (`cmd/api`)
 
 - HTTP/GraphQL API for web UI and integrations
+- **WebSocket endpoint for real-time event streaming** (`/ws`)
+- NATS JetStream consumer for event relay
 - Read-only database access
-- Future: WebSocket for real-time updates, authentication
+- Future: GraphQL implementation, authentication
 
 See detailed documentation in each component's README:
 
@@ -187,10 +189,46 @@ The test suite uses an in-process `bufconn` listener (no external ports) and val
 
 ### API Service
 
-| Variable       | Default | Description                             |
-| -------------- | ------- | --------------------------------------- |
-| `PORT`         | `8080`  | HTTP listening port                     |
-| `DATABASE_URL` | -       | PostgreSQL connection string (optional) |
+| Variable           | Default        | Description                                   |
+| ------------------ | -------------- | --------------------------------------------- |
+| `PORT`             | `8080`         | HTTP listening port                           |
+| `DATABASE_URL`     | -              | PostgreSQL connection string (optional)       |
+| `NATS_URL`         | -              | NATS server URL (optional, for WebSocket)     |
+| `NATS_STREAM`      | `tests_events` | JetStream stream name for WebSocket relay     |
+| `NATS_WS_CONSUMER` | `websocket`    | Consumer name for WebSocket NATS subscription |
+
+## WebSocket Real-Time Events
+
+The API service exposes a WebSocket endpoint at `/ws` for real-time test event streaming.
+
+### Connecting to WebSocket
+
+```javascript
+const ws = new WebSocket('ws://localhost:8080/ws');
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Event:', data.type, data);
+};
+```
+
+### Event Format
+
+All events follow this structure:
+
+```json
+{
+  "type": "test.begin|test.end|step.begin|step.end",
+  "timestamp": "2025-11-14T05:00:00Z",
+  "data": { /* event-specific data */ }
+}
+```
+
+### Test Client
+
+A simple HTML test client is available at [`docs/websocket-test-client.html`](./docs/websocket-test-client.html). Open it in a browser to connect to the WebSocket endpoint and view real-time events.
+
+**Note**: The WebSocket functionality requires `NATS_URL` to be configured. Without NATS, the WebSocket endpoint will accept connections but won't relay events.
 
 ## Logging
 
@@ -223,6 +261,7 @@ Detailed architecture documentation is available in [`docs/architecture/`](./doc
 - [x] Separate components into distinct services
 - [x] **Phase 1**: NATS JetStream publisher integration (dual-write)
 - [x] **Phase 2**: Processor service NATS consumer with database persistence
+- [x] **WebSocket component**: Real-time event streaming to web clients
 - [x] Docker Compose profiles (AIO and distributed)
 - [x] Comprehensive test suite with E2E NATS integration
 - [x] Playwright reporter integration validation
