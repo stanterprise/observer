@@ -7,22 +7,30 @@ This is a **test observability system** that ingests test execution events via g
 - **All-in-One (AIO)**: Single container with embedded services (SQLite, embedded NATS via s6-overlay) for dev/local use
 - **Distributed**: Multi-container deployment (Postgres, separate NATS, independent services) for production/CI
 
-**Current implementation status**: **Phase 1 Complete** - System is decomposed into three independent services communicating via NATS JetStream.
+**Current implementation status**: **Phase 2 Complete** - System is fully decomposed into three independent services with complete NATS JetStream integration (publisher + consumer).
 
 ### Service Architecture
 
 ```
-Test Reporter → Ingestion (gRPC) → NATS JetStream → Processor → Postgres/SQLite
-                                                           ↓
-                                                      API ← Web UI
+Test Reporter → Ingestion (gRPC) → NATS JetStream ──┬→ Processor (Consumer) → Database
+                                                     │
+                                                     └→ API Consumer (Future) → WebSocket → Web UI
+
+                                          Database ← API Service → Web UI (HTTP/GraphQL)
 ```
 
 **Components:**
 
-1. **Ingestion Service** (`cmd/ingestion/`) - Stateless gRPC endpoint that validates events and publishes to NATS
-2. **Processor Service** (`cmd/processor/`) - Consumes NATS events and persists to database (requires DB)
+1. **Ingestion Service** (`cmd/ingestion/`) - Stateless gRPC endpoint that validates events and publishes to NATS (dual-write with optional DB)
+2. **Processor Service** (`cmd/processor/`) - NATS JetStream consumer that persists events to database (requires DB and NATS)
 3. **API Service** (`cmd/api/`) - HTTP/GraphQL server for UI and integrations (future implementation)
-4. **Legacy Server** (`server/main.go`) - Monolithic backward-compatible server (direct DB writes)
+4. **Legacy Server** (`server/main.go`) - Monolithic backward-compatible server (direct DB writes, optional NATS publish)
+
+**NATS Consumer Pattern:**
+
+- **Processor Consumer** (✅ Implemented): Subscribes to all events, writes to database for persistence
+- **API Consumer** (Future): Will subscribe to events, relay real-time updates to Web UI via WebSocket
+- Multiple independent consumers can subscribe to the same NATS JetStream stream
 
 **Key directories:**
 
@@ -47,22 +55,26 @@ Test Reporter → Ingestion (gRPC) → NATS JetStream → Processor → Postgres
 The **Playwright custom reporter** is maintained in a separate repository: `github.com/stanterprise/stanterprise-playwright-reporter`
 
 This reporter serves as:
+
 - **Reference implementation** for the gRPC protocol
 - **Integration test client** for Observer development
 - **Production reporter** for Playwright test suites
 
 The reporter can be installed directly from GitHub via npm:
+
 ```bash
 npm install github:stanterprise/stanterprise-playwright-reporter
 ```
 
 When developing or testing Observer:
+
 1. Use the Playwright reporter codebase to generate realistic test events
 2. Validate protobuf schema compatibility between reporter and Observer
 3. Test end-to-end flows: Playwright → Reporter → Observer gRPC → NATS → DB
 4. Verify metadata handling and event sequencing
 
 **Development workflow**:
+
 ```bash
 # Clone reporter repository
 git clone https://github.com/stanterprise/stanterprise-playwright-reporter
@@ -146,6 +158,7 @@ type Event struct {
 ```
 
 **Stream configuration** (auto-created on startup):
+
 - Name: `tests_events` (configurable via `NATS_STREAM`)
 - Subjects: `tests.events.v1.>` (prefix configurable via `NATS_SUBJECT_PREFIX`)
 - Retention: WorkQueue policy, 24h max age
@@ -164,7 +177,7 @@ defer pub.Close()
 pub.Publish(ctx, publisher.EventTypeTestBegin, protoRequest)
 ```
 
-### Consumer (Processor Service)
+### Consumer (Processor Service) ✅ **Phase 2 Complete**
 
 Located in `pkg/consumer/nats.go`. Pull-based consumer with batch fetching:
 
@@ -181,16 +194,25 @@ consumer.Start(ctx, cfg)  // Blocks until context cancelled
 ```
 
 **Consumer configuration:**
+
 - Durable name enables resumption after restart
 - Explicit ack policy (must call `msg.Ack()` or `msg.Nak()`)
 - MaxDeliver: 5 (retry up to 5 times before DLQ)
 - AckWait: 30s (message redelivered if not acked)
 
 **Event routing** (in `processMessage()`):
+
 - Unmarshals event envelope → routes by `event.Type`
 - Calls dedicated handlers: `handleTestBegin()`, `handleTestEnd()`, etc.
 - Handlers use same GORM upsert patterns as legacy in-process code
 - Unknown event types are acked to prevent redelivery loop
+
+**Processor Service Architecture:**
+
+- No longer runs gRPC server (transformed in commit 87b0209)
+- Pure NATS consumer with database persistence
+- Supports horizontal scaling via durable consumer groups
+- Graceful shutdown with context cancellation
 
 ## gRPC Service Conventions
 
@@ -270,6 +292,7 @@ make test-nats-integration  # Sets NATS_TEST_URL=nats://localhost:4222
 ```
 
 Tests validate:
+
 - Event publishing → consumption → DB persistence round-trip
 - Consumer acknowledgment and redelivery behavior
 - Stream/consumer auto-creation
@@ -326,18 +349,21 @@ docker compose --profile dist up -d
 ### Environment Variables
 
 **Ingestion Service:**
+
 - `PORT` - gRPC listen port (default: 50051)
 - `NATS_URL` - NATS server URL (optional, e.g., `nats://localhost:4222`)
 - `NATS_STREAM` - JetStream stream name (default: `tests_events`)
 - `NATS_SUBJECT_PREFIX` - Subject prefix (default: `tests.events.v1`)
 
 **Processor Service:**
+
 - `NATS_URL` - NATS server URL (required)
 - `NATS_STREAM`, `NATS_CONSUMER` - Stream and consumer names
 - `DATABASE_URL` - Postgres or SQLite DSN (required)
 - `APPLY_MIGRATIONS` - Set to `1` to enable auto-migrations
 
 **API Service:**
+
 - `PORT` - HTTP listen port (default: 8080)
 - `DATABASE_URL` - Postgres or SQLite DSN (optional for future read-only access)
 
@@ -431,15 +457,20 @@ Check consumer lag: Fetch consumer info via NATS CLI or monitoring endpoint.
 ## Migration Roadmap
 
 **Completed:**
-- ✅ Phase 1: NATS JetStream publisher in ingestion service (dual-write mode)
+
+- ✅ **Phase 1**: NATS JetStream publisher in ingestion service (dual-write mode) - Commit #64a0f13
+- ✅ **Phase 2**: NATS JetStream consumer in processor service - Commit #87b0209
 - ✅ Separate service entrypoints (`cmd/ingestion`, `cmd/processor`, `cmd/api`)
-- ✅ NATS consumer with event routing in processor service
+- ✅ NATS consumer with event routing and database persistence
 - ✅ Docker Compose profiles (AIO + distributed)
 - ✅ Multi-stage Dockerfiles for each service
+- ✅ Comprehensive test suite (17 tests) with E2E NATS integration validation
+- ✅ Playwright reporter integration documentation
 
 **Future phases:**
-- [ ] Phase 2: Remove dual-write from ingestion (NATS-only, fully stateless)
-- [ ] Phase 3: API service GraphQL implementation
+
+- [ ] **Phase 3**: Remove dual-write from ingestion (NATS-only, fully stateless)
+- [ ] **Phase 4**: API service GraphQL implementation
 - [ ] Object storage integration (MinIO/S3) for test artifacts
 - [ ] Web UI (React + Tailwind + shadcn/ui)
 - [ ] Authentication layer (dev token, OIDC)
