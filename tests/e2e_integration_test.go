@@ -52,7 +52,7 @@ func TestEndToEndIntegration(t *testing.T) {
 
 	defer func() {
 		pub.Close()
-		
+
 		// Cleanup: delete the test stream
 		nc, err := nats.Connect(natsURL)
 		if err == nil {
@@ -64,8 +64,12 @@ func TestEndToEndIntegration(t *testing.T) {
 		}
 	}()
 
-	// Setup in-memory database
-	db, err := database.Connect("file::memory:?cache=shared", logger)
+	// Setup temporary file-based SQLite database for testing
+	// Note: Using file-based DB instead of :memory: to ensure consumer sees the same database
+	tmpFile := "test_" + time.Now().Format("20060102150405") + ".db"
+	defer os.Remove(tmpFile)
+
+	db, err := database.Connect(tmpFile, logger)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
@@ -214,11 +218,11 @@ func TestEndToEndIntegration(t *testing.T) {
 			result := db.Where("id = ?", testID).First(&testCase)
 			if result.Error == nil {
 				testFound = true
-				
+
 				// Check if status was updated (status is set on TestEnd)
 				if testCase.Status == common.TestStatus_PASSED.String() {
 					statusUpdated = true
-					
+
 					// Verify test case data
 					if testCase.Title != "E2E Integration Test" {
 						t.Errorf("Expected title 'E2E Integration Test', got '%s'", testCase.Title)
@@ -233,7 +237,7 @@ func TestEndToEndIntegration(t *testing.T) {
 			result = db.Where("test_case_run_id = ?", testID).First(&step)
 			if result.Error == nil {
 				stepFound = true
-				
+
 				// Verify step data
 				if step.Status != "" && step.Status != "RUNNING" {
 					// Step status has been updated to final state
@@ -361,7 +365,9 @@ func TestNATSEventFormat(t *testing.T) {
 	msgReceived := false
 	for msg := range msgs.Messages() {
 		msgReceived = true
-		msg.Ack()
+		if err := msg.Ack(); err != nil {
+			t.Errorf("Failed to ack message: %v", err)
+		}
 
 		// Parse event envelope
 		var event publisher.Event
