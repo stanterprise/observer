@@ -24,15 +24,15 @@ func TestNewNATSPublisher_RequiresURL(t *testing.T) {
 
 func TestNewNATSPublisher_NilLogger(t *testing.T) {
 	// This test verifies nil logger handling doesn't panic
-	// but will fail to connect without a real NATS server
+	// Use an invalid NATS URL to ensure connection fails
 	cfg := NATSConfig{
-		URL: "nats://localhost:4222",
+		URL: "nats://invalid-host-that-does-not-exist.local:4222",
 	}
 
 	_, err := NewNATSPublisher(cfg, nil)
-	// We expect an error because NATS is not running, but shouldn't panic
+	// We expect an error because the host doesn't exist
 	if err == nil {
-		t.Error("Expected error when NATS server is not available")
+		t.Error("Expected error when connecting to invalid NATS host")
 	}
 }
 
