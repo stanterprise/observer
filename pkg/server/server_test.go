@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"os"
 	"testing"
@@ -892,13 +891,4 @@ func TestInterceptors_NoError(t *testing.T) {
 	if srv == nil {
 		t.Error("NewGRPCServer() returned nil")
 	}
-}
-
-// Helper to simulate transaction errors
-type errorDB struct {
-	*gorm.DB
-}
-
-func (e *errorDB) Transaction(fc func(tx *gorm.DB) error) error {
-	return errors.New("simulated transaction error")
 }

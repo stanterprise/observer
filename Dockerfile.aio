@@ -88,6 +88,8 @@ ENV DB_DRIVER=sqlite \
     STORAGE_DRIVER=local \
     ARTIFACTS_DIR=/data/artifacts \
     NATS_URL=nats://localhost:4222 \
+    NATS_STREAM=tests_events \
+    NATS_WS_CONSUMER=websocket \
     APPLY_MIGRATIONS=1
 
 # Expose ports

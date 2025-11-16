@@ -143,7 +143,9 @@ func TestNATSPublisher_Integration(t *testing.T) {
 	msgReceived := false
 	for msg := range msgs.Messages() {
 		msgReceived = true
-		msg.Ack()
+		if err := msg.Ack(); err != nil {
+			t.Errorf("failed to ack message: %v", err)
+		}
 		t.Logf("Received message: %s", string(msg.Data()))
 	}
 
@@ -201,9 +203,12 @@ func TestEvent_Marshaling(t *testing.T) {
 	}
 
 	// Should be able to marshal and unmarshal
-	_, err := event.Type.String()
-	if err == nil {
-		// EventType is a string, so this just validates the struct
+	typeStr, err := event.Type.String()
+	if err != nil {
+		t.Errorf("EventType.String() error = %v", err)
+	}
+	if typeStr == "" {
+		t.Error("EventType.String() returned empty string")
 	}
 
 	if event.Type != EventTypeTestBegin {

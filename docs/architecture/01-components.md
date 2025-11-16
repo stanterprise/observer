@@ -40,9 +40,11 @@
 ## 6. API / GraphQL
 
 - Serves UI and external integrations.
-- Provides authentication middleware.
-- Exposes `/api/graphql` and `/metrics` endpoints.
-- Exposes a WebSocket connection to the Web UI to have real time test execution updates.
+- **WebSocket endpoint (`/ws`) for real-time event streaming** ✅
+- NATS JetStream consumer for event relay to connected clients
+- Provides authentication middleware (future).
+- Exposes `/api/graphql` and `/metrics` endpoints (future).
+- Multiple WebSocket clients supported with automatic connection management
 
 ## 7. Web UI
 

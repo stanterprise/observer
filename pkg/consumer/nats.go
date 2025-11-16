@@ -175,10 +175,14 @@ func (c *NATSConsumer) Start(ctx context.Context, cfg NATSConsumerConfig) error 
 						"subject", msg.Subject(),
 						"error", err)
 					// Negative acknowledge - will be redelivered
-					msg.Nak()
+					if nakErr := msg.Nak(); nakErr != nil {
+						c.logger.Error("failed to nak message", "error", nakErr)
+					}
 				} else {
 					// Acknowledge successful processing
-					msg.Ack()
+					if ackErr := msg.Ack(); ackErr != nil {
+						c.logger.Error("failed to ack message", "error", ackErr)
+					}
 				}
 			}
 		}

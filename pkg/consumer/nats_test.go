@@ -68,7 +68,11 @@ func TestNATSConsumer_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create stream: %v", err)
 	}
-	defer js.DeleteStream(context.Background(), streamName)
+	defer func() {
+		if err := js.DeleteStream(context.Background(), streamName); err != nil {
+			t.Logf("Failed to delete stream: %v", err)
+		}
+	}()
 
 	// Create consumer
 	cfg := NATSConsumerConfig{

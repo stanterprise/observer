@@ -14,6 +14,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/stanterprise/observer/internal/database"
+	"github.com/stanterprise/observer/pkg/websocket"
 	"github.com/stanterprise/observer/pkg/api"
 	"github.com/stanterprise/observer/pkg/api/graph"
 )
@@ -38,6 +39,35 @@ func main() {
 		logger.Warn("DATABASE_URL not set; API queries will fail without database")
 	}
 
+	// Initialize WebSocket hub
+	hub := websocket.NewHub(logger)
+	
+	// Configure NATS for WebSocket if NATS_URL is provided
+	natsURL := os.Getenv("NATS_URL")
+	if natsURL != "" {
+		wsConfig := websocket.NATSConfig{
+			URL:          natsURL,
+			StreamName:   envOr("NATS_STREAM", "tests_events"),
+			ConsumerName: envOr("NATS_WS_CONSUMER", "websocket"),
+			BatchSize:    10,
+			MaxWait:      5 * time.Second,
+		}
+		
+		if err := hub.InitNATS(wsConfig); err != nil {
+			logger.Error("failed to initialize NATS for WebSocket", "error", err)
+			os.Exit(1)
+		}
+	}
+	
+	// Start WebSocket hub in background
+	hubCtx, hubCancel := context.WithCancel(context.Background())
+	defer hubCancel()
+	
+	go hub.Run(hubCtx, websocket.NATSConfig{
+		BatchSize: 10,
+		MaxWait:   5 * time.Second,
+	})
+
 	// Create GraphQL resolver and handler
 	resolver := graph.NewResolver(db, logger)
 	gqlHandler := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))
@@ -54,8 +84,9 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "OK\n")
 	})
-	
-	// Root information endpoint
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		hub.ServeWS(w, r)
+	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
@@ -63,7 +94,9 @@ func main() {
 		}
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Observer API Service\n")
-		fmt.Fprintf(w, "\nAvailable endpoints:\n")
+		fmt.Fprintf(w, "Available endpoints:\n")
+		fmt.Fprintf(w, "  GET /health - Health check\n")
+		fmt.Fprintf(w, "  GET /ws - WebSocket endpoint for real-time events\n")
 		fmt.Fprintf(w, "  GET  /health              - Health check\n")
 		fmt.Fprintf(w, "\nGraphQL API:\n")
 		fmt.Fprintf(w, "  POST /api/graphql         - GraphQL API endpoint\n")
@@ -114,6 +147,9 @@ func main() {
 			logger.Error("server serve error", "error", err)
 		}
 	}
+
+	// Stop WebSocket hub
+	hubCancel()
 
 	// Allow up to 5s for graceful stop.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
