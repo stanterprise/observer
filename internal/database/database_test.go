@@ -161,8 +161,8 @@ func TestConnectFromEnv_NoDatabaseURL(t *testing.T) {
 func TestConnect_InvalidDSN(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Test with invalid DSN
-	_, err := Connect("invalid://dsn", logger)
+	// Test with invalid Postgres DSN (invalid port number)
+	_, err := Connect("postgres://user:pass@localhost:999999/db", logger)
 	if err == nil {
 		t.Error("Connect() with invalid DSN should return error")
 	}
