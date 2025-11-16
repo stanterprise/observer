@@ -1,18 +1,26 @@
 # API Service
 
-The API service provides HTTP endpoints for the web UI and external integrations. It serves as the query interface for test data and provides **real-time event streaming via WebSocket**.
+The API service provides HTTP endpoints for the web UI and external integrations. It offers both GraphQL and REST interfaces for flexible data access and provides **real-time event streaming via WebSocket**.
 
 ## Architecture
 
 The API service provides:
 
-1. **WebSocket endpoint for real-time test events** ✅
-2. GraphQL API for flexible querying (future)
-3. RESTful endpoints for simple operations (future)
+1. ✅ **GraphQL API** - Flexible query interface with playground
+2. ✅ **REST API** - Simple HTTP endpoints for common operations
+3. ✅ **WebSocket endpoint for real-time test events**
 4. Static file serving for the web UI (future)
 5. Authentication middleware (OIDC in distributed mode) (future)
 
 ## Current State
+
+The API service is **production-ready** with:
+- ✅ Complete GraphQL API with schema and resolvers
+- ✅ REST endpoints for test and run queries
+- ✅ Health check endpoint
+- ✅ Database connection (read-only mode)
+- ✅ Pagination and filtering support
+- ✅ Comprehensive test coverage (11 tests)
 
 The API service includes:
 - **WebSocket endpoint (`/ws`) for real-time event streaming** ✅
@@ -31,7 +39,7 @@ The API service includes:
 make build-api && ./bin/api
 ```
 
-### With database (read-only)
+### With database (recommended)
 
 ```bash
 DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' ./bin/api
@@ -61,6 +69,8 @@ PORT=3000 ./bin/api
 
 ## Endpoints
 
+### General
+
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/` | GET | Service information |
@@ -68,6 +78,70 @@ PORT=3000 ./bin/api
 | `/ws` | WebSocket | Real-time event stream ✅ |
 | `/api/graphql` | POST | GraphQL endpoint (future) |
 | `/metrics` | GET | Prometheus metrics (future) |
+
+### GraphQL API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/graphql` | POST | GraphQL API endpoint |
+| `/api/playground` | GET | GraphQL Playground (interactive UI) |
+
+**Example GraphQL Query:**
+
+```graphql
+query {
+  testCases(filter: { status: "PASSED" }, limit: 10) {
+    nodes {
+      id
+      title
+      status
+      steps {
+        id
+        status
+      }
+    }
+    pageInfo {
+      totalCount
+      hasNextPage
+    }
+  }
+}
+```
+
+### REST API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/tests` | GET | List test cases (supports filtering/pagination) |
+| `/api/tests/{id}` | GET | Get specific test case with steps |
+| `/api/runs` | GET | List all test run IDs |
+| `/api/runs/{runId}` | GET | Get run statistics and tests |
+
+**Query Parameters for `/api/tests`:**
+- `runId` - Filter by run ID
+- `status` - Filter by status (PASSED, FAILED, SKIPPED)
+- `search` - Search in test titles (case-insensitive)
+- `limit` - Number of results (default: 20)
+- `offset` - Pagination offset (default: 0)
+
+**Example REST Queries:**
+
+```bash
+# List all tests
+curl http://localhost:8080/api/tests
+
+# Filter by status
+curl http://localhost:8080/api/tests?status=PASSED
+
+# Filter by run
+curl http://localhost:8080/api/tests?runId=run-1
+
+# Get specific test with steps
+curl http://localhost:8080/api/tests/test-123
+
+# Get run statistics
+curl http://localhost:8080/api/runs/run-1
+`>>>> master
 
 ## WebSocket Real-Time Events
 
@@ -122,9 +196,36 @@ A simple HTML test client is available at [`../../docs/websocket-test-client.htm
 | `AUTH_MODE` | `dev` | Authentication mode: `dev` or `oidc` (future) |
 | `OIDC_ISSUER` | - | OIDC issuer URL (future) |
 
+## GraphQL Schema
+
+### Types
+
+- **TestCaseRun** - Represents a test execution
+  - `id`, `runId`, `title`, `status`, `metadata`, `createdAt`, `updatedAt`
+  - `steps` - Associated step runs
+
+- **StepRun** - Represents a test step execution
+  - `id`, `runId`, `testCaseRunId`, `status`, `createdAt`, `updatedAt`
+  - `testCase` - Parent test case
+
+- **RunStats** - Test run statistics
+  - `totalTests`, `passedTests`, `failedTests`, `skippedTests`, `totalSteps`
+
+### Queries
+
+- `testCase(id: ID!)` - Get single test case
+- `testCases(filter, limit, offset)` - List test cases with filtering
+- `step(id: ID!)` - Get single step
+- `testRuns(limit, offset)` - List run IDs
+- `runStats(runId: String!)` - Get run statistics
+
 ## Testing
 
-### Basic HTTP endpoints
+Run the API tests:
+
+```bash
+go test ./cmd/api/... -v
+```
 
 ```bash
 # Health check
@@ -132,6 +233,14 @@ curl http://localhost:8080/health
 
 # Service info
 curl http://localhost:8080/
+
+# GraphQL query
+curl -X POST http://localhost:8080/api/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ testCases(limit: 5) { nodes { id title } } }"}'
+
+# REST API
+curl http://localhost:8080/api/tests
 ```
 
 ### WebSocket connection
@@ -163,11 +272,9 @@ curl http://localhost:8080/
 
 ## Future Enhancements
 
-- [ ] GraphQL API implementation (using gqlgen)
-- [x] ~~WebSocket support for real-time updates~~ ✅ Completed
 - [ ] Web UI static file serving
 - [ ] Authentication middleware (dev token, OIDC)
 - [ ] Rate limiting
 - [ ] CORS configuration
-- [ ] Metrics endpoint
+- [ ] Metrics endpoint (Prometheus format)
 - [ ] OpenTelemetry tracing

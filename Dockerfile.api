@@ -4,15 +4,17 @@
 # ============================================================================
 # Builder stage
 # ============================================================================
-FROM golang:1.23-bookworm AS builder
+FROM golang:1.25-bookworm AS builder
 
 # Install build dependencies for CGO (required for SQLite support)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        ca-certificates \
         gcc \
         libc6-dev \
         libsqlite3-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* && \
+    update-ca-certificates
 
 WORKDIR /build
 
