@@ -135,7 +135,9 @@ func TestNATSIntegration(t *testing.T) {
 		msgReceived := false
 		for msg := range msgs.Messages() {
 			msgReceived = true
-			msg.Ack()
+			if err := msg.Ack(); err != nil {
+				t.Errorf("Failed to ack message: %v", err)
+			}
 
 			// Parse the event
 			var event publisher.Event
