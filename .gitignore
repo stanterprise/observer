@@ -38,3 +38,9 @@ tests/test_*
 # Node.js dependencies for WebSocket tests
 tests/node_modules/
 tests/package*.json
+
+# Web UI
+web/node_modules/
+web/dist/
+web/.env
+web/.env.local

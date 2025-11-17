@@ -179,6 +179,19 @@ nats-logs: ## Tail NATS logs
 test-nats-integration: ## Run NATS integration tests (requires NATS running)
 	NATS_TEST_URL=nats://localhost:4222 go test ./tests/... -v -run TestNATSIntegration
 
+# Web UI targets
+web-install: ## Install Web UI dependencies
+	cd web && npm install
+
+web-dev: ## Run Web UI in development mode
+	cd web && npm run dev
+
+web-build: ## Build Web UI for production
+	cd web && npm run build
+
+web-clean: ## Clean Web UI build artifacts
+	rm -rf web/dist web/node_modules
+
 # Docker image management
 IMAGE_NAME ?= observer
 IMAGE_TAG ?= latest
@@ -188,6 +201,7 @@ docker-build-all: build-all ## Build all Docker images
 	docker build -f Dockerfile.ingestion -t $(IMAGE_NAME):ingestion .
 	docker build -f Dockerfile.processor -t $(IMAGE_NAME):processor .
 	docker build -f Dockerfile.api -t $(IMAGE_NAME):api .
+	docker build -f Dockerfile.web -t $(IMAGE_NAME):web .
 
 docker-build-aio: build-all ## Build AIO Docker image
 	docker build -f Dockerfile.aio -t $(IMAGE_NAME):aio .
@@ -201,6 +215,9 @@ docker-build-processor: build-all ## Build processor Docker image
 docker-build-api: build-all ## Build API Docker image
 	docker build -f Dockerfile.api -t $(IMAGE_NAME):api .
 
+docker-build-web: ## Build Web UI Docker image
+	docker build -f Dockerfile.web -t $(IMAGE_NAME):web .
+
 # Backward compatibility
 docker-build: docker-build-all ## Build all Docker images (alias)
 
@@ -208,7 +225,7 @@ docker-build: docker-build-all ## Build all Docker images (alias)
 docker-up-aio: docker-build-aio ## Start AIO profile with docker compose
 	docker compose --profile aio up -d
 
-docker-up-dist: docker-build-ingestion docker-build-processor docker-build-api ## Start distributed profile with docker compose
+docker-up-dist: docker-build-ingestion docker-build-processor docker-build-api docker-build-web ## Start distributed profile with docker compose
 	docker compose --profile dist up -d
 
 docker-down: ## Stop all docker compose services

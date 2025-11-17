@@ -1,0 +1,3 @@
+#!/command/execlineb -P
+# Nginx service - serves Web UI and proxies API/WebSocket
+nginx -g "daemon off;"

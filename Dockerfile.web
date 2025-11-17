@@ -1,0 +1,43 @@
+# Dockerfile for Web UI
+# Multi-stage build: Node.js for building, Nginx for serving
+
+# ============================================================================
+# Builder stage - Build React application
+# ============================================================================
+FROM node:20-alpine AS builder
+
+WORKDIR /build
+
+# Copy package files and install dependencies
+COPY web/package*.json ./
+RUN npm ci
+
+# Copy source code and build
+COPY web/ ./
+RUN npm run build
+
+# ============================================================================
+# Runtime stage - Nginx for serving static files and proxying
+# ============================================================================
+FROM nginx:alpine
+
+# Install envsubst for environment variable substitution
+RUN apk add --no-cache gettext
+
+# Copy built application from builder
+COPY --from=builder /build/dist /usr/share/nginx/html
+
+# Copy Nginx configuration template
+COPY docker/nginx/nginx.conf.template /etc/nginx/templates/default.conf.template
+
+# Environment variables for backend configuration
+# These will be substituted in the nginx.conf.template by envsubst
+ENV API_BACKEND_HOST=localhost \
+    API_BACKEND_PORT=8080
+
+# Expose HTTP port
+EXPOSE 80
+
+# Use default nginx entrypoint which handles template substitution
+# The nginx image automatically runs envsubst on files in /etc/nginx/templates/
+CMD ["nginx", "-g", "daemon off;"]
