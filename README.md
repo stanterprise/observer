@@ -30,11 +30,12 @@ The Observer system is composed of three main components:
 
 ### 3. **API Service** (`cmd/api`)
 
-- HTTP/GraphQL API for web UI and integrations
+- HTTP REST/GraphQL API for web UI and integrations (✅ Implemented)
 - **WebSocket endpoint for real-time event streaming** (`/ws`)
-- NATS JetStream consumer for event relay
+- NATS JetStream consumer for event relay to WebSocket clients
+- REST endpoints for test listing, run statistics, and details
+- GraphQL support with interactive playground
 - Read-only database access
-- Future: GraphQL implementation, authentication
 
 See detailed documentation in each component's README:
 
@@ -245,7 +246,7 @@ The repository maintains backward compatibility with the monolithic `server/main
 1. **Legacy Mode**: Run `./bin/observer` for single-process deployment
 2. **Distributed Mode**: Run `ingestion`, `processor`, and `api` services independently
 
-**Phase 2 Complete**: The system now supports full NATS JetStream integration with both publisher (ingestion) and consumer (processor) services. The processor service runs as a pure NATS consumer with database persistence, enabling fully distributed event-driven architecture.
+**Phase 2 Complete**: The system now supports full NATS JetStream integration with both publisher (ingestion) and consumer (processor, WebSocket) services. The processor service runs as a pure NATS consumer with database persistence, enabling fully distributed event-driven architecture. The API service includes WebSocket support for real-time event streaming to web clients, and the Web UI provides a modern React-based interface with live updates.
 
 ## Architecture Documentation
 
@@ -292,12 +293,14 @@ The development server includes proxying for API and WebSocket endpoints to `loc
 - [x] **Phase 1**: NATS JetStream publisher integration (dual-write)
 - [x] **Phase 2**: Processor service NATS consumer with database persistence
 - [x] **WebSocket component**: Real-time event streaming to web clients
+- [x] **Web UI**: React + TypeScript + Tailwind CSS interface
+- [x] **REST API**: Test listing, run statistics, and detail endpoints
 - [x] Docker Compose profiles (AIO and distributed)
 - [x] Comprehensive test suite with E2E NATS integration
 - [x] Playwright reporter integration validation
-- [x] **Web UI**: React + TypeScript + Tailwind CSS interface ✅
 - [ ] **Phase 3**: Remove DB from ingestion (NATS-only, fully stateless)
-- [ ] **Phase 4**: GraphQL API implementation
+- [ ] **Phase 4**: Complete GraphQL API implementation
+- [ ] Enhanced Web UI features (test details, artifact viewer, filtering)
 - [ ] Object storage for artifacts (MinIO/S3)
 - [ ] Authentication layer (dev token, OIDC)
 - [ ] Metrics (Prometheus) and tracing (OpenTelemetry)

@@ -7,29 +7,30 @@ This is a **test observability system** that ingests test execution events via g
 - **All-in-One (AIO)**: Single container with embedded services (SQLite, embedded NATS via s6-overlay) for dev/local use
 - **Distributed**: Multi-container deployment (Postgres, separate NATS, independent services) for production/CI
 
-**Current implementation status**: **Phase 2 Complete** - System is fully decomposed into three independent services with complete NATS JetStream integration (publisher + consumer).
+**Current implementation status**: **Phase 3+ In Progress** - System has completed distributed architecture with WebSocket real-time streaming and Web UI implementation.
 
 ### Service Architecture
 
 ```
 Test Reporter → Ingestion (gRPC) → NATS JetStream ──┬→ Processor (Consumer) → Database
                                                      │
-                                                     └→ API Consumer (Future) → WebSocket → Web UI
+                                                     └→ API Consumer (WebSocket) → Web UI (React)
 
-                                          Database ← API Service → Web UI (HTTP/GraphQL)
+                                          Database ← API Service (REST/GraphQL + WebSocket) → Web UI
 ```
 
 **Components:**
 
 1. **Ingestion Service** (`cmd/ingestion/`) - Stateless gRPC endpoint that validates events and publishes to NATS (dual-write with optional DB)
 2. **Processor Service** (`cmd/processor/`) - NATS JetStream consumer that persists events to database (requires DB and NATS)
-3. **API Service** (`cmd/api/`) - HTTP/GraphQL server for UI and integrations (future implementation)
-4. **Legacy Server** (`server/main.go`) - Monolithic backward-compatible server (direct DB writes, optional NATS publish)
+3. **API Service** (`cmd/api/`) - HTTP REST/GraphQL server + WebSocket endpoint for real-time events (✅ Implemented)
+4. **Web UI** (`web/`) - React + TypeScript + Tailwind CSS dashboard with real-time updates (✅ Implemented)
+5. **Legacy Server** (`server/main.go`) - Monolithic backward-compatible server (direct DB writes, optional NATS publish)
 
 **NATS Consumer Pattern:**
 
 - **Processor Consumer** (✅ Implemented): Subscribes to all events, writes to database for persistence
-- **API Consumer** (Future): Will subscribe to events, relay real-time updates to Web UI via WebSocket
+- **WebSocket Consumer** (✅ Implemented): Subscribes to events, relays real-time updates to Web UI clients via WebSocket
 - Multiple independent consumers can subscribe to the same NATS JetStream stream
 
 **Key directories:**
@@ -38,6 +39,9 @@ Test Reporter → Ingestion (gRPC) → NATS JetStream ──┬→ Processor (Co
 - `pkg/publisher/` - NATS JetStream publisher (wraps event serialization + stream management)
 - `pkg/consumer/` - NATS consumer with event routing and DB persistence logic
 - `pkg/server/` - gRPC service implementation with panic recovery + logging interceptors
+- `pkg/websocket/` - WebSocket hub for real-time event streaming to web clients
+- `pkg/api/` - REST API handlers and GraphQL schema
+- `web/` - React + TypeScript + Tailwind CSS web interface
 - `internal/database/` - GORM connection supporting both Postgres and SQLite
 - `internal/models/` - GORM models (`TestCaseRun`, `StepRun`) with JSON metadata fields
 - `tests/` - In-process `bufconn` tests + NATS integration tests
@@ -365,7 +369,10 @@ docker compose --profile dist up -d
 **API Service:**
 
 - `PORT` - HTTP listen port (default: 8080)
-- `DATABASE_URL` - Postgres or SQLite DSN (optional for future read-only access)
+- `DATABASE_URL` - Postgres or SQLite DSN (optional for read-only access)
+- `NATS_URL` - NATS server URL (optional, for WebSocket relay)
+- `NATS_STREAM` - JetStream stream name (default: `tests_events`)
+- `NATS_WS_CONSUMER` - Consumer name for WebSocket (default: `websocket`)
 
 ## Code Style & Patterns
 
@@ -458,20 +465,24 @@ Check consumer lag: Fetch consumer info via NATS CLI or monitoring endpoint.
 
 **Completed:**
 
-- ✅ **Phase 1**: NATS JetStream publisher in ingestion service (dual-write mode) - Commit #64a0f13
-- ✅ **Phase 2**: NATS JetStream consumer in processor service - Commit #87b0209
+- ✅ **Phase 1**: NATS JetStream publisher in ingestion service (dual-write mode)
+- ✅ **Phase 2**: NATS JetStream consumer in processor service
+- ✅ **WebSocket Component**: Real-time event streaming via WebSocket
+- ✅ **Web UI**: React + TypeScript + Tailwind CSS interface with real-time updates
+- ✅ **REST API**: Test listing, run statistics, and detail endpoints
 - ✅ Separate service entrypoints (`cmd/ingestion`, `cmd/processor`, `cmd/api`)
 - ✅ NATS consumer with event routing and database persistence
 - ✅ Docker Compose profiles (AIO + distributed)
 - ✅ Multi-stage Dockerfiles for each service
-- ✅ Comprehensive test suite (17 tests) with E2E NATS integration validation
+- ✅ Comprehensive test suite (20+ tests) with E2E NATS integration validation
 - ✅ Playwright reporter integration documentation
+- ✅ Web UI with Nginx reverse proxy for both deployment modes
 
 **Future phases:**
 
 - [ ] **Phase 3**: Remove dual-write from ingestion (NATS-only, fully stateless)
-- [ ] **Phase 4**: API service GraphQL implementation
+- [ ] **Phase 4**: Complete GraphQL API implementation
 - [ ] Object storage integration (MinIO/S3) for test artifacts
-- [ ] Web UI (React + Tailwind + shadcn/ui)
+- [ ] Enhanced Web UI features (test details, artifact viewer, filtering)
 - [ ] Authentication layer (dev token, OIDC)
 - [ ] Observability (Prometheus metrics, OpenTelemetry tracing)
