@@ -97,7 +97,7 @@ func (p *NATSPublisher) ensureStream(ctx context.Context) error {
 	streamCfg := jetstream.StreamConfig{
 		Name:        p.stream,
 		Subjects:    []string{p.prefix + ".>"},
-		Retention:   jetstream.WorkQueuePolicy,
+		Retention:   jetstream.LimitsPolicy, // Use LimitsPolicy to allow multiple independent consumers
 		MaxAge:      24 * time.Hour, // Keep events for 24 hours
 		Storage:     jetstream.FileStorage,
 		Replicas:    1,

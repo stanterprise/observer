@@ -1,11 +1,30 @@
 # Dockerfile for All-in-One (AIO) deployment mode
-# Single container with embedded NATS, ingestion, processor, and API services
+# Single container with embedded NATS, ingestion, processor, API services, and Web UI
 # Managed via s6-overlay process supervisor
 
 # ============================================================================
-# Builder stage - Build Go binaries for Linux
+# Web UI Builder stage - Build React application
 # ============================================================================
-FROM golang:1.23-bookworm AS builder
+FROM node:20-bookworm AS web-builder
+
+WORKDIR /build
+
+# Copy package files
+COPY web/package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY web/ ./
+
+# Build the application
+RUN npm run build
+
+# ============================================================================
+# Go Builder stage - Build Go binaries for Linux
+# ============================================================================
+FROM golang:1.24-bookworm AS go-builder
 
 # Install build dependencies for CGO (required for SQLite)
 RUN apt-get update && \
@@ -30,7 +49,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build -o /bin/ingestion ./cmd/ingestion && \
     CGO_ENABLED=1 GOOS=linux go build -o /bin/api ./cmd/api
 
 # ============================================================================
-# Runtime stage - Debian with s6-overlay
+# Runtime stage - Debian with s6-overlay, Nginx, and all services
 # ============================================================================
 FROM debian:bookworm-slim
 
@@ -38,10 +57,11 @@ FROM debian:bookworm-slim
 ARG S6_OVERLAY_VERSION=3.2.0.0
 ARG NATS_VERSION=2.10.24
 
-# Install runtime dependencies
+# Install runtime dependencies including Nginx
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
+        nginx \
         procps \
         sqlite3 \
         wget \
@@ -67,10 +87,22 @@ RUN S6_ARCH=$(dpkg --print-architecture | sed 's/amd64/x86_64/; s/arm64/aarch64/
     tar -C / -Jxpf s6-overlay-${S6_ARCH}.tar.xz && \
     rm s6-overlay-*.tar.xz
 
-# Copy service binaries from builder stage
-COPY --from=builder /bin/ingestion /usr/local/bin/
-COPY --from=builder /bin/processor /usr/local/bin/
-COPY --from=builder /bin/api /usr/local/bin/
+# Copy service binaries from Go builder stage
+COPY --from=go-builder /bin/ingestion /usr/local/bin/
+COPY --from=go-builder /bin/processor /usr/local/bin/
+COPY --from=go-builder /bin/api /usr/local/bin/
+
+# Copy Web UI from web builder stage
+COPY --from=web-builder /build/dist /var/www/html
+
+# Copy and configure Nginx for AIO mode (API backend on localhost:8080)
+COPY docker/nginx/nginx.conf.template /etc/nginx/sites-available/observer
+RUN sed 's/\${API_BACKEND_HOST}/localhost/g; s/\${API_BACKEND_PORT}/8080/g' \
+    /etc/nginx/sites-available/observer > /tmp/observer.conf && \
+    sed 's|/usr/share/nginx/html|/var/www/html|g' /tmp/observer.conf > /etc/nginx/sites-available/observer && \
+    rm -f /etc/nginx/sites-enabled/default && \
+    ln -s /etc/nginx/sites-available/observer /etc/nginx/sites-enabled/observer && \
+    rm -f /tmp/observer.conf
 
 # Copy s6-overlay service definitions
 COPY docker/s6-overlay/s6-rc.d /etc/s6-overlay/s6-rc.d/
@@ -93,7 +125,12 @@ ENV DB_DRIVER=sqlite \
     APPLY_MIGRATIONS=1
 
 # Expose ports
-EXPOSE 50051 8080 4222 8222
+# 80 - Web UI (Nginx)
+# 50051 - gRPC ingestion
+# 8080 - API service (internal, proxied by Nginx)
+# 4222 - NATS client
+# 8222 - NATS monitoring
+EXPOSE 80 50051 8080 4222 8222
 
 # Use s6-overlay as init system
 ENTRYPOINT ["/init"]
