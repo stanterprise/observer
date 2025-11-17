@@ -4,25 +4,26 @@
 # ============================================================================
 # Builder stage - Build React application
 # ============================================================================
-FROM node:20-alpine AS builder
+FROM node:20-bookworm AS builder
 
 WORKDIR /build
 
-# Copy package files and install dependencies
+# Copy package files
 COPY web/package*.json ./
-RUN npm ci
 
-# Copy source code and build
+# Install dependencies
+RUN npm install
+
+# Copy source code
 COPY web/ ./
+
+# Build the application
 RUN npm run build
 
 # ============================================================================
 # Runtime stage - Nginx for serving static files and proxying
 # ============================================================================
 FROM nginx:alpine
-
-# Install envsubst for environment variable substitution
-RUN apk add --no-cache gettext
 
 # Copy built application from builder
 COPY --from=builder /build/dist /usr/share/nginx/html

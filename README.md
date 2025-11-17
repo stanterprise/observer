@@ -256,6 +256,36 @@ Detailed architecture documentation is available in [`docs/architecture/`](./doc
 - [02-dataflow.md](./docs/architecture/02-dataflow.md) - Data flow diagrams
 - [03-modes.md](./docs/architecture/03-modes.md) - AIO vs Distributed modes
 
+## Web UI
+
+The Observer service includes a modern web interface built with React, TypeScript, and Tailwind CSS.
+
+### Features
+
+- **Real-time Updates**: Live test execution monitoring via WebSocket
+- **Test Run Listing**: View all test runs with status, timing, and metadata
+- **Responsive Design**: Mobile-friendly interface
+- **Configurable Endpoints**: Environment-based API and WebSocket configuration
+
+### Access
+
+- **AIO Mode**: `http://localhost:3000` (Web UI served by Nginx on port 80/3000)
+- **Distributed Mode**: `http://localhost:3000` (Standalone Web UI service)
+
+### Development
+
+See [web/README.md](./web/README.md) for development instructions.
+
+Quick start:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+The development server includes proxying for API and WebSocket endpoints to `localhost:8080`.
+
 ## Roadmap
 
 - [x] Separate components into distinct services
@@ -265,10 +295,10 @@ Detailed architecture documentation is available in [`docs/architecture/`](./doc
 - [x] Docker Compose profiles (AIO and distributed)
 - [x] Comprehensive test suite with E2E NATS integration
 - [x] Playwright reporter integration validation
+- [x] **Web UI**: React + TypeScript + Tailwind CSS interface ✅
 - [ ] **Phase 3**: Remove DB from ingestion (NATS-only, fully stateless)
 - [ ] **Phase 4**: GraphQL API implementation
 - [ ] Object storage for artifacts (MinIO/S3)
-- [ ] Web UI (React + Tailwind + shadcn/ui)
 - [ ] Authentication layer (dev token, OIDC)
 - [ ] Metrics (Prometheus) and tracing (OpenTelemetry)
 - [ ] Kubernetes Helm charts

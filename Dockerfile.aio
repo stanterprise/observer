@@ -5,16 +5,20 @@
 # ============================================================================
 # Web UI Builder stage - Build React application
 # ============================================================================
-FROM node:20-alpine AS web-builder
+FROM node:20-bookworm AS web-builder
 
 WORKDIR /build
 
-# Copy package files and install dependencies
+# Copy package files
 COPY web/package*.json ./
-RUN npm ci
 
-# Copy source code and build
+# Install dependencies
+RUN npm install
+
+# Copy source code
 COPY web/ ./
+
+# Build the application
 RUN npm run build
 
 # ============================================================================
@@ -91,16 +95,14 @@ COPY --from=go-builder /bin/api /usr/local/bin/
 # Copy Web UI from web builder stage
 COPY --from=web-builder /build/dist /var/www/html
 
-# Copy Nginx configuration for AIO mode (API backend on localhost:8080)
+# Copy and configure Nginx for AIO mode (API backend on localhost:8080)
 COPY docker/nginx/nginx.conf.template /etc/nginx/sites-available/observer
-RUN sed 's/${API_BACKEND_HOST}/localhost/g; s/${API_BACKEND_PORT}/8080/g' \
-    /etc/nginx/sites-available/observer > /etc/nginx/sites-enabled/default && \
-    rm /etc/nginx/sites-enabled/default && \
+RUN sed 's/\${API_BACKEND_HOST}/localhost/g; s/\${API_BACKEND_PORT}/8080/g' \
+    /etc/nginx/sites-available/observer > /tmp/observer.conf && \
+    sed 's|/usr/share/nginx/html|/var/www/html|g' /tmp/observer.conf > /etc/nginx/sites-available/observer && \
+    rm -f /etc/nginx/sites-enabled/default && \
     ln -s /etc/nginx/sites-available/observer /etc/nginx/sites-enabled/observer && \
-    rm -f /etc/nginx/sites-enabled/default
-
-# Update Nginx configuration to use correct root directory
-RUN sed -i 's|/usr/share/nginx/html|/var/www/html|g' /etc/nginx/sites-available/observer
+    rm -f /tmp/observer.conf
 
 # Copy s6-overlay service definitions
 COPY docker/s6-overlay/s6-rc.d /etc/s6-overlay/s6-rc.d/
