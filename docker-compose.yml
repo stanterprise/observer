@@ -18,11 +18,11 @@ services:
       ARTIFACTS_DIR: /data/artifacts
       APPLY_MIGRATIONS: "1"
     ports:
-      - "${AIO_WEB_PORT:-3000}:80"             # Web UI
-      - "${AIO_GRPC_PORT:-50051}:50051"        # gRPC ingestion
-      - "${AIO_API_PORT:-8080}:8080"           # API service (internal)
-      - "${AIO_NATS_PORT:-4222}:4222"          # NATS client
-      - "${AIO_NATS_HTTP_PORT:-8222}:8222"     # NATS monitoring
+      - "${AIO_WEB_PORT:-3000}:80" # Web UI
+      - "${AIO_GRPC_PORT:-50051}:50051" # gRPC ingestion
+      - "${AIO_API_PORT:-8080}:8080" # API service (internal)
+      - "${AIO_NATS_PORT:-4222}:4222" # NATS client
+      - "${AIO_NATS_HTTP_PORT:-8222}:8222" # NATS monitoring
     volumes:
       - aio-data:/data
     healthcheck:
@@ -37,7 +37,7 @@ services:
   # Distributed Profile - Multi-container deployment
   # Usage: docker compose --profile dist up -d
   # ============================================================================
-  
+
   # Ingestion service - gRPC endpoint for test reporters
   ingestion:
     build:
@@ -150,10 +150,11 @@ services:
   # Shared Infrastructure Services
   # Used by distributed profile and available for development
   # ============================================================================
-  
+
   db:
     image: postgres:16-alpine
     container_name: observer-postgres
+    profiles: ["dist"]
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -179,6 +180,7 @@ services:
   nats:
     image: nats:2.10-alpine
     container_name: observer-nats
+    profiles: ["dist"]
     restart: unless-stopped
     command: ["-js", "-m", "8222"]
     ports:

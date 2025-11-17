@@ -24,7 +24,7 @@ RUN npm run build
 # ============================================================================
 # Go Builder stage - Build Go binaries for Linux
 # ============================================================================
-FROM golang:1.23-bookworm AS go-builder
+FROM golang:1.24-bookworm AS go-builder
 
 # Install build dependencies for CGO (required for SQLite)
 RUN apt-get update && \

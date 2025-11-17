@@ -1,55 +1,55 @@
-import { useEffect, useState } from 'react'
-import { apiUrl } from '../lib/config'
-import { Card, CardHeader, CardTitle, CardContent } from '../components/Card'
-import { Badge } from '../components/Badge'
-import type { TestCaseRun, WebSocketEvent } from '../types'
-import { Play, Clock } from 'lucide-react'
+import { useEffect, useState } from "react";
+import { apiUrl } from "../lib/config";
+import { Card, CardHeader, CardTitle, CardContent } from "../components/Card";
+import { Badge } from "../components/Badge";
+import type { TestCaseRun, WebSocketEvent } from "../types";
+import { Play, Clock } from "lucide-react";
 
 interface TestRunsPageProps {
-  onWebSocketEvent?: WebSocketEvent | null
+  onWebSocketEvent?: WebSocketEvent | null;
 }
 
 export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
-  const [tests, setTests] = useState<TestCaseRun[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [tests, setTests] = useState<TestCaseRun[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchTests()
-  }, [])
+    fetchTests();
+  }, []);
 
   const fetchTests = async () => {
     try {
-      setLoading(true)
-      const response = await fetch(apiUrl('/tests?limit=50'))
+      setLoading(true);
+      const response = await fetch(apiUrl("/tests?limit=50"));
       if (!response.ok) {
-        throw new Error(`Failed to fetch tests: ${response.statusText}`)
+        throw new Error(`Failed to fetch tests: ${response.statusText}`);
       }
-      const data = await response.json()
-      setTests(data.tests || [])
-      setError(null)
+      const data = await response.json();
+      setTests(data.data || []);
+      setError(null);
     } catch (err) {
-      console.error('Error fetching tests:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch tests')
+      console.error("Error fetching tests:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch tests");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Handle WebSocket events
   useEffect(() => {
     if (onWebSocketEvent) {
       // Re-fetch when we get events
-      fetchTests()
+      fetchTests();
     }
-  }, [onWebSocketEvent])
+  }, [onWebSocketEvent]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-600">Loading tests...</div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -57,7 +57,7 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
       <div className="flex items-center justify-center h-64">
         <div className="text-red-600">Error: {error}</div>
       </div>
-    )
+    );
   }
 
   return (
@@ -77,7 +77,9 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
           <CardContent>
             <div className="text-center py-12">
               <Play className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No tests found</h3>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">
+                No tests found
+              </h3>
               <p className="mt-1 text-sm text-gray-500">
                 Test runs will appear here once tests are executed.
               </p>
@@ -97,16 +99,18 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-600">File:</span>{' '}
-                    <span className="text-gray-900 font-mono text-xs">{test.file}</span>
+                    <span className="text-gray-600">File:</span>{" "}
+                    <span className="text-gray-900 font-mono text-xs">
+                      {test.file}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-gray-600">Project:</span>{' '}
+                    <span className="text-gray-600">Project:</span>{" "}
                     <span className="text-gray-900">{test.project}</span>
                   </div>
                   <div className="flex items-center">
                     <Clock className="h-4 w-4 mr-1 text-gray-400" />
-                    <span className="text-gray-600">Started:</span>{' '}
+                    <span className="text-gray-600">Started:</span>{" "}
                     <span className="text-gray-900 ml-1">
                       {new Date(test.started_at).toLocaleString()}
                     </span>
@@ -114,7 +118,7 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
                   {test.finished_at && (
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 mr-1 text-gray-400" />
-                      <span className="text-gray-600">Finished:</span>{' '}
+                      <span className="text-gray-600">Finished:</span>{" "}
                       <span className="text-gray-900 ml-1">
                         {new Date(test.finished_at).toLocaleString()}
                       </span>
@@ -123,7 +127,9 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
                 </div>
                 {test.error_message && (
                   <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-900 font-mono">{test.error_message}</p>
+                    <p className="text-sm text-red-900 font-mono">
+                      {test.error_message}
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -132,5 +138,5 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
         </div>
       )}
     </div>
-  )
+  );
 }
