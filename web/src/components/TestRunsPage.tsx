@@ -35,12 +35,20 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
           file: test.test_case?.location?.file || "",
           project: test.test_case?.project || "",
           status: test.status,
-          started_at: test.started_at,
-          finished_at: test.finished_at,
+          started_at: test.started_at
+            ? new Date(test.CreatedAt).toISOString()
+            : undefined,
+          finished_at: test.finished_at
+            ? new Date(test.UpdatedAt).toISOString()
+            : undefined,
           error_message: test.error?.message,
           metadata: test.metadata,
-          created_at: test.CreatedAt,
-          updated_at: test.UpdatedAt,
+          created_at: test.CreatedAt
+            ? new Date(test.CreatedAt).toISOString()
+            : undefined,
+          updated_at: test.UpdatedAt
+            ? new Date(test.UpdatedAt).toISOString()
+            : undefined,
         }))
       );
       setError(null);
