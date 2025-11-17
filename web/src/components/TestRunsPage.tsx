@@ -26,7 +26,23 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
         throw new Error(`Failed to fetch tests: ${response.statusText}`);
       }
       const data = await response.json();
-      setTests(data.data || []);
+      setTests(
+        (data.data || []).map((test: any) => ({
+          id: test.id,
+          test_case_id: test.ID,
+          test_run_id: test.RunID || "unknown",
+          title: test.Title || "",
+          file: test.test_case?.location?.file || "",
+          project: test.test_case?.project || "",
+          status: test.status,
+          started_at: test.started_at,
+          finished_at: test.finished_at,
+          error_message: test.error?.message,
+          metadata: test.metadata,
+          created_at: test.CreatedAt,
+          updated_at: test.UpdatedAt,
+        }))
+      );
       setError(null);
     } catch (err) {
       console.error("Error fetching tests:", err);
@@ -36,11 +52,57 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
     }
   };
 
-  // Handle WebSocket events
+  // Handle WebSocket events - update local state instead of refetching
   useEffect(() => {
-    if (onWebSocketEvent) {
-      // Re-fetch when we get events
-      fetchTests();
+    if (!onWebSocketEvent) return;
+
+    const { type, data } = onWebSocketEvent;
+
+    // Update the test in the local state based on the event
+    if (type === "test.begin" || type === "test.end") {
+      setTests((prevTests) => {
+        const testData = data as any; // Cast from event data
+        const testId = testData.test_case?.id || testData.id;
+
+        // Check if we already have this test
+        const existingIndex = prevTests.findIndex((t) => t.id === testId);
+
+        if (existingIndex >= 0) {
+          // Update existing test
+          const updatedTests = [...prevTests];
+          updatedTests[existingIndex] = {
+            ...updatedTests[existingIndex],
+            status: testData.status || updatedTests[existingIndex].status,
+            finished_at:
+              testData.finished_at || updatedTests[existingIndex].finished_at,
+            error_message:
+              testData.error?.message ||
+              updatedTests[existingIndex].error_message,
+          };
+          return updatedTests;
+        } else if (type === "test.begin") {
+          // Add new test at the beginning
+          const now = new Date().toISOString();
+          const newTest: TestCaseRun = {
+            id: testId,
+            test_case_id: testData.test_case?.id || testId,
+            test_run_id: testData.test_run_id || "unknown",
+            title: testData.test_case?.title || "",
+            file: testData.test_case?.location?.file || "",
+            project: testData.test_case?.project || "",
+            status: "running",
+            started_at: testData.started_at || now,
+            finished_at: undefined,
+            error_message: undefined,
+            metadata: {},
+            created_at: now,
+            updated_at: now,
+          };
+          return [newTest, ...prevTests];
+        }
+
+        return prevTests;
+      });
     }
   }, [onWebSocketEvent]);
 
