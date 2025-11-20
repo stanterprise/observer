@@ -8,7 +8,7 @@ require (
 	github.com/99designs/gqlgen v0.17.83
 	github.com/gorilla/websocket v1.5.3
 	github.com/nats-io/nats.go v1.47.0
-	github.com/stanterprise/proto-go v0.0.8
+	github.com/stanterprise/proto-go v0.0.9
 	github.com/vektah/gqlparser/v2 v2.5.31
 	google.golang.org/grpc v1.73.0
 	gorm.io/datatypes v1.2.7

@@ -72,6 +72,8 @@ github.com/sosodev/duration v1.3.1 h1:qtHBDMQ6lvMQsL15g4aopM4HEfOaYuhWBw3NPTtlqq
 github.com/sosodev/duration v1.3.1/go.mod h1:RQIBBX0+fMLc/D9+Jb/fwvVmo0eZvDDEERAikUR6SDg=
 github.com/stanterprise/proto-go v0.0.8 h1:4sDNT/hoTPbdt6C2yZ/omL85ChIyCFaEFMQh30NR/WU=
 github.com/stanterprise/proto-go v0.0.8/go.mod h1:1J+0v3Z7RvZh8yQUX/3Nz2dSBH5a1tpJ8pt4mXjAvFw=
+github.com/stanterprise/proto-go v0.0.9 h1:73YjDiU50V5NMlC2MekjW26a15PDGQ5T/17SH9/XYDk=
+github.com/stanterprise/proto-go v0.0.9/go.mod h1:1J+0v3Z7RvZh8yQUX/3Nz2dSBH5a1tpJ8pt4mXjAvFw=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
