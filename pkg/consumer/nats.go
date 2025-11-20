@@ -212,6 +212,20 @@ func (c *NATSConsumer) processMessage(ctx context.Context, msg jetstream.Msg) er
 		return c.handleStepBegin(ctx, event.Data)
 	case publisher.EventTypeStepEnd:
 		return c.handleStepEnd(ctx, event.Data)
+	case publisher.EventTypeSuiteBegin:
+		return c.handleSuiteBegin(ctx, event.Data)
+	case publisher.EventTypeSuiteEnd:
+		return c.handleSuiteEnd(ctx, event.Data)
+	case publisher.EventTypeTestFailure:
+		return c.handleTestFailure(ctx, event.Data)
+	case publisher.EventTypeTestError:
+		return c.handleTestError(ctx, event.Data)
+	case publisher.EventTypeStdOutput:
+		return c.handleStdOutput(ctx, event.Data)
+	case publisher.EventTypeStdError:
+		return c.handleStdError(ctx, event.Data)
+	case publisher.EventTypeHeartbeat:
+		return c.handleHeartbeat(ctx, event.Data)
 	default:
 		c.logger.Warn("unknown event type", "type", event.Type)
 		// Acknowledge unknown events to prevent redelivery
@@ -367,6 +381,124 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 		return fmt.Errorf("persist step end: %w", err)
 	}
 
+	return nil
+}
+
+// handleSuiteBegin processes a suite begin event
+func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessage) error {
+	var req events.SuiteBeginEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal suite begin event: %w", err)
+	}
+
+	if req.Suite == nil {
+		return errors.New("suite is nil")
+	}
+
+	c.logger.Info("suite start",
+		"suite_id", req.Suite.Id,
+		"name", req.Suite.Name)
+
+	// Note: Database persistence for suites not yet implemented
+	// Suite data is available via WebSocket relay for real-time monitoring
+	return nil
+}
+
+// handleSuiteEnd processes a suite end event
+func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage) error {
+	var req events.SuiteEndEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal suite end event: %w", err)
+	}
+
+	if req.Suite == nil {
+		return errors.New("suite is nil")
+	}
+
+	c.logger.Info("suite end",
+		"suite_id", req.Suite.Id,
+		"status", req.Suite.Status)
+
+	// Note: Database persistence for suites not yet implemented
+	// Suite data is available via WebSocket relay for real-time monitoring
+	return nil
+}
+
+// handleTestFailure processes a test failure event
+func (c *NATSConsumer) handleTestFailure(ctx context.Context, data json.RawMessage) error {
+	var req events.TestFailureEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal test failure event: %w", err)
+	}
+
+	c.logger.Info("test failure",
+		"test_id", req.TestId,
+		"message_len", len(req.FailureMessage))
+
+	// Note: Database persistence for failures not yet implemented
+	// Failure data is available via WebSocket relay for real-time monitoring
+	return nil
+}
+
+// handleTestError processes a test error event
+func (c *NATSConsumer) handleTestError(ctx context.Context, data json.RawMessage) error {
+	var req events.TestErrorEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal test error event: %w", err)
+	}
+
+	c.logger.Info("test error",
+		"test_id", req.TestId,
+		"message_len", len(req.ErrorMessage))
+
+	// Note: Database persistence for errors not yet implemented
+	// Error data is available via WebSocket relay for real-time monitoring
+	return nil
+}
+
+// handleStdOutput processes a stdout event
+func (c *NATSConsumer) handleStdOutput(ctx context.Context, data json.RawMessage) error {
+	var req events.StdOutputEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal stdout event: %w", err)
+	}
+
+	c.logger.Debug("stdout",
+		"test_id", req.TestId,
+		"message_len", len(req.Message))
+
+	// Note: stdout typically not persisted to DB due to volume
+	// Available via WebSocket relay in real-time
+	return nil
+}
+
+// handleStdError processes a stderr event
+func (c *NATSConsumer) handleStdError(ctx context.Context, data json.RawMessage) error {
+	var req events.StdErrorEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal stderr event: %w", err)
+	}
+
+	c.logger.Debug("stderr",
+		"test_id", req.TestId,
+		"message_len", len(req.Message))
+
+	// Note: stderr typically not persisted to DB due to volume
+	// Available via WebSocket relay in real-time
+	return nil
+}
+
+// handleHeartbeat processes a heartbeat event
+func (c *NATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMessage) error {
+	var req events.HeartbeatEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal heartbeat event: %w", err)
+	}
+
+	c.logger.Debug("heartbeat", "source_id", req.SourceId)
+
+	// Note: Heartbeats typically not persisted to DB
+	// Available for monitoring via WebSocket relay
 	return nil
 }
 
