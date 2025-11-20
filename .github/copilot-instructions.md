@@ -48,7 +48,7 @@ Test Reporter → Ingestion (gRPC) → NATS JetStream ──┬→ Processor (Co
 
 ## Critical Dependencies
 
-- **Protobuf schema**: `github.com/stanterprise/proto-go/testsystem/v1` (external, versioned at v0.0.8)
+- **Protobuf schema**: `github.com/stanterprise/proto-go/testsystem/v1` (external, versioned at v0.0.9)
 - **NATS JetStream**: Event bus for service decoupling (nats.go v1.47.0)
 - **GORM**: Multi-dialect ORM (Postgres + SQLite); uses `datatypes.JSONMap` for metadata
 - **slog**: Go 1.21+ structured logging (always use `*slog.Logger`, never `log.Printf`)

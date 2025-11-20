@@ -255,7 +255,7 @@ The ingestion service currently implements dual-write (NATS + optional DB). This
 
 **Status**: Validated  
 **Repository**: `github.com/stanterprise/stanterprise-playwright-reporter`  
-**Version**: Compatible with protobuf v0.0.8
+**Version**: Compatible with protobuf v0.0.9
 
 **Validation**:
 

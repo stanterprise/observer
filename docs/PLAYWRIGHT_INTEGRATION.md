@@ -188,7 +188,7 @@ nats stream info tests_events
 
 The Observer implements the gRPC protocol defined in `github.com/stanterprise/proto-go/testsystem/v1/observer`.
 
-Current version: `v0.0.8`
+Current version: `v0.0.9`
 
 ### Supported Events
 
@@ -197,22 +197,27 @@ Current version: `v0.0.8`
    - `runId` - Test run identifier (shared across related tests)
    - `title` - Test name
    - `metadata` - Additional key-value data
+   - `retryCount` - Total number of retry attempts allowed (optional)
+   - `retryIndex` - Current retry attempt index (optional)
+   - `timeout` - Timeout in milliseconds (optional)
 
 2. **TestEndEvent** - Sent when a test completes
    - `id` - Test identifier
    - `status` - PASSED, FAILED, SKIPPED
-   - `duration` - Execution time
+   - `duration` - Execution time (protobuf Duration type)
 
 3. **StepBeginEvent** - Sent when a test step starts
    - `id` - Step identifier
    - `testCaseRunId` - Parent test identifier
    - `title` - Step description
-   - `type` - Step category (e.g., "action", "assertion")
+   - `type` - Step type (e.g., "action", "assertion")
+   - `category` - Step category (e.g., "hook", "fixture", "test.step") (optional)
 
 4. **StepEndEvent** - Sent when a test step completes
    - `id` - Step identifier
    - `status` - Step result
    - `error` - Error message if failed
+   - `category` - Step category (optional)
 
 ## Troubleshooting
 
