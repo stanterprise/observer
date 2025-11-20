@@ -203,7 +203,7 @@ Current version: `v0.0.9`
 
 2. **TestEndEvent** - Sent when a test completes
    - `id` - Test identifier
-   - `status` - PASSED, FAILED, SKIPPED
+   - `status` - PASSED, FAILED, SKIPPED, BROKEN, TIMEDOUT, INTERRUPTED
    - `duration` - Execution time (protobuf Duration type)
 
 3. **StepBeginEvent** - Sent when a test step starts
