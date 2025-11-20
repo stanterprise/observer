@@ -62,11 +62,14 @@ type TestCaseRunConnection struct {
 type TestStatus string
 
 const (
-	TestStatusPassed  TestStatus = "PASSED"
-	TestStatusFailed  TestStatus = "FAILED"
-	TestStatusSkipped TestStatus = "SKIPPED"
-	TestStatusRunning TestStatus = "RUNNING"
-	TestStatusPending TestStatus = "PENDING"
+	TestStatusPassed      TestStatus = "PASSED"
+	TestStatusFailed      TestStatus = "FAILED"
+	TestStatusSkipped     TestStatus = "SKIPPED"
+	TestStatusRunning     TestStatus = "RUNNING"
+	TestStatusPending     TestStatus = "PENDING"
+	TestStatusBroken      TestStatus = "BROKEN"
+	TestStatusTimedout    TestStatus = "TIMEDOUT"
+	TestStatusInterrupted TestStatus = "INTERRUPTED"
 )
 
 var AllTestStatus = []TestStatus{
@@ -75,11 +78,14 @@ var AllTestStatus = []TestStatus{
 	TestStatusSkipped,
 	TestStatusRunning,
 	TestStatusPending,
+	TestStatusBroken,
+	TestStatusTimedout,
+	TestStatusInterrupted,
 }
 
 func (e TestStatus) IsValid() bool {
 	switch e {
-	case TestStatusPassed, TestStatusFailed, TestStatusSkipped, TestStatusRunning, TestStatusPending:
+	case TestStatusPassed, TestStatusFailed, TestStatusSkipped, TestStatusRunning, TestStatusPending, TestStatusBroken, TestStatusTimedout, TestStatusInterrupted:
 		return true
 	}
 	return false

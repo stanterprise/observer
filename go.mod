@@ -8,7 +8,7 @@ require (
 	github.com/99designs/gqlgen v0.17.83
 	github.com/gorilla/websocket v1.5.3
 	github.com/nats-io/nats.go v1.47.0
-	github.com/stanterprise/proto-go v0.0.8
+	github.com/stanterprise/proto-go v0.0.9
 	github.com/vektah/gqlparser/v2 v2.5.31
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.10
@@ -36,11 +36,11 @@ require (
 	github.com/nats-io/nkeys v0.4.11 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/sosodev/duration v1.3.1 // indirect
-	golang.org/x/crypto v0.43.0 // indirect
-	golang.org/x/net v0.46.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
+	golang.org/x/crypto v0.44.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/sync v0.18.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
 	gorm.io/driver/mysql v1.5.6 // indirect
 )
