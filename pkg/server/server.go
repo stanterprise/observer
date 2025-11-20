@@ -242,8 +242,38 @@ func (s *EventServer) ReportSuiteBegin(ctx context.Context, in *events.SuiteBegi
 		}
 	}
 
-	// Note: Database persistence for suites not yet implemented
-	// Will be added in future when suite models are defined
+	// Persist to DB if configured
+	if s.db != nil {
+		// Convert metadata map[string]string to datatypes.JSONMap (map[string]any)
+		md := map[string]any{}
+		for k, v := range in.Suite.Metadata {
+			md[k] = v
+		}
+
+		var startTime *time.Time
+		if in.Suite.StartTime != nil {
+			t := in.Suite.StartTime.AsTime()
+			startTime = &t
+		}
+
+		suite := &m.TestSuiteRun{
+			ID:              in.Suite.Id,
+			Name:            in.Suite.Name,
+			Description:     in.Suite.Description,
+			Metadata:        md,
+			TestSuiteSpecID: in.Suite.TestSuiteSpecId,
+			InitiatedBy:     in.Suite.InitiatedBy,
+			StartTime:       startTime,
+		}
+
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "start_time", "updated_at"}),
+		}).Create(suite).Error; err != nil {
+			s.logger.Error("persist suite begin failed", "suite_id", in.Suite.Id, "error", err)
+			return nil, status.Error(codes.Internal, "database error")
+		}
+	}
 
 	return &observer.AckResponse{Success: true, Message: "suite begin received: " + in.Suite.Id}, nil
 }
@@ -265,8 +295,30 @@ func (s *EventServer) ReportSuiteEnd(ctx context.Context, in *events.SuiteEndEve
 		}
 	}
 
-	// Note: Database persistence for suites not yet implemented
-	// Will be added in future when suite models are defined
+	// Persist to DB if configured
+	if s.db != nil {
+		statusStr := in.Suite.Status.String()
+
+		var endTime *time.Time
+		if in.Suite.EndTime != nil {
+			t := in.Suite.EndTime.AsTime()
+			endTime = &t
+		}
+
+		suite := &m.TestSuiteRun{
+			ID:      in.Suite.Id,
+			Status:  statusStr,
+			EndTime: endTime,
+		}
+
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "end_time", "updated_at"}),
+		}).Create(suite).Error; err != nil {
+			s.logger.Error("persist suite end failed", "suite_id", in.Suite.Id, "error", err)
+			return nil, status.Error(codes.Internal, "database error")
+		}
+	}
 
 	return &observer.AckResponse{Success: true, Message: "suite end received: " + in.Suite.Id}, nil
 }

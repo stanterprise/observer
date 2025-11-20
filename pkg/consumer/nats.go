@@ -399,8 +399,36 @@ func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessag
 		"suite_id", req.Suite.Id,
 		"name", req.Suite.Name)
 
-	// Note: Database persistence for suites not yet implemented
-	// Suite data is available via WebSocket relay for real-time monitoring
+	// Convert metadata map[string]string to datatypes.JSONMap (map[string]any)
+	md := map[string]any{}
+	for k, v := range req.Suite.Metadata {
+		md[k] = v
+	}
+
+	var startTime *time.Time
+	if req.Suite.StartTime != nil {
+		t := req.Suite.StartTime.AsTime()
+		startTime = &t
+	}
+
+	suite := &m.TestSuiteRun{
+		ID:              req.Suite.Id,
+		Name:            req.Suite.Name,
+		Description:     req.Suite.Description,
+		Metadata:        md,
+		TestSuiteSpecID: req.Suite.TestSuiteSpecId,
+		InitiatedBy:     req.Suite.InitiatedBy,
+		StartTime:       startTime,
+	}
+
+	// Upsert to database
+	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "start_time", "updated_at"}),
+	}).Create(suite).Error; err != nil {
+		return fmt.Errorf("persist suite begin: %w", err)
+	}
+
 	return nil
 }
 
@@ -419,8 +447,28 @@ func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage)
 		"suite_id", req.Suite.Id,
 		"status", req.Suite.Status)
 
-	// Note: Database persistence for suites not yet implemented
-	// Suite data is available via WebSocket relay for real-time monitoring
+	statusStr := req.Suite.Status.String()
+
+	var endTime *time.Time
+	if req.Suite.EndTime != nil {
+		t := req.Suite.EndTime.AsTime()
+		endTime = &t
+	}
+
+	suite := &m.TestSuiteRun{
+		ID:      req.Suite.Id,
+		Status:  statusStr,
+		EndTime: endTime,
+	}
+
+	// Upsert status on suite end
+	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"status", "end_time", "updated_at"}),
+	}).Create(suite).Error; err != nil {
+		return fmt.Errorf("persist suite end: %w", err)
+	}
+
 	return nil
 }
 
