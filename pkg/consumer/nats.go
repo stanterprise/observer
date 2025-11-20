@@ -212,6 +212,10 @@ func (c *NATSConsumer) processMessage(ctx context.Context, msg jetstream.Msg) er
 		return c.handleStepBegin(ctx, event.Data)
 	case publisher.EventTypeStepEnd:
 		return c.handleStepEnd(ctx, event.Data)
+	case publisher.EventTypeSuiteBegin:
+		return c.handleSuiteBegin(ctx, event.Data)
+	case publisher.EventTypeSuiteEnd:
+		return c.handleSuiteEnd(ctx, event.Data)
 	default:
 		c.logger.Warn("unknown event type", "type", event.Type)
 		// Acknowledge unknown events to prevent redelivery
@@ -242,16 +246,24 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 	}
 
 	tc := &m.TestCaseRun{
-		RunID:    req.TestCase.RunId,
-		Title:    req.TestCase.Title,
-		Metadata: md,
-		ID:       req.TestCase.Id,
+		RunID:      req.TestCase.RunId,
+		Title:      req.TestCase.Title,
+		Metadata:   md,
+		ID:         req.TestCase.Id,
+		RetryCount: ptrInt32(req.TestCase.RetryCount),
+		RetryIndex: ptrInt32(req.TestCase.RetryIndex),
+		Timeout:    ptrInt32(req.TestCase.Timeout),
+	}
+	// Convert protobuf Duration to nanoseconds if present
+	if req.TestCase.Duration != nil {
+		nanos := req.TestCase.Duration.AsDuration().Nanoseconds()
+		tc.Duration = &nanos
 	}
 
 	// Upsert to database
 	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"title", "metadata", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"title", "metadata", "duration", "retry_count", "retry_index", "timeout", "updated_at"}),
 	}).Create(tc).Error; err != nil {
 		return fmt.Errorf("persist test start: %w", err)
 	}
@@ -280,11 +292,16 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 		RunID:  req.TestCase.RunId,
 		Status: statusStr,
 	}
+	// Convert protobuf Duration to nanoseconds if present
+	if req.TestCase.Duration != nil {
+		nanos := req.TestCase.Duration.AsDuration().Nanoseconds()
+		tc.Duration = &nanos
+	}
 
 	// Upsert status on finish
 	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"status", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "updated_at"}),
 	}).Create(tc).Error; err != nil {
 		return fmt.Errorf("persist test end: %w", err)
 	}
@@ -308,6 +325,7 @@ func (c *NATSConsumer) handleStepBegin(ctx context.Context, data json.RawMessage
 	st := &m.StepRun{
 		TestCaseRunID: req.Step.TestCaseRunId,
 		Status:        "RUNNING",
+		Category:      req.Step.Category,
 	}
 
 	if err := c.db.WithContext(ctx).Create(st).Error; err != nil {
@@ -346,6 +364,7 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 				st := &m.StepRun{
 					TestCaseRunID: req.Step.TestCaseRunId,
 					Status:        statusToString(req.Step.Status),
+					Category:      req.Step.Category,
 				}
 				if err := tx.Create(st).Error; err != nil {
 					return err
@@ -354,10 +373,17 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 			}
 			return q.Error
 		}
-		// Update the locked row
+		// Update the locked row with both status and category
+		updates := map[string]interface{}{
+			"status": statusToString(req.Step.Status),
+		}
+		// Only update category if it's provided
+		if req.Step.Category != "" {
+			updates["category"] = req.Step.Category
+		}
 		if err := tx.Model(&m.StepRun{}).
 			Where("id = ?", step.ID).
-			Update("status", statusToString(req.Step.Status)).Error; err != nil {
+			Updates(updates).Error; err != nil {
 			return err
 		}
 		return nil
@@ -373,6 +399,94 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 // statusToString converts protobuf status to string
 func statusToString(status common.TestStatus) string {
 	return status.String()
+}
+
+// ptrInt32 returns a pointer to the given int32 value
+func ptrInt32(v int32) *int32 {
+	if v == 0 {
+		return nil
+	}
+	return &v
+}
+
+// handleSuiteBegin processes a suite begin event
+func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessage) error {
+	var req events.SuiteBeginEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal suite begin event: %w", err)
+	}
+
+	if req.Suite == nil {
+		return errors.New("suite is nil")
+	}
+
+	c.logger.Info("suite start",
+		"id", req.Suite.Id,
+		"name", req.Suite.Name,
+		"project", req.Suite.ProjectName)
+
+	// Convert metadata map[string]string to datatypes.JSONMap (map[string]any)
+	md := map[string]any{}
+	for k, v := range req.Suite.Metadata {
+		md[k] = v
+	}
+
+	suite := &m.TestSuiteRun{
+		ID:              req.Suite.Id,
+		Name:            req.Suite.Name,
+		Description:     req.Suite.Description,
+		Metadata:        md,
+		TestSuiteSpecID: req.Suite.TestSuiteSpecId,
+		InitiatedBy:     req.Suite.InitiatedBy,
+		ProjectName:     req.Suite.ProjectName,
+	}
+
+	// Upsert to database
+	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "project_name", "updated_at"}),
+	}).Create(suite).Error; err != nil {
+		return fmt.Errorf("persist suite start: %w", err)
+	}
+
+	return nil
+}
+
+// handleSuiteEnd processes a suite end event
+func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage) error {
+	var req events.SuiteEndEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal suite end event: %w", err)
+	}
+
+	if req.Suite == nil {
+		return errors.New("suite is nil")
+	}
+
+	c.logger.Info("suite finish",
+		"id", req.Suite.Id,
+		"status", req.Suite.Status)
+
+	statusStr := req.Suite.Status.String()
+	suite := &m.TestSuiteRun{
+		ID:     req.Suite.Id,
+		Status: statusStr,
+	}
+	// Convert protobuf Duration to nanoseconds if present
+	if req.Suite.Duration != nil {
+		nanos := req.Suite.Duration.AsDuration().Nanoseconds()
+		suite.Duration = &nanos
+	}
+
+	// Upsert status on finish
+	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "updated_at"}),
+	}).Create(suite).Error; err != nil {
+		return fmt.Errorf("persist suite end: %w", err)
+	}
+
+	return nil
 }
 
 // Close closes the NATS connection

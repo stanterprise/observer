@@ -117,10 +117,12 @@ func (p *NATSPublisher) ensureStream(ctx context.Context) error {
 type EventType string
 
 const (
-	EventTypeTestBegin EventType = "test.begin"
-	EventTypeTestEnd   EventType = "test.end"
-	EventTypeStepBegin EventType = "step.begin"
-	EventTypeStepEnd   EventType = "step.end"
+	EventTypeTestBegin  EventType = "test.begin"
+	EventTypeTestEnd    EventType = "test.end"
+	EventTypeStepBegin  EventType = "step.begin"
+	EventTypeStepEnd    EventType = "step.end"
+	EventTypeSuiteBegin EventType = "suite.begin"
+	EventTypeSuiteEnd   EventType = "suite.end"
 )
 
 // Event represents a generic event wrapper for publishing

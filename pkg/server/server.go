@@ -56,6 +56,14 @@ func validateTestID(id string) error {
 	return nil
 }
 
+// ptrInt32 returns a pointer to the given int32 value
+func ptrInt32(v int32) *int32 {
+	if v == 0 {
+		return nil
+	}
+	return &v
+}
+
 func (s *EventServer) ReportTestBegin(ctx context.Context, in *events.TestBeginEventRequest) (*observer.AckResponse, error) {
 	if in == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
@@ -84,14 +92,22 @@ func (s *EventServer) ReportTestBegin(ctx context.Context, in *events.TestBeginE
 			md[k] = v
 		}
 		tc := &m.TestCaseRun{
-			RunID:    in.TestCase.RunId,
-			Title:    in.TestCase.Title,
-			Metadata: md,
-			ID:       in.TestCase.Id,
+			RunID:      in.TestCase.RunId,
+			Title:      in.TestCase.Title,
+			Metadata:   md,
+			ID:         in.TestCase.Id,
+			RetryCount: ptrInt32(in.TestCase.RetryCount),
+			RetryIndex: ptrInt32(in.TestCase.RetryIndex),
+			Timeout:    ptrInt32(in.TestCase.Timeout),
+		}
+		// Convert protobuf Duration to nanoseconds if present
+		if in.TestCase.Duration != nil {
+			nanos := in.TestCase.Duration.AsDuration().Nanoseconds()
+			tc.Duration = &nanos
 		}
 		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"title", "metadata", "updated_at"}),
+			DoUpdates: clause.AssignmentColumns([]string{"title", "metadata", "duration", "retry_count", "retry_index", "timeout", "updated_at"}),
 		}).Create(tc).Error; err != nil {
 			s.logger.Error("persist test start failed", "id", in.TestCase.Id, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
@@ -128,9 +144,14 @@ func (s *EventServer) ReportTestEnd(ctx context.Context, in *events.TestEndEvent
 			RunID:  in.TestCase.RunId,
 			Status: statusStr,
 		}
+		// Convert protobuf Duration to nanoseconds if present
+		if in.TestCase.Duration != nil {
+			nanos := in.TestCase.Duration.AsDuration().Nanoseconds()
+			tc.Duration = &nanos
+		}
 		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"status", "updated_at"}),
+			DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "updated_at"}),
 		}).Create(tc).Error; err != nil {
 			s.logger.Error("persist test end failed", "id", in.TestCase.Id, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
@@ -161,7 +182,11 @@ func (s *EventServer) ReportStepBegin(ctx context.Context, in *events.StepBeginE
 	}
 
 	if s.db != nil {
-		st := &m.StepRun{TestCaseRunID: in.Step.TestCaseRunId, Status: "RUNNING"}
+		st := &m.StepRun{
+			TestCaseRunID: in.Step.TestCaseRunId,
+			Status:        "RUNNING",
+			Category:      in.Step.Category,
+		}
 		if err := s.db.WithContext(ctx).Create(st).Error; err != nil {
 			s.logger.Error("persist step begin failed", "run_id", in.Step.TestCaseRunId, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
@@ -203,7 +228,11 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 			if q.Error != nil {
 				if errors.Is(q.Error, gorm.ErrRecordNotFound) {
 					// No step row exists; create one inside the tx.
-					st := &m.StepRun{TestCaseRunID: in.Step.TestCaseRunId, Status: in.Step.Status.String()}
+					st := &m.StepRun{
+						TestCaseRunID: in.Step.TestCaseRunId,
+						Status:        in.Step.Status.String(),
+						Category:      in.Step.Category,
+					}
 					if err := tx.Create(st).Error; err != nil {
 						return err
 					}
@@ -211,8 +240,15 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 				}
 				return q.Error
 			}
-			// Update the locked row.
-			if err := tx.Model(&m.StepRun{}).Where("id = ?", step.ID).Update("status", in.Step.Status.String()).Error; err != nil {
+			// Update the locked row with both status and category.
+			updates := map[string]interface{}{
+				"status": in.Step.Status.String(),
+			}
+			// Only update category if it's provided
+			if in.Step.Category != "" {
+				updates["category"] = in.Step.Category
+			}
+			if err := tx.Model(&m.StepRun{}).Where("id = ?", step.ID).Updates(updates).Error; err != nil {
 				return err
 			}
 			return nil
@@ -223,6 +259,96 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 		}
 	}
 	return &observer.AckResponse{Success: true, Message: "step end received: " + in.Step.TestCaseRunId}, nil
+}
+
+func (s *EventServer) ReportSuiteBegin(ctx context.Context, in *events.SuiteBeginEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if in.Suite == nil {
+		return nil, status.Error(codes.InvalidArgument, "suite is required")
+	}
+	if err := validateTestID(in.Suite.Id); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	s.logger.Info("suite start", "id", in.Suite.Id, "name", in.Suite.Name, "project", in.Suite.ProjectName)
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeSuiteBegin, in); err != nil {
+			s.logger.Error("publish to NATS failed", "id", in.Suite.Id, "error", err)
+			// Continue with DB write even if NATS publish fails (best-effort)
+		}
+	}
+
+	// Persist or update TestSuiteRun if DB is configured
+	if s.db != nil {
+		// Convert metadata map[string]string to datatypes.JSONMap (map[string]any)
+		md := map[string]any{}
+		for k, v := range in.Suite.Metadata {
+			md[k] = v
+		}
+		suite := &m.TestSuiteRun{
+			ID:              in.Suite.Id,
+			Name:            in.Suite.Name,
+			Description:     in.Suite.Description,
+			Metadata:        md,
+			TestSuiteSpecID: in.Suite.TestSuiteSpecId,
+			InitiatedBy:     in.Suite.InitiatedBy,
+			ProjectName:     in.Suite.ProjectName,
+		}
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "project_name", "updated_at"}),
+		}).Create(suite).Error; err != nil {
+			s.logger.Error("persist suite start failed", "id", in.Suite.Id, "error", err)
+			return nil, status.Error(codes.Internal, "database error")
+		}
+	}
+	return &observer.AckResponse{Success: true, Message: "suite start received: " + in.Suite.Id}, nil
+}
+
+func (s *EventServer) ReportSuiteEnd(ctx context.Context, in *events.SuiteEndEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if in.Suite == nil {
+		return nil, status.Error(codes.InvalidArgument, "suite is required")
+	}
+	if err := validateTestID(in.Suite.Id); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	s.logger.Info("suite finish", "id", in.Suite.Id, "status", in.Suite.Status)
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeSuiteEnd, in); err != nil {
+			s.logger.Error("publish to NATS failed", "id", in.Suite.Id, "error", err)
+			// Continue with DB write even if NATS publish fails (best-effort)
+		}
+	}
+
+	// Upsert status on finish if DB is configured
+	if s.db != nil {
+		statusStr := in.Suite.Status.String()
+		suite := &m.TestSuiteRun{
+			ID:     in.Suite.Id,
+			Status: statusStr,
+		}
+		// Convert protobuf Duration to nanoseconds if present
+		if in.Suite.Duration != nil {
+			nanos := in.Suite.Duration.AsDuration().Nanoseconds()
+			suite.Duration = &nanos
+		}
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "updated_at"}),
+		}).Create(suite).Error; err != nil {
+			s.logger.Error("persist suite end failed", "id", in.Suite.Id, "error", err)
+			return nil, status.Error(codes.Internal, "database error")
+		}
+	}
+	return &observer.AckResponse{Success: true, Message: "suite finish received: " + in.Suite.Id}, nil
 }
 
 // Note: timestamp conversion helpers will be added when timestamp fields are persisted.

@@ -12,6 +12,9 @@ enum TestStatus {
   SKIPPED
   RUNNING
   PENDING
+  BROKEN
+  TIMEDOUT
+  INTERRUPTED
 }
 
 """

@@ -106,7 +106,7 @@ func AutoMigrateSchema(db *gorm.DB, l *slog.Logger) error {
 		return nil
 	}
 	l.Info("running gorm automigrate")
-	if err := db.AutoMigrate(&m.TestCaseRun{}, &m.StepRun{}); err != nil {
+	if err := db.AutoMigrate(&m.TestCaseRun{}, &m.StepRun{}, &m.TestSuiteRun{}); err != nil {
 		return fmt.Errorf("automigrate: %w", err)
 	}
 	l.Info("automigrate complete")
