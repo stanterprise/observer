@@ -35,6 +35,9 @@ tests/test_*
 *.sqlite
 *.sqlite3
 
+# Test artifacts
+**/api_test_*
+
 # Node.js dependencies for WebSocket tests
 tests/node_modules/
 tests/package*.json
