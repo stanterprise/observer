@@ -406,94 +406,6 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 	return nil
 }
 
-// handleSuiteBegin processes a suite begin event
-func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessage) error {
-	var req events.SuiteBeginEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
-		return fmt.Errorf("unmarshal suite begin event: %w", err)
-	}
-
-	if req.Suite == nil {
-		return errors.New("suite is nil")
-	}
-
-	c.logger.Info("suite start",
-		"suite_id", req.Suite.Id,
-		"name", req.Suite.Name)
-
-	// Convert metadata map[string]string to datatypes.JSONMap (map[string]any)
-	md := map[string]any{}
-	for k, v := range req.Suite.Metadata {
-		md[k] = v
-	}
-
-	var startTime *time.Time
-	if req.Suite.StartTime != nil {
-		t := req.Suite.StartTime.AsTime()
-		startTime = &t
-	}
-
-	suite := &m.TestSuiteRun{
-		ID:              req.Suite.Id,
-		Name:            req.Suite.Name,
-		Description:     req.Suite.Description,
-		Metadata:        md,
-		TestSuiteSpecID: req.Suite.TestSuiteSpecId,
-		InitiatedBy:     req.Suite.InitiatedBy,
-		StartTime:       startTime,
-	}
-
-	// Upsert to database
-	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "start_time", "updated_at"}),
-	}).Create(suite).Error; err != nil {
-		return fmt.Errorf("persist suite begin: %w", err)
-	}
-
-	return nil
-}
-
-// handleSuiteEnd processes a suite end event
-func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage) error {
-	var req events.SuiteEndEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
-		return fmt.Errorf("unmarshal suite end event: %w", err)
-	}
-
-	if req.Suite == nil {
-		return errors.New("suite is nil")
-	}
-
-	c.logger.Info("suite end",
-		"suite_id", req.Suite.Id,
-		"status", req.Suite.Status)
-
-	statusStr := req.Suite.Status.String()
-
-	var endTime *time.Time
-	if req.Suite.EndTime != nil {
-		t := req.Suite.EndTime.AsTime()
-		endTime = &t
-	}
-
-	suite := &m.TestSuiteRun{
-		ID:      req.Suite.Id,
-		Status:  statusStr,
-		EndTime: endTime,
-	}
-
-	// Upsert status on suite end
-	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"status", "end_time", "updated_at"}),
-	}).Create(suite).Error; err != nil {
-		return fmt.Errorf("persist suite end: %w", err)
-	}
-
-	return nil
-}
-
 // handleTestFailure processes a test failure event
 func (c *NATSConsumer) handleTestFailure(ctx context.Context, data json.RawMessage) error {
 	var req events.TestFailureEventRequest
@@ -607,6 +519,12 @@ func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessag
 		md[k] = v
 	}
 
+	var startTime *time.Time
+	if req.Suite.StartTime != nil {
+		t := req.Suite.StartTime.AsTime()
+		startTime = &t
+	}
+
 	suite := &m.TestSuiteRun{
 		ID:              req.Suite.Id,
 		Name:            req.Suite.Name,
@@ -615,12 +533,13 @@ func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessag
 		TestSuiteSpecID: req.Suite.TestSuiteSpecId,
 		InitiatedBy:     req.Suite.InitiatedBy,
 		ProjectName:     req.Suite.ProjectName,
+		StartTime:       startTime,
 	}
 
 	// Upsert to database
 	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "project_name", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "project_name", "start_time", "updated_at"}),
 	}).Create(suite).Error; err != nil {
 		return fmt.Errorf("persist suite start: %w", err)
 	}
@@ -644,10 +563,19 @@ func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage)
 		"status", req.Suite.Status)
 
 	statusStr := req.Suite.Status.String()
-	suite := &m.TestSuiteRun{
-		ID:     req.Suite.Id,
-		Status: statusStr,
+	
+	var endTime *time.Time
+	if req.Suite.EndTime != nil {
+		t := req.Suite.EndTime.AsTime()
+		endTime = &t
 	}
+	
+	suite := &m.TestSuiteRun{
+		ID:      req.Suite.Id,
+		Status:  statusStr,
+		EndTime: endTime,
+	}
+	
 	// Convert protobuf Duration to nanoseconds if present
 	if req.Suite.Duration != nil {
 		nanos := req.Suite.Duration.AsDuration().Nanoseconds()
@@ -657,7 +585,7 @@ func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage)
 	// Upsert status on finish
 	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "end_time", "updated_at"}),
 	}).Create(suite).Error; err != nil {
 		return fmt.Errorf("persist suite end: %w", err)
 	}

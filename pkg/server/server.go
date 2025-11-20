@@ -302,6 +302,7 @@ func (s *EventServer) ReportSuiteBegin(ctx context.Context, in *events.SuiteBegi
 			Metadata:        md,
 			TestSuiteSpecID: in.Suite.TestSuiteSpecId,
 			InitiatedBy:     in.Suite.InitiatedBy,
+			ProjectName:     in.Suite.ProjectName,
 			StartTime:       startTime,
 		}
 
@@ -347,15 +348,22 @@ func (s *EventServer) ReportSuiteEnd(ctx context.Context, in *events.SuiteEndEve
 			endTime = &t
 		}
 
+		var duration *int64
+		if in.Suite.Duration != nil {
+			d := in.Suite.Duration.AsDuration().Nanoseconds()
+			duration = &d
+		}
+
 		suite := &m.TestSuiteRun{
-			ID:      in.Suite.Id,
-			Status:  statusStr,
-			EndTime: endTime,
+			ID:       in.Suite.Id,
+			Status:   statusStr,
+			Duration: duration,
+			EndTime:  endTime,
 		}
 
 		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"status", "end_time", "updated_at"}),
+			DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "end_time", "updated_at"}),
 		}).Create(suite).Error; err != nil {
 			s.logger.Error("persist suite end failed", "suite_id", in.Suite.Id, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
