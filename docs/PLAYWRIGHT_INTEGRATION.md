@@ -219,6 +219,21 @@ Current version: `v0.0.9`
    - `error` - Error message if failed
    - `category` - Step category (optional)
 
+### Suite Events (Available in proto schema, not yet implemented in Observer)
+
+The proto-go v0.0.9 schema also defines suite-level events, though Observer does not currently handle them:
+
+5. **SuiteBeginEvent** - Sent when a test suite starts
+   - `suite.id` - Unique suite run identifier
+   - `suite.name` - Suite name
+   - `suite.projectName` - Project name (e.g., browser/device configuration) (new in v0.0.9)
+   - `suite.metadata` - Additional metadata
+
+6. **SuiteEndEvent** - Sent when a test suite completes
+   - `suite.id` - Suite identifier
+   - `suite.status` - Suite execution status
+   - `suite.duration` - Execution time
+
 ## Troubleshooting
 
 ### Connection Refused
