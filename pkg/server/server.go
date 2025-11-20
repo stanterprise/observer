@@ -261,6 +261,96 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 	return &observer.AckResponse{Success: true, Message: "step end received: " + in.Step.TestCaseRunId}, nil
 }
 
+func (s *EventServer) ReportSuiteBegin(ctx context.Context, in *events.SuiteBeginEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if in.Suite == nil {
+		return nil, status.Error(codes.InvalidArgument, "suite is required")
+	}
+	if err := validateTestID(in.Suite.Id); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	s.logger.Info("suite start", "id", in.Suite.Id, "name", in.Suite.Name, "project", in.Suite.ProjectName)
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeSuiteBegin, in); err != nil {
+			s.logger.Error("publish to NATS failed", "id", in.Suite.Id, "error", err)
+			// Continue with DB write even if NATS publish fails (best-effort)
+		}
+	}
+
+	// Persist or update TestSuiteRun if DB is configured
+	if s.db != nil {
+		// Convert metadata map[string]string to datatypes.JSONMap (map[string]any)
+		md := map[string]any{}
+		for k, v := range in.Suite.Metadata {
+			md[k] = v
+		}
+		suite := &m.TestSuiteRun{
+			ID:              in.Suite.Id,
+			Name:            in.Suite.Name,
+			Description:     in.Suite.Description,
+			Metadata:        md,
+			TestSuiteSpecID: in.Suite.TestSuiteSpecId,
+			InitiatedBy:     in.Suite.InitiatedBy,
+			ProjectName:     in.Suite.ProjectName,
+		}
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "project_name", "updated_at"}),
+		}).Create(suite).Error; err != nil {
+			s.logger.Error("persist suite start failed", "id", in.Suite.Id, "error", err)
+			return nil, status.Error(codes.Internal, "database error")
+		}
+	}
+	return &observer.AckResponse{Success: true, Message: "suite start received: " + in.Suite.Id}, nil
+}
+
+func (s *EventServer) ReportSuiteEnd(ctx context.Context, in *events.SuiteEndEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if in.Suite == nil {
+		return nil, status.Error(codes.InvalidArgument, "suite is required")
+	}
+	if err := validateTestID(in.Suite.Id); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	s.logger.Info("suite finish", "id", in.Suite.Id, "status", in.Suite.Status)
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeSuiteEnd, in); err != nil {
+			s.logger.Error("publish to NATS failed", "id", in.Suite.Id, "error", err)
+			// Continue with DB write even if NATS publish fails (best-effort)
+		}
+	}
+
+	// Upsert status on finish if DB is configured
+	if s.db != nil {
+		statusStr := in.Suite.Status.String()
+		suite := &m.TestSuiteRun{
+			ID:     in.Suite.Id,
+			Status: statusStr,
+		}
+		// Convert protobuf Duration to nanoseconds if present
+		if in.Suite.Duration != nil {
+			nanos := in.Suite.Duration.AsDuration().Nanoseconds()
+			suite.Duration = &nanos
+		}
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "updated_at"}),
+		}).Create(suite).Error; err != nil {
+			s.logger.Error("persist suite end failed", "id", in.Suite.Id, "error", err)
+			return nil, status.Error(codes.Internal, "database error")
+		}
+	}
+	return &observer.AckResponse{Success: true, Message: "suite finish received: " + in.Suite.Id}, nil
+}
+
 // Note: timestamp conversion helpers will be added when timestamp fields are persisted.
 
 // RegisterServices keeps backward compatibility; returns the created server for further customization in callers.

@@ -38,3 +38,21 @@ type StepRun struct {
 }
 
 func (StepRun) TableName() string { return "step_runs" }
+
+// TestSuiteRun corresponds to entities.TestSuiteRun in protobuf definitions.
+// Primary key is the server-side "id" provided by the client (authoritative).
+type TestSuiteRun struct {
+	ID              string            `gorm:"column:id;primaryKey;type:text"`
+	Name            string            `gorm:"column:name;type:text"`
+	Description     string            `gorm:"column:description;type:text"`
+	Status          string            `gorm:"column:status;type:text"`
+	Metadata        datatypes.JSONMap `gorm:"column:metadata;type:jsonb"`
+	Duration        *int64            `gorm:"column:duration"` // Duration in nanoseconds
+	TestSuiteSpecID string            `gorm:"column:test_suite_spec_id;type:text"`
+	InitiatedBy     string            `gorm:"column:initiated_by;type:text"`
+	ProjectName     string            `gorm:"column:project_name;type:text"`
+	CreatedAt       time.Time         `gorm:"column:created_at"`
+	UpdatedAt       time.Time         `gorm:"column:updated_at"`
+}
+
+func (TestSuiteRun) TableName() string { return "test_suite_runs" }
