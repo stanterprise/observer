@@ -216,6 +216,16 @@ func (c *NATSConsumer) processMessage(ctx context.Context, msg jetstream.Msg) er
 		return c.handleSuiteBegin(ctx, event.Data)
 	case publisher.EventTypeSuiteEnd:
 		return c.handleSuiteEnd(ctx, event.Data)
+	case publisher.EventTypeTestFailure:
+		return c.handleTestFailure(ctx, event.Data)
+	case publisher.EventTypeTestError:
+		return c.handleTestError(ctx, event.Data)
+	case publisher.EventTypeStdOutput:
+		return c.handleStdOutput(ctx, event.Data)
+	case publisher.EventTypeStdError:
+		return c.handleStdError(ctx, event.Data)
+	case publisher.EventTypeHeartbeat:
+		return c.handleHeartbeat(ctx, event.Data)
 	default:
 		c.logger.Warn("unknown event type", "type", event.Type)
 		// Acknowledge unknown events to prevent redelivery
@@ -396,6 +406,84 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 	return nil
 }
 
+// handleTestFailure processes a test failure event
+func (c *NATSConsumer) handleTestFailure(ctx context.Context, data json.RawMessage) error {
+	var req events.TestFailureEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal test failure event: %w", err)
+	}
+
+	c.logger.Info("test failure",
+		"test_id", req.TestId,
+		"message_len", len(req.FailureMessage))
+
+	// Note: Database persistence for failures not yet implemented
+	// Failure data is available via WebSocket relay for real-time monitoring
+	return nil
+}
+
+// handleTestError processes a test error event
+func (c *NATSConsumer) handleTestError(ctx context.Context, data json.RawMessage) error {
+	var req events.TestErrorEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal test error event: %w", err)
+	}
+
+	c.logger.Info("test error",
+		"test_id", req.TestId,
+		"message_len", len(req.ErrorMessage))
+
+	// Note: Database persistence for errors not yet implemented
+	// Error data is available via WebSocket relay for real-time monitoring
+	return nil
+}
+
+// handleStdOutput processes a stdout event
+func (c *NATSConsumer) handleStdOutput(ctx context.Context, data json.RawMessage) error {
+	var req events.StdOutputEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal stdout event: %w", err)
+	}
+
+	c.logger.Debug("stdout",
+		"test_id", req.TestId,
+		"message_len", len(req.Message))
+
+	// Note: stdout typically not persisted to DB due to volume
+	// Available via WebSocket relay in real-time
+	return nil
+}
+
+// handleStdError processes a stderr event
+func (c *NATSConsumer) handleStdError(ctx context.Context, data json.RawMessage) error {
+	var req events.StdErrorEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal stderr event: %w", err)
+	}
+
+	c.logger.Debug("stderr",
+		"test_id", req.TestId,
+		"message_len", len(req.Message))
+
+	// Note: stderr typically not persisted to DB due to volume
+	// Available via WebSocket relay in real-time
+	return nil
+}
+
+// handleHeartbeat processes a heartbeat event
+func (c *NATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMessage) error {
+	var req events.HeartbeatEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal heartbeat event: %w", err)
+	}
+
+	c.logger.Debug("heartbeat", "source_id", req.SourceId)
+
+	// Note: Heartbeats typically not persisted to DB
+	// Available for monitoring via WebSocket relay
+	return nil
+}
+
 // statusToString converts protobuf status to string
 func statusToString(status common.TestStatus) string {
 	return status.String()
@@ -431,6 +519,12 @@ func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessag
 		md[k] = v
 	}
 
+	var startTime *time.Time
+	if req.Suite.StartTime != nil {
+		t := req.Suite.StartTime.AsTime()
+		startTime = &t
+	}
+
 	suite := &m.TestSuiteRun{
 		ID:              req.Suite.Id,
 		Name:            req.Suite.Name,
@@ -439,12 +533,13 @@ func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessag
 		TestSuiteSpecID: req.Suite.TestSuiteSpecId,
 		InitiatedBy:     req.Suite.InitiatedBy,
 		ProjectName:     req.Suite.ProjectName,
+		StartTime:       startTime,
 	}
 
 	// Upsert to database
 	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "project_name", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "project_name", "start_time", "updated_at"}),
 	}).Create(suite).Error; err != nil {
 		return fmt.Errorf("persist suite start: %w", err)
 	}
@@ -468,10 +563,19 @@ func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage)
 		"status", req.Suite.Status)
 
 	statusStr := req.Suite.Status.String()
-	suite := &m.TestSuiteRun{
-		ID:     req.Suite.Id,
-		Status: statusStr,
+	
+	var endTime *time.Time
+	if req.Suite.EndTime != nil {
+		t := req.Suite.EndTime.AsTime()
+		endTime = &t
 	}
+	
+	suite := &m.TestSuiteRun{
+		ID:      req.Suite.Id,
+		Status:  statusStr,
+		EndTime: endTime,
+	}
+	
 	// Convert protobuf Duration to nanoseconds if present
 	if req.Suite.Duration != nil {
 		nanos := req.Suite.Duration.AsDuration().Nanoseconds()
@@ -481,7 +585,7 @@ func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage)
 	// Upsert status on finish
 	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "end_time", "updated_at"}),
 	}).Create(suite).Error; err != nil {
 		return fmt.Errorf("persist suite end: %w", err)
 	}

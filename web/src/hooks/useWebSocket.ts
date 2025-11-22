@@ -62,8 +62,18 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data) as WebSocketEvent;
-          onMessageRef.current?.(data);
+          if (event.data.includes("\n")) {
+            const events = event.data.split("\n");
+            for (const evt of events) {
+              if (evt.trim()) {
+                const parsedEvent = JSON.parse(evt) as WebSocketEvent;
+                onMessageRef.current?.(parsedEvent);
+              }
+            }
+          } else {
+            const data = JSON.parse(event.data) as WebSocketEvent;
+            onMessageRef.current?.(data);
+          }
         } catch (error) {
           console.error("Failed to parse WebSocket message:", error);
         }

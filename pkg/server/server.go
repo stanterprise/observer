@@ -276,18 +276,25 @@ func (s *EventServer) ReportSuiteBegin(ctx context.Context, in *events.SuiteBegi
 	// Publish to NATS if publisher is configured
 	if s.publisher != nil {
 		if err := s.publisher.Publish(ctx, publisher.EventTypeSuiteBegin, in); err != nil {
-			s.logger.Error("publish to NATS failed", "id", in.Suite.Id, "error", err)
-			// Continue with DB write even if NATS publish fails (best-effort)
+			s.logger.Error("publish to NATS failed", "suite_id", in.Suite.Id, "error", err)
+			// Continue even if NATS publish fails (best-effort)
 		}
 	}
 
-	// Persist or update TestSuiteRun if DB is configured
+	// Persist to DB if configured
 	if s.db != nil {
 		// Convert metadata map[string]string to datatypes.JSONMap (map[string]any)
 		md := map[string]any{}
 		for k, v := range in.Suite.Metadata {
 			md[k] = v
 		}
+
+		var startTime *time.Time
+		if in.Suite.StartTime != nil {
+			t := in.Suite.StartTime.AsTime()
+			startTime = &t
+		}
+
 		suite := &m.TestSuiteRun{
 			ID:              in.Suite.Id,
 			Name:            in.Suite.Name,
@@ -296,16 +303,19 @@ func (s *EventServer) ReportSuiteBegin(ctx context.Context, in *events.SuiteBegi
 			TestSuiteSpecID: in.Suite.TestSuiteSpecId,
 			InitiatedBy:     in.Suite.InitiatedBy,
 			ProjectName:     in.Suite.ProjectName,
+			StartTime:       startTime,
 		}
+
 		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "project_name", "updated_at"}),
+			DoUpdates: clause.AssignmentColumns([]string{"name", "description", "metadata", "test_suite_spec_id", "initiated_by", "project_name", "start_time", "updated_at"}),
 		}).Create(suite).Error; err != nil {
-			s.logger.Error("persist suite start failed", "id", in.Suite.Id, "error", err)
+			s.logger.Error("persist suite begin failed", "suite_id", in.Suite.Id, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
 		}
 	}
-	return &observer.AckResponse{Success: true, Message: "suite start received: " + in.Suite.Id}, nil
+
+	return &observer.AckResponse{Success: true, Message: "suite begin received: " + in.Suite.Id}, nil
 }
 
 func (s *EventServer) ReportSuiteEnd(ctx context.Context, in *events.SuiteEndEventRequest) (*observer.AckResponse, error) {
@@ -323,32 +333,156 @@ func (s *EventServer) ReportSuiteEnd(ctx context.Context, in *events.SuiteEndEve
 	// Publish to NATS if publisher is configured
 	if s.publisher != nil {
 		if err := s.publisher.Publish(ctx, publisher.EventTypeSuiteEnd, in); err != nil {
-			s.logger.Error("publish to NATS failed", "id", in.Suite.Id, "error", err)
-			// Continue with DB write even if NATS publish fails (best-effort)
+			s.logger.Error("publish to NATS failed", "suite_id", in.Suite.Id, "error", err)
+			// Continue even if NATS publish fails (best-effort)
 		}
 	}
 
-	// Upsert status on finish if DB is configured
+	// Persist to DB if configured
 	if s.db != nil {
 		statusStr := in.Suite.Status.String()
-		suite := &m.TestSuiteRun{
-			ID:     in.Suite.Id,
-			Status: statusStr,
+
+		var endTime *time.Time
+		if in.Suite.EndTime != nil {
+			t := in.Suite.EndTime.AsTime()
+			endTime = &t
 		}
-		// Convert protobuf Duration to nanoseconds if present
+
+		var duration *int64
 		if in.Suite.Duration != nil {
-			nanos := in.Suite.Duration.AsDuration().Nanoseconds()
-			suite.Duration = &nanos
+			d := in.Suite.Duration.AsDuration().Nanoseconds()
+			duration = &d
 		}
+
+		suite := &m.TestSuiteRun{
+			ID:       in.Suite.Id,
+			Status:   statusStr,
+			Duration: duration,
+			EndTime:  endTime,
+		}
+
 		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "updated_at"}),
+			DoUpdates: clause.AssignmentColumns([]string{"status", "duration", "end_time", "updated_at"}),
 		}).Create(suite).Error; err != nil {
-			s.logger.Error("persist suite end failed", "id", in.Suite.Id, "error", err)
+			s.logger.Error("persist suite end failed", "suite_id", in.Suite.Id, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
 		}
 	}
-	return &observer.AckResponse{Success: true, Message: "suite finish received: " + in.Suite.Id}, nil
+
+	return &observer.AckResponse{Success: true, Message: "suite end received: " + in.Suite.Id}, nil
+}
+
+func (s *EventServer) ReportTestFailure(ctx context.Context, in *events.TestFailureEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if err := validateTestID(in.TestId); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	s.logger.Info("test failure", "test_id", in.TestId, "message_len", len(in.FailureMessage))
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeTestFailure, in); err != nil {
+			s.logger.Error("publish to NATS failed", "test_id", in.TestId, "error", err)
+			// Continue even if NATS publish fails (best-effort)
+		}
+	}
+
+	// Note: Database persistence for failures not yet implemented
+	// Failure info will be available via WebSocket relay in real-time
+
+	return &observer.AckResponse{Success: true, Message: "test failure received: " + in.TestId}, nil
+}
+
+func (s *EventServer) ReportTestError(ctx context.Context, in *events.TestErrorEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if err := validateTestID(in.TestId); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	s.logger.Info("test error", "test_id", in.TestId, "message_len", len(in.ErrorMessage))
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeTestError, in); err != nil {
+			s.logger.Error("publish to NATS failed", "test_id", in.TestId, "error", err)
+			// Continue even if NATS publish fails (best-effort)
+		}
+	}
+
+	// Note: Database persistence for errors not yet implemented
+	// Error info will be available via WebSocket relay in real-time
+
+	return &observer.AckResponse{Success: true, Message: "test error received: " + in.TestId}, nil
+}
+
+func (s *EventServer) ReportStdOutput(ctx context.Context, in *events.StdOutputEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if err := validateTestID(in.TestId); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	s.logger.Debug("stdout", "test_id", in.TestId, "message_len", len(in.Message))
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeStdOutput, in); err != nil {
+			s.logger.Error("publish to NATS failed", "test_id", in.TestId, "error", err)
+			// Continue even if NATS publish fails (best-effort)
+		}
+	}
+
+	// Note: stdout typically not persisted to DB due to volume
+	// Available via WebSocket relay in real-time
+
+	return &observer.AckResponse{Success: true, Message: "stdout received"}, nil
+}
+
+func (s *EventServer) ReportStdError(ctx context.Context, in *events.StdErrorEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if err := validateTestID(in.TestId); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	s.logger.Debug("stderr", "test_id", in.TestId, "message_len", len(in.Message))
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeStdError, in); err != nil {
+			s.logger.Error("publish to NATS failed", "test_id", in.TestId, "error", err)
+			// Continue even if NATS publish fails (best-effort)
+		}
+	}
+
+	// Note: stderr typically not persisted to DB due to volume
+	// Available via WebSocket relay in real-time
+
+	return &observer.AckResponse{Success: true, Message: "stderr received"}, nil
+}
+
+func (s *EventServer) Heartbeat(ctx context.Context, in *events.HeartbeatEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	s.logger.Debug("heartbeat", "source_id", in.SourceId)
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeHeartbeat, in); err != nil {
+			s.logger.Error("publish to NATS failed", "source_id", in.SourceId, "error", err)
+			// Continue even if NATS publish fails (best-effort)
+		}
+	}
+
+	// Note: Heartbeats typically not persisted to DB
+	// Available for monitoring via WebSocket relay
+
+	return &observer.AckResponse{Success: true, Message: "heartbeat received"}, nil
 }
 
 // Note: timestamp conversion helpers will be added when timestamp fields are persisted.

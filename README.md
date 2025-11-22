@@ -205,11 +205,11 @@ The API service exposes a WebSocket endpoint at `/ws` for real-time test event s
 ### Connecting to WebSocket
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/ws');
+const ws = new WebSocket("ws://localhost:8080/ws");
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  console.log('Event:', data.type, data);
+  console.log("Event:", data.type, data);
 };
 ```
 
@@ -221,7 +221,9 @@ All events follow this structure:
 {
   "type": "test.begin|test.end|step.begin|step.end",
   "timestamp": "2025-11-14T05:00:00Z",
-  "data": { /* event-specific data */ }
+  "data": {
+    /* event-specific data */
+  }
 }
 ```
 
@@ -275,9 +277,21 @@ The Observer service includes a modern web interface built with React, TypeScrip
 
 ### Development
 
-See [web/README.md](./web/README.md) for development instructions.
+See [web/README.md](./web/README.md) for web UI development and [web/README-LOCAL-DEV.md](./web/README-LOCAL-DEV.md) for running web locally with Docker backend.
 
-Quick start:
+**Option 1: Local Web + Docker Backend** (Recommended)
+
+```bash
+# Start backend services (DB, NATS, ingestion, processor, API)
+docker compose --profile web-dev up -d
+
+# Run web dev server
+cd web
+npm install
+npm run dev  # Opens on http://localhost:3000
+```
+
+**Option 2: Full Development Mode**
 
 ```bash
 cd web
