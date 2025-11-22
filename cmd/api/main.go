@@ -14,9 +14,9 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/stanterprise/observer/internal/database"
-	"github.com/stanterprise/observer/pkg/websocket"
 	"github.com/stanterprise/observer/pkg/api"
 	"github.com/stanterprise/observer/pkg/api/graph"
+	"github.com/stanterprise/observer/pkg/websocket"
 )
 
 func main() {
@@ -41,7 +41,7 @@ func main() {
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub(logger)
-	
+
 	// Configure NATS for WebSocket if NATS_URL is provided
 	natsURL := os.Getenv("NATS_URL")
 	if natsURL != "" {
@@ -52,17 +52,17 @@ func main() {
 			BatchSize:    10,
 			MaxWait:      5 * time.Second,
 		}
-		
+
 		if err := hub.InitNATS(wsConfig); err != nil {
 			logger.Error("failed to initialize NATS for WebSocket", "error", err)
 			os.Exit(1)
 		}
 	}
-	
+
 	// Start WebSocket hub in background
 	hubCtx, hubCancel := context.WithCancel(context.Background())
 	defer hubCancel()
-	
+
 	go hub.Run(hubCtx, websocket.NATSConfig{
 		BatchSize: 10,
 		MaxWait:   5 * time.Second,
@@ -78,7 +78,7 @@ func main() {
 
 	// Create HTTP server with endpoints
 	mux := http.NewServeMux()
-	
+
 	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -116,14 +116,18 @@ func main() {
 	restHandler.RegisterRoutes(mux)
 
 	addr := ":" + *port
+
+	// Wrap with CORS middleware for local development
+	handler := corsMiddleware(mux, logger)
+
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: mux,
+		Handler: handler,
 	}
 
-	logger.Info("api server starting", 
-		"addr", addr, 
-		"graphql", "/api/graphql", 
+	logger.Info("api server starting",
+		"addr", addr,
+		"graphql", "/api/graphql",
 		"playground", "/api/playground",
 		"rest_api", "/api/tests, /api/runs")
 
@@ -175,4 +179,34 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// corsMiddleware adds CORS headers to support local web development
+// where the web UI runs on a different port (e.g., Vite dev server on :3000)
+func corsMiddleware(next http.Handler, logger *slog.Logger) http.Handler {
+	allowedOrigins := envOr("CORS_ALLOWED_ORIGINS", "*")
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+
+		// Set CORS headers
+		if allowedOrigins == "*" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		} else if origin != "" {
+			// TODO: Check origin against allowedOrigins list
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		// Handle preflight requests
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

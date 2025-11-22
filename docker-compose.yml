@@ -45,7 +45,7 @@ services:
       dockerfile: Dockerfile.ingestion
     image: observer:ingestion
     container_name: observer-ingestion
-    profiles: ["dist"]
+    profiles: ["dist", "web-dev"]
     restart: unless-stopped
     environment:
       PORT: "50051"
@@ -72,7 +72,7 @@ services:
       dockerfile: Dockerfile.processor
     image: observer:processor
     container_name: observer-processor
-    profiles: ["dist"]
+    profiles: ["dist", "web-dev"]
     restart: unless-stopped
     environment:
       NATS_URL: nats://nats:4222
@@ -100,7 +100,7 @@ services:
       dockerfile: Dockerfile.api
     image: observer:api
     container_name: observer-api
-    profiles: ["dist"]
+    profiles: ["dist", "web-dev"]
     restart: unless-stopped
     environment:
       PORT: "8080"
@@ -108,6 +108,9 @@ services:
       NATS_URL: nats://nats:4222
       NATS_STREAM: tests_events
       NATS_WS_CONSUMER: websocket
+      CORS_ALLOWED_ORIGINS: "*" # Allow all origins for development
+    ports:
+      - "${API_PORT:-8080}:8080" # Expose API port for local web development
     depends_on:
       db:
         condition: service_healthy
@@ -154,7 +157,7 @@ services:
   db:
     image: postgres:16-alpine
     container_name: observer-postgres
-    profiles: ["dist"]
+    profiles: ["dist", "infra", "web-dev"]
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -180,7 +183,7 @@ services:
   nats:
     image: nats:2.10-alpine
     container_name: observer-nats
-    profiles: ["dist"]
+    profiles: ["dist", "infra", "web-dev"]
     restart: unless-stopped
     command: ["-js", "-m", "8222"]
     ports:

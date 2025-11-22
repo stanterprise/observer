@@ -1,8 +1,8 @@
-import { Link, Outlet } from 'react-router-dom'
-import { Activity, CheckCircle, XCircle } from 'lucide-react'
+import { Link, Outlet } from "react-router-dom";
+import { Activity, CheckCircle, XCircle } from "lucide-react";
 
 interface LayoutProps {
-  isConnected: boolean
+  isConnected: boolean;
 }
 
 export function Layout({ isConnected }: LayoutProps) {
@@ -43,5 +43,5 @@ export function Layout({ isConnected }: LayoutProps) {
         <Outlet />
       </main>
     </div>
-  )
+  );
 }
