@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { apiUrl } from "../lib/config";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/Card";
 import { Badge } from "../components/Badge";
-import type { TestCaseRun, WebSocketEvent } from "../types";
+import type { TestCaseRun, WebSocketEvent, TestCaseResponse, WebSocketTestData, TestStatus } from "../types";
 import { Play, Clock } from "lucide-react";
 
 interface TestRunsPageProps {
@@ -27,18 +27,18 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
       }
       const data = await response.json();
       setTests(
-        (data.data || []).map((test: any) => ({
-          id: test.id,
+        (data.data || []).map((test: TestCaseResponse) => ({
+          id: test.ID,
           test_case_id: test.ID,
           test_run_id: test.RunID || "unknown",
           title: test.Title || "",
-          file: test.test_case?.location?.file || "",
-          project: test.test_case?.project || "",
-          status: test.status,
+          file: "",
+          project: "",
+          status: test.Status.toLowerCase() as TestStatus,
           started_at: new Date(test.CreatedAt).toISOString(),
           finished_at: new Date(test.UpdatedAt).toISOString(),
-          error_message: test.error?.message,
-          metadata: test.metadata,
+          error_message: undefined,
+          metadata: test.Metadata,
           created_at: new Date(test.CreatedAt).toISOString(),
           updated_at: new Date(test.UpdatedAt).toISOString(),
         }))
@@ -61,7 +61,7 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
     // Update the test in the local state based on the event
     if (type === "test.begin" || type === "test.end") {
       setTests((prevTests) => {
-        const testData = data as any; // Cast from event data
+        const testData = data as WebSocketTestData;
         const testId = testData.test_case?.id || testData.id;
 
         // Check if we already have this test
@@ -72,7 +72,7 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
           const updatedTests = [...prevTests];
           updatedTests[existingIndex] = {
             ...updatedTests[existingIndex],
-            status: testData.status || updatedTests[existingIndex].status,
+            status: (testData.status?.toLowerCase() || updatedTests[existingIndex].status) as TestStatus,
             finished_at:
               testData.finished_at || updatedTests[existingIndex].finished_at,
             error_message:
@@ -84,9 +84,9 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
           // Add new test at the beginning
           const now = new Date().toISOString();
           const newTest: TestCaseRun = {
-            id: testId,
-            test_case_id: testData.test_case?.id || testId,
-            test_run_id: testData.test_run_id || "unknown",
+            id: testId || "unknown",
+            test_case_id: testData.test_case?.id || testId || "unknown",
+            test_run_id: testData.test_run_id || testData.run_id || "unknown",
             title: testData.test_case?.title || "",
             file: testData.test_case?.location?.file || "",
             project: testData.test_case?.project || "",

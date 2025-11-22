@@ -54,3 +54,40 @@ export interface WebSocketEvent {
   timestamp: string;
   data: unknown;
 }
+
+// API Response types
+export interface TestCaseResponse {
+  ID: string;
+  RunID: string;
+  Title: string;
+  Status: string;
+  Metadata?: Record<string, unknown>;
+  Duration?: number;
+  CreatedAt: string;
+  UpdatedAt: string;
+}
+
+export interface WebSocketTestData {
+  id?: string;
+  run_id?: string;
+  test_case?: {
+    id?: string;
+    title?: string;
+    run_id?: string;
+    location?: {
+      file?: string;
+    };
+    project?: string;
+  };
+  status?: string;
+  started_at?: string;
+  finished_at?: string;
+  error?: {
+    message?: string;
+  };
+  test_run_id?: string;
+}
+
+export interface WebSocketStepData {
+  test_case_run_id?: string;
+}
