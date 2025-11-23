@@ -91,4 +91,9 @@ export interface WebSocketTestData {
 
 export interface WebSocketStepData {
   test_case_run_id?: string;
+  id?: string;
+  parent_step_id?: string;
+  status?: string;
+  category?: string;
+  title?: string;
 }
