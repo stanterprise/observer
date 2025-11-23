@@ -26,6 +26,7 @@ export interface TestCaseRun {
 export interface StepRun {
   id: string;
   test_case_run_id: string;
+  parent_step_id?: string; // Reference to parent step for nested steps
   title: string;
   category: string;
   status: TestStatus;

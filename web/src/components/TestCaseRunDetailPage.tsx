@@ -14,8 +14,10 @@ interface Step {
   ID: string;
   RunID: string;
   TestCaseRunID: string;
+  ParentStepID?: string;
   Status: string;
   Category: string;
+  Title: string;
   CreatedAt: string;
   UpdatedAt: string;
 }
@@ -273,58 +275,86 @@ export function TestCaseRunDetailPage({
           </Card>
         ) : (
           <div className="space-y-3">
-            {steps.map((step, index) => {
-              const stepStatus = getTestStatus(step.Status);
-              const isLastStep = index === steps.length - 1;
-
-              return (
-                <Card
-                  key={step.ID}
-                  className={`${
-                    stepStatus === "failed" ? "border-red-200 bg-red-50" : ""
-                  }`}
-                >
-                  <CardContent className="py-4">
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-700">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-3">
-                            <Badge status={stepStatus} />
-                            <span className="text-sm font-medium text-gray-700">
-                              {step.Category || "Step"}
-                            </span>
-                          </div>
-                          {stepStatus === "passed" && (
-                            <CheckCircle2 className="h-5 w-5 text-green-600" />
-                          )}
-                          {stepStatus === "failed" && (
-                            <AlertCircle className="h-5 w-5 text-red-600" />
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-4 text-xs text-gray-500">
-                          <div className="flex items-center">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Started: {new Date(step.CreatedAt).toLocaleString()}
-                          </div>
-                          {!isLastStep && step.UpdatedAt !== step.CreatedAt && (
-                            <div>
-                              Completed:{" "}
-                              {new Date(step.UpdatedAt).toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {renderStepHierarchy(steps, null, 0, getTestStatus)}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+// Helper function to render steps hierarchically
+function renderStepHierarchy(
+  allSteps: Step[],
+  parentId: string | null,
+  level: number,
+  getTestStatus: (status: string) => TestStatus
+): React.ReactNode[] {
+  // Find all steps that have the given parent
+  const childSteps = allSteps.filter(
+    (step) => (step.ParentStepID || null) === parentId
+  );
+
+  return childSteps.map((step, index) => {
+    const stepStatus = getTestStatus(step.Status);
+    const hasChildren = allSteps.some((s) => s.ParentStepID === step.ID);
+
+    return (
+      <div key={step.ID}>
+        <div style={{ marginLeft: level > 0 ? `${level * 2}rem` : "0" }}>
+          <Card
+            className={`${
+              stepStatus === "failed" ? "border-red-200 bg-red-50" : ""
+            }`}
+          >
+            <CardContent className="py-4">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-700">
+                  {level > 0 ? "↳" : index + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-3">
+                      <Badge status={stepStatus} />
+                      <span className="text-sm font-medium text-gray-700">
+                        {step.Title || step.Category || "Step"}
+                      </span>
+                    </div>
+                    {stepStatus === "passed" && (
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    )}
+                    {stepStatus === "failed" && (
+                      <AlertCircle className="h-5 w-5 text-red-600" />
+                    )}
+                  </div>
+                  {step.Category && step.Title && (
+                    <div className="text-xs text-gray-500 mb-1">
+                      Category: {step.Category}
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-4 text-xs text-gray-500">
+                    <div className="flex items-center">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Started: {new Date(step.CreatedAt).toLocaleString()}
+                    </div>
+                    {step.UpdatedAt !== step.CreatedAt && (
+                      <div>
+                        Completed: {new Date(step.UpdatedAt).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        {/* Recursively render child steps */}
+        {hasChildren && (
+          <div className="space-y-3 mt-3">
+            {renderStepHierarchy(allSteps, step.ID, level + 1, getTestStatus)}
+          </div>
+        )}
+      </div>
+    );
+  });
 }

@@ -183,16 +183,24 @@ func (s *EventServer) ReportStepBegin(ctx context.Context, in *events.StepBeginE
 
 	if s.db != nil {
 		st := &m.StepRun{
+			ID:            in.Step.Id,
+			RunID:         in.Step.RunId,
 			TestCaseRunID: in.Step.TestCaseRunId,
+			ParentStepID:  in.Step.ParentStepId,
 			Status:        "RUNNING",
 			Category:      in.Step.Category,
+			Title:         in.Step.Title,
 		}
-		if err := s.db.WithContext(ctx).Create(st).Error; err != nil {
-			s.logger.Error("persist step begin failed", "run_id", in.Step.TestCaseRunId, "error", err)
+		// Use upsert to handle idempotency
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "category", "title", "parent_step_id", "updated_at"}),
+		}).Create(st).Error; err != nil {
+			s.logger.Error("persist step begin failed", "id", in.Step.Id, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
 		}
 	}
-	return &observer.AckResponse{Success: true, Message: "step received: " + in.Step.TestCaseRunId}, nil
+	return &observer.AckResponse{Success: true, Message: "step received: " + in.Step.Id}, nil
 }
 
 func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEventRequest) (*observer.AckResponse, error) {
@@ -217,48 +225,25 @@ func (s *EventServer) ReportStepEnd(ctx context.Context, in *events.StepEndEvent
 	}
 
 	if s.db != nil {
-		// Make read+update atomic to avoid races among concurrent step-end reports.
-		err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-			var step m.StepRun
-			// Lock the latest step row for this test case.
-			q := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-				Where("test_case_run_id = ?", in.Step.TestCaseRunId).
-				Order("created_at DESC").
-				Limit(1).Take(&step)
-			if q.Error != nil {
-				if errors.Is(q.Error, gorm.ErrRecordNotFound) {
-					// No step row exists; create one inside the tx.
-					st := &m.StepRun{
-						TestCaseRunID: in.Step.TestCaseRunId,
-						Status:        in.Step.Status.String(),
-						Category:      in.Step.Category,
-					}
-					if err := tx.Create(st).Error; err != nil {
-						return err
-					}
-					return nil
-				}
-				return q.Error
-			}
-			// Update the locked row with both status and category.
-			updates := map[string]interface{}{
-				"status": in.Step.Status.String(),
-			}
-			// Only update category if it's provided
-			if in.Step.Category != "" {
-				updates["category"] = in.Step.Category
-			}
-			if err := tx.Model(&m.StepRun{}).Where("id = ?", step.ID).Updates(updates).Error; err != nil {
-				return err
-			}
-			return nil
-		})
-		if err != nil {
-			s.logger.Error("persist step end failed", "run_id", in.Step.TestCaseRunId, "error", err)
+		// Use upsert pattern for idempotency - step may already exist from StepBegin
+		st := &m.StepRun{
+			ID:            in.Step.Id,
+			RunID:         in.Step.RunId,
+			TestCaseRunID: in.Step.TestCaseRunId,
+			ParentStepID:  in.Step.ParentStepId,
+			Status:        in.Step.Status.String(),
+			Category:      in.Step.Category,
+			Title:         in.Step.Title,
+		}
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"status", "category", "title", "parent_step_id", "updated_at"}),
+		}).Create(st).Error; err != nil {
+			s.logger.Error("persist step end failed", "id", in.Step.Id, "error", err)
 			return nil, status.Error(codes.Internal, "database error")
 		}
 	}
-	return &observer.AckResponse{Success: true, Message: "step end received: " + in.Step.TestCaseRunId}, nil
+	return &observer.AckResponse{Success: true, Message: "step end received: " + in.Step.Id}, nil
 }
 
 func (s *EventServer) ReportSuiteBegin(ctx context.Context, in *events.SuiteBeginEventRequest) (*observer.AckResponse, error) {
