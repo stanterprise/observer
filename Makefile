@@ -165,6 +165,12 @@ db-psql: ## Open psql against the db container
 db-reset: ## Reset database by recreating container and volume
 	docker compose down -v && docker compose up -d db
 
+db-clear: ## Clear all data from the database (drops and recreates tables)
+	docker compose exec -e PGPASSWORD=$${POSTGRES_PASSWORD:-postgres} db psql -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-observer} -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO $${POSTGRES_USER:-postgres}; GRANT ALL ON SCHEMA public TO public;"
+
+db-migrate: ## Run database migrations
+	@APPLY_MIGRATIONS=1 DATABASE_URL='$(DATABASE_URL)' go run ./scripts/migrate.go
+
 # NATS helpers
 nats-up: ## Start NATS container
 	docker compose up -d nats
