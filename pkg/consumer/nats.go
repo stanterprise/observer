@@ -330,9 +330,11 @@ func (c *NATSConsumer) handleStepBegin(ctx context.Context, data json.RawMessage
 		return errors.New("step is nil")
 	}
 
-	c.logger.Info("test step", "run_id", req.Step.TestCaseRunId)
+	c.logger.Info("test step", "id", req.Step.Id, "run_id", req.Step.TestCaseRunId)
 
 	st := &m.StepRun{
+		ID:            req.Step.Id,
+		RunID:         req.Step.RunId,
 		TestCaseRunID: req.Step.TestCaseRunId,
 		Status:        "RUNNING",
 		Category:      req.Step.Category,
@@ -372,6 +374,8 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 			if errors.Is(q.Error, gorm.ErrRecordNotFound) {
 				// No step row exists; create one inside the tx
 				st := &m.StepRun{
+					ID:            req.Step.Id,
+					RunID:         req.Step.RunId,
 					TestCaseRunID: req.Step.TestCaseRunId,
 					Status:        statusToString(req.Step.Status),
 					Category:      req.Step.Category,
@@ -563,19 +567,19 @@ func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage)
 		"status", req.Suite.Status)
 
 	statusStr := req.Suite.Status.String()
-	
+
 	var endTime *time.Time
 	if req.Suite.EndTime != nil {
 		t := req.Suite.EndTime.AsTime()
 		endTime = &t
 	}
-	
+
 	suite := &m.TestSuiteRun{
 		ID:      req.Suite.Id,
 		Status:  statusStr,
 		EndTime: endTime,
 	}
-	
+
 	// Convert protobuf Duration to nanoseconds if present
 	if req.Suite.Duration != nil {
 		nanos := req.Suite.Duration.AsDuration().Nanoseconds()
