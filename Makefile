@@ -224,12 +224,16 @@ docker-build-api: build-all ## Build API Docker image
 docker-build-web: ## Build Web UI Docker image
 	docker build -f Dockerfile.web -t $(IMAGE_NAME):web .
 
+
 # Backward compatibility
 docker-build: docker-build-all ## Build all Docker images (alias)
 
 # Docker Compose helpers
 docker-up-aio: docker-build-aio ## Start AIO profile with docker compose
 	docker compose --profile aio up -d
+
+docker-dev-web: ## Start all containers except for Web UI in dev mode
+	docker compose --profile web-dev up -d
 
 docker-up-dist: docker-build-ingestion docker-build-processor docker-build-api docker-build-web ## Start distributed profile with docker compose
 	docker compose --profile dist up -d
