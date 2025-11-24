@@ -234,6 +234,10 @@ docker-up-aio: docker-build-aio ## Start AIO profile with docker compose
 
 docker-dev-web: ## Start all containers except for Web UI in dev mode
 	docker compose --profile web-dev up -d
+	@echo "Waiting for database to be ready..."
+	@sleep 2
+	@echo "Running database migrations..."
+	@$(MAKE) db-migrate
 
 docker-up-dist: docker-build-ingestion docker-build-processor docker-build-api docker-build-web ## Start distributed profile with docker compose
 	docker compose --profile dist up -d

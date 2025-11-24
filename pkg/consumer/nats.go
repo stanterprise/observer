@@ -388,12 +388,6 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 	}
 
 	return nil
-
-	if err != nil {
-		return fmt.Errorf("persist step end: %w", err)
-	}
-
-	return nil
 }
 
 // handleTestFailure processes a test failure event
