@@ -311,43 +311,81 @@ make build-all  # Builds: observer, ingestion, processor, api → bin/
 
 Individual targets: `make build-ingestion`, `make build-processor`, `make build-api`
 
-### Run Distributed Mode (Local Development)
+### Local Development Modes
+
+**Option 1: Full Docker (Recommended)**
 
 ```bash
-# Start infrastructure
-make db-up    # Postgres on :5432
-make nats-up  # NATS on :4222, monitoring on :8222
+# Start all backend services (DB, NATS, ingestion, processor, API)
+docker compose --profile web-dev up -d
 
-# Run services independently
-NATS_URL=nats://localhost:4222 ./bin/ingestion  # gRPC on :50051
-
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
-NATS_URL=nats://localhost:4222 \
-./bin/processor
-
-./bin/api  # HTTP on :8080 (future implementation)
+# Run web UI locally with hot reload
+cd web && npm install && npm run dev  # Opens http://localhost:3000
 ```
 
-### Run Legacy Monolithic Mode
+**Option 2: Hybrid (Backend in Docker, Services locally)**
 
 ```bash
-make run-dev  # Builds + runs with DATABASE_URL from docker-compose Postgres
+# Start infrastructure only
+make db-up nats-up
+
+# Run services individually (separate terminals)
+NATS_URL=nats://localhost:4222 ./bin/ingestion
+DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
+  NATS_URL=nats://localhost:4222 ./bin/processor
+DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
+  NATS_URL=nats://localhost:4222 ./bin/api
+
+# Run web UI
+cd web && npm run dev
+```
+
+**Option 3: Legacy Monolithic Mode**
+
+```bash
+make run-dev  # Single process with DATABASE_URL from docker-compose Postgres
 ```
 
 ### Docker Compose Profiles
 
-**AIO profile** (single container with s6-overlay):
+**web-dev profile** (backend services for local web development):
 
 ```bash
-docker compose --profile aio up -d
-# Exposes: :50051 (gRPC), :8080 (API), :4222 (NATS), :8222 (NATS monitoring)
+docker compose --profile web-dev up -d
+# Starts: db, nats, ingestion, processor, api
+# Run web UI locally: cd web && npm run dev
 ```
 
-**Distributed profile** (separate containers):
+**dist profile** (full distributed deployment):
 
 ```bash
 docker compose --profile dist up -d
-# Starts: ingestion, processor, api, db, nats
+# Starts: db, nats, ingestion, processor, api, web (Nginx)
+# Access web UI at http://localhost:3000
+```
+
+**aio profile** (single container with s6-overlay):
+
+```bash
+docker compose --profile aio up -d
+# Single container with embedded NATS, SQLite, all services
+# Exposes: :3000 (Web), :50051 (gRPC), :8080 (API), :4222 (NATS)
+```
+
+### Database Migrations
+
+Migrations run automatically when `APPLY_MIGRATIONS=1` is set. To run manually:
+
+```bash
+make db-migrate  # Uses DATABASE_URL or PG* environment variables
+```
+
+To reset database completely:
+
+```bash
+make db-reset  # Recreates container and volume
+# OR
+make db-clear  # Drops and recreates schema only
 ```
 
 ### Environment Variables
@@ -373,6 +411,22 @@ docker compose --profile dist up -d
 - `NATS_URL` - NATS server URL (optional, for WebSocket relay)
 - `NATS_STREAM` - JetStream stream name (default: `tests_events`)
 - `NATS_WS_CONSUMER` - Consumer name for WebSocket (default: `websocket`)
+- `CORS_ALLOWED_ORIGINS` - CORS origins (default: `*` for development)
+
+**Web UI** (environment variables injected via Nginx template):
+
+- `API_BACKEND_HOST` - API service hostname (default: `api` in Docker, `localhost` for dev)
+- `API_BACKEND_PORT` - API service port (default: `8080`)
+
+**Development**: Web UI uses Vite proxy in dev mode (`vite.config.ts`):
+
+- `/api` → `http://localhost:8080`
+- `/ws` → `ws://localhost:8080`
+
+**Production**: Nginx reverse proxy configuration (`docker/nginx/nginx.conf.template`):
+
+- `/api` → `http://${API_BACKEND_HOST}:${API_BACKEND_PORT}`
+- `/ws` → `ws://${API_BACKEND_HOST}:${API_BACKEND_PORT}`
 
 ## Code Style & Patterns
 
@@ -486,3 +540,4 @@ Check consumer lag: Fetch consumer info via NATS CLI or monitoring endpoint.
 - [ ] Enhanced Web UI features (test details, artifact viewer, filtering)
 - [ ] Authentication layer (dev token, OIDC)
 - [ ] Observability (Prometheus metrics, OpenTelemetry tracing)
+- [ ] Replace Postgres with Document based Database (e.g., MongoDB) for flexible schema
