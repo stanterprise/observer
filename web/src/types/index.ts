@@ -26,6 +26,7 @@ export interface TestCaseRun {
 export interface StepRun {
   id: string;
   test_case_run_id: string;
+  parent_step_id?: string; // Reference to parent step for nested steps
   title: string;
   category: string;
   status: TestStatus;
@@ -53,4 +54,46 @@ export interface WebSocketEvent {
   type: EventType;
   timestamp: string;
   data: unknown;
+}
+
+// API Response types
+export interface TestCaseResponse {
+  ID: string;
+  RunID: string;
+  Title: string;
+  Status: string;
+  Metadata?: Record<string, unknown>;
+  Duration?: number;
+  CreatedAt: string;
+  UpdatedAt: string;
+}
+
+export interface WebSocketTestData {
+  id?: string;
+  run_id?: string;
+  test_case?: {
+    id?: string;
+    title?: string;
+    run_id?: string;
+    location?: {
+      file?: string;
+    };
+    project?: string;
+  };
+  status?: string;
+  started_at?: string;
+  finished_at?: string;
+  error?: {
+    message?: string;
+  };
+  test_run_id?: string;
+}
+
+export interface WebSocketStepData {
+  test_case_run_id?: string;
+  id?: string;
+  parent_step_id?: string;
+  status?: string;
+  category?: string;
+  title?: string;
 }

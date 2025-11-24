@@ -7,8 +7,14 @@ This guide explains how to run the web UI locally for development while running 
 1. **Start backend services** (database, NATS, ingestion, processor, API):
 
    ```bash
-   docker compose --profile web-dev up -d
+   make docker-dev-web
    ```
+
+   This command:
+
+   - Starts all backend containers (db, NATS, ingestion, processor, API)
+   - Waits for database to be ready
+   - Runs database migrations automatically
 
 2. **Install web dependencies** (first time only):
 
@@ -83,6 +89,15 @@ Available variables:
 - `VITE_WS_URL` - WebSocket endpoint (default: auto-detected)
 
 ## Troubleshooting
+
+### Database Tables Missing
+
+If you see errors like "relation does not exist" in API or processor logs:
+
+1. Ensure migrations ran: `make db-migrate`
+2. Check tables exist: `docker compose exec db psql -U postgres -d observer -c "\dt"`
+3. If using `docker-dev-web`, migrations should run automatically
+4. For manual setup, always run `make db-migrate` after starting database
 
 ### CORS Errors
 

@@ -330,15 +330,23 @@ func (c *NATSConsumer) handleStepBegin(ctx context.Context, data json.RawMessage
 		return errors.New("step is nil")
 	}
 
-	c.logger.Info("test step", "run_id", req.Step.TestCaseRunId)
+	c.logger.Info("test step", "id", req.Step.Id, "run_id", req.Step.TestCaseRunId)
 
 	st := &m.StepRun{
+		ID:            req.Step.Id,
+		RunID:         req.Step.RunId,
 		TestCaseRunID: req.Step.TestCaseRunId,
+		ParentStepID:  req.Step.ParentStepId,
 		Status:        "RUNNING",
 		Category:      req.Step.Category,
+		Title:         req.Step.Title,
 	}
 
-	if err := c.db.WithContext(ctx).Create(st).Error; err != nil {
+	// Use upsert for idempotency
+	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"status", "category", "title", "parent_step_id", "updated_at"}),
+	}).Create(st).Error; err != nil {
 		return fmt.Errorf("persist step begin: %w", err)
 	}
 
@@ -357,49 +365,25 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 	}
 
 	c.logger.Info("test step end",
+		"id", req.Step.Id,
 		"run_id", req.Step.TestCaseRunId,
 		"status", req.Step.Status)
 
-	// Use transaction to ensure atomic read+update
-	err := c.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var step m.StepRun
-		// Lock the latest step row for this test case
-		q := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("test_case_run_id = ?", req.Step.TestCaseRunId).
-			Order("created_at DESC").
-			Limit(1).Take(&step)
-		if q.Error != nil {
-			if errors.Is(q.Error, gorm.ErrRecordNotFound) {
-				// No step row exists; create one inside the tx
-				st := &m.StepRun{
-					TestCaseRunID: req.Step.TestCaseRunId,
-					Status:        statusToString(req.Step.Status),
-					Category:      req.Step.Category,
-				}
-				if err := tx.Create(st).Error; err != nil {
-					return err
-				}
-				return nil
-			}
-			return q.Error
-		}
-		// Update the locked row with both status and category
-		updates := map[string]interface{}{
-			"status": statusToString(req.Step.Status),
-		}
-		// Only update category if it's provided
-		if req.Step.Category != "" {
-			updates["category"] = req.Step.Category
-		}
-		if err := tx.Model(&m.StepRun{}).
-			Where("id = ?", step.ID).
-			Updates(updates).Error; err != nil {
-			return err
-		}
-		return nil
-	})
+	// Use upsert pattern for idempotency
+	st := &m.StepRun{
+		ID:            req.Step.Id,
+		RunID:         req.Step.RunId,
+		TestCaseRunID: req.Step.TestCaseRunId,
+		ParentStepID:  req.Step.ParentStepId,
+		Status:        statusToString(req.Step.Status),
+		Category:      req.Step.Category,
+		Title:         req.Step.Title,
+	}
 
-	if err != nil {
+	if err := c.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"status", "category", "title", "parent_step_id", "updated_at"}),
+	}).Create(st).Error; err != nil {
 		return fmt.Errorf("persist step end: %w", err)
 	}
 
@@ -563,19 +547,19 @@ func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage)
 		"status", req.Suite.Status)
 
 	statusStr := req.Suite.Status.String()
-	
+
 	var endTime *time.Time
 	if req.Suite.EndTime != nil {
 		t := req.Suite.EndTime.AsTime()
 		endTime = &t
 	}
-	
+
 	suite := &m.TestSuiteRun{
 		ID:      req.Suite.Id,
 		Status:  statusStr,
 		EndTime: endTime,
 	}
-	
+
 	// Convert protobuf Duration to nanoseconds if present
 	if req.Suite.Duration != nil {
 		nanos := req.Suite.Duration.AsDuration().Nanoseconds()

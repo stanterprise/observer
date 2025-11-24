@@ -165,6 +165,12 @@ db-psql: ## Open psql against the db container
 db-reset: ## Reset database by recreating container and volume
 	docker compose down -v && docker compose up -d db
 
+db-clear: ## Clear all data from the database (drops and recreates tables)
+	docker compose exec -e PGPASSWORD=$${POSTGRES_PASSWORD:-postgres} db psql -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-observer} -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO $${POSTGRES_USER:-postgres}; GRANT ALL ON SCHEMA public TO public;"
+
+db-migrate: ## Run database migrations
+	@APPLY_MIGRATIONS=1 DATABASE_URL='$(DATABASE_URL)' go run ./scripts/migrate.go
+
 # NATS helpers
 nats-up: ## Start NATS container
 	docker compose up -d nats
@@ -218,12 +224,20 @@ docker-build-api: build-all ## Build API Docker image
 docker-build-web: ## Build Web UI Docker image
 	docker build -f Dockerfile.web -t $(IMAGE_NAME):web .
 
+
 # Backward compatibility
 docker-build: docker-build-all ## Build all Docker images (alias)
 
 # Docker Compose helpers
 docker-up-aio: docker-build-aio ## Start AIO profile with docker compose
 	docker compose --profile aio up -d
+
+docker-dev-web: ## Start all containers except for Web UI in dev mode
+	docker compose --profile web-dev up -d
+	@echo "Waiting for database to be ready..."
+	@sleep 2
+	@echo "Running database migrations..."
+	@$(MAKE) db-migrate
 
 docker-up-dist: docker-build-ingestion docker-build-processor docker-build-api docker-build-web ## Start distributed profile with docker compose
 	docker compose --profile dist up -d

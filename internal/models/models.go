@@ -51,8 +51,10 @@ type StepRun struct {
 	ID            string    `gorm:"column:id;primaryKey"`
 	RunID         string    `gorm:"column:run_id;type:text"`
 	TestCaseRunID string    `gorm:"column:test_case_run_id;type:text"`
+	ParentStepID  string    `gorm:"column:parent_step_id;type:text"` // Reference to parent step for nested steps
 	Status        string    `gorm:"column:status;type:text"`
 	Category      string    `gorm:"column:category;type:text"`
+	Title         string    `gorm:"column:title;type:text"`
 	CreatedAt     time.Time `gorm:"column:created_at"`
 	UpdatedAt     time.Time `gorm:"column:updated_at"`
 }
