@@ -1,0 +1,26 @@
+apiVersion: v2
+name: observer
+description: A Helm chart for Observer - Test Observability System
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - testing
+  - observability
+  - grpc
+  - nats
+home: https://github.com/stanterprise/observer
+sources:
+  - https://github.com/stanterprise/observer
+maintainers:
+  - name: Stanterprise Team
+    url: https://github.com/stanterprise
+dependencies:
+  - name: postgresql
+    version: "~15.5.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: nats
+    version: "~1.2.0"
+    repository: https://nats-io.github.io/k8s/helm/charts/
+    condition: nats.enabled

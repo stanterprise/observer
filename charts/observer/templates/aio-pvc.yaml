@@ -1,0 +1,18 @@
+{{- if and (eq .Values.mode "aio") .Values.aio.enabled .Values.aio.persistence.enabled (not .Values.aio.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "observer.fullname" . }}-aio
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: aio
+spec:
+  accessModes:
+    - {{ .Values.aio.persistence.accessMode }}
+  {{- if .Values.aio.persistence.storageClass }}
+  storageClassName: {{ .Values.aio.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.aio.persistence.size }}
+{{- end }}
