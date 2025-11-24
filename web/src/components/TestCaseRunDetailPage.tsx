@@ -3,7 +3,12 @@ import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "../lib/config";
 import { Card, CardHeader, CardTitle, CardContent } from "./Card";
 import { Badge } from "./Badge";
-import type { WebSocketEvent, TestStatus, WebSocketTestData, WebSocketStepData } from "../types";
+import type {
+  WebSocketEvent,
+  TestStatus,
+  WebSocketTestData,
+  WebSocketStepData,
+} from "../types";
 import { ArrowLeft, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface TestCaseRunDetailPageProps {
@@ -45,9 +50,7 @@ export function TestCaseRunDetailPage({
   onWebSocketEvent,
 }: TestCaseRunDetailPageProps) {
   const { testId } = useParams<{ testId: string }>();
-  const [testDetail, setTestDetail] = useState<TestDetailResponse | null>(
-    null
-  );
+  const [testDetail, setTestDetail] = useState<TestDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,9 +126,7 @@ export function TestCaseRunDetailPage({
           Back to Tests
         </Link>
         <div className="flex items-center justify-center h-64">
-          <div className="text-red-600">
-            Error: {error || "Test not found"}
-          </div>
+          <div className="text-red-600">Error: {error || "Test not found"}</div>
         </div>
       </div>
     );
