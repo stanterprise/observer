@@ -301,6 +301,44 @@ npm run dev
 
 The development server includes proxying for API and WebSocket endpoints to `localhost:8080`.
 
+## Deployment
+
+### Docker Images
+
+Pre-built Docker images are available on GitHub Container Registry:
+
+```bash
+# Pull AIO image
+docker pull ghcr.io/stanterprise/observer/aio:latest
+
+# Pull distributed mode images
+docker pull ghcr.io/stanterprise/observer/ingestion:latest
+docker pull ghcr.io/stanterprise/observer/processor:latest
+docker pull ghcr.io/stanterprise/observer/api:latest
+docker pull ghcr.io/stanterprise/observer/web:latest
+```
+
+### Kubernetes / Helm
+
+Install Observer on Kubernetes using Helm:
+
+```bash
+# Install from OCI registry
+helm install observer oci://ghcr.io/stanterprise/observer/charts/observer --version 0.1.0
+
+# Or add the Helm repository
+helm repo add observer https://stanterprise.github.io/observer/
+helm install observer observer/observer
+```
+
+See the [Deployment Guide](DEPLOYMENT.md) for detailed instructions on:
+- Docker image usage
+- Helm chart installation and configuration
+- Production deployment
+- AIO vs Distributed mode selection
+- Ingress configuration
+- Scaling and monitoring
+
 ## Roadmap
 
 - [x] Separate components into distinct services
@@ -312,13 +350,14 @@ The development server includes proxying for API and WebSocket endpoints to `loc
 - [x] Docker Compose profiles (AIO and distributed)
 - [x] Comprehensive test suite with E2E NATS integration
 - [x] Playwright reporter integration validation
+- [x] **Docker image publishing**: GitHub Container Registry
+- [x] **Kubernetes Helm charts**: Deployment templates for AIO and distributed modes
 - [ ] **Phase 3**: Remove DB from ingestion (NATS-only, fully stateless)
 - [ ] **Phase 4**: Complete GraphQL API implementation
 - [ ] Enhanced Web UI features (test details, artifact viewer, filtering)
 - [ ] Object storage for artifacts (MinIO/S3)
 - [ ] Authentication layer (dev token, OIDC)
 - [ ] Metrics (Prometheus) and tracing (OpenTelemetry)
-- [ ] Kubernetes Helm charts
 
 ## License
 

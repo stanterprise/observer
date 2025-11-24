@@ -1,0 +1,7 @@
+chart-dirs:
+  - charts
+chart-repos:
+  - bitnami=https://charts.bitnami.com/bitnami
+  - nats=https://nats-io.github.io/k8s/helm/charts/
+helm-extra-args: --timeout 600s
+validate-maintainers: false
