@@ -121,8 +121,8 @@ helm repo update
 # Install the chart
 helm install observer observer/observer
 
-# Install in AIO mode
-helm install observer observer/observer -f observer/values-aio.yaml
+# Install in AIO mode with values file
+helm install observer observer/observer --set mode=aio --set aio.enabled=true --set distributed.enabled=false
 ```
 
 #### Method 3: Install from Source

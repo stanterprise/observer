@@ -159,9 +159,16 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer
 ### Development/Testing
 
 ```bash
-# 1. Install in AIO mode
+# 1. Install in AIO mode (using pre-packaged values from source)
+# Note: values files are referenced without 'charts/' prefix when using OCI registry
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
-  -f observer/values-aio.yaml
+  --set mode=aio \
+  --set aio.enabled=true \
+  --set distributed.enabled=false
+
+# Or from source repository:
+# git clone https://github.com/stanterprise/observer.git
+# helm install observer ./charts/observer -f charts/observer/values-aio.yaml
 
 # 2. Port forward to access
 kubectl port-forward svc/observer-aio 3000:80
@@ -176,9 +183,14 @@ kubectl port-forward svc/observer-aio 50051:50051
 ```bash
 # 1. Install with production configuration
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
-  -f observer/values-production.yaml \
+  --set distributed.ingestion.replicaCount=3 \
+  --set distributed.ingestion.autoscaling.enabled=true \
   --set ingress.enabled=true \
   --set ingress.hosts[0].host=observer.example.com
+
+# Or from source with production values file:
+# git clone https://github.com/stanterprise/observer.git
+# helm install observer ./charts/observer -f charts/observer/values-production.yaml
 
 # 2. Configure DNS to point to ingress
 # 3. Test reporters send gRPC traffic to ingress endpoint
