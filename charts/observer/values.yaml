@@ -232,35 +232,60 @@ externalNats:
   existingSecret: ""
 
 # Ingress configuration
+# Each ingress can be independently enabled and configured
 ingress:
-  enabled: false
-  className: "nginx"
-  annotations: {}
-    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
-  hosts:
-    - host: observer.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-          service: web
-  tls: []
-    # - secretName: observer-tls
-    #   hosts:
-    #     - observer.example.com
+  # Web UI ingress - serves the React frontend
+  web:
+    enabled: false
+    className: "nginx"
+    annotations: {}
+      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: observer.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+      # - secretName: observer-web-tls
+      #   hosts:
+      #     - observer.example.com
   
-  # Separate ingress for gRPC (optional)
+  # API ingress - serves the REST/GraphQL API and WebSocket
+  api:
+    enabled: false
+    className: "nginx"
+    annotations: {}
+      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      # nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      # nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+      # nginx.ingress.kubernetes.io/websocket-services: "observer-api"
+    hosts:
+      - host: api.observer.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+      # - secretName: observer-api-tls
+      #   hosts:
+      #     - api.observer.example.com
+  
+  # gRPC ingress - serves the gRPC ingestion endpoint
   grpc:
     enabled: false
     className: "nginx"
     annotations:
       nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+      # nginx.ingress.kubernetes.io/ssl-redirect: "true"
     hosts:
       - host: grpc.observer.example.com
         paths:
           - path: /
             pathType: Prefix
-            service: ingestion
+    tls: []
+      # - secretName: observer-grpc-tls
+      #   hosts:
+      #     - grpc.observer.example.com
 
 # Service Account
 serviceAccount:

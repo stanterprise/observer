@@ -1,21 +1,25 @@
-{{- if .Values.ingress.enabled }}
+{{/*
+Web UI Ingress
+*/}}
+{{- if .Values.ingress.web.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "observer.fullname" . }}
+  name: {{ include "observer.fullname" . }}-web
   labels:
     {{- include "observer.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+    app.kubernetes.io/component: web
+  {{- with .Values.ingress.web.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if .Values.ingress.className }}
-  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.web.className }}
+  ingressClassName: {{ .Values.ingress.web.className }}
   {{- end }}
-  {{- if .Values.ingress.tls }}
+  {{- if .Values.ingress.web.tls }}
   tls:
-    {{- range .Values.ingress.tls }}
+    {{- range .Values.ingress.web.tls }}
     - hosts:
         {{- range .hosts }}
         - {{ . | quote }}
@@ -24,7 +28,7 @@ spec:
     {{- end }}
   {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
+    {{- range .Values.ingress.web.hosts }}
     - host: {{ .host | quote }}
       http:
         paths:
@@ -33,7 +37,6 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                {{- if eq .service "web" }}
                 {{- if eq $.Values.mode "aio" }}
                 name: {{ include "observer.fullname" $ }}-aio
                 {{- else }}
@@ -41,7 +44,54 @@ spec:
                 {{- end }}
                 port:
                   number: 80
-                {{- else if eq .service "api" }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+---
+{{/*
+API Ingress
+*/}}
+{{- if .Values.ingress.api.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "observer.fullname" . }}-api
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  {{- with .Values.ingress.api.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.api.className }}
+  ingressClassName: {{ .Values.ingress.api.className }}
+  {{- end }}
+  {{- if .Values.ingress.api.tls }}
+  tls:
+    {{- range .Values.ingress.api.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.api.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                {{- if eq $.Values.mode "aio" }}
+                name: {{ include "observer.fullname" $ }}-aio
+                port:
+                  number: 8080
+                {{- else }}
                 name: {{ include "observer.fullname" $ }}-api
                 port:
                   number: 8080
@@ -50,6 +100,9 @@ spec:
     {{- end }}
 {{- end }}
 ---
+{{/*
+gRPC Ingress
+*/}}
 {{- if .Values.ingress.grpc.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -65,6 +118,16 @@ metadata:
 spec:
   {{- if .Values.ingress.grpc.className }}
   ingressClassName: {{ .Values.ingress.grpc.className }}
+  {{- end }}
+  {{- if .Values.ingress.grpc.tls }}
+  tls:
+    {{- range .Values.ingress.grpc.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
   {{- end }}
   rules:
     {{- range .Values.ingress.grpc.hosts }}

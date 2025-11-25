@@ -56,9 +56,9 @@ Services deployed:
 
 1. Get the Web UI URL:
 
-{{- if .Values.ingress.enabled }}
-{{- range .Values.ingress.hosts }}
-  Web UI: http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}{{ range .paths }}{{ .path }}{{ end }}
+{{- if .Values.ingress.web.enabled }}
+{{- range .Values.ingress.web.hosts }}
+  Web UI: http{{ if $.Values.ingress.web.tls }}s{{ end }}://{{ .host }}{{ range .paths }}{{ .path }}{{ end }}
 {{- end }}
 
 {{- else if contains "NodePort" .Values.distributed.web.service.type }}
@@ -81,11 +81,22 @@ Services deployed:
 {{- end }}
 {{- end }}
 
-2. Get the gRPC Ingestion endpoint:
+2. Get the API endpoint:
+
+{{- if .Values.ingress.api.enabled }}
+{{- range .Values.ingress.api.hosts }}
+  API: http{{ if $.Values.ingress.api.tls }}s{{ end }}://{{ .host }}{{ range .paths }}{{ .path }}{{ end }}
+{{- end }}
+{{- else }}
+  API is available via the Web UI ingress or port-forward:
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "observer.fullname" . }}-api 8080:8080
+{{- end }}
+
+3. Get the gRPC Ingestion endpoint:
 
 {{- if .Values.ingress.grpc.enabled }}
 {{- range .Values.ingress.grpc.hosts }}
-  gRPC: {{ .host }}:443
+  gRPC: {{ .host }}{{ if $.Values.ingress.grpc.tls }}:443{{ else }}:50051{{ end }}
 {{- end }}
 
 {{- else if eq .Values.mode "distributed" }}
@@ -106,7 +117,7 @@ Services deployed:
 {{- end }}
 {{- end }}
 
-3. Check pod status:
+4. Check pod status:
 
   kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }}"
 

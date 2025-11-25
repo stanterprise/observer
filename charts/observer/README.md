@@ -105,12 +105,22 @@ The chart supports two deployment modes:
 
 #### Ingress Parameters
 
+The chart provides configurable ingresses for each service:
+
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `ingress.enabled` | Enable ingress | `false` |
-| `ingress.className` | Ingress class | `nginx` |
-| `ingress.hosts[0].host` | Hostname | `observer.example.com` |
-| `ingress.tls` | TLS configuration | `[]` |
+| `ingress.web.enabled` | Enable Web UI ingress | `false` |
+| `ingress.web.className` | Web ingress class | `nginx` |
+| `ingress.web.hosts[0].host` | Web UI hostname | `observer.example.com` |
+| `ingress.web.tls` | Web TLS configuration | `[]` |
+| `ingress.api.enabled` | Enable API ingress | `false` |
+| `ingress.api.className` | API ingress class | `nginx` |
+| `ingress.api.hosts[0].host` | API hostname | `api.observer.example.com` |
+| `ingress.api.tls` | API TLS configuration | `[]` |
+| `ingress.grpc.enabled` | Enable gRPC ingress | `false` |
+| `ingress.grpc.className` | gRPC ingress class | `nginx` |
+| `ingress.grpc.hosts[0].host` | gRPC hostname | `grpc.observer.example.com` |
+| `ingress.grpc.tls` | gRPC TLS configuration | `[]` |
 
 ### Example Configurations
 
@@ -154,31 +164,51 @@ nats:
         pvc:
           size: 50Gi
 
+# Configurable ingresses for each service
 ingress:
-  enabled: true
-  className: nginx
-  annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-  hosts:
-    - host: observer.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-          service: web
-  tls:
-    - secretName: observer-tls
-      hosts:
-        - observer.example.com
+  web:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    hosts:
+      - host: observer.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: observer-web-tls
+        hosts:
+          - observer.example.com
+  api:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    hosts:
+      - host: api.observer.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: observer-api-tls
+        hosts:
+          - api.observer.example.com
   grpc:
     enabled: true
+    className: nginx
     annotations:
       nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
     hosts:
       - host: grpc.observer.example.com
         paths:
           - path: /
             pathType: Prefix
-            service: ingestion
+    tls:
+      - secretName: observer-grpc-tls
+        hosts:
+          - grpc.observer.example.com
 ```
 
 #### Development AIO Deployment
