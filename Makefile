@@ -22,7 +22,7 @@ PROTOC_GEN_GO_VERSION ?= v1.36.6
 PROTOC_GEN_GO_GRPC_VERSION ?= v1.5.1
 GOLANGCI_LINT_VERSION ?= v1.60.3
 
-.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down
+.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down helm-deps helm-lint helm-template helm-template-aio helm-template-prod helm-dry-run helm-dry-run-aio helm-dry-run-prod helm-test helm-validate
 
 .DEFAULT_GOAL := help
 
@@ -244,3 +244,33 @@ docker-up-dist: docker-build-ingestion docker-build-processor docker-build-api d
 
 docker-down: ## Stop all docker compose services
 	docker compose down
+
+# Helm chart management
+helm-deps: ## Update Helm chart dependencies
+	helm dependency update charts/observer/
+
+helm-lint: ## Lint the Helm chart
+	helm lint charts/observer/
+
+helm-template: ## Render Helm templates with default values
+	helm template observer charts/observer/
+
+helm-template-aio: ## Render Helm templates with AIO mode
+	helm template observer charts/observer/ --values charts/observer/values-aio.yaml
+
+helm-template-prod: ## Render Helm templates with production values
+	helm template observer charts/observer/ --values charts/observer/values-production.yaml
+
+helm-dry-run: ## Dry-run Helm install with default values
+	helm install observer-test charts/observer/ --dry-run --debug
+
+helm-dry-run-aio: ## Dry-run Helm install with AIO mode
+	helm install observer-test charts/observer/ --values charts/observer/values-aio.yaml --dry-run --debug
+
+helm-dry-run-prod: ## Dry-run Helm install with production values
+	helm install observer-test charts/observer/ --values charts/observer/values-production.yaml --dry-run --debug
+
+helm-test: ## Run comprehensive Helm chart tests
+	./scripts/test-helm-chart.sh
+
+helm-validate: helm-deps helm-lint helm-test ## Run all Helm validation steps
