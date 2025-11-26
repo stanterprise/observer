@@ -4,39 +4,34 @@
 # ============================================================================
 # Builder stage
 # ============================================================================
-FROM golang:1.24-bookworm AS builder
+FROM golang:1.24-alpine AS builder
 
 # Install build dependencies for CGO (required for SQLite support)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        gcc \
-        libc6-dev \
-        libsqlite3-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache gcc musl-dev sqlite-dev
 
 WORKDIR /build
 
-# Copy go mod files and download dependencies
+# Copy go mod files and download dependencies (cached layer)
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod download && go mod verify
 
-# Copy source code
-COPY . .
+# Copy only necessary source files
+COPY cmd/processor/ ./cmd/processor/
+COPY pkg/ ./pkg/
+COPY internal/ ./internal/
 
-# Build processor binary for Linux with CGO enabled (for potential SQLite use)
-RUN CGO_ENABLED=1 GOOS=linux go build -o /bin/processor ./cmd/processor
+# Build processor binary with CGO for SQLite
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH:-amd64} \
+    go build -ldflags='-w -s' \
+    -o /bin/processor ./cmd/processor
 
 # ============================================================================
 # Runtime stage
 # ============================================================================
-FROM debian:bookworm-slim
+FROM alpine:3.20
 
-# Install runtime dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        ca-certificates \
-        procps \
-    && rm -rf /var/lib/apt/lists/*
+# Install runtime dependencies (SQLite libs for CGO binary)
+RUN apk add --no-cache ca-certificates tzdata libstdc++ sqlite-libs
 
 # Copy processor binary from builder
 COPY --from=builder /bin/processor /usr/local/bin/processor
