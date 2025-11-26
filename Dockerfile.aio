@@ -102,13 +102,11 @@ RUN chmod +x /usr/local/bin/ingestion /usr/local/bin/processor /usr/local/bin/ap
 COPY --from=web-builder /build/dist /var/www/html
 
 # Copy and configure Nginx for AIO mode (API backend on localhost:8080)
-COPY docker/nginx/nginx.conf.template /etc/nginx/sites-available/observer
+COPY docker/nginx/nginx.conf.template /etc/nginx/nginx.conf.template
 RUN sed 's/\${API_BACKEND_HOST}/localhost/g; s/\${API_BACKEND_PORT}/8080/g' \
-    /etc/nginx/sites-available/observer > /tmp/observer.conf && \
-    sed 's|/usr/share/nginx/html|/var/www/html|g' /tmp/observer.conf > /etc/nginx/sites-available/observer && \
-    rm -f /etc/nginx/sites-enabled/default && \
-    ln -s /etc/nginx/sites-available/observer /etc/nginx/sites-enabled/observer && \
-    rm -f /tmp/observer.conf
+    /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && \
+    sed -i 's|/usr/share/nginx/html|/var/www/html|g' /etc/nginx/nginx.conf && \
+    rm -f /etc/nginx/nginx.conf.template /etc/nginx/sites-enabled/default
 
 # Copy s6-overlay service definitions
 COPY docker/s6-overlay/s6-rc.d /etc/s6-overlay/s6-rc.d/
