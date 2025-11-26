@@ -3,7 +3,7 @@ entries:
   observer:
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2025-11-26T03:09:06.51090417Z"
+    created: "2025-11-26T03:46:01.012021205Z"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -14,7 +14,7 @@ entries:
       repository: https://nats-io.github.io/k8s/helm/charts/
       version: ~1.2.0
     description: A Helm chart for Observer - Test Observability System
-    digest: a0e99b5098e0ea89e60d6b555371cf27f1f7629857aaf2e50f7b0055735dcb71
+    digest: 6ca45c6798e05098cead7df218ad341be2836fbbdeb9460be88c3b31269c2ac8
     home: https://github.com/stanterprise/observer
     keywords:
     - testing
@@ -31,4 +31,4 @@ entries:
     urls:
     - https://stanterprise.github.io/observer/observer-0.0.1.tgz
     version: 0.0.1
-generated: "2025-11-26T03:09:06.502344343Z"
+generated: "2025-11-26T03:46:01.003697697Z"
