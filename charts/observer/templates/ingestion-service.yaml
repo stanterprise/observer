@@ -1,0 +1,19 @@
+{{- if and (eq .Values.mode "distributed") .Values.distributed.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "observer.fullname" . }}-ingestion
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingestion
+spec:
+  type: {{ .Values.distributed.ingestion.service.type }}
+  ports:
+  - port: {{ .Values.distributed.ingestion.service.port }}
+    targetPort: grpc
+    protocol: TCP
+    name: grpc
+  selector:
+    {{- include "observer.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: ingestion
+{{- end }}

@@ -1,0 +1,30 @@
+# Values for AIO (All-in-One) deployment mode
+# Override default values with: helm install observer ./charts/observer -f charts/observer/values-aio.yaml
+
+mode: aio
+
+aio:
+  enabled: true
+  replicaCount: 1
+  
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  persistence:
+    enabled: true
+    size: 10Gi
+
+distributed:
+  enabled: false
+
+# Disable external dependencies in AIO mode
+postgresql:
+  enabled: false
+
+nats:
+  enabled: false

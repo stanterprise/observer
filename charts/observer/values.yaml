@@ -1,0 +1,316 @@
+# Default values for observer
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Deployment mode: "aio" or "distributed"
+mode: distributed
+
+# Global image configuration
+image:
+  registry: ghcr.io
+  repository: stanterprise/observer
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# AIO (All-in-One) mode configuration
+aio:
+  enabled: false
+  replicaCount: 1
+  
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  service:
+    type: ClusterIP
+    # Web UI port
+    webPort: 80
+    # gRPC ingestion port
+    grpcPort: 50051
+    # API port (internal)
+    apiPort: 8080
+    # NATS client port
+    natsPort: 4222
+    # NATS monitoring port
+    natsMonitoringPort: 8222
+  
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 10Gi
+    # existingClaim: ""
+  
+  env:
+    DB_DRIVER: sqlite
+    DATABASE_URL: /data/db/observer.db
+    STORAGE_DRIVER: local
+    ARTIFACTS_DIR: /data/artifacts
+    APPLY_MIGRATIONS: "1"
+    NATS_URL: nats://localhost:4222
+    NATS_STREAM: tests_events
+    NATS_WS_CONSUMER: websocket
+
+# Distributed mode configuration
+distributed:
+  enabled: true
+  
+  # Ingestion service configuration
+  ingestion:
+    replicaCount: 2
+    
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    
+    service:
+      type: ClusterIP
+      port: 50051
+      # For external access (e.g., LoadBalancer or NodePort)
+      # type: LoadBalancer
+    
+    autoscaling:
+      enabled: false
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 80
+      targetMemoryUtilizationPercentage: 80
+    
+    env:
+      PORT: "50051"
+      NATS_STREAM: tests_events
+      NATS_SUBJECT_PREFIX: tests.events.v1
+  
+  # Processor service configuration
+  processor:
+    replicaCount: 2
+    
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 200m
+        memory: 256Mi
+    
+    autoscaling:
+      enabled: false
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 80
+      targetMemoryUtilizationPercentage: 80
+    
+    env:
+      NATS_STREAM: tests_events
+      NATS_CONSUMER: processor
+      APPLY_MIGRATIONS: "1"
+  
+  # API service configuration
+  api:
+    replicaCount: 2
+    
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    
+    service:
+      type: ClusterIP
+      port: 8080
+    
+    autoscaling:
+      enabled: false
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 80
+      targetMemoryUtilizationPercentage: 80
+    
+    env:
+      PORT: "8080"
+      NATS_STREAM: tests_events
+      NATS_WS_CONSUMER: websocket
+      CORS_ALLOWED_ORIGINS: "*"
+  
+  # Web UI configuration
+  web:
+    replicaCount: 2
+    
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+    
+    service:
+      type: ClusterIP
+      port: 80
+    
+    autoscaling:
+      enabled: false
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 80
+    
+    env:
+      API_BACKEND_HOST: observer-api
+      API_BACKEND_PORT: "8080"
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  # Use external PostgreSQL by setting enabled: false and configuring externalDatabase
+  auth:
+    username: postgres
+    password: postgres
+    database: observer
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+# External database configuration (when postgresql.enabled=false)
+externalDatabase:
+  host: ""
+  port: 5432
+  username: postgres
+  password: ""
+  database: observer
+  # Use existing secret for password
+  existingSecret: ""
+  existingSecretPasswordKey: password
+
+# NATS configuration
+nats:
+  enabled: true
+  # Use external NATS by setting enabled: false and configuring externalNats
+  config:
+    jetstream:
+      enabled: true
+      fileStore:
+        pvc:
+          size: 10Gi
+  natsBox:
+    enabled: false
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# External NATS configuration (when nats.enabled=false)
+externalNats:
+  url: ""
+  # Use existing secret for credentials
+  existingSecret: ""
+
+# Ingress configuration
+# Each ingress can be independently enabled and configured
+ingress:
+  # Web UI ingress - serves the React frontend
+  web:
+    enabled: false
+    className: "nginx"
+    annotations: {}
+      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: observer.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+      # - secretName: observer-web-tls
+      #   hosts:
+      #     - observer.example.com
+  
+  # API ingress - serves the REST/GraphQL API and WebSocket
+  api:
+    enabled: false
+    className: "nginx"
+    annotations: {}
+      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      # nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      # nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+      # nginx.ingress.kubernetes.io/websocket-services: "observer-api"
+    hosts:
+      - host: api.observer.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+      # - secretName: observer-api-tls
+      #   hosts:
+      #     - api.observer.example.com
+  
+  # gRPC ingress - serves the gRPC ingestion endpoint
+  grpc:
+    enabled: false
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+      # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: grpc.observer.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+      # - secretName: observer-grpc-tls
+      #   hosts:
+      #     - grpc.observer.example.com
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod Security Context
+podSecurityContext:
+  fsGroup: 2000
+
+# Security Context
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

@@ -4,31 +4,31 @@
 # ============================================================================
 # Builder stage
 # ============================================================================
-FROM golang:1.24-bookworm AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /build
 
-# Copy go mod files and download dependencies
+# Copy go mod files and download dependencies (cached layer)
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod download && go mod verify
 
-# Copy source code
-COPY . .
+# Copy only necessary source files
+COPY cmd/ingestion/ ./cmd/ingestion/
+COPY pkg/ ./pkg/
+COPY internal/ ./internal/
 
-# Build ingestion binary for Linux
-RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/ingestion ./cmd/ingestion
+# Build ingestion binary with optimizations
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} \
+    go build -ldflags='-w -s -extldflags "-static"' \
+    -o /bin/ingestion ./cmd/ingestion
 
 # ============================================================================
 # Runtime stage
 # ============================================================================
-FROM debian:bookworm-slim
+FROM alpine:3.20
 
-# Install runtime dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        ca-certificates \
-        procps \
-    && rm -rf /var/lib/apt/lists/*
+# Install minimal runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata
 
 # Copy ingestion binary from builder
 COPY --from=builder /bin/ingestion /usr/local/bin/ingestion

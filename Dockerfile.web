@@ -4,15 +4,15 @@
 # ============================================================================
 # Builder stage - Build React application
 # ============================================================================
-FROM node:20-bookworm AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /build
 
-# Copy package files
+# Copy package files (cached layer)
 COPY web/package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install all dependencies (including dev deps needed for build)
+RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY web/ ./

@@ -1,0 +1,127 @@
+{{- if and (eq .Values.mode "distributed") .Values.distributed.enabled .Values.distributed.ingestion.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "observer.fullname" . }}-ingestion
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingestion
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "observer.fullname" . }}-ingestion
+  minReplicas: {{ .Values.distributed.ingestion.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.distributed.ingestion.autoscaling.maxReplicas }}
+  metrics:
+  {{- if .Values.distributed.ingestion.autoscaling.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.distributed.ingestion.autoscaling.targetCPUUtilizationPercentage }}
+  {{- end }}
+  {{- if .Values.distributed.ingestion.autoscaling.targetMemoryUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.distributed.ingestion.autoscaling.targetMemoryUtilizationPercentage }}
+  {{- end }}
+{{- end }}
+---
+{{- if and (eq .Values.mode "distributed") .Values.distributed.enabled .Values.distributed.processor.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "observer.fullname" . }}-processor
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: processor
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "observer.fullname" . }}-processor
+  minReplicas: {{ .Values.distributed.processor.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.distributed.processor.autoscaling.maxReplicas }}
+  metrics:
+  {{- if .Values.distributed.processor.autoscaling.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.distributed.processor.autoscaling.targetCPUUtilizationPercentage }}
+  {{- end }}
+  {{- if .Values.distributed.processor.autoscaling.targetMemoryUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.distributed.processor.autoscaling.targetMemoryUtilizationPercentage }}
+  {{- end }}
+{{- end }}
+---
+{{- if and (eq .Values.mode "distributed") .Values.distributed.enabled .Values.distributed.api.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "observer.fullname" . }}-api
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "observer.fullname" . }}-api
+  minReplicas: {{ .Values.distributed.api.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.distributed.api.autoscaling.maxReplicas }}
+  metrics:
+  {{- if .Values.distributed.api.autoscaling.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.distributed.api.autoscaling.targetCPUUtilizationPercentage }}
+  {{- end }}
+  {{- if .Values.distributed.api.autoscaling.targetMemoryUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.distributed.api.autoscaling.targetMemoryUtilizationPercentage }}
+  {{- end }}
+{{- end }}
+---
+{{- if and (eq .Values.mode "distributed") .Values.distributed.enabled .Values.distributed.web.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "observer.fullname" . }}-web
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "observer.fullname" . }}-web
+  minReplicas: {{ .Values.distributed.web.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.distributed.web.autoscaling.maxReplicas }}
+  metrics:
+  {{- if .Values.distributed.web.autoscaling.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.distributed.web.autoscaling.targetCPUUtilizationPercentage }}
+  {{- end }}
+{{- end }}
