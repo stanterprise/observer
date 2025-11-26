@@ -117,11 +117,10 @@ RUN find /etc/s6-overlay/s6-rc.d -type f -name "run" -exec chmod +x {} \;
 # Create data directories and Nginx runtime directories with proper permissions
 # s6-overlay will run as root, services will run as appropriate users
 RUN mkdir -p /data/artifacts /data/db /run \
-             /var/lib/nginx /var/cache/nginx \
-             /var/log/nginx && \
+             /var/lib/nginx /var/cache/nginx && \
     chmod -R 755 /data && \
     chmod 755 /run && \
-    chmod -R 755 /var/lib/nginx /var/cache/nginx /var/log/nginx
+    chmod -R 755 /var/lib/nginx /var/cache/nginx
 
 # Environment variables
 ENV DB_DRIVER=sqlite \
