@@ -24,10 +24,14 @@ RUN npm run build
 # ============================================================================
 # Go Builder stage - Build Go binaries for Linux
 # ============================================================================
-FROM golang:1.24-alpine AS go-builder
+FROM golang:1.24-bookworm AS go-builder
 
 # Install build dependencies for CGO (required for SQLite)
-RUN apk add --no-cache gcc musl-dev sqlite-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libc6-dev \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
@@ -91,6 +95,9 @@ COPY --from=go-builder /bin/ingestion /usr/local/bin/
 COPY --from=go-builder /bin/processor /usr/local/bin/
 COPY --from=go-builder /bin/api /usr/local/bin/
 
+# Ensure binaries are executable
+RUN chmod +x /usr/local/bin/ingestion /usr/local/bin/processor /usr/local/bin/api
+
 # Copy Web UI from web builder stage
 COPY --from=web-builder /build/dist /var/www/html
 
@@ -109,11 +116,14 @@ COPY docker/s6-overlay/s6-rc.d /etc/s6-overlay/s6-rc.d/
 # Make s6 service run scripts executable
 RUN find /etc/s6-overlay/s6-rc.d -type f -name "run" -exec chmod +x {} \;
 
-# Create data directories with proper permissions
+# Create data directories and Nginx runtime directories with proper permissions
 # s6-overlay will run as root, services will run as appropriate users
-RUN mkdir -p /data/artifacts /data/db /run && \
+RUN mkdir -p /data/artifacts /data/db /run \
+             /var/lib/nginx /var/cache/nginx \
+             /var/log/nginx && \
     chmod -R 755 /data && \
-    chmod 755 /run
+    chmod 755 /run && \
+    chmod -R 755 /var/lib/nginx /var/cache/nginx /var/log/nginx
 
 # Environment variables
 ENV DB_DRIVER=sqlite \

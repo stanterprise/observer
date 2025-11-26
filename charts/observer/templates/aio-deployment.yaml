@@ -69,6 +69,10 @@ spec:
           mountPath: /run
         - name: tmp
           mountPath: /tmp
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        - name: nginx-lib
+          mountPath: /var/lib/nginx
       volumes:
       - name: data
         {{- if .Values.aio.persistence.enabled }}
@@ -83,6 +87,10 @@ spec:
       - name: tmp
         emptyDir:
           medium: Memory
+      - name: nginx-cache
+        emptyDir: {}
+      - name: nginx-lib
+        emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
