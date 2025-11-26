@@ -41,9 +41,11 @@ COPY pkg/ ./pkg/
 COPY internal/ ./internal/
 
 # Build all service binaries for Linux with CGO enabled (required for SQLite)
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags='-w -s' -o /bin/ingestion ./cmd/ingestion && \
-    CGO_ENABLED=1 GOOS=linux go build -ldflags='-w -s' -o /bin/processor ./cmd/processor && \
-    CGO_ENABLED=1 GOOS=linux go build -ldflags='-w -s' -o /bin/api ./cmd/api
+# TARGETARCH is automatically set by BuildKit for multi-platform builds
+ARG TARGETARCH
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags='-w -s' -o /bin/ingestion ./cmd/ingestion && \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags='-w -s' -o /bin/processor ./cmd/processor && \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags='-w -s' -o /bin/api ./cmd/api
 
 # ============================================================================
 # Runtime stage - Debian with s6-overlay, Nginx, and all services
