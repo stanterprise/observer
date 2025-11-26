@@ -11,8 +11,8 @@ WORKDIR /build
 # Copy package files (cached layer)
 COPY web/package*.json ./
 
-# Install dependencies with clean install for faster, deterministic builds
-RUN npm ci --omit=dev --ignore-scripts
+# Install all dependencies (including dev deps needed for build)
+RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY web/ ./
