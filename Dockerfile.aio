@@ -109,9 +109,11 @@ COPY docker/s6-overlay/s6-rc.d /etc/s6-overlay/s6-rc.d/
 # Make s6 service run scripts executable
 RUN find /etc/s6-overlay/s6-rc.d -type f -name "run" -exec chmod +x {} \;
 
-# Create data directories
-RUN mkdir -p /data/artifacts /data/db && \
-    chmod -R 755 /data
+# Create data directories with proper permissions
+# s6-overlay will run as root, services will run as appropriate users
+RUN mkdir -p /data/artifacts /data/db /run && \
+    chmod -R 755 /data && \
+    chmod 755 /run
 
 # Environment variables
 ENV DB_DRIVER=sqlite \

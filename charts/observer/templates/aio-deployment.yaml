@@ -24,7 +24,7 @@ spec:
       containers:
       - name: aio
         securityContext:
-          {{- toYaml .Values.securityContext | nindent 10 }}
+          {{- toYaml .Values.aioSecurityContext | nindent 10 }}
         image: {{ include "observer.image" (dict "component" "aio" "Values" .Values "Chart" .Chart) }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
@@ -65,6 +65,10 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /data
+        - name: run
+          mountPath: /run
+        - name: tmp
+          mountPath: /tmp
       volumes:
       - name: data
         {{- if .Values.aio.persistence.enabled }}
@@ -73,6 +77,12 @@ spec:
         {{- else }}
         emptyDir: {}
         {{- end }}
+      - name: run
+        emptyDir:
+          medium: Memory
+      - name: tmp
+        emptyDir:
+          medium: Memory
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

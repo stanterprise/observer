@@ -21,7 +21,7 @@ fullnameOverride: ""
 aio:
   enabled: false
   replicaCount: 1
-  
+
   resources:
     limits:
       cpu: 2000m
@@ -29,7 +29,7 @@ aio:
     requests:
       cpu: 500m
       memory: 512Mi
-  
+
   service:
     type: ClusterIP
     # Web UI port
@@ -42,14 +42,14 @@ aio:
     natsPort: 4222
     # NATS monitoring port
     natsMonitoringPort: 8222
-  
+
   persistence:
     enabled: true
     storageClass: ""
     accessMode: ReadWriteOnce
     size: 10Gi
     # existingClaim: ""
-  
+
   env:
     DB_DRIVER: sqlite
     DATABASE_URL: /data/db/observer.db
@@ -63,11 +63,11 @@ aio:
 # Distributed mode configuration
 distributed:
   enabled: true
-  
+
   # Ingestion service configuration
   ingestion:
     replicaCount: 2
-    
+
     resources:
       limits:
         cpu: 1000m
@@ -75,29 +75,29 @@ distributed:
       requests:
         cpu: 100m
         memory: 128Mi
-    
+
     service:
       type: ClusterIP
       port: 50051
       # For external access (e.g., LoadBalancer or NodePort)
       # type: LoadBalancer
-    
+
     autoscaling:
       enabled: false
       minReplicas: 2
       maxReplicas: 10
       targetCPUUtilizationPercentage: 80
       targetMemoryUtilizationPercentage: 80
-    
+
     env:
       PORT: "50051"
       NATS_STREAM: tests_events
       NATS_SUBJECT_PREFIX: tests.events.v1
-  
+
   # Processor service configuration
   processor:
     replicaCount: 2
-    
+
     resources:
       limits:
         cpu: 1000m
@@ -105,23 +105,23 @@ distributed:
       requests:
         cpu: 200m
         memory: 256Mi
-    
+
     autoscaling:
       enabled: false
       minReplicas: 2
       maxReplicas: 10
       targetCPUUtilizationPercentage: 80
       targetMemoryUtilizationPercentage: 80
-    
+
     env:
       NATS_STREAM: tests_events
       NATS_CONSUMER: processor
       APPLY_MIGRATIONS: "1"
-  
+
   # API service configuration
   api:
     replicaCount: 2
-    
+
     resources:
       limits:
         cpu: 1000m
@@ -129,28 +129,28 @@ distributed:
       requests:
         cpu: 100m
         memory: 128Mi
-    
+
     service:
       type: ClusterIP
       port: 8080
-    
+
     autoscaling:
       enabled: false
       minReplicas: 2
       maxReplicas: 10
       targetCPUUtilizationPercentage: 80
       targetMemoryUtilizationPercentage: 80
-    
+
     env:
       PORT: "8080"
       NATS_STREAM: tests_events
       NATS_WS_CONSUMER: websocket
       CORS_ALLOWED_ORIGINS: "*"
-  
+
   # Web UI configuration
   web:
     replicaCount: 2
-    
+
     resources:
       limits:
         cpu: 500m
@@ -158,17 +158,17 @@ distributed:
       requests:
         cpu: 50m
         memory: 64Mi
-    
+
     service:
       type: ClusterIP
       port: 80
-    
+
     autoscaling:
       enabled: false
       minReplicas: 2
       maxReplicas: 5
       targetCPUUtilizationPercentage: 80
-    
+
     env:
       API_BACKEND_HOST: observer-api
       API_BACKEND_PORT: "8080"
@@ -216,7 +216,7 @@ nats:
           size: 10Gi
   natsBox:
     enabled: false
-  
+
   resources:
     limits:
       cpu: 1000m
@@ -238,7 +238,8 @@ ingress:
   web:
     enabled: false
     className: "nginx"
-    annotations: {}
+    annotations:
+      {}
       # cert-manager.io/cluster-issuer: "letsencrypt-prod"
       # nginx.ingress.kubernetes.io/ssl-redirect: "true"
     hosts:
@@ -246,16 +247,18 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
-    tls: []
+    tls:
+      []
       # - secretName: observer-web-tls
       #   hosts:
       #     - observer.example.com
-  
+
   # API ingress - serves the REST/GraphQL API and WebSocket
   api:
     enabled: false
     className: "nginx"
-    annotations: {}
+    annotations:
+      {}
       # cert-manager.io/cluster-issuer: "letsencrypt-prod"
       # nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
       # nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
@@ -265,11 +268,12 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
-    tls: []
+    tls:
+      []
       # - secretName: observer-api-tls
       #   hosts:
       #     - api.observer.example.com
-  
+
   # gRPC ingress - serves the gRPC ingestion endpoint
   grpc:
     enabled: false
@@ -282,7 +286,8 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
-    tls: []
+    tls:
+      []
       # - secretName: observer-grpc-tls
       #   hosts:
       #     - grpc.observer.example.com
@@ -297,14 +302,23 @@ serviceAccount:
 podSecurityContext:
   fsGroup: 2000
 
-# Security Context
+# Security Context (for distributed mode services)
 securityContext:
   capabilities:
     drop:
-    - ALL
+      - ALL
   readOnlyRootFilesystem: false
   runAsNonRoot: true
   runAsUser: 1000
+
+# AIO Security Context (s6-overlay requires root for initialization)
+aioSecurityContext:
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: false
+  runAsUser: 0
 
 # Node selector
 nodeSelector: {}
