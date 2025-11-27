@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 # Deployment mode: "aio" or "distributed"
-mode: distributed
+mode: aio
 
 # Global image configuration
 image:
@@ -19,7 +19,7 @@ fullnameOverride: ""
 
 # AIO (All-in-One) mode configuration
 aio:
-  enabled: false
+  enabled: true
   replicaCount: 1
 
   resources:
@@ -62,11 +62,11 @@ aio:
 
 # Distributed mode configuration
 distributed:
-  enabled: true
+  enabled: false
 
   # Ingestion service configuration
   ingestion:
-    replicaCount: 2
+    replicaCount: 1
 
     resources:
       limits:
@@ -84,8 +84,8 @@ distributed:
 
     autoscaling:
       enabled: false
-      minReplicas: 2
-      maxReplicas: 10
+      minReplicas: 1
+      maxReplicas: 2
       targetCPUUtilizationPercentage: 80
       targetMemoryUtilizationPercentage: 80
 
@@ -96,7 +96,7 @@ distributed:
 
   # Processor service configuration
   processor:
-    replicaCount: 2
+    replicaCount: 1
 
     resources:
       limits:
@@ -108,8 +108,8 @@ distributed:
 
     autoscaling:
       enabled: false
-      minReplicas: 2
-      maxReplicas: 10
+      minReplicas: 1
+      maxReplicas: 3
       targetCPUUtilizationPercentage: 80
       targetMemoryUtilizationPercentage: 80
 
@@ -120,7 +120,7 @@ distributed:
 
   # API service configuration
   api:
-    replicaCount: 2
+    replicaCount: 1
 
     resources:
       limits:
@@ -136,8 +136,8 @@ distributed:
 
     autoscaling:
       enabled: false
-      minReplicas: 2
-      maxReplicas: 10
+      minReplicas: 1
+      maxReplicas: 3
       targetCPUUtilizationPercentage: 80
       targetMemoryUtilizationPercentage: 80
 
@@ -149,7 +149,7 @@ distributed:
 
   # Web UI configuration
   web:
-    replicaCount: 2
+    replicaCount: 1
 
     resources:
       limits:
@@ -165,8 +165,8 @@ distributed:
 
     autoscaling:
       enabled: false
-      minReplicas: 2
-      maxReplicas: 5
+      minReplicas: 1
+      maxReplicas: 2
       targetCPUUtilizationPercentage: 80
 
     env:
