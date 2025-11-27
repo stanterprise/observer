@@ -23,12 +23,12 @@
       "upgradePackages": "true"
     },
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
-      "version": "latest",
-      "helm": "latest",
+      "version": "1.31",
+      "helm": "3.16",
       "minikube": "none"
     },
     "ghcr.io/dhoeric/features/google-cloud-cli:1": {
-      "version": "latest",
+      "version": "502.0.0",
       "installGkeGcloudAuthPlugin": true
     }
   },

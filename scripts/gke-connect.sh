@@ -105,12 +105,24 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Load .env file if it exists
-ENV_FILE="${SCRIPT_DIR:-$(dirname "$0")}/../.env"
+# Determine script directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Load .env file if it exists (only export valid KEY=value lines)
+ENV_FILE="${SCRIPT_DIR}/../.env"
 if [ -f "$ENV_FILE" ]; then
     print_info "Loading environment from .env file..."
-    # shellcheck source=/dev/null
-    source "$ENV_FILE"
+    # Only export lines that look like valid variable assignments (KEY=value)
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+        # Remove leading/trailing whitespace from key
+        key=$(echo "$key" | xargs)
+        # Only export if key is a valid variable name and not already set
+        if [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && [ -z "${!key:-}" ]; then
+            export "$key=$value"
+        fi
+    done < "$ENV_FILE"
 fi
 
 echo ""
@@ -139,12 +151,16 @@ if ! command_exists kubectl; then
     echo "Install kubectl:"
     echo "  - gcloud: gcloud components install kubectl"
     echo "  - macOS: brew install kubectl"
-    echo "  - Linux: curl -LO 'https://dl.k8s.io/release/\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl'"
+    echo "  - Linux: See https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/"
     exit 1
 fi
 
-print_success "gcloud CLI found: $(gcloud version --format='value(Google Cloud SDK)' 2>/dev/null || echo 'version unknown')"
-print_success "kubectl found: $(kubectl version --client --short 2>/dev/null || kubectl version --client -o json 2>/dev/null | jq -r '.clientVersion.gitVersion' || echo 'version unknown')"
+# Get tool versions (with simple fallbacks)
+GCLOUD_VERSION=$(gcloud version --format='value(Google Cloud SDK)' 2>/dev/null || echo 'version unknown')
+KUBECTL_VERSION=$(kubectl version --client -o yaml 2>/dev/null | grep gitVersion | head -1 | cut -d: -f2 | tr -d ' ' || echo 'version unknown')
+
+print_success "gcloud CLI found: $GCLOUD_VERSION"
+print_success "kubectl found: $KUBECTL_VERSION"
 
 # Check if GKE_PROJECT is set
 if [ -z "$GKE_PROJECT" ]; then
