@@ -22,7 +22,7 @@ PROTOC_GEN_GO_VERSION ?= v1.36.6
 PROTOC_GEN_GO_GRPC_VERSION ?= v1.5.1
 GOLANGCI_LINT_VERSION ?= v1.60.3
 
-.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down helm-deps helm-lint helm-template helm-template-aio helm-template-prod helm-dry-run helm-dry-run-aio helm-dry-run-prod helm-test helm-validate
+.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down helm-deps helm-lint helm-template helm-template-aio helm-template-prod helm-dry-run helm-dry-run-aio helm-dry-run-prod helm-test helm-validate gke-connect gke-connect-ns gke-deploy gke-deploy-aio gke-deploy-prod gke-status gke-logs gke-port-forward gke-uninstall
 
 .DEFAULT_GOAL := help
 
@@ -274,3 +274,48 @@ helm-test: ## Run comprehensive Helm chart tests
 	./scripts/test-helm-chart.sh
 
 helm-validate: helm-deps helm-lint helm-test ## Run all Helm validation steps
+
+# GKE cluster management
+gke-connect: ## Connect to GKE cluster (requires gcloud CLI)
+	./scripts/gke-connect.sh
+
+gke-connect-ns: ## Connect to GKE cluster and set observer namespace
+	./scripts/gke-connect.sh --namespace observer
+
+gke-deploy: helm-deps ## Deploy Observer to GKE cluster
+	helm upgrade --install observer ./charts/observer --create-namespace --namespace observer
+
+gke-deploy-aio: helm-deps ## Deploy Observer in AIO mode to GKE cluster
+	helm upgrade --install observer ./charts/observer --values ./charts/observer/values-aio.yaml --create-namespace --namespace observer
+
+gke-deploy-prod: helm-deps ## Deploy Observer with production values to GKE cluster
+	helm upgrade --install observer ./charts/observer --values ./charts/observer/values-production.yaml --create-namespace --namespace observer
+
+gke-status: ## Show Observer deployment status on GKE
+	@echo "=== Helm Release ==="
+	helm status observer -n observer 2>/dev/null || echo "Observer not deployed"
+	@echo ""
+	@echo "=== Pods ==="
+	kubectl get pods -n observer 2>/dev/null || echo "Namespace 'observer' not found"
+	@echo ""
+	@echo "=== Services ==="
+	kubectl get svc -n observer 2>/dev/null || true
+
+gke-logs: ## Show logs from Observer pods on GKE
+	kubectl logs -n observer -l app.kubernetes.io/instance=observer --all-containers --tail=100
+
+gke-port-forward: ## Port-forward Observer services (Web UI: 3000, gRPC: 50051, API: 8080)
+	@echo "Starting port-forward in background..."
+	@echo "Web UI:  http://localhost:3000"
+	@echo "gRPC:    localhost:50051"
+	@echo "API:     http://localhost:8080"
+	@echo ""
+	@echo "Press Ctrl+C to stop all port-forwards"
+	kubectl port-forward -n observer svc/observer-web 3000:80 &
+	kubectl port-forward -n observer svc/observer-ingestion 50051:50051 &
+	kubectl port-forward -n observer svc/observer-api 8080:8080 &
+	wait
+
+gke-uninstall: ## Uninstall Observer from GKE cluster
+	helm uninstall observer -n observer || true
+	@echo "Note: PVCs are not deleted. To delete data, run: kubectl delete pvc -n observer -l app.kubernetes.io/instance=observer"

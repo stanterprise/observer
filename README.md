@@ -189,6 +189,18 @@ The test suite uses an in-process `bufconn` listener (no external ports) and val
 - `make proto` – Generate gRPC stubs
 - `make tools` – Install dev tools
 
+### GKE Cluster
+
+- `make gke-connect` – Connect to GKE cluster
+- `make gke-connect-ns` – Connect and set observer namespace
+- `make gke-deploy` – Deploy Observer to GKE
+- `make gke-deploy-aio` – Deploy in AIO mode
+- `make gke-deploy-prod` – Deploy with production values
+- `make gke-status` – Show deployment status
+- `make gke-logs` – View Observer logs
+- `make gke-port-forward` – Port-forward services
+- `make gke-uninstall` – Uninstall from cluster
+
 ## Configuration
 
 ### Ingestion Service
@@ -358,6 +370,14 @@ See the [Deployment Guide](DEPLOYMENT.md) for detailed instructions on:
 - AIO vs Distributed mode selection
 - Ingress configuration
 - Scaling and monitoring
+
+### GKE Development
+
+For development against a GKE cluster, see [GKE Development Guide](docs/GKE_DEVELOPMENT.md) which covers:
+- Connecting to GKE clusters
+- Deploying Observer to GKE
+- Development workflow with Kubernetes
+- Makefile targets for GKE operations
 
 ## Roadmap
 
