@@ -81,6 +81,20 @@ Get the image tag
 {{- end }}
 
 {{/*
+Get the image pull policy - use Always for mutable tags, IfNotPresent for immutable
+*/}}
+{{- define "observer.image.pullPolicy" -}}
+{{- $tag := include "observer.image.tag" . -}}
+{{- if .Values.image.pullPolicy -}}
+{{- .Values.image.pullPolicy }}
+{{- else if or (hasSuffix "latest" $tag) (hasSuffix "main" $tag) (hasSuffix "develop" $tag) -}}
+Always
+{{- else -}}
+IfNotPresent
+{{- end -}}
+{{- end }}
+
+{{/*
 Get the full image name for a component
 */}}
 {{- define "observer.image" -}}

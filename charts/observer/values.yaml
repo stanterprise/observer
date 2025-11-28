@@ -234,6 +234,24 @@ externalNats:
 # Ingress configuration
 # Each ingress can be independently enabled and configured
 ingress:
+  # Google-managed SSL certificate (GCP/GKE only)
+  # Automatically provisions and renews certificates for your domains
+  managedCertificate:
+    enabled: false
+    # When enabled, creates a ManagedCertificate resource for all ingress hosts
+    # Certificate provisioning takes 15-60 minutes on first deployment
+    # Requires valid DNS records pointing to the load balancer IPs
+
+  # SSL/HTTPS configuration
+  ssl:
+    # Redirect HTTP to HTTPS (only enable after certificates are provisioned)
+    redirect: false
+    # TLS policy (GCP only) - MODERN, COMPATIBLE, or RESTRICTED
+    # MODERN: TLS 1.2+, strong ciphers
+    # COMPATIBLE: TLS 1.0+, wider compatibility
+    # RESTRICTED: TLS 1.2+, most restrictive
+    policy: "MODERN"
+
   # Web UI ingress - serves the React frontend
   web:
     enabled: false
@@ -291,6 +309,18 @@ ingress:
       # - secretName: observer-grpc-tls
       #   hosts:
       #     - grpc.observer.example.com
+    # GCP BackendConfig for gRPC (only used with GCE ingress class)
+    # Set enabled: true when using className: "gce" for proper HTTP/2 support
+    backendConfig:
+      enabled: false
+      healthCheck:
+        checkIntervalSec: 10
+        timeoutSec: 5
+        type: HTTP2
+        requestPath: /grpc.health.v1.HealthService/Check
+      timeoutSec: 30
+      connectionDraining:
+        drainingTimeoutSec: 60
 
 # Service Account
 serviceAccount:
