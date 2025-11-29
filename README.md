@@ -202,11 +202,12 @@ The test suite uses an in-process `bufconn` listener (no external ports) and val
 
 ### Processor Service
 
-| Variable           | Default | Description                             |
-| ------------------ | ------- | --------------------------------------- |
-| `PORT`             | `50052` | gRPC listening port                     |
-| `DATABASE_URL`     | -       | PostgreSQL connection string (required) |
-| `APPLY_MIGRATIONS` | -       | Set to `1` to enable auto-migrations    |
+| Variable           | Default | Description                                                 |
+| ------------------ | ------- | ----------------------------------------------------------- |
+| `PORT`             | `50052` | gRPC listening port                                         |
+| `DATABASE_URL`     | -       | PostgreSQL connection string (for SQL backend)              |
+| `MONGODB_URI`      | -       | MongoDB connection string (for MongoDB backend, preferred)  |
+| `APPLY_MIGRATIONS` | -       | Set to `1` to enable auto-migrations (SQL backend only)     |
 
 ### API Service
 
@@ -214,9 +215,62 @@ The test suite uses an in-process `bufconn` listener (no external ports) and val
 | ------------------ | -------------- | --------------------------------------------- |
 | `PORT`             | `8080`         | HTTP listening port                           |
 | `DATABASE_URL`     | -              | PostgreSQL connection string (optional)       |
+| `MONGODB_URI`      | -              | MongoDB connection string (optional)          |
 | `NATS_URL`         | -              | NATS server URL (optional, for WebSocket)     |
 | `NATS_STREAM`      | `tests_events` | JetStream stream name for WebSocket relay     |
 | `NATS_WS_CONSUMER` | `websocket`    | Consumer name for WebSocket NATS subscription |
+
+### MongoDB Configuration
+
+MongoDB can be configured using either a connection URI or split environment variables:
+
+| Variable            | Default    | Description                           |
+| ------------------- | ---------- | ------------------------------------- |
+| `MONGODB_URI`       | -          | Full MongoDB connection URI           |
+| `MONGO_URI`         | -          | Alias for `MONGODB_URI`               |
+| `MONGO_HOST`        | -          | MongoDB server host                   |
+| `MONGO_PORT`        | `27017`    | MongoDB server port                   |
+| `MONGO_USER`        | -          | MongoDB username                      |
+| `MONGO_PASSWORD`    | -          | MongoDB password                      |
+| `MONGO_DATABASE`    | `observer` | MongoDB database name                 |
+| `MONGO_AUTH_SOURCE` | `admin`    | MongoDB authentication source         |
+
+**Connection URI format:**
+```
+mongodb://[user:pass@]host[:port]/database[?options]
+mongodb+srv://[user:pass@]host/database[?options]
+```
+
+## Database Backends
+
+The Observer service supports two database backends:
+
+### MongoDB (Recommended for new deployments)
+
+MongoDB provides a document-based data model that aligns well with test run hierarchies:
+
+- **Test runs are stored as single documents** containing embedded tests, suites, and steps
+- **Flexible schema** for storing metadata and custom attributes
+- **Efficient queries** for retrieving complete test run data
+- **Better suited** for hierarchical test structures (suites → tests → steps)
+
+**Docker Compose with MongoDB:**
+```bash
+docker compose --profile mongo up -d
+```
+
+### PostgreSQL/SQLite (Legacy support)
+
+The relational backend using GORM remains available for backward compatibility:
+
+- **Normalized tables** for test_case_runs, step_runs, test_suite_runs
+- **Mature tooling** for migrations and queries
+- **Suitable** for smaller deployments or existing PostgreSQL infrastructure
+
+**Docker Compose with PostgreSQL:**
+```bash
+docker compose --profile dist up -d
+```
 
 ## WebSocket Real-Time Events
 
