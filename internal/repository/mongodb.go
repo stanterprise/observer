@@ -351,7 +351,34 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 	}
 
 	// Nested step - append to parent step's steps array
-	// This is more complex and may require multiple levels of array filters
+	// Note: Deep nesting of steps (step -> step -> step) requires recursive updates
+	// which are complex with MongoDB's array update operators. For now, we log a warning
+	// and store the parent step reference. The step will still be queryable by ID.
+	r.logger.Warn("nested step support is limited; step will be stored with parent reference only",
+		"id", step.ID, "parent", parentStepID)
+
+	// Store the nested step at the test level with parent reference
+	// This allows later retrieval and tree reconstruction
+	filter := bson.M{"tests.id": testID}
+	update := bson.M{
+		"$push": bson.M{
+			"tests.$[test].steps": step,
+		},
+		"$set": bson.M{
+			"updated_at": now,
+		},
+	}
+	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"test.id": testID},
+		},
+	})
+
+	_, err := r.collection.UpdateMany(ctx, filter, update, arrayFilters)
+	if err != nil {
+		return fmt.Errorf("append nested step to test: %w", err)
+	}
+
 	r.logger.Info("step begin (nested)", "id", step.ID, "parent", parentStepID)
 	return nil
 }
