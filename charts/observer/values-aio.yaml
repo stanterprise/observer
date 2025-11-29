@@ -108,7 +108,7 @@ ingress:
         checkIntervalSec: 10
         timeoutSec: 5
         type: HTTP2
-        requestPath: /grpc.health.v1.HealthService/Check
+        requestPath: /grpc.health.v1.Health/Check
       timeoutSec: 30
       connectionDraining:
         drainingTimeoutSec: 60
