@@ -1,6 +1,7 @@
 # Dockerfile for All-in-One (AIO) deployment mode
 # Single container with embedded NATS, ingestion, processor, API services, and Web UI
 # Managed via s6-overlay process supervisor
+# syntax=docker/dockerfile:1.4
 
 # ============================================================================
 # Web UI Builder stage - Build React application
@@ -13,7 +14,9 @@ WORKDIR /build
 COPY web/package*.json ./
 
 # Install all dependencies (including dev deps needed for build)
-RUN npm ci --ignore-scripts
+# Use cache mount for npm to speed up rebuilds
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts
 
 # Copy source code
 COPY web/ ./
@@ -27,17 +30,22 @@ RUN npm run build
 FROM golang:1.24-bookworm AS go-builder
 
 # Install build dependencies for CGO (required for SQLite)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libc6-dev \
-    libsqlite3-dev \
-    && rm -rf /var/lib/apt/lists/*
+    libsqlite3-dev
 
 WORKDIR /build
 
 # Copy go mod files and download dependencies (cached layer)
 COPY go.mod go.sum ./
-RUN go mod download && go mod verify
+
+# Use cache mount for Go modules to avoid re-downloading on each build
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go mod download && go mod verify
 
 # Copy only necessary source files
 COPY cmd/ ./cmd/
@@ -47,9 +55,19 @@ COPY internal/ ./internal/
 # Build all service binaries for Linux with CGO enabled (required for SQLite)
 # TARGETARCH is automatically set by BuildKit for multi-platform builds
 ARG TARGETARCH
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags='-w -s' -o /bin/ingestion ./cmd/ingestion && \
-    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags='-w -s' -o /bin/processor ./cmd/processor && \
-    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags='-w -s' -o /bin/api ./cmd/api
+
+# Use cache mounts for faster builds across architectures
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} \
+    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo sqlite_omit_load_extension' \
+    -o /bin/ingestion ./cmd/ingestion && \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} \
+    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo sqlite_omit_load_extension' \
+    -o /bin/processor ./cmd/processor && \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} \
+    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo sqlite_omit_load_extension' \
+    -o /bin/api ./cmd/api
 
 # ============================================================================
 # Runtime stage - Debian with s6-overlay, Nginx, and all services
@@ -61,34 +79,37 @@ ARG S6_OVERLAY_VERSION=3.2.0.0
 ARG NATS_VERSION=2.10.24
 
 # Install runtime dependencies including Nginx
-RUN apt-get update && \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         nginx \
         procps \
         sqlite3 \
         wget \
-        xz-utils \
-    && rm -rf /var/lib/apt/lists/* && \
+        xz-utils && \
     update-ca-certificates
 
-# Install NATS server
+# Install NATS server and s6-overlay in parallel (architecture-specific downloads)
 RUN NATS_ARCH=$(dpkg --print-architecture | sed 's/amd64/amd64/; s/arm64/arm64/') && \
+    S6_ARCH=$(dpkg --print-architecture | sed 's/amd64/x86_64/; s/arm64/aarch64/') && \
     echo "Installing NATS server for architecture: ${NATS_ARCH}" && \
-    wget --no-check-certificate https://github.com/nats-io/nats-server/releases/download/v${NATS_VERSION}/nats-server-v${NATS_VERSION}-linux-${NATS_ARCH}.tar.gz && \
+    echo "Installing s6-overlay for architecture: ${S6_ARCH}" && \
+    # Download NATS and s6-overlay in parallel
+    wget -q --no-check-certificate \
+      https://github.com/nats-io/nats-server/releases/download/v${NATS_VERSION}/nats-server-v${NATS_VERSION}-linux-${NATS_ARCH}.tar.gz \
+      https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz \
+      https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz && \
+    # Extract NATS
     tar xzf nats-server-v${NATS_VERSION}-linux-${NATS_ARCH}.tar.gz && \
     mv nats-server-v${NATS_VERSION}-linux-${NATS_ARCH}/nats-server /usr/local/bin/ && \
-    rm -rf nats-server-v${NATS_VERSION}-linux-${NATS_ARCH}* && \
-    chmod +x /usr/local/bin/nats-server
-
-# Install s6-overlay for process supervision
-RUN S6_ARCH=$(dpkg --print-architecture | sed 's/amd64/x86_64/; s/arm64/aarch64/') && \
-    echo "Installing s6-overlay for architecture: ${S6_ARCH}" && \
-    wget --no-check-certificate https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz && \
-    wget --no-check-certificate https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz && \
+    chmod +x /usr/local/bin/nats-server && \
+    # Extract s6-overlay
     tar -C / -Jxpf s6-overlay-noarch.tar.xz && \
     tar -C / -Jxpf s6-overlay-${S6_ARCH}.tar.xz && \
-    rm s6-overlay-*.tar.xz
+    # Clean up
+    rm -rf nats-server-v${NATS_VERSION}-linux-${NATS_ARCH}* s6-overlay-*.tar.xz
 
 # Copy service binaries from Go builder stage
 COPY --from=go-builder /bin/ingestion /usr/local/bin/

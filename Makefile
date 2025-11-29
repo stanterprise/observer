@@ -212,6 +212,26 @@ docker-build-all: build-all ## Build all Docker images
 docker-build-aio: build-all ## Build AIO Docker image
 	docker build -f Dockerfile.aio -t $(IMAGE_NAME):aio .
 
+docker-buildx-aio: ## Build multi-platform AIO Docker image with BuildKit (optimized)
+	docker buildx build \
+		--platform linux/amd64,linux/arm64 \
+		--cache-from type=local,src=/tmp/.buildx-cache \
+		--cache-to type=local,dest=/tmp/.buildx-cache-new \
+		-f Dockerfile.aio \
+		-t $(IMAGE_NAME):aio \
+		--load \
+		. && \
+	rm -rf /tmp/.buildx-cache && \
+	mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+docker-buildx-setup: ## Setup buildx multi-platform builder (one-time setup)
+	docker buildx create --name multiarch --driver docker-container --use || true
+	docker buildx inspect --bootstrap
+
+docker-buildx-clean: ## Clean buildx cache
+	rm -rf /tmp/.buildx-cache
+	docker buildx prune -af
+
 docker-build-ingestion: build-all ## Build ingestion Docker image
 	docker build -f Dockerfile.ingestion -t $(IMAGE_NAME):ingestion .
 

@@ -1,0 +1,107 @@
+name: Cache Cleanup
+
+# Periodically clean up old build cache images to save registry space
+# Keeps the most recent cache but removes older versions
+
+on:
+  schedule:
+    # Run monthly on the 1st at 2 AM UTC
+    - cron: "0 2 1 * *"
+  workflow_dispatch:
+    inputs:
+      keep_latest_count:
+        description: "Number of latest cache versions to keep"
+        required: false
+        default: "2"
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    strategy:
+      matrix:
+        image: [aio, ingestion, processor, api, web]
+
+    steps:
+      - name: Cleanup old cache images
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const packageName = `${{ env.IMAGE_NAME }}/${{ matrix.image }}`;
+            const keepCount = parseInt('${{ github.event.inputs.keep_latest_count || '2' }}');
+
+            try {
+              // Get all versions with 'buildcache' tag
+              const { data: versions } = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+                package_type: 'container',
+                package_name: packageName.toLowerCase(),
+                org: context.repo.owner,
+                per_page: 100
+              });
+
+              const cacheVersions = versions
+                .filter(v => v.metadata?.container?.tags?.includes('buildcache'))
+                .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+              console.log(`Found ${cacheVersions.length} cache versions for ${packageName}`);
+
+              if (cacheVersions.length <= keepCount) {
+                console.log(`Only ${cacheVersions.length} cache versions found, keeping all (threshold: ${keepCount})`);
+                return;
+              }
+
+              const versionsToDelete = cacheVersions.slice(keepCount);
+              console.log(`Deleting ${versionsToDelete.length} old cache versions`);
+
+              for (const version of versionsToDelete) {
+                console.log(`Deleting cache version ${version.id} (updated: ${version.updated_at})`);
+                await github.rest.packages.deletePackageVersionForOrg({
+                  package_type: 'container',
+                  package_name: packageName.toLowerCase(),
+                  org: context.repo.owner,
+                  package_version_id: version.id
+                });
+              }
+
+              console.log(`✅ Cleanup complete for ${packageName}`);
+
+            } catch (error) {
+              console.log(`⚠️  Cache cleanup skipped for ${packageName}: ${error.message}`);
+              console.log('This is normal if no cache images exist yet.');
+            }
+
+      - name: Report cleanup status
+        if: always()
+        run: |
+          echo "### 🧹 Cache Cleanup - ${{ matrix.image }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Keep Latest:** ${{ github.event.inputs.keep_latest_count || '2' }} versions" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Old cache versions have been removed to save registry storage space." >> $GITHUB_STEP_SUMMARY
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: cleanup
+    if: always()
+    steps:
+      - name: Cleanup Summary
+        run: |
+          echo "# 🧹 Cache Cleanup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Build cache cleanup has completed for all images." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Benefits" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Reduced registry storage usage" >> $GITHUB_STEP_SUMMARY
+          echo "- Retained most recent cache for fast builds" >> $GITHUB_STEP_SUMMARY
+          echo "- Automatic monthly cleanup schedule" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "💡 Cache will be rebuilt automatically on next build" >> $GITHUB_STEP_SUMMARY
