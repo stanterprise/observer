@@ -91,20 +91,17 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Use multi-layer cache strategy for optimal performance
-          cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.image }}:buildcache
-            type=gha
-          cache-to: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.image }}:buildcache,mode=max
-            type=gha,mode=max
+          # Use registry cache for authenticated builds (push events), GHA cache for PRs
+          # PRs cannot access registry cache without authentication
+          cache-from: ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}/{1}/{2}:buildcache', env.REGISTRY, env.IMAGE_NAME, matrix.image) || 'type=gha' }}
+          cache-to: ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}/{1}/{2}:buildcache,mode=max', env.REGISTRY, env.IMAGE_NAME, matrix.image) || 'type=gha,mode=max' }}
 
       - name: Report build performance
         if: always()
         run: |
           echo "### 📊 Build Performance for ${{ matrix.image }}" >> $GITHUB_STEP_SUMMARY
           echo "**Platform(s):** ${{ (github.event_name != 'pull_request') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Cache Strategy:** Registry + GitHub Actions cache" >> $GITHUB_STEP_SUMMARY
+          echo "**Cache Strategy:** ${{ github.event_name != 'pull_request' && 'Registry cache' || 'GitHub Actions cache' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Build Status:** ${{ steps.build.outcome }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "ℹ️ For optimization details, see [BUILD_OPTIMIZATION.md](https://github.com/${{ github.repository }}/blob/main/docs/BUILD_OPTIMIZATION.md)" >> $GITHUB_STEP_SUMMARY
