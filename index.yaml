@@ -2,8 +2,8 @@ apiVersion: v1
 entries:
   observer:
   - apiVersion: v2
-    appVersion: 0.0.1-grpc-healthcheck
-    created: "2025-11-29T06:42:28.997826791Z"
+    appVersion: 0.0.2-http-health
+    created: "2025-11-30T02:01:25.306461923Z"
     dependencies:
     - condition: postgresql.enabled
       name: postgresql
@@ -14,7 +14,7 @@ entries:
       repository: https://nats-io.github.io/k8s/helm/charts/
       version: ~1.2.0
     description: A Helm chart for Observer - Test Observability System
-    digest: 3c80152f78a3efd88e18e45bf38b00519dcf241fab3ec9a54a2e8aa441c4c96f
+    digest: e7263e6c0170ec05339d3408972bd447853363916094acb4db5e59c687b0580d
     home: https://github.com/stanterprise/observer
     keywords:
     - testing
@@ -29,6 +29,6 @@ entries:
     - https://github.com/stanterprise/observer
     type: application
     urls:
-    - https://stanterprise.github.io/observer/observer-0.0.1-grpc-healthcheck.tgz
-    version: 0.0.1-grpc-healthcheck
-generated: "2025-11-29T06:42:28.989404839Z"
+    - https://stanterprise.github.io/observer/observer-0.0.2-http-health.tgz
+    version: 0.0.2-http-health
+generated: "2025-11-30T02:01:25.29802306Z"
