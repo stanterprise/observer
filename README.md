@@ -14,12 +14,14 @@ A test observability system that collects test execution events via gRPC. The sy
 Get Observer running in 2 minutes! Choose your preferred method:
 
 **Docker (Fastest)**
+
 ```bash
 docker run -d -p 3000:80 -p 50051:50051 -v observer-data:/data \
   ghcr.io/stanterprise/observer/aio:latest
 ```
 
 **Kubernetes/Helm**
+
 ```bash
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer --version 0.1.0
 kubectl port-forward svc/observer-web 3000:80
@@ -155,6 +157,22 @@ The test suite uses an in-process `bufconn` listener (no external ports) and val
 - `make build-processor` – Build processor service
 - `make build-api` – Build API service
 - `make build-all` – Build all components
+
+**Docker Images:**
+
+- `make docker-build-all` – Build all Docker images (standard)
+- `make docker-build-aio` – Build AIO image
+- `make docker-buildx-aio` – **Optimized multi-platform build (60-90% faster)** ⚡
+
+> 💡 **Build Performance**: Multi-architecture builds optimized from ~20min to ~2-8min using BuildKit cache mounts.  
+> See [Build Optimization Guide](docs/BUILD_OPTIMIZATION.md) for details.
+
+**Setup for optimized builds:**
+
+```bash
+./scripts/setup-buildx.sh  # One-time setup
+make docker-buildx-aio      # Fast cached builds
+```
 
 ### Running
 
@@ -406,6 +424,7 @@ helm install observer observer/observer
 ```
 
 See the [Deployment Guide](DEPLOYMENT.md) for detailed instructions on:
+
 - Docker image usage
 - Helm chart installation and configuration
 - Production deployment
@@ -432,6 +451,28 @@ See the [Deployment Guide](DEPLOYMENT.md) for detailed instructions on:
 - [ ] Object storage for artifacts (MinIO/S3)
 - [ ] Authentication layer (dev token, OIDC)
 - [ ] Metrics (Prometheus) and tracing (OpenTelemetry)
+
+## CI/CD & Build Optimization
+
+The project uses optimized GitHub Actions workflows with BuildKit cache mounts for fast, efficient builds:
+
+### Build Performance
+
+- **Multi-platform builds** (AMD64 + ARM64) in ~8-12 minutes (first build)
+- **Cached rebuilds** in ~2-4 minutes for code changes
+- **60-90% faster** than traditional Docker builds
+
+### Workflows
+
+- **docker-publish.yml** - Automated image building and publishing with dual cache strategy
+- **build-performance.yml** - Weekly validation of build optimization effectiveness
+- **cache-cleanup.yml** - Automated registry cache management
+
+### Documentation
+
+- [Build Optimization Guide](docs/BUILD_OPTIMIZATION.md) - Complete optimization details
+- [GitHub Actions Integration](docs/GITHUB_ACTIONS_BUILDS.md) - CI/CD examples and best practices
+- [Quick Reference](BUILD_QUICK_REF.md) - Essential commands and troubleshooting
 
 ## License
 

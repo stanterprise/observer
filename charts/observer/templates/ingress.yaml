@@ -9,10 +9,17 @@ metadata:
   labels:
     {{- include "observer.labels" . | nindent 4 }}
     app.kubernetes.io/component: web
-  {{- with .Values.ingress.web.annotations }}
   annotations:
+    {{- if .Values.ingress.managedCertificate.enabled }}
+    networking.gke.io/managed-certificates: {{ include "observer.fullname" . }}-cert
+    kubernetes.io/ingress.allow-http: "true"
+    {{- if or .Values.ingress.ssl.redirect .Values.ingress.ssl.policy }}
+    networking.gke.io/v1beta1.FrontendConfig: {{ include "observer.fullname" . }}-frontend
+    {{- end }}
+    {{- end }}
+    {{- with .Values.ingress.web.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   {{- if .Values.ingress.web.className }}
   ingressClassName: {{ .Values.ingress.web.className }}
@@ -59,10 +66,17 @@ metadata:
   labels:
     {{- include "observer.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
-  {{- with .Values.ingress.api.annotations }}
   annotations:
+    {{- if .Values.ingress.managedCertificate.enabled }}
+    networking.gke.io/managed-certificates: {{ include "observer.fullname" . }}-cert
+    kubernetes.io/ingress.allow-http: "true"
+    {{- if or .Values.ingress.ssl.redirect .Values.ingress.ssl.policy }}
+    networking.gke.io/v1beta1.FrontendConfig: {{ include "observer.fullname" . }}-frontend
+    {{- end }}
+    {{- end }}
+    {{- with .Values.ingress.api.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   {{- if .Values.ingress.api.className }}
   ingressClassName: {{ .Values.ingress.api.className }}
@@ -111,10 +125,17 @@ metadata:
   labels:
     {{- include "observer.labels" . | nindent 4 }}
     app.kubernetes.io/component: ingestion
-  {{- with .Values.ingress.grpc.annotations }}
   annotations:
+    {{- if .Values.ingress.managedCertificate.enabled }}
+    networking.gke.io/managed-certificates: {{ include "observer.fullname" . }}-cert
+    kubernetes.io/ingress.allow-http: "true"
+    {{- end }}
+    {{- if .Values.ingress.grpc.backendConfig.enabled }}
+    cloud.google.com/backend-config: '{"default": "{{ include "observer.fullname" . }}-grpc-backend"}'
+    {{- end }}
+    {{- with .Values.ingress.grpc.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   {{- if .Values.ingress.grpc.className }}
   ingressClassName: {{ .Values.ingress.grpc.className }}

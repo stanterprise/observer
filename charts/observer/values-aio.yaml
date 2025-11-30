@@ -31,3 +31,88 @@ postgresql:
 
 nats:
   enabled: false
+
+ingress:
+  # Google-managed SSL certificate for HTTPS
+  managedCertificate:
+    enabled: true
+
+  # SSL/HTTPS configuration
+  ssl:
+    # Redirect HTTP to HTTPS (enable after certificates are Active)
+    # Check status: kubectl describe managedcertificate observer-cert -n observer-test
+    redirect: false
+    policy: "MODERN"
+
+  # Web UI ingress - serves the React frontend
+  web:
+    enabled: true
+    className: "gce"
+    annotations:
+      kubernetes.io/ingress.class: "gce"
+      networking.gke.io/managed-certificates: "observer-cert"
+      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: observer.stanterprise.dev
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      []
+      # - secretName: observer-web-tls
+      #   hosts:
+      #     - observer.example.com
+
+  # API ingress - serves the REST/GraphQL API and WebSocket
+  api:
+    enabled: true
+    className: "gce"
+    annotations:
+      kubernetes.io/ingress.class: "gce"
+      kubernetes.io/ingress.allow-http: "true"
+      networking.gke.io/managed-certificates: "observer-cert"
+      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      # nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      # nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+      # nginx.ingress.kubernetes.io/websocket-services: "observer-api"
+    hosts:
+      - host: api.observer.stanterprise.dev
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      []
+      # - secretName: observer-api-tls
+      #   hosts:
+      #     - api.observer.example.com
+  # gRPC ingress - serves the gRPC ingestion endpoint
+  grpc:
+    enabled: true
+    className: "gce"
+    annotations:
+      kubernetes.io/ingress.class: "gce"
+      networking.gke.io/managed-certificates: "observer-cert"
+      # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: grpc.observer.stanterprise.dev
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: observer-cert-secret
+        hosts:
+          - grpc.observer.stanterprise.dev
+    # GCP BackendConfig for gRPC - enables HTTP/2 for gRPC support
+    backendConfig:
+      enabled: true
+      protocol: HTTP2
+      healthCheck:
+        checkIntervalSec: 10
+        timeoutSec: 5
+        port: 8081
+        type: HTTP
+        requestPath: /health
+      timeoutSec: 30
+      connectionDraining:
+        drainingTimeoutSec: 60

@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 # Deployment mode: "aio" or "distributed"
-mode: distributed
+mode: aio
 
 # Global image configuration
 image:
@@ -19,7 +19,7 @@ fullnameOverride: ""
 
 # AIO (All-in-One) mode configuration
 aio:
-  enabled: false
+  enabled: true
   replicaCount: 1
 
   resources:
@@ -60,13 +60,21 @@ aio:
     NATS_STREAM: tests_events
     NATS_WS_CONSUMER: websocket
 
+  # gRPC LoadBalancer for direct external access (alternative to Ingress)
+  grpcLoadBalancer:
+    enabled: false
+    port: 50051
+    annotations: {}
+    # loadBalancerIP: ""  # Specify a static IP if needed
+    # loadBalancerSourceRanges: []  # Restrict source IPs if needed
+
 # Distributed mode configuration
 distributed:
-  enabled: true
+  enabled: false
 
   # Ingestion service configuration
   ingestion:
-    replicaCount: 2
+    replicaCount: 1
 
     resources:
       limits:
@@ -84,8 +92,8 @@ distributed:
 
     autoscaling:
       enabled: false
-      minReplicas: 2
-      maxReplicas: 10
+      minReplicas: 1
+      maxReplicas: 2
       targetCPUUtilizationPercentage: 80
       targetMemoryUtilizationPercentage: 80
 
@@ -96,7 +104,7 @@ distributed:
 
   # Processor service configuration
   processor:
-    replicaCount: 2
+    replicaCount: 1
 
     resources:
       limits:
@@ -108,8 +116,8 @@ distributed:
 
     autoscaling:
       enabled: false
-      minReplicas: 2
-      maxReplicas: 10
+      minReplicas: 1
+      maxReplicas: 3
       targetCPUUtilizationPercentage: 80
       targetMemoryUtilizationPercentage: 80
 
@@ -120,7 +128,7 @@ distributed:
 
   # API service configuration
   api:
-    replicaCount: 2
+    replicaCount: 1
 
     resources:
       limits:
@@ -136,8 +144,8 @@ distributed:
 
     autoscaling:
       enabled: false
-      minReplicas: 2
-      maxReplicas: 10
+      minReplicas: 1
+      maxReplicas: 3
       targetCPUUtilizationPercentage: 80
       targetMemoryUtilizationPercentage: 80
 
@@ -149,7 +157,7 @@ distributed:
 
   # Web UI configuration
   web:
-    replicaCount: 2
+    replicaCount: 1
 
     resources:
       limits:
@@ -165,8 +173,8 @@ distributed:
 
     autoscaling:
       enabled: false
-      minReplicas: 2
-      maxReplicas: 5
+      minReplicas: 1
+      maxReplicas: 2
       targetCPUUtilizationPercentage: 80
 
     env:
@@ -231,9 +239,40 @@ externalNats:
   # Use existing secret for credentials
   existingSecret: ""
 
+# Gateway API configuration (alternative to Ingress)
+# GKE Gateway API for advanced L7 load balancing
+gateway:
+  enabled: false
+  className: gke-l7-global-external-managed
+  annotations: {}
+  # TLS configuration for Gateway
+  tls:
+    enabled: false
+    # Certificate reference - should match ManagedCertificate name
+    certificateRefs: []
+    # - name: observer-gateway-cert
+
 # Ingress configuration
 # Each ingress can be independently enabled and configured
 ingress:
+  # Google-managed SSL certificate (GCP/GKE only)
+  # Automatically provisions and renews certificates for your domains
+  managedCertificate:
+    enabled: false
+    # When enabled, creates a ManagedCertificate resource for all ingress hosts
+    # Certificate provisioning takes 15-60 minutes on first deployment
+    # Requires valid DNS records pointing to the load balancer IPs
+
+  # SSL/HTTPS configuration
+  ssl:
+    # Redirect HTTP to HTTPS (only enable after certificates are provisioned)
+    redirect: false
+    # TLS policy (GCP only) - MODERN, COMPATIBLE, or RESTRICTED
+    # MODERN: TLS 1.2+, strong ciphers
+    # COMPATIBLE: TLS 1.0+, wider compatibility
+    # RESTRICTED: TLS 1.2+, most restrictive
+    policy: "MODERN"
+
   # Web UI ingress - serves the React frontend
   web:
     enabled: false
@@ -291,6 +330,18 @@ ingress:
       # - secretName: observer-grpc-tls
       #   hosts:
       #     - grpc.observer.example.com
+    # GCP BackendConfig for gRPC (only used with GCE ingress class)
+    # Set enabled: true when using className: "gce" for proper HTTP/2 support
+    backendConfig:
+      enabled: false
+      healthCheck:
+        checkIntervalSec: 10
+        timeoutSec: 5
+        type: HTTP2
+        requestPath: /grpc.health.v1.HealthService/Check
+      timeoutSec: 30
+      connectionDraining:
+        drainingTimeoutSec: 60
 
 # Service Account
 serviceAccount:

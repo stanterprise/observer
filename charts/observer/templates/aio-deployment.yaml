@@ -34,6 +34,9 @@ spec:
         - name: grpc
           containerPort: 50051
           protocol: TCP
+        - name: health
+          containerPort: 8081
+          protocol: TCP
         - name: api
           containerPort: 8080
           protocol: TCP
@@ -49,17 +52,17 @@ spec:
           value: {{ $value | quote }}
         {{- end }}
         livenessProbe:
-          httpGet:
-            path: /health
-            port: web
+          grpc:
+            port: 50051
           initialDelaySeconds: 30
           periodSeconds: 10
+          timeoutSeconds: 5
         readinessProbe:
-          httpGet:
-            path: /health
-            port: web
+          grpc:
+            port: 50051
           initialDelaySeconds: 10
           periodSeconds: 5
+          timeoutSeconds: 3
         resources:
           {{- toYaml .Values.aio.resources | nindent 10 }}
         volumeMounts:
