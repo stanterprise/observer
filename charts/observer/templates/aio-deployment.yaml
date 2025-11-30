@@ -34,6 +34,9 @@ spec:
         - name: grpc
           containerPort: 50051
           protocol: TCP
+        - name: health
+          containerPort: 8081
+          protocol: TCP
         - name: api
           containerPort: 8080
           protocol: TCP

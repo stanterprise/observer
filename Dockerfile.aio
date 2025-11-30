@@ -156,10 +156,11 @@ ENV DB_DRIVER=sqlite \
 # Expose ports
 # 80 - Web UI (Nginx)
 # 50051 - gRPC ingestion
+# 8081 - HTTP health check (for GCE load balancer)
 # 8080 - API service (internal, proxied by Nginx)
 # 4222 - NATS client
 # 8222 - NATS monitoring
-EXPOSE 80 50051 8080 4222 8222
+EXPOSE 80 50051 8081 8080 4222 8222
 
 # Use s6-overlay as init system
 ENTRYPOINT ["/init"]
