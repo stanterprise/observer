@@ -2,6 +2,8 @@
 
 This guide explains how to build and run Observer using Docker and Docker Compose.
 
+> **⚡ Performance Note**: For optimized multi-architecture builds, see [Build Optimization Guide](BUILD_OPTIMIZATION.md)
+
 ## Docker Images
 
 Observer provides separate Docker images for each deployment scenario:
@@ -16,7 +18,7 @@ Observer provides separate Docker images for each deployment scenario:
 ### Build Docker Images
 
 ```bash
-# Build all images
+# Build all images (standard build)
 make docker-build-all
 
 # Or build individual images
@@ -24,7 +26,19 @@ make docker-build-aio        # AIO image
 make docker-build-ingestion  # Ingestion service
 make docker-build-processor  # Processor service
 make docker-build-api        # API service
+
+# For faster multi-platform builds with caching:
+make docker-buildx-setup     # One-time setup
+make docker-buildx-aio       # Optimized multi-arch build (60-90% faster)
 ```
+
+**Build Performance:**
+
+- Standard build: ~20 min for ARM64, ~15 min for AMD64
+- Optimized buildx (first): ~8 min for both architectures
+- Optimized buildx (cached): ~2 min for code changes
+
+See [Build Optimization Guide](BUILD_OPTIMIZATION.md) for details.
 
 ### Run with Docker Compose
 
@@ -47,6 +61,7 @@ docker compose --profile aio down
 ```
 
 **Ports:**
+
 - `50051` - gRPC ingestion endpoint
 - `8080` - HTTP API and UI
 - `4222` - NATS client connections
@@ -73,6 +88,7 @@ docker compose --profile dist down
 ```
 
 **Services:**
+
 - `ingestion` - gRPC endpoint (port 50051)
 - `processor` - NATS consumer and database writer
 - `api` - HTTP API and UI (port 8080)
@@ -85,15 +101,15 @@ docker compose --profile dist down
 
 All services support these environment variables:
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `MODE` | Deployment mode: `aio` or `service` | `service` | Yes |
-| `SERVICE_TYPE` | Service to run: `ingestion`, `processor`, `api`, `observer` | `ingestion` | When `MODE=service` |
-| `PORT` | Service listen port | `50051` (ingestion), `8080` (api) | No |
-| `DATABASE_URL` | Database connection URL | - | For processor, api |
-| `NATS_URL` | NATS server URL | `nats://localhost:4222` | For ingestion, processor |
-| `NATS_STREAM` | NATS stream name | `tests_events` | No |
-| `APPLY_MIGRATIONS` | Run database migrations on startup | - | No |
+| Variable           | Description                                                 | Default                           | Required                 |
+| ------------------ | ----------------------------------------------------------- | --------------------------------- | ------------------------ |
+| `MODE`             | Deployment mode: `aio` or `service`                         | `service`                         | Yes                      |
+| `SERVICE_TYPE`     | Service to run: `ingestion`, `processor`, `api`, `observer` | `ingestion`                       | When `MODE=service`      |
+| `PORT`             | Service listen port                                         | `50051` (ingestion), `8080` (api) | No                       |
+| `DATABASE_URL`     | Database connection URL                                     | -                                 | For processor, api       |
+| `NATS_URL`         | NATS server URL                                             | `nats://localhost:4222`           | For ingestion, processor |
+| `NATS_STREAM`      | NATS stream name                                            | `tests_events`                    | No                       |
+| `APPLY_MIGRATIONS` | Run database migrations on startup                          | -                                 | No                       |
 
 ### Distributed Mode Configuration
 

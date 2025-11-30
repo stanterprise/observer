@@ -5,6 +5,39 @@
 
 Observer has been deployed in All-in-One mode with all services in a single container.
 
+{{- if .Values.ingress.managedCertificate.enabled }}
+
+🔒 HTTPS/SSL Configuration:
+{{- if .Values.ingress.web.enabled }}
+  Status: Google-managed certificate provisioning in progress
+
+  Check certificate status:
+    kubectl describe managedcertificate {{ include "observer.fullname" . }}-cert -n {{ .Release.Namespace }}
+
+  ⏱️  Certificate provisioning takes 15-60 minutes.
+  Once Status shows "Active", your sites will be available via HTTPS:
+
+{{- range .Values.ingress.web.hosts }}
+  Web UI: https://{{ .host }}
+{{- end }}
+{{- range .Values.ingress.api.hosts }}
+  API: https://{{ .host }}
+{{- end }}
+{{- range .Values.ingress.grpc.hosts }}
+  gRPC: {{ .host }}:443
+{{- end }}
+
+{{- if not .Values.ingress.ssl.redirect }}
+
+  💡 To enable HTTP → HTTPS redirect after certificates are Active:
+    1. Update values: ingress.ssl.redirect: true
+    2. Run: helm upgrade {{ .Release.Name }} charts/observer/ --namespace {{ .Release.Namespace }} --values charts/observer/values-aio.yaml
+{{- else }}
+  ✅ HTTP → HTTPS redirect is enabled
+{{- end }}
+{{- end }}
+{{- end }}
+
 1. Get the application URL by running:
 
 {{- if contains "NodePort" .Values.aio.service.type }}
@@ -23,11 +56,11 @@ Observer has been deployed in All-in-One mode with all services in a single cont
 
 {{- else if contains "ClusterIP" .Values.aio.service.type }}
   export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "observer.name" . }},app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=aio" -o jsonpath="{.items[0].metadata.name}")
-  
+
   echo "Access the Web UI by running:"
   echo "  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME {{ .Values.aio.service.webPort }}:80"
   echo "  Then visit http://127.0.0.1:{{ .Values.aio.service.webPort }}"
-  
+
   echo ""
   echo "Access the gRPC endpoint by running:"
   echo "  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME {{ .Values.aio.service.grpcPort }}:50051"
@@ -128,10 +161,10 @@ Services deployed:
 {{ else }}
   # Ingestion logs
   kubectl logs --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=ingestion" -f
-  
+
   # Processor logs
   kubectl logs --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=processor" -f
-  
+
   # API logs
   kubectl logs --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=api" -f
 {{ end }}

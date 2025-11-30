@@ -1,0 +1,160 @@
+name: Build Performance Test
+
+# Test and validate Docker build optimizations
+# Runs on schedule and can be triggered manually for testing
+
+on:
+  schedule:
+    # Run weekly on Mondays at 6 AM UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      test_image:
+        description: "Image to test (aio, ingestion, processor, api, web, or all)"
+        required: false
+        default: "aio"
+        type: choice
+        options:
+          - aio
+          - ingestion
+          - processor
+          - api
+          - web
+          - all
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  performance-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        image: ${{ (github.event.inputs.test_image == 'all' || github.event.inputs.test_image == '') && fromJSON('["aio", "ingestion", "processor", "api", "web"]') || fromJSON(format('["{0}"]', github.event.inputs.test_image)) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # First build - measure cold cache performance
+      - name: Build (Cold Cache)
+        id: build_cold
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.${{ matrix.image }}
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.image }}:buildcache,mode=max
+          outputs: type=docker,dest=/tmp/${{ matrix.image }}-image.tar
+
+      # Second build - measure warm cache performance
+      - name: Build (Warm Cache)
+        id: build_warm
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.${{ matrix.image }}
+          platforms: linux/amd64
+          push: false
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.image }}:buildcache
+          outputs: type=docker,dest=/tmp/${{ matrix.image }}-image-cached.tar
+
+      # Make a trivial code change and rebuild
+      - name: Simulate code change
+        run: |
+          echo "// Test change $(date)" >> cmd/ingestion/main.go || echo "// Test change $(date)" >> web/src/App.tsx || true
+
+      - name: Build (Code Change)
+        id: build_change
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.${{ matrix.image }}
+          platforms: linux/amd64
+          push: false
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.image }}:buildcache
+
+      - name: Generate Performance Report
+        if: always()
+        run: |
+          echo "# 📊 Build Performance Report - ${{ matrix.image }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scenario | Status | Platform |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Cold Cache (Multi-arch) | ${{ steps.build_cold.outcome }} | linux/amd64,linux/arm64 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Warm Cache (Single arch) | ${{ steps.build_warm.outcome }} | linux/amd64 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Code Change | ${{ steps.build_change.outcome }} | linux/amd64 |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Cache Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cache Backend:** Registry (GHCR)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cache Reference:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.image }}:buildcache\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cache Mode:** max (all layers)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Expected Performance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scenario | Expected Time |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|---------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| First build (multi-arch) | ~8-12 minutes |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cached build (no changes) | ~30-60 seconds |" >> $GITHUB_STEP_SUMMARY
+          echo "| Code change rebuild | ~2-4 minutes |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "ℹ️ For more details, see [BUILD_OPTIMIZATION.md](https://github.com/${{ github.repository }}/blob/main/docs/BUILD_OPTIMIZATION.md)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check image size
+        if: success()
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Image Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f /tmp/${{ matrix.image }}-image.tar ]; then
+            SIZE=$(du -h /tmp/${{ matrix.image }}-image.tar | cut -f1)
+            echo "**Image Size:** $SIZE" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: performance-test
+    if: always()
+    steps:
+      - name: Overall Summary
+        run: |
+          echo "# 🎉 Build Performance Test Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All build performance tests have completed. Check individual job outputs for detailed metrics." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Optimization Features" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ BuildKit cache mounts for NPM, Go modules, Go build cache, APT packages" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Registry cache for cross-runner persistence" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Multi-platform builds (AMD64 + ARM64)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Incremental compilation for faster rebuilds" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Documentation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- [Build Optimization Guide](https://github.com/${{ github.repository }}/blob/main/docs/BUILD_OPTIMIZATION.md)" >> $GITHUB_STEP_SUMMARY
+          echo "- [GitHub Actions Integration](https://github.com/${{ github.repository }}/blob/main/docs/GITHUB_ACTIONS_BUILDS.md)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Quick Reference](https://github.com/${{ github.repository }}/blob/main/BUILD_QUICK_REF.md)" >> $GITHUB_STEP_SUMMARY

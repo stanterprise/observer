@@ -6,6 +6,11 @@ metadata:
   labels:
     {{- include "observer.labels" . | nindent 4 }}
     app.kubernetes.io/component: aio
+  {{- if .Values.ingress.grpc.backendConfig.enabled }}
+  annotations:
+    cloud.google.com/backend-config: '{"ports": {"50051":"{{ include "observer.fullname" . }}-grpc-backend"}}'
+    cloud.google.com/app-protocols: '{"grpc":"HTTP2"}'
+  {{- end }}
 spec:
   type: {{ .Values.aio.service.type }}
   ports:
@@ -17,6 +22,10 @@ spec:
     targetPort: grpc
     protocol: TCP
     name: grpc
+  - port: 8081
+    targetPort: health
+    protocol: TCP
+    name: health
   - port: {{ .Values.aio.service.apiPort }}
     targetPort: api
     protocol: TCP

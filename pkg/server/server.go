@@ -13,7 +13,10 @@ import (
 	observer "github.com/stanterprise/proto-go/testsystem/v1/observer"
 	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -476,6 +479,16 @@ func (s *EventServer) Heartbeat(ctx context.Context, in *events.HeartbeatEventRe
 func RegisterServices(s *grpc.Server, logger *slog.Logger, db *gorm.DB) *EventServer {
 	srv := New(logger, db)
 	observer.RegisterTestEventCollectorServer(s, srv)
+
+	// Register health check service
+	healthServer := health.NewServer()
+	healthpb.RegisterHealthServer(s, healthServer)
+	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus("testsystem.v1.observer.TestEventCollector", healthpb.HealthCheckResponse_SERVING)
+
+	// Register reflection service for grpcurl/testing
+	reflection.Register(s)
+
 	return srv
 }
 
@@ -483,6 +496,16 @@ func RegisterServices(s *grpc.Server, logger *slog.Logger, db *gorm.DB) *EventSe
 func RegisterServicesWithPublisher(s *grpc.Server, logger *slog.Logger, db *gorm.DB, pub *publisher.NATSPublisher) *EventServer {
 	srv := NewWithPublisher(logger, db, pub)
 	observer.RegisterTestEventCollectorServer(s, srv)
+
+	// Register health check service
+	healthServer := health.NewServer()
+	healthpb.RegisterHealthServer(s, healthServer)
+	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus("testsystem.v1.observer.TestEventCollector", healthpb.HealthCheckResponse_SERVING)
+
+	// Register reflection service for grpcurl/testing
+	reflection.Register(s)
+
 	return srv
 }
 

@@ -11,13 +11,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/stanterprise/observer/pkg/healthhttp"
 	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/stanterprise/observer/pkg/server"
 )
 
 func main() {
 	var (
-		port = flag.String("port", envOr("PORT", "50051"), "TCP port to listen on")
+		port       = flag.String("port", envOr("PORT", "50051"), "TCP port to listen on")
+		healthPort = flag.String("health-port", envOr("HEALTH_PORT", "8081"), "HTTP health check port")
 	)
 	flag.Parse()
 
@@ -47,6 +49,14 @@ func main() {
 	} else {
 		logger.Info("NATS publisher disabled - NATS_URL not set")
 	}
+
+	// Start HTTP health check server for GCE load balancer compatibility
+	healthServer := healthhttp.NewServer(*healthPort, logger)
+	go func() {
+		if err := healthServer.Start(); err != nil {
+			logger.Error("HTTP health server failed", "error", err)
+		}
+	}()
 
 	grpcServer := server.NewGRPCServer(logger)
 	// Ingestion service does not use database directly - it publishes to NATS
@@ -82,6 +92,12 @@ func main() {
 	// Allow up to 5s for graceful stop.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	// Shutdown HTTP health server
+	if err := healthServer.Shutdown(ctx); err != nil {
+		logger.Error("HTTP health server shutdown error", "error", err)
+	}
+
 	done := make(chan struct{})
 	go func() {
 		grpcServer.GracefulStop()

@@ -1,0 +1,177 @@
+{{- if and .Values.gateway.enabled (eq .Values.mode "aio") }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ include "observer.fullname" . }}-gateway
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+  {{- with .Values.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  gatewayClassName: {{ .Values.gateway.gatewayClassName }}
+  listeners:
+  {{- if .Values.gateway.web.enabled }}
+  - name: http-web
+    protocol: HTTP
+    port: 80
+    hostname: {{ .Values.gateway.web.hostname }}
+    allowedRoutes:
+      namespaces:
+        from: Same
+  {{- if .Values.gateway.tls.enabled }}
+  - name: https-web
+    protocol: HTTPS
+    port: 443
+    hostname: {{ .Values.gateway.web.hostname }}
+    tls:
+      mode: Terminate
+      options:
+        networking.gke.io/pre-shared-certs: {{ .Values.gateway.tls.gcpCertificateName | quote }}
+    allowedRoutes:
+      namespaces:
+        from: Same
+  {{- end }}
+  {{- end }}
+  {{- if .Values.gateway.api.enabled }}
+  - name: http-api
+    protocol: HTTP
+    port: 80
+    hostname: {{ .Values.gateway.api.hostname }}
+    allowedRoutes:
+      namespaces:
+        from: Same
+  {{- if .Values.gateway.tls.enabled }}
+  - name: https-api
+    protocol: HTTPS
+    port: 443
+    hostname: {{ .Values.gateway.api.hostname }}
+    tls:
+      mode: Terminate
+      options:
+        networking.gke.io/pre-shared-certs: {{ .Values.gateway.tls.gcpCertificateName | quote }}
+    allowedRoutes:
+      namespaces:
+        from: Same
+  {{- end }}
+  {{- end }}
+  {{- if .Values.gateway.grpc.enabled }}
+  - name: http-grpc
+    protocol: HTTP
+    port: 80
+    hostname: {{ .Values.gateway.grpc.hostname }}
+    allowedRoutes:
+      namespaces:
+        from: Same
+  {{- if .Values.gateway.tls.enabled }}
+  - name: https-grpc
+    protocol: HTTPS
+    port: 443
+    hostname: {{ .Values.gateway.grpc.hostname }}
+    tls:
+      mode: Terminate
+      options:
+        networking.gke.io/pre-shared-certs: {{ .Values.gateway.tls.gcpCertificateName | quote }}
+    allowedRoutes:
+      namespaces:
+        from: Same
+  {{- end }}
+  {{- end }}
+  addresses:
+  {{- if .Values.gateway.addresses }}
+  {{- range .Values.gateway.addresses }}
+  - type: {{ .type }}
+    value: {{ .value }}
+  {{- end }}
+  {{- end }}
+---
+{{- if .Values.gateway.web.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "observer.fullname" . }}-web-route
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+  - name: {{ include "observer.fullname" . }}-gateway
+    {{- if .Values.gateway.tls.enabled }}
+    sectionName: https-web
+    {{- else }}
+    sectionName: http-web
+    {{- end }}
+  hostnames:
+  - {{ .Values.gateway.web.hostname }}
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: {{ include "observer.fullname" . }}-aio
+      port: 80
+{{- end }}
+---
+{{- if .Values.gateway.api.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "observer.fullname" . }}-api-route
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+  - name: {{ include "observer.fullname" . }}-gateway
+    {{- if .Values.gateway.tls.enabled }}
+    sectionName: https-api
+    {{- else }}
+    sectionName: http-api
+    {{- end }}
+  hostnames:
+  - {{ .Values.gateway.api.hostname }}
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: {{ include "observer.fullname" . }}-aio
+      port: 8080
+{{- end }}
+---
+{{- if .Values.gateway.grpc.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "observer.fullname" . }}-grpc-route
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+  annotations:
+    # Enable HTTP/2 for gRPC traffic
+    networking.gke.io/app-protocols: '{"grpc":"HTTP2"}'
+spec:
+  parentRefs:
+  - name: {{ include "observer.fullname" . }}-gateway
+    {{- if .Values.gateway.tls.enabled }}
+    sectionName: https-grpc
+    {{- else }}
+    sectionName: http-grpc
+    {{- end }}
+  hostnames:
+  - {{ .Values.gateway.grpc.hostname }}
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+      headers:
+      - type: Exact
+        name: content-type
+        value: application/grpc
+    backendRefs:
+    - name: {{ include "observer.fullname" . }}-aio
+      port: 50051
+{{- end }}
+{{- end }}
