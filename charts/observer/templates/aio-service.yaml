@@ -9,6 +9,7 @@ metadata:
   {{- if .Values.ingress.grpc.backendConfig.enabled }}
   annotations:
     cloud.google.com/backend-config: '{"ports": {"50051":"{{ include "observer.fullname" . }}-grpc-backend"}}'
+    cloud.google.com/app-protocols: '{"grpc":"HTTP2"}'
   {{- end }}
 spec:
   type: {{ .Values.aio.service.type }}

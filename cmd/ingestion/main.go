@@ -92,12 +92,12 @@ func main() {
 	// Allow up to 5s for graceful stop.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	// Shutdown HTTP health server
 	if err := healthServer.Shutdown(ctx); err != nil {
 		logger.Error("HTTP health server shutdown error", "error", err)
 	}
-	
+
 	done := make(chan struct{})
 	go func() {
 		grpcServer.GracefulStop()
