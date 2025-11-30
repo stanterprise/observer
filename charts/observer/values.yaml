@@ -60,6 +60,14 @@ aio:
     NATS_STREAM: tests_events
     NATS_WS_CONSUMER: websocket
 
+  # gRPC LoadBalancer for direct external access (alternative to Ingress)
+  grpcLoadBalancer:
+    enabled: false
+    port: 50051
+    annotations: {}
+    # loadBalancerIP: ""  # Specify a static IP if needed
+    # loadBalancerSourceRanges: []  # Restrict source IPs if needed
+
 # Distributed mode configuration
 distributed:
   enabled: false
@@ -230,6 +238,19 @@ externalNats:
   url: ""
   # Use existing secret for credentials
   existingSecret: ""
+
+# Gateway API configuration (alternative to Ingress)
+# GKE Gateway API for advanced L7 load balancing
+gateway:
+  enabled: false
+  className: gke-l7-global-external-managed
+  annotations: {}
+  # TLS configuration for Gateway
+  tls:
+    enabled: false
+    # Certificate reference - should match ManagedCertificate name
+    certificateRefs: []
+    # - name: observer-gateway-cert
 
 # Ingress configuration
 # Each ingress can be independently enabled and configured
