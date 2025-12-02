@@ -13,7 +13,7 @@ metadata:
     {{- if .Values.ingress.managedCertificate.enabled }}
     networking.gke.io/managed-certificates: {{ include "observer.fullname" . }}-cert
     kubernetes.io/ingress.allow-http: "true"
-    {{- if or .Values.ingress.ssl.redirect .Values.ingress.ssl.policy }}
+    {{- if or .Values.ingress.ssl.redirect (ne .Values.ingress.ssl.policy "") }}
     networking.gke.io/v1beta1.FrontendConfig: {{ include "observer.fullname" . }}-frontend
     {{- end }}
     {{- end }}
@@ -70,7 +70,7 @@ metadata:
     {{- if .Values.ingress.managedCertificate.enabled }}
     networking.gke.io/managed-certificates: {{ include "observer.fullname" . }}-cert
     kubernetes.io/ingress.allow-http: "true"
-    {{- if or .Values.ingress.ssl.redirect .Values.ingress.ssl.policy }}
+    {{- if or .Values.ingress.ssl.redirect (ne .Values.ingress.ssl.policy "") }}
     networking.gke.io/v1beta1.FrontendConfig: {{ include "observer.fullname" . }}-frontend
     {{- end }}
     {{- end }}
