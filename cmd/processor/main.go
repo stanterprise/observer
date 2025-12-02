@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stanterprise/observer/internal/database"
+	"github.com/stanterprise/observer/internal/repository"
 	"github.com/stanterprise/observer/pkg/consumer"
 )
 
@@ -25,17 +26,80 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Processor service requires database connection
+	// Try MongoDB first, fall back to SQL if not configured
+	mongoDB, err := database.ConnectMongoDBFromEnv(logger)
+	if err != nil {
+		logger.Error("mongodb connect failed", "error", err)
+		os.Exit(1)
+	}
+
+	if mongoDB != nil {
+		// Use MongoDB backend
+		logger.Info("using MongoDB backend")
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		defer mongoDB.Close(ctx)
+
+		repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
+
+		cfg := consumer.MongoNATSConsumerConfig{
+			URL:          *natsURL,
+			StreamName:   *streamName,
+			ConsumerName: *consumerName,
+			BatchSize:    *batchSize,
+			MaxWait:      *maxWait,
+		}
+
+		natsConsumer, err := consumer.NewMongoNATSConsumer(cfg, logger, repo)
+		if err != nil {
+			logger.Error("failed to create MongoDB NATS consumer", "error", err)
+			os.Exit(1)
+		}
+		defer natsConsumer.Close()
+
+		logger.Info("processor service starting (MongoDB)",
+			"nats_url", *natsURL,
+			"stream", *streamName,
+			"consumer", *consumerName)
+
+		errChan := make(chan error, 1)
+		go func() {
+			if err := natsConsumer.Start(ctx, cfg); err != nil && err != context.Canceled {
+				errChan <- err
+			}
+			close(errChan)
+		}()
+
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+		select {
+		case sig := <-sigCh:
+			logger.Info("shutdown signal received", "signal", sig)
+		case err := <-errChan:
+			if err != nil {
+				logger.Error("consumer error", "error", err)
+				os.Exit(1)
+			}
+		}
+
+		cancel()
+		logger.Info("processor service stopped gracefully")
+		return
+	}
+
+	// Fall back to SQL backend (GORM)
 	db, err := database.ConnectFromEnv(logger)
 	if err != nil {
 		logger.Error("database connect failed", "error", err)
 		os.Exit(1)
 	}
 	if db == nil {
-		logger.Error("DATABASE_URL not set; processor requires database")
+		logger.Error("DATABASE_URL or MONGODB_URI not set; processor requires database")
 		os.Exit(1)
 	}
-	logger.Info("database connected")
+	logger.Info("using SQL backend (GORM)")
 
 	if err := database.AutoMigrateSchema(db, logger); err != nil {
 		logger.Error("automigrate failed", "error", err)
@@ -59,7 +123,7 @@ func main() {
 	}
 	defer natsConsumer.Close()
 
-	logger.Info("processor service starting",
+	logger.Info("processor service starting (SQL)",
 		"nats_url", *natsURL,
 		"stream", *streamName,
 		"consumer", *consumerName)
