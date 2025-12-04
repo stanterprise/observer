@@ -157,7 +157,7 @@ export function TestCaseRunDetailPage({
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link
-            to={`/runs/${test.RunID}`}
+            to={`/suite_runs/${test.RunID}`}
             className="inline-flex items-center text-blue-600 hover:text-blue-700"
           >
             <ArrowLeft className="h-5 w-5" />

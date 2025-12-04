@@ -12,18 +12,22 @@ export function Layout({ isConnected }: LayoutProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Activity className="h-8 w-8 text-blue-600 mr-3" />
-              <span className="text-xl font-bold text-gray-900">Observer</span>
+              <Link to="/" className="flex items-center">
+                <Activity className="h-8 w-8 text-blue-600 mr-3" />
+                <span className="text-xl font-bold text-gray-900">
+                  Observer
+                </span>
+              </Link>
             </div>
             <div className="flex items-center space-x-8">
               <Link
-                to="/"
+                to="/runs"
                 className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
               >
                 Test Cases
               </Link>
               <Link
-                to="/runs"
+                to="/suite_runs"
                 className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
               >
                 Test Runs

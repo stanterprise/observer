@@ -426,9 +426,8 @@ func (c *MongoNATSConsumer) handleTestFailure(ctx context.Context, data json.Raw
 		"test_id", req.TestId,
 		"message_len", len(req.FailureMessage))
 
-	// Failure data could be stored as part of the test document
-	// For now, just log it
-	return nil
+	// Update test status to FAILED
+	return c.repo.UpdateTestStatus(ctx, req.TestId, "FAILED")
 }
 
 // handleTestError processes a test error event
@@ -442,7 +441,8 @@ func (c *MongoNATSConsumer) handleTestError(ctx context.Context, data json.RawMe
 		"test_id", req.TestId,
 		"message_len", len(req.ErrorMessage))
 
-	return nil
+	// Update test status to ERROR
+	return c.repo.UpdateTestStatus(ctx, req.TestId, "ERROR")
 }
 
 // handleStdOutput processes a stdout event

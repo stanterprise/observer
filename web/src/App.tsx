@@ -7,6 +7,7 @@ import { TestSuiteRunDetailPage } from "./components/TestSuiteRunDetailPage";
 import { TestCaseRunDetailPage } from "./components/TestCaseRunDetailPage";
 import { useWebSocket } from "./hooks/useWebSocket";
 import type { WebSocketEvent } from "./types";
+import DashboardPage from "./components/DashboardPage";
 
 function App() {
   const [lastEvent, setLastEvent] = useState<WebSocketEvent | null>(null);
@@ -27,11 +28,12 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout isConnected={isConnected} />}>
+          <Route index element={<DashboardPage />} />
           <Route
-            index
+            path="runs"
             element={<TestRunsPage onWebSocketEvent={lastEvent} />}
           />
-          <Route path="runs">
+          <Route path="suite_runs">
             <Route
               index
               element={<TestSuiteRunsPage onWebSocketEvent={lastEvent} />}

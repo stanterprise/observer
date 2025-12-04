@@ -3,8 +3,20 @@ import { Link } from "react-router-dom";
 import { apiUrl } from "../lib/config";
 import { Card, CardHeader, CardTitle, CardContent } from "./Card";
 import { Badge } from "./Badge";
-import type { WebSocketEvent, TestStatus, TestCaseResponse, WebSocketTestData } from "../types";
-import { Play, CheckCircle, XCircle, CircleDashed, Clock } from "lucide-react";
+import type {
+  WebSocketEvent,
+  TestStatus,
+  TestCaseResponse,
+  WebSocketTestData,
+} from "../types";
+import {
+  Play,
+  CheckCircle,
+  XCircle,
+  CircleDashed,
+  Clock,
+  ArrowUpDown,
+} from "lucide-react";
 
 interface TestRunsPageProps {
   onWebSocketEvent?: WebSocketEvent | null;
@@ -23,6 +35,7 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
   const [runs, setRuns] = useState<TestRunStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
     fetchRuns();
@@ -67,6 +80,14 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
       const stats = (await Promise.all(statsPromises)).filter(
         (s): s is TestRunStats => s !== null
       );
+
+      // Sort by lastUpdated (most recent first by default)
+      stats.sort((a, b) => {
+        const aTime = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0;
+        const bTime = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
+        return bTime - aTime; // Descending order (newest first)
+      });
+
       setRuns(stats);
       setError(null);
     } catch (err) {
@@ -141,6 +162,17 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
     return "running";
   };
 
+  const toggleSortOrder = () => {
+    setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+  };
+
+  // Sort runs based on current sort order
+  const sortedRuns = [...runs].sort((a, b) => {
+    const aTime = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0;
+    const bTime = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
+    return sortOrder === "desc" ? bTime - aTime : aTime - bTime;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -168,64 +200,112 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {runs.map((run) => (
-            <Link key={run.runId} to={`/runs/${run.runId}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base truncate flex-1">
-                      {run.runId}
-                    </CardTitle>
-                    <Badge status={getRunStatus(run)} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div className="flex items-center">
-                        <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                        <span className="text-gray-600">Passed:</span>
-                        <span className="ml-1 font-semibold text-green-600">
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Run ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <div className="flex items-center justify-center">
+                        <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                        Passed
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <div className="flex items-center justify-center">
+                        <XCircle className="h-4 w-4 mr-1 text-red-600" />
+                        Failed
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <div className="flex items-center justify-center">
+                        <CircleDashed className="h-4 w-4 mr-1 text-gray-600" />
+                        Skipped
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <div className="flex items-center justify-center">
+                        <Play className="h-4 w-4 mr-1 text-blue-600" />
+                        Total
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <button
+                        onClick={toggleSortOrder}
+                        className="flex items-center hover:text-gray-700 transition-colors"
+                      >
+                        <Clock className="h-4 w-4 mr-1" />
+                        Last Updated
+                        <ArrowUpDown className="h-3 w-3 ml-1" />
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedRuns.map((run) => (
+                    <tr
+                      key={run.runId}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Link
+                          to={`/suite_runs/${run.runId}`}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          {run.runId}
+                        </Link>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge status={getRunStatus(run)} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <span className="text-green-600 font-semibold">
                           {run.passed}
                         </span>
-                      </div>
-                      <div className="flex items-center">
-                        <XCircle className="h-4 w-4 mr-2 text-red-600" />
-                        <span className="text-gray-600">Failed:</span>
-                        <span className="ml-1 font-semibold text-red-600">
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <span className="text-red-600 font-semibold">
                           {run.failed}
                         </span>
-                      </div>
-                      <div className="flex items-center">
-                        <CircleDashed className="h-4 w-4 mr-2 text-gray-600" />
-                        <span className="text-gray-600">Skipped:</span>
-                        <span className="ml-1 font-semibold text-gray-600">
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <span className="text-gray-600 font-semibold">
                           {run.skipped}
                         </span>
-                      </div>
-                      <div className="flex items-center">
-                        <Play className="h-4 w-4 mr-2 text-blue-600" />
-                        <span className="text-gray-600">Total:</span>
-                        <span className="ml-1 font-semibold text-blue-600">
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <span className="text-blue-600 font-semibold">
                           {run.total}
                         </span>
-                      </div>
-                    </div>
-                    {run.lastUpdated && (
-                      <div className="flex items-center text-xs text-gray-500 pt-2 border-t border-gray-100">
-                        <Clock className="h-3 w-3 mr-1" />
-                        <span>
-                          Last updated: {new Date(run.lastUpdated).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {run.lastUpdated ? (
+                          <div className="flex flex-col">
+                            <span>
+                              {new Date(run.lastUpdated).toLocaleDateString()}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(run.lastUpdated).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">N/A</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
