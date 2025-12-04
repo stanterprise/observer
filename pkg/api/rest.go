@@ -36,6 +36,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
 }
 
+// DB returns the underlying GORM database connection
+func (h *Handler) DB() *gorm.DB {
+	return h.db
+}
+
 // handleTests handles GET /api/tests - list all test cases with optional filtering
 func (h *Handler) handleTests(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

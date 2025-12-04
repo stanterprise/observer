@@ -181,31 +181,30 @@ distributed:
       API_BACKEND_HOST: observer-api
       API_BACKEND_PORT: "8080"
 
-# PostgreSQL configuration
-postgresql:
+# MongoDB configuration
+mongodb:
   enabled: true
-  # Use external PostgreSQL by setting enabled: false and configuring externalDatabase
+  # Use external MongoDB by setting enabled: false and configuring externalDatabase
   auth:
-    username: postgres
-    password: postgres
+    rootUser: root
+    rootPassword: password
     database: observer
-  primary:
-    persistence:
-      enabled: true
-      size: 10Gi
-    resources:
-      limits:
-        cpu: 1000m
-        memory: 1Gi
-      requests:
-        cpu: 250m
-        memory: 256Mi
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 256Mi
 
-# External database configuration (when postgresql.enabled=false)
+# External database configuration (when mongodb.enabled=false)
 externalDatabase:
   host: ""
-  port: 5432
-  username: postgres
+  port: 27017
+  username: root
   password: ""
   database: observer
   # Use existing secret for password

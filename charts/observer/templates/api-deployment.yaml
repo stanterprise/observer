@@ -36,7 +36,7 @@ spec:
         env:
         - name: NATS_URL
           value: {{ include "observer.nats.url" . }}
-        - name: DATABASE_URL
+        - name: MONGODB_URI
           value: {{ include "observer.database.url" . }}
         {{- range $key, $value := .Values.distributed.api.env }}
         - name: {{ $key }}

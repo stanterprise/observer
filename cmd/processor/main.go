@@ -26,88 +26,26 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Try MongoDB first, fall back to SQL if not configured
+	// Connect to MongoDB
 	mongoDB, err := database.ConnectMongoDBFromEnv(logger)
 	if err != nil {
 		logger.Error("mongodb connect failed", "error", err)
 		os.Exit(1)
 	}
-
-	if mongoDB != nil {
-		// Use MongoDB backend
-		logger.Info("using MongoDB backend")
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		defer mongoDB.Close(ctx)
-
-		repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
-
-		cfg := consumer.MongoNATSConsumerConfig{
-			URL:          *natsURL,
-			StreamName:   *streamName,
-			ConsumerName: *consumerName,
-			BatchSize:    *batchSize,
-			MaxWait:      *maxWait,
-		}
-
-		natsConsumer, err := consumer.NewMongoNATSConsumer(cfg, logger, repo)
-		if err != nil {
-			logger.Error("failed to create MongoDB NATS consumer", "error", err)
-			os.Exit(1)
-		}
-		defer natsConsumer.Close()
-
-		logger.Info("processor service starting (MongoDB)",
-			"nats_url", *natsURL,
-			"stream", *streamName,
-			"consumer", *consumerName)
-
-		errChan := make(chan error, 1)
-		go func() {
-			if err := natsConsumer.Start(ctx, cfg); err != nil && err != context.Canceled {
-				errChan <- err
-			}
-			close(errChan)
-		}()
-
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-
-		select {
-		case sig := <-sigCh:
-			logger.Info("shutdown signal received", "signal", sig)
-		case err := <-errChan:
-			if err != nil {
-				logger.Error("consumer error", "error", err)
-				os.Exit(1)
-			}
-		}
-
-		cancel()
-		logger.Info("processor service stopped gracefully")
-		return
-	}
-
-	// Fall back to SQL backend (GORM)
-	db, err := database.ConnectFromEnv(logger)
-	if err != nil {
-		logger.Error("database connect failed", "error", err)
-		os.Exit(1)
-	}
-	if db == nil {
-		logger.Error("DATABASE_URL or MONGODB_URI not set; processor requires database")
-		os.Exit(1)
-	}
-	logger.Info("using SQL backend (GORM)")
-
-	if err := database.AutoMigrateSchema(db, logger); err != nil {
-		logger.Error("automigrate failed", "error", err)
+	if mongoDB == nil {
+		logger.Error("MONGODB_URI or MONGO_URI not set; processor requires MongoDB")
 		os.Exit(1)
 	}
 
-	// Create NATS consumer configuration
-	cfg := consumer.NATSConsumerConfig{
+	logger.Info("using MongoDB backend")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	defer mongoDB.Close(ctx)
+
+	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
+
+	cfg := consumer.MongoNATSConsumerConfig{
 		URL:          *natsURL,
 		StreamName:   *streamName,
 		ConsumerName: *consumerName,
@@ -115,24 +53,18 @@ func main() {
 		MaxWait:      *maxWait,
 	}
 
-	// Initialize NATS consumer
-	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, db)
+	natsConsumer, err := consumer.NewMongoNATSConsumer(cfg, logger, repo)
 	if err != nil {
-		logger.Error("failed to create NATS consumer", "error", err)
+		logger.Error("failed to create MongoDB NATS consumer", "error", err)
 		os.Exit(1)
 	}
 	defer natsConsumer.Close()
 
-	logger.Info("processor service starting (SQL)",
+	logger.Info("processor service starting",
 		"nats_url", *natsURL,
 		"stream", *streamName,
 		"consumer", *consumerName)
 
-	// Create context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Run consumer in separate goroutine
 	errChan := make(chan error, 1)
 	go func() {
 		if err := natsConsumer.Start(ctx, cfg); err != nil && err != context.Canceled {
@@ -141,7 +73,6 @@ func main() {
 		close(errChan)
 	}()
 
-	// Wait for shutdown signal
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
@@ -155,7 +86,6 @@ func main() {
 		}
 	}
 
-	// Cancel context to stop consumer
 	cancel()
 
 	// Allow up to 5s for graceful stop

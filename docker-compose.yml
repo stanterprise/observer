@@ -12,11 +12,9 @@ services:
     profiles: ["aio"]
     restart: unless-stopped
     environment:
-      DB_DRIVER: sqlite
-      DATABASE_URL: /data/db/observer.db
+      MONGODB_URI: mongodb://localhost:27017/observer
       STORAGE_DRIVER: local
       ARTIFACTS_DIR: /data/artifacts
-      APPLY_MIGRATIONS: "1"
     ports:
       - "${AIO_WEB_PORT:-3000}:80" # Web UI
       - "${AIO_GRPC_PORT:-50051}:50051" # gRPC ingestion
@@ -45,7 +43,7 @@ services:
       dockerfile: Dockerfile.ingestion
     image: observer:ingestion
     container_name: observer-ingestion
-    profiles: ["dist", "web-dev", "mongo"]
+    profiles: ["dist", "web-dev"]
     restart: unless-stopped
     environment:
       PORT: "50051"
@@ -78,12 +76,11 @@ services:
       NATS_URL: nats://nats:4222
       NATS_STREAM: tests_events
       NATS_CONSUMER: processor
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-observer}?sslmode=disable
-      APPLY_MIGRATIONS: "1"
+      MONGODB_URI: mongodb://${MONGO_USER:-root}:${MONGO_PASSWORD:-password}@mongodb:27017/${MONGO_DATABASE:-observer}?authSource=admin
     depends_on:
       nats:
         condition: service_healthy
-      db:
+      mongodb:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "pgrep", "-f", "processor"]
@@ -131,7 +128,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: "8080"
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-observer}?sslmode=disable
+      MONGODB_URI: mongodb://${MONGO_USER:-root}:${MONGO_PASSWORD:-password}@mongodb:27017/${MONGO_DATABASE:-observer}?authSource=admin
       NATS_URL: nats://nats:4222
       NATS_STREAM: tests_events
       NATS_WS_CONSUMER: websocket
@@ -139,7 +136,7 @@ services:
     ports:
       - "${API_PORT:-8080}:8080" # Expose API port for local web development
     depends_on:
-      db:
+      mongodb:
         condition: service_healthy
       nats:
         condition: service_healthy
@@ -207,31 +204,6 @@ services:
     networks:
       - observer-net
 
-  # Web UI service with MongoDB backend
-  web-mongo:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-    image: observer:web
-    container_name: observer-web-mongo
-    profiles: ["mongo"]
-    restart: unless-stopped
-    environment:
-      API_BACKEND_HOST: api-mongo
-      API_BACKEND_PORT: "8080"
-    ports:
-      - "${WEB_PORT:-3000}:80"
-    depends_on:
-      api-mongo:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - observer-net
-
   # ============================================================================
   # Shared Infrastructure Services
   # Used by distributed profile and available for development
@@ -288,7 +260,7 @@ services:
   nats:
     image: nats:2.10-alpine
     container_name: observer-nats
-    profiles: ["dist", "infra", "web-dev", "mongo"]
+    profiles: ["dist", "infra", "web-dev"]
     restart: unless-stopped
     command: ["-js", "-m", "8222"]
     ports:
@@ -305,7 +277,6 @@ services:
       - observer-net
 
 volumes:
-  postgres-data:
   mongodb-data:
   nats-data:
   aio-data:

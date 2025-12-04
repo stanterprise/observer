@@ -109,10 +109,10 @@ Get the full image name for a component
 Database connection string
 */}}
 {{- define "observer.database.url" -}}
-{{- if .Values.postgresql.enabled }}
-{{- printf "postgres://%s:%s@%s-postgresql:5432/%s?sslmode=disable" .Values.postgresql.auth.username .Values.postgresql.auth.password (include "observer.fullname" .) .Values.postgresql.auth.database }}
+{{- if .Values.mongodb.enabled }}
+{{- printf "mongodb://%s:%s@%s-mongodb:27017/%s?authSource=admin" .Values.mongodb.auth.rootUser .Values.mongodb.auth.rootPassword (include "observer.fullname" .) .Values.mongodb.auth.database }}
 {{- else }}
-{{- printf "postgres://%s:%s@%s:%d/%s?sslmode=disable" .Values.externalDatabase.username .Values.externalDatabase.password .Values.externalDatabase.host (int .Values.externalDatabase.port) .Values.externalDatabase.database }}
+{{- printf "mongodb://%s:%s@%s:%d/%s?authSource=admin" .Values.externalDatabase.username .Values.externalDatabase.password .Values.externalDatabase.host (int .Values.externalDatabase.port) .Values.externalDatabase.database }}
 {{- end }}
 {{- end }}
 
