@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiUrl } from "../lib/config";
-import { Card, CardHeader, CardTitle, CardContent } from "./Card";
+import { Card, CardContent } from "./Card";
 import { Badge } from "./Badge";
 import type {
   WebSocketEvent,
