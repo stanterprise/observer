@@ -499,3 +499,49 @@ func (r *MongoRepository) GetTestFromRun(ctx context.Context, testID string) (*m
 
 	return tests[0], nil
 }
+
+// UpdateTestStatus updates the status of a test case run
+func (r *MongoRepository) UpdateTestStatus(ctx context.Context, testID string, status string) error {
+	now := time.Now()
+
+	updateFields := bson.M{
+		"tests.$[test].updated_at": now,
+		"tests.$[test].status":     status,
+	}
+
+	// Update test in root document's tests array
+	filter := bson.M{"tests.id": testID}
+	update := bson.M{"$set": updateFields}
+	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"test.id": testID},
+		},
+	})
+
+	result, err := r.collection.UpdateMany(ctx, filter, update, arrayFilters)
+	if err != nil {
+		return fmt.Errorf("update test status: %w", err)
+	}
+
+	if result.MatchedCount > 0 {
+		r.logger.Info("test status updated", "id", testID, "status", status)
+		return nil
+	}
+
+	// Try nested suite's tests
+	nestedFields := bson.M{
+		"suites.$[].tests.$[test].updated_at": now,
+		"suites.$[].tests.$[test].status":     status,
+	}
+
+	filter = bson.M{"suites.tests.id": testID}
+	update = bson.M{"$set": nestedFields}
+
+	_, err = r.collection.UpdateMany(ctx, filter, update, arrayFilters)
+	if err != nil {
+		return fmt.Errorf("update nested test status: %w", err)
+	}
+
+	r.logger.Info("test status updated (nested)", "id", testID, "status", status)
+	return nil
+}

@@ -214,20 +214,56 @@ func (h *Handler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 
 	// Calculate statistics
 	stats := map[string]int{
-		"total":   len(tests),
-		"passed":  0,
-		"failed":  0,
-		"skipped": 0,
+		"total":       len(tests),
+		"passed":      0,
+		"failed":      0,
+		"skipped":     0,
+		"running":     0,
+		"broken":      0,
+		"timedout":    0,
+		"interrupted": 0,
+		"unknown":     0,
 	}
 
 	for _, test := range tests {
 		switch test.Status {
 		case "PASSED":
 			stats["passed"]++
+			if stats["running"] > 0 {
+			stats["running"]--
+			}
 		case "FAILED":
 			stats["failed"]++
+			if stats["running"] > 0 {
+			stats["running"]--
+			}
 		case "SKIPPED":
 			stats["skipped"]++
+		case "RUNNING":
+			stats["running"]++
+		case "BROKEN":
+			stats["broken"]++
+			if stats["running"] > 0 {
+			stats["running"]--
+			}
+		case "TIMEDOUT":
+			stats["timedout"]++
+			if stats["running"] > 0 {
+			stats["running"]--
+			}
+		case "INTERRUPTED":
+			stats["interrupted"]++
+			if stats["running"] > 0 {
+			stats["running"]--
+			}
+		case "UNKNOWN":
+			stats["unknown"]++
+		case "":
+			// Empty status - treat as running (test started but status not set)
+			stats["running"]++
+		default:
+			// Unknown status value - count as unknown
+			stats["unknown"]++
 		}
 	}
 
