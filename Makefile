@@ -171,6 +171,38 @@ db-clear: ## Clear all data from the database (drops and recreates tables)
 db-migrate: ## Run database migrations
 	@APPLY_MIGRATIONS=1 DATABASE_URL='$(DATABASE_URL)' go run ./scripts/migrate.go
 
+# MongoDB helpers
+MONGO_USER ?= root
+MONGO_PASSWORD ?= password
+MONGO_DATABASE ?= observer
+MONGO_PORT ?= 27017
+MONGODB_URI := mongodb://$(MONGO_USER):$(MONGO_PASSWORD)@localhost:$(MONGO_PORT)/$(MONGO_DATABASE)?authSource=admin
+
+mongo-up: ## Start MongoDB container
+	docker compose up -d mongodb
+
+mongo-down: ## Stop MongoDB container
+	docker compose stop mongodb
+
+mongo-logs: ## Tail MongoDB logs
+	docker compose logs -f mongodb
+
+mongo-shell: ## Open mongosh against the MongoDB container
+	docker compose exec mongodb mongosh --username $(MONGO_USER) --password $(MONGO_PASSWORD) --authenticationDatabase admin $(MONGO_DATABASE)
+
+mongo-reset: ## Reset MongoDB by recreating container and volume
+	docker compose down mongodb -v && docker compose up -d mongodb
+
+mongo-clear: ## Clear all data from MongoDB (drops database)
+	docker compose exec mongodb mongosh --username $(MONGO_USER) --password $(MONGO_PASSWORD) --authenticationDatabase admin --eval "db.getSiblingDB('$(MONGO_DATABASE)').dropDatabase()"
+
+mongo-env-print: ## Print effective MongoDB-related environment
+	@echo "MONGO_USER=$(MONGO_USER)"
+	@echo "MONGO_PASSWORD=$(MONGO_PASSWORD)"
+	@echo "MONGO_DATABASE=$(MONGO_DATABASE)"
+	@echo "MONGO_PORT=$(MONGO_PORT)"
+	@echo "MONGODB_URI=$(MONGODB_URI)"
+
 # NATS helpers
 nats-up: ## Start NATS container
 	docker compose up -d nats
@@ -184,6 +216,12 @@ nats-logs: ## Tail NATS logs
 # Integration tests
 test-nats-integration: ## Run NATS integration tests (requires NATS running)
 	NATS_TEST_URL=nats://localhost:4222 go test ./tests/... -v -run TestNATSIntegration
+
+test-mongo-integration: ## Run MongoDB integration tests (requires MongoDB running)
+	MONGODB_TEST_URI='$(MONGODB_URI)' go test ./tests/... -v -run TestMongoDB
+
+test-all-integration: ## Run all integration tests (requires NATS and MongoDB running)
+	NATS_TEST_URL=nats://localhost:4222 MONGODB_TEST_URI='$(MONGODB_URI)' go test ./tests/... -v
 
 # Web UI targets
 web-install: ## Install Web UI dependencies
@@ -258,6 +296,12 @@ docker-dev-web: ## Start all containers except for Web UI in dev mode
 	@sleep 2
 	@echo "Running database migrations..."
 	@$(MAKE) db-migrate
+
+docker-dev-mongo: ## Start all containers with MongoDB backend (except Web UI)
+	docker compose --profile mongo up -d
+	@echo "Waiting for MongoDB to be ready..."
+	@sleep 3
+	@echo "MongoDB is ready for connections"
 
 docker-up-dist: docker-build-ingestion docker-build-processor docker-build-api docker-build-web ## Start distributed profile with docker compose
 	docker compose --profile dist up -d

@@ -267,7 +267,7 @@ services:
   mongodb:
     image: mongo:7.0
     container_name: observer-mongodb
-    profiles: ["mongo"]
+    profiles: ["web-dev", "mongo"]
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-root}
