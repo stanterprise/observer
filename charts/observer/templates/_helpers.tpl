@@ -106,13 +106,17 @@ Get the full image name for a component
 {{- end }}
 
 {{/*
-Database connection string
+Database connection string (MongoDB URI)
 */}}
 {{- define "observer.database.url" -}}
 {{- if .Values.mongodb.enabled }}
-{{- printf "mongodb://%s:%s@%s-mongodb:27017/%s?authSource=admin" .Values.mongodb.auth.rootUser .Values.mongodb.auth.rootPassword (include "observer.fullname" .) .Values.mongodb.auth.database }}
+{{- $user := index .Values.mongodb.auth.usernames 0 | default "observer" }}
+{{- $password := index .Values.mongodb.auth.passwords 0 | default "password" }}
+{{- $database := index .Values.mongodb.auth.databases 0 | default "observer" }}
+{{- printf "mongodb://%s:%s@%s-mongodb:27017/%s?authSource=admin" $user $password (include "observer.fullname" .) $database }}
 {{- else }}
-{{- printf "mongodb://%s:%s@%s:%d/%s?authSource=admin" .Values.externalDatabase.username .Values.externalDatabase.password .Values.externalDatabase.host (int .Values.externalDatabase.port) .Values.externalDatabase.database }}
+{{- $authSource := .Values.externalDatabase.authSource | default "admin" }}
+{{- printf "mongodb://%s:%s@%s:%d/%s?authSource=%s" .Values.externalDatabase.username .Values.externalDatabase.password .Values.externalDatabase.host (int .Values.externalDatabase.port) .Values.externalDatabase.database $authSource }}
 {{- end }}
 {{- end }}
 

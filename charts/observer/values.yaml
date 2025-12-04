@@ -186,9 +186,15 @@ mongodb:
   enabled: true
   # Use external MongoDB by setting enabled: false and configuring externalDatabase
   auth:
+    enabled: true
     rootUser: root
     rootPassword: password
-    database: observer
+    usernames:
+      - observer
+    passwords:
+      - password
+    databases:
+      - observer
   persistence:
     enabled: true
     size: 10Gi
@@ -204,9 +210,10 @@ mongodb:
 externalDatabase:
   host: ""
   port: 27017
-  username: root
+  username: observer
   password: ""
   database: observer
+  authSource: admin
   # Use existing secret for password
   existingSecret: ""
   existingSecretPasswordKey: password

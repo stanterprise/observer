@@ -79,7 +79,7 @@ Codespaces includes:
 
 - ✅ Go 1.23 with all dev tools (gopls, golangci-lint, delve)
 - ✅ Docker and Docker Compose
-- ✅ PostgreSQL and NATS auto-started
+- ✅ MongoDB and NATS auto-started
 - ✅ VS Code with debugging and Go extensions
 - ✅ Pre-built binaries and passing tests
 
@@ -119,17 +119,17 @@ This builds:
 
 ```bash
 # Start infrastructure services
-make db-up    # Start PostgreSQL
-make nats-up  # Start NATS
+make mongodb-up    # Start MongoDB
+make nats-up       # Start NATS
 
 # Ingestion (stateless, publishes to NATS)
 NATS_URL='nats://localhost:4222' ./bin/ingestion
 
-# API (optional DB connection)
-./bin/api
+# API (requires MongoDB)
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' ./bin/api
 
-# Processor (requires DB)
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' ./bin/processor
+# Processor (requires MongoDB)
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' ./bin/processor
 ```
 
 ### Run Legacy Monolithic Server
@@ -177,14 +177,14 @@ make docker-buildx-aio      # Fast cached builds
 ### Running
 
 - `make run` – Run legacy server (depends on build)
-- `make run-dev` – Run with PostgreSQL database
+- `make run-dev` – Run with MongoDB database
 
 ### Database
 
-- `make db-up` – Start PostgreSQL container
-- `make db-down` – Stop containers and remove volumes
-- `make db-psql` – Open psql against the database
-- `make db-reset` – Reset database
+- `make mongodb-up` – Start MongoDB container
+- `make mongodb-down` – Stop containers and remove volumes
+- `make mongodb-shell` – Open mongosh against the database
+- `make mongodb-reset` – Reset database
 
 ### NATS
 
@@ -220,20 +220,18 @@ make docker-buildx-aio      # Fast cached builds
 
 ### Processor Service
 
-| Variable           | Default | Description                                                 |
-| ------------------ | ------- | ----------------------------------------------------------- |
-| `PORT`             | `50052` | gRPC listening port                                         |
-| `DATABASE_URL`     | -       | PostgreSQL connection string (for SQL backend)              |
-| `MONGODB_URI`      | -       | MongoDB connection string (for MongoDB backend, preferred)  |
-| `APPLY_MIGRATIONS` | -       | Set to `1` to enable auto-migrations (SQL backend only)     |
+| Variable       | Default | Description                                 |
+| -------------- | ------- | ------------------------------------------- |
+| `MONGODB_URI`  | -       | MongoDB connection string (required)        |
+| `NATS_URL`     | -       | NATS server URL (required)                  |
+| `NATS_STREAM`  | -       | JetStream stream name                       |
 
 ### API Service
 
 | Variable           | Default        | Description                                   |
 | ------------------ | -------------- | --------------------------------------------- |
 | `PORT`             | `8080`         | HTTP listening port                           |
-| `DATABASE_URL`     | -              | PostgreSQL connection string (optional)       |
-| `MONGODB_URI`      | -              | MongoDB connection string (optional)          |
+| `MONGODB_URI`      | -              | MongoDB connection string (required)          |
 | `NATS_URL`         | -              | NATS server URL (optional, for WebSocket)     |
 | `NATS_STREAM`      | `tests_events` | JetStream stream name for WebSocket relay     |
 | `NATS_WS_CONSUMER` | `websocket`    | Consumer name for WebSocket NATS subscription |
@@ -273,19 +271,6 @@ MongoDB provides a document-based data model that aligns well with test run hier
 - **Better suited** for hierarchical test structures (suites → tests → steps)
 
 **Docker Compose with MongoDB:**
-```bash
-docker compose --profile mongo up -d
-```
-
-### PostgreSQL/SQLite (Legacy support)
-
-The relational backend using GORM remains available for backward compatibility:
-
-- **Normalized tables** for test_case_runs, step_runs, test_suite_runs
-- **Mature tooling** for migrations and queries
-- **Suitable** for smaller deployments or existing PostgreSQL infrastructure
-
-**Docker Compose with PostgreSQL:**
 ```bash
 docker compose --profile dist up -d
 ```
