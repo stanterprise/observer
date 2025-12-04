@@ -5,7 +5,11 @@ export type TestStatus =
   | "failed"
   | "skipped"
   | "running"
-  | "pending";
+  | "pending"
+  | "unknown"
+  | "broken"
+  | "timedout"
+  | "interrupted";
 
 export interface TestCaseRun {
   id: string;
@@ -45,6 +49,10 @@ export interface TestRunStats {
   failed: number;
   skipped: number;
   running: number;
+  broken?: number;
+  timedout?: number;
+  interrupted?: number;
+  unknown?: number;
 }
 
 // WebSocket event types

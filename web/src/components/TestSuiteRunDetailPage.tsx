@@ -125,8 +125,12 @@ export function TestSuiteRunDetailPage({
       FAILED: "failed",
       SKIPPED: "skipped",
       RUNNING: "running",
+      UNKNOWN: "unknown",
+      BROKEN: "broken",
+      TIMEDOUT: "timedout",
+      INTERRUPTED: "interrupted",
     };
-    return (statusMap[status] || "pending") as TestStatus;
+    return (statusMap[status] || "unknown") as TestStatus;
   };
 
   const formatDuration = (nanoseconds?: number) => {
@@ -152,7 +156,7 @@ export function TestSuiteRunDetailPage({
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link
-            to="/runs"
+            to="/suite_runs"
             className="inline-flex items-center text-blue-600 hover:text-blue-700"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -163,6 +167,70 @@ export function TestSuiteRunDetailPage({
 
       {/* Run Summary Card */}
       <Card>
+        {/* Progress Bar */}
+        <div className="h-2 bg-gray-200 rounded-t-lg overflow-hidden flex">
+          {runDetail.statistics.passed > 0 && (
+            <div
+              className="bg-green-500 transition-all duration-300"
+              style={{
+                width: `${
+                  (runDetail.statistics.passed / runDetail.statistics.total) *
+                  100
+                }%`,
+              }}
+              title={`${runDetail.statistics.passed} passed`}
+            />
+          )}
+          {runDetail.statistics.failed > 0 && (
+            <div
+              className="bg-red-500 transition-all duration-300"
+              style={{
+                width: `${
+                  (runDetail.statistics.failed / runDetail.statistics.total) *
+                  100
+                }%`,
+              }}
+              title={`${runDetail.statistics.failed} failed`}
+            />
+          )}
+          {runDetail.statistics.skipped > 0 && (
+            <div
+              className="bg-gray-400 transition-all duration-300"
+              style={{
+                width: `${
+                  (runDetail.statistics.skipped / runDetail.statistics.total) *
+                  100
+                }%`,
+              }}
+              title={`${runDetail.statistics.skipped} skipped`}
+            />
+          )}
+          {runDetail.statistics.total > 0 &&
+            runDetail.statistics.passed +
+              runDetail.statistics.failed +
+              runDetail.statistics.skipped <
+              runDetail.statistics.total && (
+              <div
+                className="bg-blue-300 transition-all duration-300 animate-pulse"
+                style={{
+                  width: `${
+                    ((runDetail.statistics.total -
+                      runDetail.statistics.passed -
+                      runDetail.statistics.failed -
+                      runDetail.statistics.skipped) /
+                      runDetail.statistics.total) *
+                    100
+                  }%`,
+                }}
+                title={`${
+                  runDetail.statistics.total -
+                  runDetail.statistics.passed -
+                  runDetail.statistics.failed -
+                  runDetail.statistics.skipped
+                } running/pending`}
+              />
+            )}
+        </div>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -231,9 +299,10 @@ export function TestSuiteRunDetailPage({
                           <Clock className="h-4 w-4 mr-1" />
                           Duration: {formatDuration(test.Duration)}
                         </div>
-                        {test.RetryCount !== undefined && test.RetryCount > 0 && (
-                          <div>Retries: {test.RetryCount}</div>
-                        )}
+                        {test.RetryCount !== undefined &&
+                          test.RetryCount > 0 && (
+                            <div>Retries: {test.RetryCount}</div>
+                          )}
                         <div>
                           Started: {new Date(test.CreatedAt).toLocaleString()}
                         </div>
