@@ -138,8 +138,12 @@ export function TestCaseRunDetailPage({
       FAILED: "failed",
       SKIPPED: "skipped",
       RUNNING: "running",
+      UNKNOWN: "unknown",
+      BROKEN: "broken",
+      TIMEDOUT: "timedout",
+      INTERRUPTED: "interrupted",
     };
-    return (statusMap[status] || "pending") as TestStatus;
+    return (statusMap[status] || "unknown") as TestStatus;
   };
 
   const formatDuration = (nanoseconds?: number) => {

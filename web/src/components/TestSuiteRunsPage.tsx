@@ -28,6 +28,11 @@ interface TestRunStats {
   passed: number;
   failed: number;
   skipped: number;
+  running?: number;
+  broken?: number;
+  timedout?: number;
+  interrupted?: number;
+  unknown?: number;
   lastUpdated?: string;
 }
 
@@ -64,6 +69,11 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
           passed: statsData.statistics.passed || 0,
           failed: statsData.statistics.failed || 0,
           skipped: statsData.statistics.skipped || 0,
+          running: statsData.statistics.running || 0,
+          broken: statsData.statistics.broken || 0,
+          timedout: statsData.statistics.timedout || 0,
+          interrupted: statsData.statistics.interrupted || 0,
+          unknown: statsData.statistics.unknown || 0,
           lastUpdated:
             statsData.tests && statsData.tests.length > 0
               ? new Date(
@@ -122,6 +132,11 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
                 passed: statsData.statistics.passed || 0,
                 failed: statsData.statistics.failed || 0,
                 skipped: statsData.statistics.skipped || 0,
+                running: statsData.statistics.running || 0,
+                broken: statsData.statistics.broken || 0,
+                timedout: statsData.statistics.timedout || 0,
+                interrupted: statsData.statistics.interrupted || 0,
+                unknown: statsData.statistics.unknown || 0,
                 lastUpdated: new Date().toISOString(),
               };
 
@@ -156,9 +171,23 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
   }
 
   const getRunStatus = (run: TestRunStats): TestStatus => {
+    // Prioritize error states
     if (run.failed > 0) return "failed";
+    if (run.broken && run.broken > 0) return "broken";
+    if (run.timedout && run.timedout > 0) return "timedout";
+    if (run.interrupted && run.interrupted > 0) return "interrupted";
+
+    // Then check for success or skip (all tests completed)
     if (run.passed === run.total && run.total > 0) return "passed";
     if (run.skipped === run.total && run.total > 0) return "skipped";
+
+    // Check for active running tests (tests in progress)
+    if (run.running && run.running > 0) return "running";
+
+    // Check for unknown status (actual UNKNOWN status from backend)
+    if (run.unknown && run.unknown > 0) return "unknown";
+
+    // If no tests or all tests are in a mixed state, default to running
     return "running";
   };
 
