@@ -37,7 +37,8 @@ interface RunStatistics {
 
 interface RunDetail {
   runId: string;
-  tests: TestCase[];
+  Tests: TestCase[];
+  Suites: RunDetail[];
   statistics: RunStatistics;
   totalSteps: number;
 }
@@ -49,6 +50,15 @@ export function TestSuiteRunDetailPage({
   const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const countTests = (suite: RunDetail): number => {
+    let total = suite.Tests?.length || 0;
+    for (const childSuite of suite.Suites ?? []) {
+      total += countTests(childSuite);
+    }
+
+    return total;
+  };
 
   useEffect(() => {
     if (runId) {
@@ -64,6 +74,7 @@ export function TestSuiteRunDetailPage({
         throw new Error(`Failed to fetch run details: ${response.statusText}`);
       }
       const data = await response.json();
+      console.log("Fetched run details:", data);
       setRunDetail(data);
       setError(null);
     } catch (err) {
@@ -279,10 +290,10 @@ export function TestSuiteRunDetailPage({
       {/* Test Cases List */}
       <div>
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Test Cases ({runDetail.tests.length})
+          Test Cases ({countTests(runDetail)})
         </h2>
         <div className="space-y-3">
-          {runDetail.tests.map((test) => (
+          {runDetail.Tests?.map((test) => (
             <Link key={test.ID} to={`/tests/${test.ID}`}>
               <Card className="hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="py-4">

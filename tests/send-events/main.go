@@ -6,12 +6,12 @@ import (
 	"log"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"github.com/stanterprise/proto-go/testsystem/v1/common"
 	"github.com/stanterprise/proto-go/testsystem/v1/entities"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	observer "github.com/stanterprise/proto-go/testsystem/v1/observer"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -28,7 +28,7 @@ func main() {
 	// Send test begin event
 	testID := fmt.Sprintf("test-%d", time.Now().Unix())
 	fmt.Printf("Sending test begin event for test ID: %s\n", testID)
-	
+
 	_, err = client.ReportTestBegin(ctx, &events.TestBeginEventRequest{
 		TestCase: &entities.TestCaseRun{
 			Id:    testID,
