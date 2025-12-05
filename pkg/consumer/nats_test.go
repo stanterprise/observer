@@ -112,7 +112,7 @@ func TestNATSConsumer_Integration(t *testing.T) {
 			TestCase: &entities.TestCaseRun{
 				Id:       "test-consumer-1",
 				RunId:    "run-consumer-1",
-				Title:    "Consumer Test",
+				Name:    "Consumer Test",
 				Metadata: map[string]string{"env": "test"},
 			},
 		})

@@ -77,7 +77,7 @@ func (s *EventServer) ReportTestBegin(ctx context.Context, in *events.TestBeginE
 	if err := validateTestID(in.TestCase.Id); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	s.logger.Info("test start", "run_id", in.TestCase.RunId, "title", in.TestCase.Title, "metadata_count", len(in.TestCase.Metadata))
+	s.logger.Info("test start", "run_id", in.TestCase.RunId, "title", in.TestCase.Name, "metadata_count", len(in.TestCase.Metadata))
 
 	// Publish to NATS if publisher is configured (Phase 1: dual-write)
 	if s.publisher != nil {
@@ -96,7 +96,7 @@ func (s *EventServer) ReportTestBegin(ctx context.Context, in *events.TestBeginE
 		}
 		tc := &m.TestCaseRun{
 			RunID:      in.TestCase.RunId,
-			Title:      in.TestCase.Title,
+			Title:      in.TestCase.Name,
 			Metadata:   md,
 			ID:         in.TestCase.Id,
 			RetryCount: ptrInt32(in.TestCase.RetryCount),
@@ -259,7 +259,7 @@ func (s *EventServer) ReportSuiteBegin(ctx context.Context, in *events.SuiteBegi
 	if err := validateTestID(in.Suite.Id); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	s.logger.Info("suite start", "id", in.Suite.Id, "name", in.Suite.Name, "project", in.Suite.ProjectName)
+	s.logger.Info("suite start", "id", in.Suite.Id, "name", in.Suite.Name, "project", in.Suite.Project)
 
 	// Publish to NATS if publisher is configured
 	if s.publisher != nil {
@@ -288,9 +288,9 @@ func (s *EventServer) ReportSuiteBegin(ctx context.Context, in *events.SuiteBegi
 			Name:            in.Suite.Name,
 			Description:     in.Suite.Description,
 			Metadata:        md,
-			TestSuiteSpecID: in.Suite.TestSuiteSpecId,
+			TestSuiteSpecID: "",
 			InitiatedBy:     in.Suite.InitiatedBy,
-			ProjectName:     in.Suite.ProjectName,
+			ProjectName:     in.Suite.Project,
 			StartTime:       startTime,
 		}
 

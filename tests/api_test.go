@@ -32,7 +32,7 @@ func setupTestServerWithDB(t *testing.T) (*grpc.ClientConn, *gorm.DB, func()) {
 	// Create in-memory SQLite database with unique name to avoid conflicts
 	dbName := fmt.Sprintf("file:test_%d_%d?mode=memory&cache=shared",
 		time.Now().UnixNano(), os.Getpid())
-	
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	db, err := database.Connect(dbName, logger)
 	if err != nil {
@@ -96,7 +96,7 @@ func TestFullTestLifecycle(t *testing.T) {
 			TestCase: &entities.TestCaseRun{
 				Id:       testID,
 				RunId:    runID,
-				Title:    "Full Lifecycle Test",
+				Name:    "Full Lifecycle Test",
 				Metadata: map[string]string{
 					"browser":     "chromium",
 					"environment": "test",
@@ -249,7 +249,7 @@ func TestErrorHandling(t *testing.T) {
 				TestCase: &entities.TestCaseRun{
 					Id:    "",
 					RunId: "run-1",
-					Title: "Test",
+					Name: "Test",
 				},
 			},
 			callFunc: func(ctx context.Context, req interface{}) error {
@@ -332,7 +332,7 @@ func TestConcurrentRequests(t *testing.T) {
 				TestCase: &entities.TestCaseRun{
 					Id:    testID,
 					RunId: runID,
-					Title: "Concurrent Test " + string(rune('A'+testNum)),
+					Name: "Concurrent Test " + string(rune('A'+testNum)),
 				},
 			}
 
@@ -391,7 +391,7 @@ func TestIdempotency(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:    testID,
 			RunId: runID,
-			Title: "Idempotency Test",
+			Name: "Idempotency Test",
 		},
 	}
 
@@ -432,7 +432,7 @@ func TestFailedTestScenario(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:    testID,
 			RunId: runID,
-			Title: "Failed Test Scenario",
+			Name: "Failed Test Scenario",
 		},
 	}
 
@@ -528,7 +528,7 @@ func TestMetadataPersistence(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:       testID,
 			RunId:    runID,
-			Title:    "Metadata Test",
+			Name:    "Metadata Test",
 			Metadata: metadata,
 		},
 	}
@@ -575,7 +575,7 @@ func TestMultipleStepsInTest(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:    testID,
 			RunId: runID,
-			Title: "Multi-Step Test",
+			Name: "Multi-Step Test",
 		},
 	}
 
@@ -585,7 +585,7 @@ func TestMultipleStepsInTest(t *testing.T) {
 
 	// Execute a single step (multiple steps would fail with current implementation)
 	stepID := time.Now().Format("20060102150405.000000") + "-step-A"
-	
+
 	// Begin step
 	stepBeginReq := &events.StepBeginEventRequest{
 		Step: &entities.StepRun{
@@ -652,7 +652,7 @@ func TestSkippedTestScenario(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:    testID,
 			RunId: runID,
-			Title: "Skipped Test",
+			Name: "Skipped Test",
 		},
 	}
 

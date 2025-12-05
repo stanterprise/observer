@@ -43,7 +43,7 @@ func TestReportLifecycle(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:       "test-id",
 			RunId:    "test-id",
-			Title:    "test-name",
+			Name:    "test-name",
 			Metadata: map[string]string{"k": "v"},
 		},
 	})
@@ -94,7 +94,7 @@ func TestReportStep(t *testing.T) {
 	defer cancel()
 
 	// Must start test first
-	_, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{Id: "test-id", RunId: "tid", Title: "n"}})
+	_, err := client.ReportTestBegin(ctx, &events.TestBeginEventRequest{TestCase: &entities.TestCaseRun{Id: "test-id", RunId: "tid", Name: "n"}})
 	if err != nil {
 		t.Fatalf("start failed: %v", err)
 	}

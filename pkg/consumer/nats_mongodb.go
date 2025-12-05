@@ -233,7 +233,7 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 	c.logger.Info("suite start",
 		"id", req.Suite.Id,
 		"name", req.Suite.Name,
-		"project", req.Suite.ProjectName)
+		"project", req.Suite.Project)
 
 	// Convert metadata
 	md := make(map[string]interface{})
@@ -252,9 +252,9 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 		Name:            req.Suite.Name,
 		Description:     req.Suite.Description,
 		Metadata:        md,
-		TestSuiteSpecID: req.Suite.TestSuiteSpecId,
+		TestSuiteSpecID: "",
 		InitiatedBy:     req.Suite.InitiatedBy,
-		ProjectName:     req.Suite.ProjectName,
+		ProjectName:     req.Suite.Project,
 		StartTime:       startTime,
 	}
 
@@ -312,7 +312,7 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 	c.logger.Info("test start",
 		"id", req.TestCase.Id,
 		"run_id", req.TestCase.RunId,
-		"title", req.TestCase.Title)
+		"title", req.TestCase.Name)
 
 	// Convert metadata
 	md := make(map[string]interface{})
@@ -323,7 +323,7 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 	test := &m.TestDocument{
 		ID:         req.TestCase.Id,
 		RunID:      req.TestCase.RunId,
-		Title:      req.TestCase.Title,
+		Title:      req.TestCase.Name,
 		Metadata:   md,
 		RetryCount: ptrInt32(req.TestCase.RetryCount),
 		RetryIndex: ptrInt32(req.TestCase.RetryIndex),

@@ -93,7 +93,7 @@ func TestReportTestBegin(t *testing.T) {
 				TestCase: &entities.TestCaseRun{
 					Id:       "test-1",
 					RunId:    "run-1",
-					Title:    "Test Case 1",
+					Name:    "Test Case 1",
 					Metadata: map[string]string{"key": "value"},
 				},
 			},
@@ -120,7 +120,7 @@ func TestReportTestBegin(t *testing.T) {
 				TestCase: &entities.TestCaseRun{
 					Id:    "",
 					RunId: "run-1",
-					Title: "Test Case",
+					Name: "Test Case",
 				},
 			},
 			wantCode: codes.InvalidArgument,
@@ -177,7 +177,7 @@ func TestReportTestBegin_DBPersistence(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:       "test-persist",
 			RunId:    "run-persist",
-			Title:    "Persistence Test",
+			Name:    "Persistence Test",
 			Metadata: map[string]string{"env": "test"},
 		},
 	}
@@ -565,7 +565,7 @@ func TestReportTestBegin_NoDB(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:    "test-no-db",
 			RunId: "run-no-db",
-			Title: "Test Without DB",
+			Name: "Test Without DB",
 		},
 	}
 
@@ -669,7 +669,7 @@ func TestReportTestBegin_DBError(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:    "test-db-error",
 			RunId: "run-db-error",
-			Title: "Test DB Error",
+			Name: "Test DB Error",
 		},
 	}
 
@@ -799,7 +799,7 @@ func TestReportTestBegin_Upsert(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:       "test-upsert",
 			RunId:    "run-1",
-			Title:    "Original Title",
+			Name:    "Original Title",
 			Metadata: map[string]string{"version": "1"},
 		},
 	}
@@ -813,7 +813,7 @@ func TestReportTestBegin_Upsert(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:       "test-upsert",
 			RunId:    "run-1",
-			Title:    "Updated Title",
+			Name:    "Updated Title",
 			Metadata: map[string]string{"version": "2"},
 		},
 	}

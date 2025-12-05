@@ -113,7 +113,7 @@ func TestNATSIntegration(t *testing.T) {
 			TestCase: &entities.TestCaseRun{
 				Id:       "test-nats-1",
 				RunId:    "run-nats-1",
-				Title:    "NATS Integration Test",
+				Name:    "NATS Integration Test",
 				Metadata: map[string]string{"env": "test"},
 			},
 		}

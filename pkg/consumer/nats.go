@@ -246,7 +246,7 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 
 	c.logger.Info("test start",
 		"run_id", req.TestCase.RunId,
-		"title", req.TestCase.Title,
+		"title", req.TestCase.Name,
 		"metadata_count", len(req.TestCase.Metadata))
 
 	// Convert metadata map[string]string to datatypes.JSONMap (map[string]any)
@@ -257,7 +257,7 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 
 	tc := &m.TestCaseRun{
 		RunID:      req.TestCase.RunId,
-		Title:      req.TestCase.Title,
+		Title:      req.TestCase.Name,
 		Metadata:   md,
 		ID:         req.TestCase.Id,
 		RetryCount: ptrInt32(req.TestCase.RetryCount),
@@ -495,7 +495,7 @@ func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessag
 	c.logger.Info("suite start",
 		"id", req.Suite.Id,
 		"name", req.Suite.Name,
-		"project", req.Suite.ProjectName)
+		"project", req.Suite.Project)
 
 	// Convert metadata map[string]string to datatypes.JSONMap (map[string]any)
 	md := map[string]any{}
@@ -514,9 +514,9 @@ func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessag
 		Name:            req.Suite.Name,
 		Description:     req.Suite.Description,
 		Metadata:        md,
-		TestSuiteSpecID: req.Suite.TestSuiteSpecId,
+		TestSuiteSpecID: "",
 		InitiatedBy:     req.Suite.InitiatedBy,
-		ProjectName:     req.Suite.ProjectName,
+		ProjectName:     req.Suite.Project,
 		StartTime:       startTime,
 	}
 

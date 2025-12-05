@@ -137,7 +137,7 @@ func TestEndToEndIntegration(t *testing.T) {
 			TestCase: &entities.TestCaseRun{
 				Id:    testID,
 				RunId: runID,
-				Title: "E2E Integration Test",
+				Name: "E2E Integration Test",
 				Metadata: map[string]string{
 					"environment": "test",
 					"framework":   "playwright",
@@ -347,7 +347,7 @@ func TestNATSEventFormat(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:    "format-test-1",
 			RunId: "format-run-1",
-			Title: "Format Validation Test",
+			Name: "Format Validation Test",
 		},
 	}
 

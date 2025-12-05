@@ -33,7 +33,7 @@ func main() {
 		TestCase: &entities.TestCaseRun{
 			Id:    testID,
 			RunId: "run-123",
-			Title: "Demo Test for WebSocket",
+			Name: "Demo Test for WebSocket",
 			Metadata: map[string]string{
 				"browser": "chrome",
 				"env":     "staging",
