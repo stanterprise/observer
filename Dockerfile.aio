@@ -94,14 +94,30 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     update-ca-certificates
 
 # Install MongoDB (architecture-specific)
+# For ARM64, download binaries directly from MongoDB (no APT packages available)
+# For AMD64, use official MongoDB APT repository
 RUN MONGO_ARCH=$(dpkg --print-architecture) && \
     echo "Installing MongoDB for architecture: ${MONGO_ARCH}" && \
-    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg && \
-    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list && \
-    apt-get update && \
-    apt-get install -y mongodb-org-server=7.0.15 mongodb-org-shell=7.0.15 mongodb-org-tools=7.0.15 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    if [ "${MONGO_ARCH}" = "arm64" ]; then \
+        # For ARM64, download and install binaries directly
+        echo "Downloading MongoDB binaries for ARM64..." && \
+        wget -q https://fastdl.mongodb.org/linux/mongodb-linux-aarch64-debian12-7.0.15.tgz && \
+        tar -xzf mongodb-linux-aarch64-debian12-7.0.15.tgz && \
+        cp mongodb-linux-aarch64-debian12-7.0.15/bin/mongod /usr/local/bin/ && \
+        cp mongodb-linux-aarch64-debian12-7.0.15/bin/mongosh /usr/local/bin/ || cp mongodb-linux-aarch64-debian12-7.0.15/bin/mongo /usr/local/bin/ || true && \
+        chmod +x /usr/local/bin/mongod /usr/local/bin/mongosh 2>/dev/null || chmod +x /usr/local/bin/mongod /usr/local/bin/mongo 2>/dev/null || true && \
+        rm -rf mongodb-linux-aarch64-debian12-7.0.15* && \
+        mkdir -p /var/lib/mongodb /var/log/mongodb && \
+        chmod 755 /var/lib/mongodb /var/log/mongodb; \
+    else \
+        # For AMD64, use official MongoDB repository
+        curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg && \
+        echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list && \
+        apt-get update && \
+        apt-get install -y mongodb-org-server=7.0.15 mongodb-org-shell=7.0.15 mongodb-org-tools=7.0.15 && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # Install NATS server and s6-overlay in parallel (architecture-specific downloads)
 RUN NATS_ARCH=$(dpkg --print-architecture | sed 's/amd64/amd64/; s/arm64/arm64/') && \
