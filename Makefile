@@ -55,7 +55,7 @@ build-processor: $(PROCESSOR_BIN) ## Build processor service
 
 build-api: $(API_BIN) ## Build api service
 
-build-all: $(APP_BIN) $(INGESTION_BIN) $(PROCESSOR_BIN) $(API_BIN) ## Build all components
+build-all: $(INGESTION_BIN) $(PROCESSOR_BIN) $(API_BIN) ## Build all components
 
 run: build ## Run the server using the built binary
 	./$(APP_BIN)
@@ -232,14 +232,14 @@ web-clean: ## Clean Web UI build artifacts
 IMAGE_NAME ?= observer
 IMAGE_TAG ?= latest
 
-docker-build-all: build-all ## Build all Docker images
+docker-build-all: ## Build all Docker images
 	docker build -f Dockerfile.aio -t $(IMAGE_NAME):aio .
 	docker build -f Dockerfile.ingestion -t $(IMAGE_NAME):ingestion .
 	docker build -f Dockerfile.processor -t $(IMAGE_NAME):processor .
 	docker build -f Dockerfile.api -t $(IMAGE_NAME):api .
 	docker build -f Dockerfile.web -t $(IMAGE_NAME):web .
 
-docker-build-aio: build-all ## Build AIO Docker image
+docker-build-aio: ## Build AIO Docker image
 	docker build -f Dockerfile.aio -t $(IMAGE_NAME):aio .
 
 docker-buildx-aio: ## Build multi-platform AIO Docker image with BuildKit (optimized)
@@ -262,13 +262,13 @@ docker-buildx-clean: ## Clean buildx cache
 	rm -rf /tmp/.buildx-cache
 	docker buildx prune -af
 
-docker-build-ingestion: build-all ## Build ingestion Docker image
+docker-build-ingestion: ## Build ingestion Docker image
 	docker build -f Dockerfile.ingestion -t $(IMAGE_NAME):ingestion .
 
-docker-build-processor: build-all ## Build processor Docker image
+docker-build-processor: ## Build processor Docker image
 	docker build -f Dockerfile.processor -t $(IMAGE_NAME):processor .
 
-docker-build-api: build-all ## Build API Docker image
+docker-build-api: ## Build API Docker image
 	docker build -f Dockerfile.api -t $(IMAGE_NAME):api .
 
 docker-build-web: ## Build Web UI Docker image

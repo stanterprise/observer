@@ -59,17 +59,19 @@ func NewMongoRepository(collection *mongo.Collection, logger *slog.Logger) *Mong
 }
 
 // UpsertSuiteBegin handles suite begin events with true upsert semantics:
-// - If root suite (no parent): Creates a new TestRunDocument or updates it if already exists
+// - If root suite (no parent): Creates a new TestRunDocument AND adds the suite to its own suites array
 // - If nested suite: Finds the suite by ID within parent and updates if exists, inserts if not
 // This implements the requirement that when a suite is reported, the handler should
 // find the entity in the root suite document and upsert it.
+// For root suites, we create both the root document AND add the suite to the suites array
+// so that tests can consistently find their parent suite in the suites array.
 func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDocument, parentSuiteID string) error {
 	now := time.Now()
 	suite.CreatedAt = now
 	suite.UpdatedAt = now
 
 	if parentSuiteID == "" {
-		// Root suite - create new document
+		// Root suite - create new document AND add suite to suites array
 		doc := &m.TestRunDocument{
 			ID:              suite.ID,
 			Name:            suite.Name,
@@ -82,7 +84,7 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 			StartTime:       suite.StartTime,
 			CreatedAt:       now,
 			UpdatedAt:       now,
-			Suites:          []*m.SuiteDocument{},
+			Suites:          []*m.SuiteDocument{suite}, // Add the root suite to its own suites array
 			Tests:           []*m.TestDocument{},
 		}
 
@@ -93,7 +95,6 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 			"$setOnInsert": bson.M{
 				"_id":        suite.ID,
 				"created_at": now,
-				"suites":     []*m.SuiteDocument{},
 				"tests":      []*m.TestDocument{},
 			},
 			"$set": bson.M{
@@ -109,9 +110,62 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 			},
 		}
 
-		_, err := r.collection.UpdateOne(ctx, filter, update, opts)
+		result, err := r.collection.UpdateOne(ctx, filter, update, opts)
 		if err != nil {
 			return fmt.Errorf("upsert root suite: %w", err)
+		}
+
+		// If this was an insert (not an update), also ensure the suite is in the suites array
+		if result.UpsertedCount > 0 {
+			// Document was created, now add the root suite to the suites array
+			filter = bson.M{"_id": suite.ID}
+			update = bson.M{
+				"$set": bson.M{
+					"suites": []*m.SuiteDocument{suite},
+				},
+			}
+			_, err = r.collection.UpdateOne(ctx, filter, update)
+			if err != nil {
+				return fmt.Errorf("add root suite to suites array: %w", err)
+			}
+		} else {
+			// Document existed, update the root suite in the suites array
+			// First try to update existing suite entry
+			filter = bson.M{
+				"_id":        suite.ID,
+				"suites.id": suite.ID,
+			}
+			update = bson.M{
+				"$set": bson.M{
+					"suites.$.name":               suite.Name,
+					"suites.$.description":        suite.Description,
+					"suites.$.status":             suite.Status,
+					"suites.$.metadata":           suite.Metadata,
+					"suites.$.test_suite_spec_id": suite.TestSuiteSpecID,
+					"suites.$.initiated_by":       suite.InitiatedBy,
+					"suites.$.project_name":       suite.ProjectName,
+					"suites.$.start_time":         suite.StartTime,
+					"suites.$.updated_at":         now,
+				},
+			}
+			result, err = r.collection.UpdateOne(ctx, filter, update)
+			if err != nil {
+				return fmt.Errorf("update root suite in suites array: %w", err)
+			}
+
+			if result.MatchedCount == 0 {
+				// Suite entry doesn't exist in suites array, add it
+				filter = bson.M{"_id": suite.ID}
+				update = bson.M{
+					"$push": bson.M{
+						"suites": suite,
+					},
+				}
+				_, err = r.collection.UpdateOne(ctx, filter, update)
+				if err != nil {
+					return fmt.Errorf("append root suite to suites array: %w", err)
+				}
+			}
 		}
 
 		r.logger.Info("suite begin (root)", "id", suite.ID, "name", suite.Name)
@@ -293,6 +347,7 @@ func (r *MongoRepository) UpsertSuiteEnd(ctx context.Context, suiteID string, st
 
 // UpsertTestBegin handles test begin events by upserting to the parent suite
 // (update if exists, insert if not)
+// Tests should always be added to suite's tests array, never to root document's tests array
 func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocument, suiteID string) error {
 	now := time.Now()
 	test.CreatedAt = now
@@ -302,53 +357,82 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 		test.Steps = []*m.StepDocument{}
 	}
 
-	// First, try to update existing test if it already exists in root document's tests array
+	// First, try to find and update the test in a nested suite (level 1 - direct child of root)
 	filter := bson.M{
-		"_id":      suiteID,
-		"tests.id": test.ID,
+		"suites.id":        suiteID,
+		"suites.tests.id": test.ID,
 	}
 	update := bson.M{
 		"$set": bson.M{
-			"tests.$.title":       test.Title,
-			"tests.$.status":      test.Status,
-			"tests.$.metadata":    test.Metadata,
-			"tests.$.duration":    test.Duration,
-			"tests.$.retry_count": test.RetryCount,
-			"tests.$.retry_index": test.RetryIndex,
-			"tests.$.timeout":     test.Timeout,
-			"tests.$.updated_at":  now,
+			"suites.$[suite].tests.$[test].title":       test.Title,
+			"suites.$[suite].tests.$[test].status":      test.Status,
+			"suites.$[suite].tests.$[test].metadata":    test.Metadata,
+			"suites.$[suite].tests.$[test].duration":    test.Duration,
+			"suites.$[suite].tests.$[test].retry_count": test.RetryCount,
+			"suites.$[suite].tests.$[test].retry_index": test.RetryIndex,
+			"suites.$[suite].tests.$[test].timeout":     test.Timeout,
+			"suites.$[suite].tests.$[test].updated_at":  now,
+			"updated_at": now,
 		},
 	}
+	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"suite.id": suiteID},
+			bson.M{"test.id": test.ID},
+		},
+	})
 
-	result, err := r.collection.UpdateOne(ctx, filter, update)
+	result, err := r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 	if err != nil {
-		return fmt.Errorf("update existing test in suite: %w", err)
+		return fmt.Errorf("update test in nested suite: %w", err)
 	}
 
 	if result.MatchedCount > 0 {
-		// Test was found and updated
-		r.logger.Info("test begin (updated)", "id", test.ID, "title", test.Title, "suite", suiteID)
+		// Test was found and updated in nested suite
+		r.logger.Info("test begin (nested, updated)", "id", test.ID, "title", test.Title, "suite", suiteID)
 		return nil
 	}
 
-	// Test doesn't exist, append it to root document
-	filter = bson.M{"_id": suiteID}
+	// Test doesn't exist in nested suite, try to append it
+	filter = bson.M{"suites.id": suiteID}
 	update = bson.M{
 		"$push": bson.M{
-			"tests": test,
+			"suites.$[suite].tests": test,
 		},
 		"$set": bson.M{
 			"updated_at": now,
 		},
 	}
+	arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"suite.id": suiteID},
+		},
+	})
 
-	result, err = r.collection.UpdateOne(ctx, filter, update)
+	result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 	if err != nil {
-		return fmt.Errorf("append test to suite: %w", err)
+		return fmt.Errorf("append test to nested suite: %w", err)
 	}
 
-	if result.MatchedCount == 0 {
-		// Suite not found at root level, try nested suite
+	if result.MatchedCount > 0 {
+		// Test was appended to nested suite
+		r.logger.Info("test begin (nested, inserted)", "id", test.ID, "title", test.Title, "suite", suiteID)
+		return nil
+	}
+
+	// Suite not found in level 1, this means the suiteID might be the root document ID
+	// In this case, we should NOT add to root document's tests array
+	// Instead, log a warning - tests should always belong to a suite
+	r.logger.Warn("test has no parent suite, suite may not have been created yet",
+		"test_id", test.ID,
+		"suite_id", suiteID,
+		"run_id", test.RunID)
+
+	// As a fallback, check if the root document exists with this ID
+	// If it does, we should NOT add tests to root level - they need a suite
+	var doc m.TestRunDocument
+	err = r.collection.FindOne(ctx, bson.M{"_id": suiteID}).Decode(&doc)
+	if err == nil {
 		// First check if test already exists in nested suite
 		filter = bson.M{
 			"suites.id":        suiteID,
@@ -410,41 +494,13 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 			return nil
 		}
 
-		// Suite not found anywhere - need to determine root suite ID and store test there
-		// Extract root suite ID from the suite ID (before first "-suite-" occurrence after initial ID)
-		rootSuiteID := extractRootSuiteID(suiteID)
-
-		r.logger.Warn("suite not found, storing test at root level",
-			"test_id", test.ID,
-			"requested_suite", suiteID,
-			"root_suite", rootSuiteID)
-
-		// Try to add test to root suite instead
-		filter = bson.M{"_id": rootSuiteID}
-		update = bson.M{
-			"$push": bson.M{
-				"tests": test,
-			},
-			"$set": bson.M{
-				"updated_at": now,
-			},
-		}
-
-		result, err = r.collection.UpdateOne(ctx, filter, update)
-		if err != nil {
-			return fmt.Errorf("append test to root suite (fallback): %w", err)
-		}
-
-		if result.MatchedCount == 0 {
-			return fmt.Errorf("root suite not found (id: %s) for fallback storage of test %s", rootSuiteID, test.ID)
-		}
-
-		r.logger.Info("test begin (root fallback)", "id", test.ID, "title", test.Title, "root_suite", rootSuiteID)
-		return nil
+		// Suite not found anywhere - this is an error
+		// Root document exists but test should belong to a suite, not directly to root
+		return fmt.Errorf("test %s belongs to run/root %s but no suite structure exists - suite.begin event may be missing", test.ID, suiteID)
 	}
 
-	r.logger.Info("test begin (inserted)", "id", test.ID, "title", test.Title, "suite", suiteID)
-	return nil
+	// Root document doesn't exist either - this is a more severe error
+	return fmt.Errorf("suite and run not found: %s (test: %s)", suiteID, test.ID)
 }
 
 // UpsertTestEnd handles test end events by finding the test within the root document
