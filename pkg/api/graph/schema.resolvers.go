@@ -6,102 +6,62 @@ package graph
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/pkg/api/graph/model"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 // TestCase is the resolver for the testCase field.
 func (r *queryResolver) TestCase(ctx context.Context, id string) (*models.TestCaseRun, error) {
-	var testCase models.TestCaseRun
-	if err := r.db.Where("id = ?", id).First(&testCase).Error; err != nil {
-		r.logger.Error("failed to fetch test case", "id", id, "error", err)
-		return nil, err
-	}
-	return &testCase, nil
+	// Stub implementation - GraphQL is not currently used
+	r.logger.Warn("GraphQL testCase resolver called but not fully implemented", "id", id)
+	return nil, fmt.Errorf("GraphQL API not implemented - use REST API at /api/tests/%s", id)
 }
 
 // TestCases is the resolver for the testCases field.
 func (r *queryResolver) TestCases(ctx context.Context, filter *model.TestCaseFilter, limit *int, offset *int) (*model.TestCaseRunConnection, error) {
-	query := r.db.Model(&models.TestCaseRun{})
-
-	// Apply filters
-	if filter != nil {
-		if filter.RunID != nil {
-			query = query.Where("run_id = ?", *filter.RunID)
-		}
-		if filter.Status != nil {
-			query = query.Where("status = ?", *filter.Status)
-		}
-		if filter.TitleContains != nil {
-			query = query.Where("LOWER(title) LIKE LOWER(?)", "%"+*filter.TitleContains+"%")
-		}
-	}
-
-	// Get total count
-	var totalCount int64
-	if err := query.Count(&totalCount).Error; err != nil {
-		r.logger.Error("failed to count test cases", "error", err)
-		return nil, err
-	}
-
-	// Apply pagination
-	if limit != nil && *limit > 0 {
-		query = query.Limit(*limit)
-	}
-	if offset != nil && *offset > 0 {
-		query = query.Offset(*offset)
-	}
-
-	// Fetch test cases
-	var testCases []*models.TestCaseRun
-	if err := query.Order("created_at DESC").Find(&testCases).Error; err != nil {
-		r.logger.Error("failed to fetch test cases", "error", err)
-		return nil, err
-	}
-
-	// Calculate hasNextPage
-	hasNextPage := false
-	if limit != nil && offset != nil {
-		hasNextPage = int64(*offset+*limit) < totalCount
-	}
-
+	// Stub implementation - GraphQL is not currently used
+	r.logger.Warn("GraphQL testCases resolver called but not fully implemented")
 	return &model.TestCaseRunConnection{
-		Nodes: testCases,
+		Nodes: []*models.TestCaseRun{},
 		PageInfo: &model.PageInfo{
-			HasNextPage: hasNextPage,
-			TotalCount:  int(totalCount),
+			HasNextPage: false,
+			TotalCount:  0,
 		},
 	}, nil
 }
 
 // Step is the resolver for the step field.
 func (r *queryResolver) Step(ctx context.Context, id string) (*models.StepRun, error) {
-	var step models.StepRun
-	if err := r.db.Where("id = ?", id).First(&step).Error; err != nil {
-		r.logger.Error("failed to fetch step", "id", id, "error", err)
-		return nil, err
-	}
-	return &step, nil
+	// Stub implementation - GraphQL is not currently used
+	r.logger.Warn("GraphQL step resolver called but not fully implemented", "id", id)
+	return nil, fmt.Errorf("GraphQL API not implemented")
 }
 
 // TestRuns is the resolver for the testRuns field.
 func (r *queryResolver) TestRuns(ctx context.Context, limit *int, offset *int) ([]string, error) {
-	var runIDs []string
-	query := r.db.Model(&models.TestCaseRun{}).
-		Select("DISTINCT run_id").
-		Order("run_id DESC")
-
+	// Use MongoDB repository to list run IDs
+	limitVal := int64(20)
+	offsetVal := int64(0)
 	if limit != nil && *limit > 0 {
-		query = query.Limit(*limit)
+		limitVal = int64(*limit)
 	}
-	if offset != nil && *offset > 0 {
-		query = query.Offset(*offset)
+	if offset != nil && *offset >= 0 {
+		offsetVal = int64(*offset)
 	}
 
-	if err := query.Pluck("run_id", &runIDs).Error; err != nil {
+	docs, _, err := r.repo.ListTestRuns(ctx, bson.M{}, limitVal, offsetVal)
+	if err != nil {
 		r.logger.Error("failed to fetch test runs", "error", err)
 		return nil, err
+	}
+
+	runIDs := make([]string, 0, len(docs))
+	for _, doc := range docs {
+		runIDs = append(runIDs, doc.ID)
 	}
 
 	return runIDs, nil
@@ -111,15 +71,16 @@ func (r *queryResolver) TestRuns(ctx context.Context, limit *int, offset *int) (
 func (r *queryResolver) RunStats(ctx context.Context, runID string) (*model.RunStats, error) {
 	stats := &model.RunStats{}
 
-	// Get test counts by status
-	var testCases []models.TestCaseRun
-	if err := r.db.Where("run_id = ?", runID).Find(&testCases).Error; err != nil {
-		r.logger.Error("failed to fetch test cases for stats", "run_id", runID, "error", err)
+	// Get test run document
+	doc, err := r.repo.GetTestRun(ctx, runID)
+	if err != nil {
+		r.logger.Error("failed to fetch test run for stats", "run_id", runID, "error", err)
 		return nil, err
 	}
 
-	stats.TotalTests = len(testCases)
-	for _, tc := range testCases {
+	// Count tests by status
+	stats.TotalTests = len(doc.Tests)
+	for _, tc := range doc.Tests {
 		switch tc.Status {
 		case "PASSED":
 			stats.PassedTests++
@@ -134,49 +95,46 @@ func (r *queryResolver) RunStats(ctx context.Context, runID string) (*model.RunS
 		}
 	}
 
-	// Get step count
-	var stepCount int64
-	if err := r.db.Model(&models.StepRun{}).Where("run_id = ?", runID).Count(&stepCount).Error; err != nil {
-		r.logger.Error("failed to count steps for stats", "run_id", runID, "error", err)
-		return nil, err
+	// Count total steps across all tests
+	totalSteps := 0
+	for _, tc := range doc.Tests {
+		totalSteps += len(tc.Steps)
 	}
-	stats.TotalSteps = int(stepCount)
+	stats.TotalSteps = totalSteps
 
 	return stats, nil
 }
 
 // Metadata is the resolver for the metadata field.
 func (r *stepRunResolver) Metadata(ctx context.Context, obj *models.StepRun) (*string, error) {
-	// StepRun model doesn't have a Metadata field in the current implementation
-	// Return empty string for now
-	empty := ""
-	return &empty, nil
+	// StepRun (StepDocument) doesn't have metadata in current schema
+	return nil, nil
 }
 
 // Error is the resolver for the error field.
 func (r *stepRunResolver) Error(ctx context.Context, obj *models.StepRun) (*string, error) {
-	// StepRun model doesn't have an Error field in the current implementation
-	// Return nil for now
+	// StepRun doesn't have error field in current schema
 	return nil, nil
 }
 
 // TestCase is the resolver for the testCase field.
 func (r *stepRunResolver) TestCase(ctx context.Context, obj *models.StepRun) (*models.TestCaseRun, error) {
-	var testCase models.TestCaseRun
-	if err := r.db.Where("id = ?", obj.TestCaseRunID).First(&testCase).Error; err != nil {
+	// Find parent test case using GetTestFromRun
+	test, err := r.repo.GetTestFromRun(ctx, obj.TestCaseRunID)
+	if err != nil {
 		r.logger.Error("failed to fetch parent test case", "test_case_run_id", obj.TestCaseRunID, "error", err)
 		return nil, err
 	}
-	return &testCase, nil
+	return test, nil
 }
 
 // Metadata is the resolver for the metadata field.
 func (r *testCaseRunResolver) Metadata(ctx context.Context, obj *models.TestCaseRun) (*string, error) {
-	if obj.Metadata == nil || len(obj.Metadata) == 0 {
+	if len(obj.Metadata) == 0 {
 		return nil, nil
 	}
 	// Convert metadata to JSON string
-	jsonBytes, err := obj.Metadata.MarshalJSON()
+	jsonBytes, err := json.Marshal(obj.Metadata)
 	if err != nil {
 		r.logger.Error("failed to marshal metadata", "id", obj.ID, "error", err)
 		return nil, err
@@ -187,21 +145,14 @@ func (r *testCaseRunResolver) Metadata(ctx context.Context, obj *models.TestCase
 
 // Error is the resolver for the error field.
 func (r *testCaseRunResolver) Error(ctx context.Context, obj *models.TestCaseRun) (*string, error) {
-	// TestCaseRun model doesn't have an Error field in the current implementation
-	// Return nil for now
+	// TestCaseRun doesn't have error field in current schema
 	return nil, nil
 }
 
 // Steps is the resolver for the steps field.
 func (r *testCaseRunResolver) Steps(ctx context.Context, obj *models.TestCaseRun) ([]*models.StepRun, error) {
-	var steps []*models.StepRun
-	if err := r.db.Where("test_case_run_id = ?", obj.ID).
-		Order("created_at ASC").
-		Find(&steps).Error; err != nil {
-		r.logger.Error("failed to fetch steps", "test_case_run_id", obj.ID, "error", err)
-		return nil, err
-	}
-	return steps, nil
+	// Steps are embedded in the test document
+	return obj.Steps, nil
 }
 
 // Query returns QueryResolver implementation.

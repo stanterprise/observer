@@ -22,7 +22,7 @@ PROTOC_GEN_GO_VERSION ?= v1.36.6
 PROTOC_GEN_GO_GRPC_VERSION ?= v1.5.1
 GOLANGCI_LINT_VERSION ?= v1.60.3
 
-.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache db-up db-down db-logs db-psql db-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down helm-deps helm-lint helm-template helm-template-aio helm-template-prod helm-dry-run helm-dry-run-aio helm-dry-run-prod helm-test helm-validate
+.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache mongodb-up mongodb-down mongodb-logs mongodb-shell mongodb-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down docker-web-dev-down web-dev-mode helm-deps helm-lint helm-template helm-template-aio helm-template-prod helm-dry-run helm-dry-run-aio helm-dry-run-prod helm-test helm-validate
 
 .DEFAULT_GOAL := help
 
@@ -55,37 +55,35 @@ build-processor: $(PROCESSOR_BIN) ## Build processor service
 
 build-api: $(API_BIN) ## Build api service
 
-build-all: $(APP_BIN) $(INGESTION_BIN) $(PROCESSOR_BIN) $(API_BIN) ## Build all components
+build-all: $(INGESTION_BIN) $(PROCESSOR_BIN) $(API_BIN) ## Build all components
 
 run: build ## Run the server using the built binary
 	./$(APP_BIN)
 
 # Defaults align with docker-compose.yml and .env.example
-POSTGRES_USER ?= postgres
-POSTGRES_PASSWORD ?= postgres
-POSTGRES_DB ?= observer
-POSTGRES_PORT ?= 5432
-APPLY_MIGRATIONS ?= 1
+MONGO_USER ?= root
+MONGO_PASSWORD ?= password
+MONGO_DATABASE ?= observer
+MONGO_PORT ?= 27017
 
-# Construct a host DSN that talks to the Compose Postgres port on localhost
-DATABASE_URL := postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable
+# Construct a MongoDB URI that talks to the Compose MongoDB port on localhost
+MONGODB_URI := mongodb://$(MONGO_USER):$(MONGO_PASSWORD)@localhost:$(MONGO_PORT)/$(MONGO_DATABASE)?authSource=admin
 
-# Run the API with DATABASE_URL and optional automigrate
-run-dev: build ## Run server with DATABASE_URL env
-	DATABASE_URL='$(DATABASE_URL)' APPLY_MIGRATIONS=$(APPLY_MIGRATIONS) ./$(APP_BIN)
+# Run the API with MONGODB_URI
+run-dev: build ## Run server with MONGODB_URI env
+	MONGODB_URI='$(MONGODB_URI)' ./$(APP_BIN)
 
-# Run the API using split PG* environment variables (ConnectFromEnv also supports these)
-run-dev-split: build ## Run server with individual PG* env vars
-	PGHOST=localhost PGPORT=$(POSTGRES_PORT) PGUSER=$(POSTGRES_USER) PGPASSWORD=$(POSTGRES_PASSWORD) PGDATABASE=$(POSTGRES_DB) PGSSLMODE=disable APPLY_MIGRATIONS=$(APPLY_MIGRATIONS) ./$(APP_BIN)
+# Run the API using split MONGO_* environment variables (ConnectMongoDBFromEnv also supports these)
+run-dev-split: build ## Run server with individual MONGO_* env vars
+	MONGO_HOST=localhost MONGO_PORT=$(MONGO_PORT) MONGO_USER=$(MONGO_USER) MONGO_PASSWORD=$(MONGO_PASSWORD) MONGO_DATABASE=$(MONGO_DATABASE) MONGO_AUTH_SOURCE=admin ./$(APP_BIN)
 
 # Print resolved environment values for verification
 env-print: ## Print effective DB-related environment
-	@echo "POSTGRES_USER=$(POSTGRES_USER)"
-	@echo "POSTGRES_PASSWORD=$(POSTGRES_PASSWORD)"
-	@echo "POSTGRES_DB=$(POSTGRES_DB)"
-	@echo "POSTGRES_PORT=$(POSTGRES_PORT)"
-	@echo "APPLY_MIGRATIONS=$(APPLY_MIGRATIONS)"
-	@echo "DATABASE_URL=$(DATABASE_URL)"
+	@echo "MONGO_USER=$(MONGO_USER)"
+	@echo "MONGO_PASSWORD=$(MONGO_PASSWORD)"
+	@echo "MONGO_DATABASE=$(MONGO_DATABASE)"
+	@echo "MONGO_PORT=$(MONGO_PORT)"
+	@echo "MONGODB_URI=$(MONGODB_URI)"
 
 test: ## Run unit tests
 	go test ./...
@@ -148,28 +146,22 @@ clean: ## Remove build and coverage artifacts
 clean-cache: ## Clean Go build and test caches
 	go clean -cache -testcache
 
-# Docker Postgres helpers
-db-up: ## Start Postgres container
-	docker compose up -d db
+# Docker MongoDB helpers
+mongodb-up: ## Start MongoDB container
+	docker compose up -d mongodb
 
-db-down: ## Stop containers and remove volumes
+mongodb-down: ## Stop containers and remove volumes
 	docker compose down -v
 
-db-logs: ## Tail Postgres logs
-	docker compose logs -f db
+mongodb-logs: ## Tail MongoDB logs
+	docker compose logs -f mongodb
 
-# Open psql in the container
-db-psql: ## Open psql against the db container
-	docker compose exec -e PGPASSWORD=$${POSTGRES_PASSWORD:-postgres} db psql -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-observer}
+# Open mongosh in the container
+mongodb-shell: ## Open mongosh against the mongodb container
+	docker compose exec mongodb mongosh -u $${MONGO_USER:-root} -p $${MONGO_PASSWORD:-password} --authenticationDatabase admin $${MONGO_DATABASE:-observer}
 
-db-reset: ## Reset database by recreating container and volume
-	docker compose down -v && docker compose up -d db
-
-db-clear: ## Clear all data from the database (drops and recreates tables)
-	docker compose exec -e PGPASSWORD=$${POSTGRES_PASSWORD:-postgres} db psql -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-observer} -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO $${POSTGRES_USER:-postgres}; GRANT ALL ON SCHEMA public TO public;"
-
-db-migrate: ## Run database migrations
-	@APPLY_MIGRATIONS=1 DATABASE_URL='$(DATABASE_URL)' go run ./scripts/migrate.go
+mongodb-reset: ## Reset database by recreating container and volume
+	docker compose down -v && docker compose up -d mongodb
 
 # MongoDB helpers
 MONGO_USER ?= root
@@ -240,14 +232,14 @@ web-clean: ## Clean Web UI build artifacts
 IMAGE_NAME ?= observer
 IMAGE_TAG ?= latest
 
-docker-build-all: build-all ## Build all Docker images
+docker-build-all: ## Build all Docker images
 	docker build -f Dockerfile.aio -t $(IMAGE_NAME):aio .
 	docker build -f Dockerfile.ingestion -t $(IMAGE_NAME):ingestion .
 	docker build -f Dockerfile.processor -t $(IMAGE_NAME):processor .
 	docker build -f Dockerfile.api -t $(IMAGE_NAME):api .
 	docker build -f Dockerfile.web -t $(IMAGE_NAME):web .
 
-docker-build-aio: build-all ## Build AIO Docker image
+docker-build-aio: ## Build AIO Docker image
 	docker build -f Dockerfile.aio -t $(IMAGE_NAME):aio .
 
 docker-buildx-aio: ## Build multi-platform AIO Docker image with BuildKit (optimized)
@@ -270,13 +262,13 @@ docker-buildx-clean: ## Clean buildx cache
 	rm -rf /tmp/.buildx-cache
 	docker buildx prune -af
 
-docker-build-ingestion: build-all ## Build ingestion Docker image
+docker-build-ingestion: ## Build ingestion Docker image
 	docker build -f Dockerfile.ingestion -t $(IMAGE_NAME):ingestion .
 
-docker-build-processor: build-all ## Build processor Docker image
+docker-build-processor: ## Build processor Docker image
 	docker build -f Dockerfile.processor -t $(IMAGE_NAME):processor .
 
-docker-build-api: build-all ## Build API Docker image
+docker-build-api: ## Build API Docker image
 	docker build -f Dockerfile.api -t $(IMAGE_NAME):api .
 
 docker-build-web: ## Build Web UI Docker image
@@ -292,10 +284,7 @@ docker-up-aio: docker-build-aio ## Start AIO profile with docker compose
 
 docker-dev-web: ## Start all containers except for Web UI in dev mode
 	docker compose --profile web-dev up -d
-	@echo "Waiting for database to be ready..."
-	@sleep 2
-	@echo "Running database migrations..."
-	@$(MAKE) db-migrate
+	@echo "Web development services started. MongoDB and API are ready."
 
 docker-dev-mongo: ## Start all containers with MongoDB backend (except Web UI)
 	docker compose --profile mongo up -d
@@ -308,6 +297,11 @@ docker-up-dist: docker-build-ingestion docker-build-processor docker-build-api d
 
 docker-down: ## Stop all docker compose services
 	docker compose down
+
+docker-web-dev-down: ## Stop web development profile services
+	docker compose --profile web-dev down
+
+web-dev-mode: docker-web-dev-down docker-build-all docker-dev-web web-dev ## Rebuild and restart all services in Docker and start web UI in development mode
 
 # Helm chart management
 helm-deps: ## Update Helm chart dependencies

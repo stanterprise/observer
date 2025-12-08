@@ -1,0 +1,3 @@
+#!/command/with-contenv sh
+# Run MongoDB as the mongodb user
+exec s6-setuidgid mongodb mongod --dbpath /data/mongodb --bind_ip 127.0.0.1 --port 27017 --logpath /data/mongodb/mongod.log

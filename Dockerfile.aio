@@ -70,13 +70,14 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -o /bin/api ./cmd/api
 
 # ============================================================================
-# Runtime stage - Debian with s6-overlay, Nginx, and all services
+# Runtime stage - Debian with s6-overlay, Nginx, MongoDB, NATS, and all services
 # ============================================================================
 FROM debian:bookworm-slim
 
-# s6-overlay and NATS versions
+# s6-overlay, NATS, and MongoDB versions
 ARG S6_OVERLAY_VERSION=3.2.0.0
 ARG NATS_VERSION=2.10.24
+ARG MONGODB_VERSION=7.0.15
 
 # Install runtime dependencies including Nginx
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -86,10 +87,37 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         ca-certificates \
         nginx \
         procps \
-        sqlite3 \
         wget \
-        xz-utils && \
+        xz-utils \
+        gnupg \
+        curl && \
     update-ca-certificates
+
+# Install MongoDB (architecture-specific)
+# For ARM64, download binaries directly from MongoDB (no APT packages available)
+# For AMD64, use official MongoDB APT repository
+RUN MONGO_ARCH=$(dpkg --print-architecture) && \
+    echo "Installing MongoDB for architecture: ${MONGO_ARCH}" && \
+    if [ "${MONGO_ARCH}" = "arm64" ]; then \
+        # For ARM64, download and install binaries directly
+        echo "Downloading MongoDB binaries for ARM64..." && \
+        wget -q https://fastdl.mongodb.org/linux/mongodb-linux-aarch64-debian12-7.0.15.tgz && \
+        tar -xzf mongodb-linux-aarch64-debian12-7.0.15.tgz && \
+        cp mongodb-linux-aarch64-debian12-7.0.15/bin/mongod /usr/local/bin/ && \
+        cp mongodb-linux-aarch64-debian12-7.0.15/bin/mongosh /usr/local/bin/ || cp mongodb-linux-aarch64-debian12-7.0.15/bin/mongo /usr/local/bin/ || true && \
+        chmod +x /usr/local/bin/mongod /usr/local/bin/mongosh 2>/dev/null || chmod +x /usr/local/bin/mongod /usr/local/bin/mongo 2>/dev/null || true && \
+        rm -rf mongodb-linux-aarch64-debian12-7.0.15* && \
+        mkdir -p /var/lib/mongodb /var/log/mongodb && \
+        chmod 755 /var/lib/mongodb /var/log/mongodb; \
+    else \
+        # For AMD64, use official MongoDB repository
+        curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg && \
+        echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list && \
+        apt-get update && \
+        apt-get install -y mongodb-org-server=7.0.15 mongodb-org-shell=7.0.15 mongodb-org-tools=7.0.15 && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # Install NATS server and s6-overlay in parallel (architecture-specific downloads)
 RUN NATS_ARCH=$(dpkg --print-architecture | sed 's/amd64/amd64/; s/arm64/arm64/') && \
@@ -137,21 +165,22 @@ RUN find /etc/s6-overlay/s6-rc.d -type f -name "run" -exec chmod +x {} \;
 
 # Create data directories and Nginx runtime directories with proper permissions
 # s6-overlay will run as root, services will run as appropriate users
-RUN mkdir -p /data/artifacts /data/db /run \
+RUN mkdir -p /data/artifacts /data/db /data/mongodb /run \
              /var/lib/nginx /var/cache/nginx && \
     chmod -R 755 /data && \
     chmod 755 /run && \
-    chmod -R 755 /var/lib/nginx /var/cache/nginx
+    chmod -R 755 /var/lib/nginx /var/cache/nginx && \
+    # Create MongoDB user if it doesn't exist (APT install creates it, binary install doesn't)
+    id mongodb 2>/dev/null || useradd -r -u 999 mongodb && \
+    chown -R mongodb:mongodb /data/mongodb
 
 # Environment variables
-ENV DB_DRIVER=sqlite \
-    DATABASE_URL=/data/db/observer.db \
+ENV MONGODB_URI=mongodb://localhost:27017/observer \
     STORAGE_DRIVER=local \
     ARTIFACTS_DIR=/data/artifacts \
     NATS_URL=nats://localhost:4222 \
     NATS_STREAM=tests_events \
-    NATS_WS_CONSUMER=websocket \
-    APPLY_MIGRATIONS=1
+    NATS_WS_CONSUMER=websocket
 
 # Expose ports
 # 80 - Web UI (Nginx)
@@ -160,7 +189,8 @@ ENV DB_DRIVER=sqlite \
 # 8080 - API service (internal, proxied by Nginx)
 # 4222 - NATS client
 # 8222 - NATS monitoring
-EXPOSE 80 50051 8081 8080 4222 8222
+# 27017 - MongoDB (internal)
+EXPOSE 80 50051 8081 8080 4222 8222 27017
 
 # Use s6-overlay as init system
 ENTRYPOINT ["/init"]

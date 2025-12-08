@@ -11,11 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/99designs/gqlgen/graphql/handler"
-	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/stanterprise/observer/internal/database"
+	"github.com/stanterprise/observer/internal/repository"
 	"github.com/stanterprise/observer/pkg/api"
-	"github.com/stanterprise/observer/pkg/api/graph"
 	"github.com/stanterprise/observer/pkg/websocket"
 )
 
@@ -27,17 +25,29 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// API service connects to database for read queries
-	db, err := database.ConnectFromEnv(logger)
+	// Connect to MongoDB
+	mongoDB, err := database.ConnectMongoDBFromEnv(logger)
 	if err != nil {
-		logger.Error("database connect failed", "error", err)
+		logger.Error("mongodb connect failed", "error", err)
 		os.Exit(1)
 	}
-	if db != nil {
-		logger.Info("database connected")
-	} else {
-		logger.Warn("DATABASE_URL not set; API queries will fail without database")
+	if mongoDB == nil {
+		logger.Error("MONGODB_URI or MONGO_URI not set; API requires MongoDB")
+		os.Exit(1)
 	}
+	
+	logger.Info("using MongoDB backend for API")
+	
+	// Ensure MongoDB connection cleanup
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		mongoDB.Close(ctx)
+	}()
+	
+	// Create MongoDB repository and handler
+	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
+	mongoHandler := api.NewMongoHandler(repo, logger)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub(logger)
@@ -68,14 +78,6 @@ func main() {
 		MaxWait:   5 * time.Second,
 	})
 
-	// Create GraphQL resolver and handler
-	resolver := graph.NewResolver(db, logger)
-	gqlHandler := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))
-	playgroundHandler := playground.Handler("GraphQL Playground", "/api/graphql")
-
-	// Create REST API handler
-	restHandler := api.NewHandler(db, logger)
-
 	// Create HTTP server with endpoints
 	mux := http.NewServeMux()
 
@@ -97,10 +99,6 @@ func main() {
 		fmt.Fprintf(w, "Available endpoints:\n")
 		fmt.Fprintf(w, "  GET /health - Health check\n")
 		fmt.Fprintf(w, "  GET /ws - WebSocket endpoint for real-time events\n")
-		fmt.Fprintf(w, "  GET  /health              - Health check\n")
-		fmt.Fprintf(w, "\nGraphQL API:\n")
-		fmt.Fprintf(w, "  POST /api/graphql         - GraphQL API endpoint\n")
-		fmt.Fprintf(w, "  GET  /api/playground      - GraphQL Playground (interactive query tool)\n")
 		fmt.Fprintf(w, "\nREST API:\n")
 		fmt.Fprintf(w, "  GET  /api/tests           - List test cases (supports ?runId, ?status, ?search, ?limit, ?offset)\n")
 		fmt.Fprintf(w, "  GET  /api/tests/{id}      - Get specific test case with steps\n")
@@ -108,12 +106,8 @@ func main() {
 		fmt.Fprintf(w, "  GET  /api/runs/{runId}    - Get run details with statistics\n")
 	})
 
-	// GraphQL endpoints
-	mux.Handle("/api/graphql", gqlHandler)
-	mux.Handle("/api/playground", playgroundHandler)
-
 	// REST API endpoints
-	restHandler.RegisterRoutes(mux)
+	mongoHandler.RegisterRoutes(mux)
 
 	addr := ":" + *port
 
@@ -127,8 +121,6 @@ func main() {
 
 	logger.Info("api server starting",
 		"addr", addr,
-		"graphql", "/api/graphql",
-		"playground", "/api/playground",
 		"rest_api", "/api/tests, /api/runs")
 
 	// Run server in separate goroutine and capture fatal serve errors.

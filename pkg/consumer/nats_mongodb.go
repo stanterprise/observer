@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -17,8 +18,43 @@ import (
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 )
 
+// noopWriter implements io.Writer but drops logs when no logger provided.
+type noopWriter struct{}
+
+func (n *noopWriter) Write(p []byte) (int, error) { return len(p), nil }
+
+// ptrInt32 returns a pointer to the given int32 value
+func ptrInt32(v int32) *int32 {
+	if v == 0 {
+		return nil
+	}
+	return &v
+}
+
+// extractTestID extracts the test ID from a test case run ID.
+// TestCaseRunId format is typically: {runId}-{testId}
+// This function strips the runId prefix to get just the testId.
+func extractTestID(testCaseRunID, runID string) string {
+	// If testCaseRunID starts with runID-, strip it
+	prefix := runID + "-"
+	if strings.HasPrefix(testCaseRunID, prefix) {
+		return strings.TrimPrefix(testCaseRunID, prefix)
+	}
+	// Otherwise, return as-is (backward compatibility)
+	return testCaseRunID
+}
+
 // MongoNATSConsumer wraps a NATS JetStream consumer for processing test events
-// and persisting them to MongoDB using a document-based data model
+// and persisting them to MongoDB using a document-based data model.
+//
+// Event Processing Flow:
+// - Suite Begin (root): Creates a new TestRunDocument if it doesn't exist
+// - Suite Begin (nested): Finds parent suite in root document and upserts the nested suite
+// - Test Begin: Finds parent suite in root document and upserts the test
+// - Step Begin: Finds parent test in root document and upserts the step
+// - End Events: Find and update existing entities within the root document
+//
+// All operations follow an upsert pattern: update if entity exists, insert if not found.
 type MongoNATSConsumer struct {
 	nc         *nats.Conn
 	js         jetstream.JetStream
@@ -233,7 +269,7 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 	c.logger.Info("suite start",
 		"id", req.Suite.Id,
 		"name", req.Suite.Name,
-		"project", req.Suite.ProjectName)
+		"project", req.Suite.Project)
 
 	// Convert metadata
 	md := make(map[string]interface{})
@@ -252,9 +288,9 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 		Name:            req.Suite.Name,
 		Description:     req.Suite.Description,
 		Metadata:        md,
-		TestSuiteSpecID: req.Suite.TestSuiteSpecId,
+		TestSuiteSpecID: "",
 		InitiatedBy:     req.Suite.InitiatedBy,
-		ProjectName:     req.Suite.ProjectName,
+		ProjectName:     req.Suite.Project,
 		StartTime:       startTime,
 	}
 
@@ -312,7 +348,7 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 	c.logger.Info("test start",
 		"id", req.TestCase.Id,
 		"run_id", req.TestCase.RunId,
-		"title", req.TestCase.Title)
+		"title", req.TestCase.Name)
 
 	// Convert metadata
 	md := make(map[string]interface{})
@@ -323,7 +359,7 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 	test := &m.TestDocument{
 		ID:         req.TestCase.Id,
 		RunID:      req.TestCase.RunId,
-		Title:      req.TestCase.Title,
+		Title:      req.TestCase.Name,
 		Metadata:   md,
 		RetryCount: ptrInt32(req.TestCase.RetryCount),
 		RetryIndex: ptrInt32(req.TestCase.RetryIndex),
@@ -366,7 +402,7 @@ func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMess
 		duration = &nanos
 	}
 
-	return c.repo.UpsertTestEnd(ctx, req.TestCase.Id, req.TestCase.Status.String(), duration)
+	return c.repo.UpsertTestEnd(ctx, req.TestCase.Id, req.TestCase.RunId, req.TestCase.Status.String(), duration)
 }
 
 // handleStepBegin processes a step begin event
@@ -380,9 +416,15 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 		return errors.New("step is nil")
 	}
 
+	// Extract the actual test ID from TestCaseRunId
+	// TestCaseRunId format is typically: {runId}-{testId}
+	// But tests are stored with just {testId}, so we need to extract it
+	testID := extractTestID(req.Step.TestCaseRunId, req.Step.RunId)
+
 	c.logger.Info("step start",
 		"id", req.Step.Id,
-		"test_id", req.Step.TestCaseRunId)
+		"test_case_run_id", req.Step.TestCaseRunId,
+		"extracted_test_id", testID)
 
 	step := &m.StepDocument{
 		ID:            req.Step.Id,
@@ -394,7 +436,7 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 		Title:         req.Step.Title,
 	}
 
-	return c.repo.UpsertStepBegin(ctx, step, req.Step.TestCaseRunId, req.Step.ParentStepId)
+	return c.repo.UpsertStepBegin(ctx, step, testID, req.Step.RunId, req.Step.ParentStepId)
 }
 
 // handleStepEnd processes a step end event
@@ -412,7 +454,7 @@ func (c *MongoNATSConsumer) handleStepEnd(ctx context.Context, data json.RawMess
 		"id", req.Step.Id,
 		"status", req.Step.Status)
 
-	return c.repo.UpsertStepEnd(ctx, req.Step.Id, mongoStatusToString(req.Step.Status))
+	return c.repo.UpsertStepEnd(ctx, req.Step.Id, req.Step.RunId, mongoStatusToString(req.Step.Status))
 }
 
 // handleTestFailure processes a test failure event

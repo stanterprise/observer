@@ -165,7 +165,7 @@ Best for: Development, testing, proof-of-concept, small-scale deployments
 
 **Features:**
 - Single pod deployment
-- Embedded SQLite database
+- Embedded MongoDB database
 - Embedded NATS server
 - All services in one container
 - Lower resource requirements
@@ -179,7 +179,7 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
   --set mode=aio \
   --set aio.enabled=true \
   --set distributed.enabled=false \
-  --set postgresql.enabled=false \
+  --set mongodb.enabled=false \
   --set nats.enabled=false
 ```
 
@@ -201,7 +201,7 @@ Best for: Production, CI/CD, high-scale deployments, high availability
 **Features:**
 - Separate pods for each service
 - Horizontal scaling with HPA
-- External or embedded PostgreSQL
+- External or embedded MongoDB
 - External or embedded NATS with JetStream
 - Independent service scaling
 - Production-ready architecture
@@ -209,15 +209,17 @@ Best for: Production, CI/CD, high-scale deployments, high availability
 **Installation:**
 
 ```bash
-# With embedded PostgreSQL and NATS
+# With embedded MongoDB and NATS
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer --version 0.1.0
 
-# With external PostgreSQL
+# With external MongoDB
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
   --version 0.1.0 \
-  --set postgresql.enabled=false \
-  --set externalDatabase.host=postgres.example.com \
-  --set externalDatabase.password=securepassword
+  --set mongodb.enabled=false \
+  --set externalDatabase.host=mongodb.example.com \
+  --set externalDatabase.username=observer \
+  --set externalDatabase.password=securepassword \
+  --set externalDatabase.database=observer
 ```
 
 **Services:**
@@ -267,12 +269,11 @@ aio:
 #### Distributed Mode
 
 ```yaml
-postgresql:
-  primary:
-    persistence:
-      enabled: true
-      size: 50Gi
-      storageClass: "fast-ssd"
+mongodb:
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: "fast-ssd"
 
 nats:
   config:
@@ -421,24 +422,27 @@ distributed:
       limits: { cpu: 1000m, memory: 1Gi }
   
   web:
-    replicaCount: 2
+        replicaCount: 2
     resources:
       requests: { cpu: 100m, memory: 128Mi }
       limits: { cpu: 500m, memory: 256Mi }
 
-postgresql:
+mongodb:
   enabled: true
   auth:
-    password: "change-in-production"
+    enabled: true
+    rootPassword: "change-in-production"
+    usernames: ["observer"]
+    passwords: ["change-in-production"]
+    databases: ["observer"]
     existingSecret: "observer-db-secret"  # Use secret instead
-  primary:
-    persistence:
-      enabled: true
-      size: 100Gi
-      storageClass: "fast-ssd"
-    resources:
-      requests: { cpu: 500m, memory: 512Mi }
-      limits: { cpu: 2000m, memory: 2Gi }
+  persistence:
+    enabled: true
+    size: 100Gi
+    storageClass: "fast-ssd"
+  resources:
+    requests: { cpu: 500m, memory: 512Mi }
+    limits: { cpu: 2000m, memory: 2Gi }
 
 nats:
   enabled: true
@@ -490,12 +494,13 @@ EOF
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
   --version 0.1.0 \
   --namespace observer \
-  --set postgresql.enabled=false \
-  --set externalDatabase.host=postgres.example.com \
-  --set externalDatabase.port=5432 \
+  --set mongodb.enabled=false \
+  --set externalDatabase.host=mongodb.example.com \
+  --set externalDatabase.port=27017 \
   --set externalDatabase.username=observer \
   --set externalDatabase.password=securepassword \
-  --set externalDatabase.database=observer
+  --set externalDatabase.database=observer \
+  --set externalDatabase.authSource=admin
 ```
 
 ### Monitoring and Observability
@@ -537,12 +542,12 @@ kubectl logs <pod-name> -n observer
 ### Database Connection Issues
 
 ```bash
-# Test PostgreSQL connection from a pod
+# Test MongoDB connection from a pod
 kubectl exec -it <processor-pod> -n observer -- sh
-# Inside pod: check DATABASE_URL environment variable
+# Inside pod: check MONGODB_URI environment variable
 
-# Check PostgreSQL pod
-kubectl logs -n observer observer-postgresql-0
+# Check MongoDB pod
+kubectl logs -n observer observer-mongodb-0
 
 # Verify service endpoints
 kubectl get endpoints -n observer

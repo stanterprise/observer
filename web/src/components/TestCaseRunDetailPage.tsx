@@ -25,6 +25,7 @@ interface Step {
   Title: string;
   CreatedAt: string;
   UpdatedAt: string;
+  Steps?: Step[]; // Nested steps for hierarchical structure
 }
 
 interface TestCaseDetail {
@@ -155,6 +156,7 @@ export function TestCaseRunDetailPage({
 
   const { test, steps } = testDetail;
   const testStatus = getTestStatus(test.Status);
+  const safeSteps = steps || [];
 
   return (
     <div className="space-y-6">
@@ -243,7 +245,7 @@ export function TestCaseRunDetailPage({
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-600">Total Steps:</dt>
-                  <dd className="text-gray-900">{steps.length}</dd>
+                  <dd className="text-gray-900">{safeSteps.length}</dd>
                 </div>
               </dl>
             </div>
@@ -268,9 +270,9 @@ export function TestCaseRunDetailPage({
       {/* Steps Section */}
       <div>
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Execution Steps ({steps.length})
+          Execution Steps ({safeSteps.length})
         </h2>
-        {steps.length === 0 ? (
+        {safeSteps.length === 0 ? (
           <Card>
             <CardContent>
               <div className="text-center py-8 text-gray-500">
@@ -280,7 +282,7 @@ export function TestCaseRunDetailPage({
           </Card>
         ) : (
           <div className="space-y-3">
-            {renderStepHierarchy(steps, null, 0, getTestStatus)}
+            {renderStepHierarchy(safeSteps, null, 0, getTestStatus)}
           </div>
         )}
       </div>

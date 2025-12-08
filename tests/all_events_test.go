@@ -92,7 +92,7 @@ func TestAllEventTypes(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:    "test-1",
 			RunId: "run-1",
-			Title: "Test Case 1",
+			Name: "Test Case 1",
 		},
 	}); err != nil {
 		t.Errorf("Failed to publish TestBegin: %v", err)
