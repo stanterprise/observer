@@ -137,8 +137,9 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 				return fmt.Errorf("add root suite to suites array: %w", err)
 			}
 		} else {
-			// Document existed, update the root suite in the suites array
-			// First try to update existing suite entry
+			// Document existed - this is a duplicate/replay event for the same run ID
+			// We should update metadata but preserve existing tests and suites
+			// Note: If this is truly a NEW run, it should have a different suite.ID
 			filter = bson.M{
 				"_id":        suite.ID,
 				"suites.id": suite.ID,
@@ -147,13 +148,15 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 				"$set": bson.M{
 					"suites.$.name":               suite.Name,
 					"suites.$.description":        suite.Description,
-					"suites.$.status":             suite.Status,
 					"suites.$.metadata":           suite.Metadata,
 					"suites.$.test_suite_spec_id": suite.TestSuiteSpecID,
 					"suites.$.initiated_by":       suite.InitiatedBy,
 					"suites.$.project_name":       suite.ProjectName,
 					"suites.$.start_time":         suite.StartTime,
 					"suites.$.updated_at":         now,
+					// Note: We intentionally do NOT update status here to avoid overwriting
+					// the final status set by SuiteEnd event
+					// Note: We do NOT set tests or suites arrays to preserve existing data
 				},
 			}
 			result, err = r.collection.UpdateOne(ctx, filter, update)
@@ -192,6 +195,7 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 	}
 
 	// First, try to update existing suite if it already exists in root document's suites array
+	// This handles duplicate/replay events for the same suite
 	filter := bson.M{
 		"_id":        parentSuiteID,
 		"suites.id": suite.ID,
@@ -200,13 +204,15 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 		"$set": bson.M{
 			"suites.$.name":               suite.Name,
 			"suites.$.description":        suite.Description,
-			"suites.$.status":             suite.Status,
 			"suites.$.metadata":           suite.Metadata,
 			"suites.$.test_suite_spec_id": suite.TestSuiteSpecID,
 			"suites.$.initiated_by":       suite.InitiatedBy,
 			"suites.$.project_name":       suite.ProjectName,
 			"suites.$.start_time":         suite.StartTime,
 			"suites.$.updated_at":         now,
+			// Note: We intentionally do NOT update status here to avoid overwriting
+			// the final status set by SuiteEnd event
+			// Note: We do NOT set tests or suites arrays to preserve existing data
 		},
 	}
 
@@ -216,7 +222,7 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 	}
 
 	if result.MatchedCount > 0 {
-		// Suite was found and updated
+		// Suite was found and updated (preserving tests and nested suites)
 		r.logger.Info("suite begin (nested, updated)", "id", suite.ID, "parent", parentSuiteID)
 		return nil
 	}
@@ -373,8 +379,12 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 		test.Steps = []*m.StepDocument{}
 	}
 
+	// Extract root document ID to ensure we only update tests in the correct test run
+	rootDocID := extractRootSuiteID(suiteID)
+
 	// First, try to find and update the test in a nested suite (level 1 - direct child of root)
 	filter := bson.M{
+		"_id":              rootDocID,        // CRITICAL: Prevent cross-document mutation
 		"suites.id":        suiteID,
 		"suites.tests.id": test.ID,
 	}
@@ -410,7 +420,10 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 	}
 
 	// Test doesn't exist in nested suite, try to append it
-	filter = bson.M{"suites.id": suiteID}
+	filter = bson.M{
+		"_id":        rootDocID, // CRITICAL: Prevent cross-document mutation
+		"suites.id": suiteID,
+	}
 	update = bson.M{
 		"$push": bson.M{
 			"suites.$[suite].tests": test,
@@ -601,8 +614,11 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 // UpsertTestEnd handles test end events by finding the test within the root document
 // structure and updating its attributes (status, duration).
 // Searches both root-level tests and nested suite tests.
-func (r *MongoRepository) UpsertTestEnd(ctx context.Context, testID string, status string, duration *int64) error {
+func (r *MongoRepository) UpsertTestEnd(ctx context.Context, testID string, runID string, status string, duration *int64) error {
 	now := time.Now()
+
+	// Extract root document ID to ensure we only update tests in the correct test run
+	rootDocID := extractRootSuiteID(runID)
 
 	updateFields := bson.M{
 		"tests.$[test].updated_at": now,
@@ -615,7 +631,10 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, testID string, stat
 	}
 
 	// Update test in root document's tests array
-	filter := bson.M{"tests.id": testID}
+	filter := bson.M{
+		"_id":       rootDocID, // CRITICAL: Prevent cross-document mutation
+		"tests.id": testID,
+	}
 	update := bson.M{"$set": updateFields}
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
@@ -676,7 +695,10 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, testID string, stat
 		},
 	}
 
-	filter = bson.M{"suites.tests.id": testID}
+	filter = bson.M{
+		"_id":              rootDocID, // CRITICAL: Prevent cross-document mutation
+		"suites.tests.id": testID,
+	}
 	_, err = r.collection.UpdateMany(ctx, filter, pipeline)
 	if err != nil {
 		return fmt.Errorf("update nested test end: %w", err)
@@ -702,7 +724,7 @@ func buildTestEndUpdate(status string, duration *int64, now time.Time) bson.M {
 
 // UpsertStepBegin handles step begin events by upserting to the parent test
 // (update if exists, insert if not)
-func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocument, testID string, parentStepID string) error {
+func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocument, testID string, runID string, parentStepID string) error {
 	now := time.Now()
 	step.CreatedAt = now
 	step.UpdatedAt = now
@@ -712,10 +734,14 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 		step.Steps = []*m.StepDocument{}
 	}
 
+	// Extract root document ID to ensure we only update steps in the correct test run
+	rootDocID := extractRootSuiteID(runID)
+
 	if parentStepID == "" {
 		// Direct child of test - check if step already exists, then update or append
 		// First try to update existing step in root-level tests
 		filter := bson.M{
+			"_id":            rootDocID, // CRITICAL: Prevent cross-document mutation
 			"tests.id":       testID,
 			"tests.steps.id": step.ID,
 		}
@@ -746,7 +772,10 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 		}
 
 		// Step doesn't exist, append it to test
-		filter = bson.M{"tests.id": testID}
+		filter = bson.M{
+			"_id":       rootDocID, // CRITICAL: Prevent cross-document mutation
+			"tests.id": testID,
+		}
 		update = bson.M{
 			"$push": bson.M{
 				"tests.$[test].steps": step,
@@ -769,6 +798,7 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 		if result.MatchedCount == 0 {
 			// Try in nested suites - first check if step exists
 			filter = bson.M{
+				"_id":                   rootDocID, // CRITICAL: Prevent cross-document mutation
 				"suites.tests.id":       testID,
 				"suites.tests.steps.id": step.ID,
 			}
@@ -847,7 +877,10 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 				},
 			}
 
-			filter = bson.M{"suites.tests.id": testID}
+			filter = bson.M{
+				"_id":              rootDocID, // CRITICAL: Prevent cross-document mutation
+				"suites.tests.id": testID,
+			}
 			_, err = r.collection.UpdateMany(ctx, filter, pipeline)
 			if err != nil {
 				return fmt.Errorf("append step to nested test: %w", err)
@@ -871,6 +904,7 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 	// This allows later retrieval and tree reconstruction
 	// First check if it exists
 	filter := bson.M{
+		"_id":            rootDocID, // CRITICAL: Prevent cross-document mutation
 		"tests.id":       testID,
 		"tests.steps.id": step.ID,
 	}
@@ -902,7 +936,10 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 	}
 
 	// Doesn't exist, append it
-	filter = bson.M{"tests.id": testID}
+	filter = bson.M{
+		"_id":       rootDocID, // CRITICAL: Prevent cross-document mutation
+		"tests.id": testID,
+	}
 	update = bson.M{
 		"$push": bson.M{
 			"tests.$[test].steps": step,
@@ -929,8 +966,11 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 // UpsertStepEnd handles step end events by finding the step within the root document
 // structure and updating its status attribute.
 // Searches both root-level test steps and nested suite test steps.
-func (r *MongoRepository) UpsertStepEnd(ctx context.Context, stepID string, status string) error {
+func (r *MongoRepository) UpsertStepEnd(ctx context.Context, stepID string, runID string, status string) error {
 	now := time.Now()
+
+	// Extract root document ID to ensure we only update steps in the correct test run
+	rootDocID := extractRootSuiteID(runID)
 
 	updateFields := bson.M{
 		"tests.$[].steps.$[step].updated_at": now,
@@ -939,7 +979,10 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, stepID string, stat
 		updateFields["tests.$[].steps.$[step].status"] = status
 	}
 
-	filter := bson.M{"tests.steps.id": stepID}
+	filter := bson.M{
+		"_id":           rootDocID, // CRITICAL: Prevent cross-document mutation
+		"tests.steps.id": stepID,
+	}
 	update := bson.M{"$set": updateFields}
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
@@ -1014,7 +1057,10 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, stepID string, stat
 		},
 	}
 
-	filter = bson.M{"suites.tests.steps.id": stepID}
+	filter = bson.M{
+		"_id":                   rootDocID, // CRITICAL: Prevent cross-document mutation
+		"suites.tests.steps.id": stepID,
+	}
 	_, err = r.collection.UpdateMany(ctx, filter, pipeline)
 	if err != nil {
 		return fmt.Errorf("update nested step end: %w", err)

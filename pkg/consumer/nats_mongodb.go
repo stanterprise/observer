@@ -402,7 +402,7 @@ func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMess
 		duration = &nanos
 	}
 
-	return c.repo.UpsertTestEnd(ctx, req.TestCase.Id, req.TestCase.Status.String(), duration)
+	return c.repo.UpsertTestEnd(ctx, req.TestCase.Id, req.TestCase.RunId, req.TestCase.Status.String(), duration)
 }
 
 // handleStepBegin processes a step begin event
@@ -436,7 +436,7 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 		Title:         req.Step.Title,
 	}
 
-	return c.repo.UpsertStepBegin(ctx, step, testID, req.Step.ParentStepId)
+	return c.repo.UpsertStepBegin(ctx, step, testID, req.Step.RunId, req.Step.ParentStepId)
 }
 
 // handleStepEnd processes a step end event
@@ -454,7 +454,7 @@ func (c *MongoNATSConsumer) handleStepEnd(ctx context.Context, data json.RawMess
 		"id", req.Step.Id,
 		"status", req.Step.Status)
 
-	return c.repo.UpsertStepEnd(ctx, req.Step.Id, mongoStatusToString(req.Step.Status))
+	return c.repo.UpsertStepEnd(ctx, req.Step.Id, req.Step.RunId, mongoStatusToString(req.Step.Status))
 }
 
 // handleTestFailure processes a test failure event
