@@ -170,8 +170,8 @@ RUN mkdir -p /data/artifacts /data/db /data/mongodb /run \
     chmod -R 755 /data && \
     chmod 755 /run && \
     chmod -R 755 /var/lib/nginx /var/cache/nginx && \
-    # Create MongoDB user and set ownership
-    useradd -r -u 999 mongodb && \
+    # Create MongoDB user if it doesn't exist (APT install creates it, binary install doesn't)
+    id mongodb 2>/dev/null || useradd -r -u 999 mongodb && \
     chown -R mongodb:mongodb /data/mongodb
 
 # Environment variables
