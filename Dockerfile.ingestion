@@ -15,7 +15,6 @@ RUN go mod download && go mod verify
 # Copy only necessary source files
 COPY cmd/ingestion/ ./cmd/ingestion/
 COPY pkg/ ./pkg/
-COPY internal/ ./internal/
 
 # Build ingestion binary with optimizations
 # TARGETARCH is automatically set by BuildKit for multi-platform builds
