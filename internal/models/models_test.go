@@ -3,34 +3,18 @@ package models
 import (
 	"testing"
 	"time"
-
-	"gorm.io/datatypes"
 )
 
-func TestTestCaseRun_TableName(t *testing.T) {
-	tc := TestCaseRun{}
-	expected := "test_case_runs"
-	if got := tc.TableName(); got != expected {
-		t.Errorf("TableName() = %v, want %v", got, expected)
-	}
-}
+// Note: TestTestDocument_Fields is in document_test.go to avoid duplication
 
-func TestStepRun_TableName(t *testing.T) {
-	sr := StepRun{}
-	expected := "step_runs"
-	if got := sr.TableName(); got != expected {
-		t.Errorf("TableName() = %v, want %v", got, expected)
-	}
-}
-
-func TestTestCaseRun_Fields(t *testing.T) {
+func TestTestDocument_BasicFields(t *testing.T) {
 	now := time.Now()
-	metadata := datatypes.JSONMap{
+	metadata := map[string]interface{}{
 		"key1": "value1",
 		"key2": "value2",
 	}
 
-	tc := TestCaseRun{
+	tc := TestDocument{
 		ID:        "test-123",
 		RunID:     "run-456",
 		Title:     "Test Case Title",
@@ -61,24 +45,29 @@ func TestStepRun_Fields(t *testing.T) {
 	now := time.Now()
 
 	sr := StepRun{
-		ID:            "step-123",
+		ID:            "step-789",
 		RunID:         "run-456",
-		TestCaseRunID: "test-789",
+		TestCaseRunID: "test-123",
 		Status:        "RUNNING",
+		Category:      "action",
+		Title:         "Step Title",
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
 
-	if sr.ID != "step-123" {
-		t.Errorf("ID = %v, want step-123", sr.ID)
+	if sr.ID != "step-789" {
+		t.Errorf("ID = %v, want step-789", sr.ID)
 	}
 	if sr.RunID != "run-456" {
 		t.Errorf("RunID = %v, want run-456", sr.RunID)
 	}
-	if sr.TestCaseRunID != "test-789" {
-		t.Errorf("TestCaseRunID = %v, want test-789", sr.TestCaseRunID)
+	if sr.TestCaseRunID != "test-123" {
+		t.Errorf("TestCaseRunID = %v, want test-123", sr.TestCaseRunID)
 	}
 	if sr.Status != "RUNNING" {
 		t.Errorf("Status = %v, want RUNNING", sr.Status)
+	}
+	if sr.Category != "action" {
+		t.Errorf("Category = %v, want action", sr.Category)
 	}
 }

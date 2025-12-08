@@ -3,25 +3,28 @@ package graph
 import (
 	"log/slog"
 
-	"gorm.io/gorm"
+	"github.com/stanterprise/observer/internal/repository"
 )
 
 // This file will not be regenerated automatically.
 //
 // It serves as dependency injection for your app, add any dependencies you require here.
 
+// Resolver is the root resolver for GraphQL queries.
+// Currently, the API service uses MongoDB with REST endpoints, not GraphQL.
+// This resolver is maintained for potential future GraphQL support.
 type Resolver struct {
-	db     *gorm.DB
+	repo   *repository.MongoRepository
 	logger *slog.Logger
 }
 
-// NewResolver creates a new resolver with database connection
-func NewResolver(db *gorm.DB, logger *slog.Logger) *Resolver {
+// NewResolver creates a new GraphQL resolver with MongoDB repository
+func NewResolver(repo *repository.MongoRepository, logger *slog.Logger) *Resolver {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &Resolver{
-		db:     db,
+		repo:   repo,
 		logger: logger,
 	}
 }

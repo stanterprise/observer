@@ -17,6 +17,19 @@ import (
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 )
 
+// noopWriter implements io.Writer but drops logs when no logger provided.
+type noopWriter struct{}
+
+func (n *noopWriter) Write(p []byte) (int, error) { return len(p), nil }
+
+// ptrInt32 returns a pointer to the given int32 value
+func ptrInt32(v int32) *int32 {
+	if v == 0 {
+		return nil
+	}
+	return &v
+}
+
 // MongoNATSConsumer wraps a NATS JetStream consumer for processing test events
 // and persisting them to MongoDB using a document-based data model
 type MongoNATSConsumer struct {
