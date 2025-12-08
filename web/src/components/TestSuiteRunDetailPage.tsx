@@ -37,8 +37,8 @@ interface RunStatistics {
 
 interface RunDetail {
   runId: string;
-  Tests: TestCase[];
-  Suites: RunDetail[];
+  tests: TestCase[]; // Note: lowercase 'tests' in response
+  suites?: RunDetail[];
   statistics: RunStatistics;
   totalSteps: number;
 }
@@ -52,8 +52,8 @@ export function TestSuiteRunDetailPage({
   const [error, setError] = useState<string | null>(null);
 
   const countTests = (suite: RunDetail): number => {
-    let total = suite.Tests?.length || 0;
-    for (const childSuite of suite.Suites ?? []) {
+    let total = suite.tests?.length || 0; // API returns 'tests' (lowercase)
+    for (const childSuite of suite.suites ?? []) {
       total += countTests(childSuite);
     }
 
@@ -293,7 +293,7 @@ export function TestSuiteRunDetailPage({
           Test Cases ({countTests(runDetail)})
         </h2>
         <div className="space-y-3">
-          {runDetail.Tests?.map((test) => (
+          {runDetail.tests?.map((test) => (
             <Link key={test.ID} to={`/tests/${test.ID}`}>
               <Card className="hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="py-4">
