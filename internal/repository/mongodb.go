@@ -18,6 +18,35 @@ type MongoRepository struct {
 	logger     *slog.Logger
 }
 
+// extractRootSuiteID extracts the root suite ID from a potentially nested suite ID
+// Example: "abc123-suite-root" -> "abc123-suite-root"
+// Example: "abc123-suite-/path/to/suite" -> "abc123-suite-root"
+func extractRootSuiteID(suiteID string) string {
+	// Look for the pattern: {base-id}-suite-{path}
+	// We want to return {base-id}-suite-root
+	// Note: base-id itself might contain "-suite-" as part of the UUID
+	// So we look for the LAST occurrence of "-suite-"
+
+	suiteMarker := "-suite-"
+	lastIdx := -1
+
+	// Find last occurrence of "-suite-"
+	for i := 0; i <= len(suiteID)-len(suiteMarker); i++ {
+		if suiteID[i:i+len(suiteMarker)] == suiteMarker {
+			lastIdx = i
+		}
+	}
+
+	if lastIdx >= 0 {
+		// Found "-suite-", extract base ID and append "-suite-root"
+		baseID := suiteID[:lastIdx]
+		return baseID + "-suite-root"
+	}
+
+	// No "-suite-" found, assume it's already a root ID or malformed
+	return suiteID + "-suite-root"
+}
+
 // NewMongoRepository creates a new MongoDB repository
 func NewMongoRepository(collection *mongo.Collection, logger *slog.Logger) *MongoRepository {
 	if logger == nil {
@@ -29,9 +58,11 @@ func NewMongoRepository(collection *mongo.Collection, logger *slog.Logger) *Mong
 	}
 }
 
-// UpsertSuiteBegin handles suite begin events.
-// - If root suite (no parent), creates a new TestRunDocument
-// - If non-root suite, appends to the parent suite's suites array
+// UpsertSuiteBegin handles suite begin events with true upsert semantics:
+// - If root suite (no parent): Creates a new TestRunDocument or updates it if already exists
+// - If nested suite: Finds the suite by ID within parent and updates if exists, inserts if not
+// This implements the requirement that when a suite is reported, the handler should
+// find the entity in the root suite document and upsert it.
 func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDocument, parentSuiteID string) error {
 	now := time.Now()
 	suite.CreatedAt = now
@@ -87,12 +118,42 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 		return nil
 	}
 
-	// Non-root suite - append to parent
+	// Non-root suite - upsert to parent (update if exists, insert if not)
 	suite.ParentSuiteID = parentSuiteID
 
-	// Try to find and update in root document's suites array
-	filter := bson.M{"_id": parentSuiteID}
+	// First, try to update existing suite if it already exists in root document's suites array
+	filter := bson.M{
+		"_id":        parentSuiteID,
+		"suites.id": suite.ID,
+	}
 	update := bson.M{
+		"$set": bson.M{
+			"suites.$.name":               suite.Name,
+			"suites.$.description":        suite.Description,
+			"suites.$.status":             suite.Status,
+			"suites.$.metadata":           suite.Metadata,
+			"suites.$.test_suite_spec_id": suite.TestSuiteSpecID,
+			"suites.$.initiated_by":       suite.InitiatedBy,
+			"suites.$.project_name":       suite.ProjectName,
+			"suites.$.start_time":         suite.StartTime,
+			"suites.$.updated_at":         now,
+		},
+	}
+
+	result, err := r.collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("update existing suite in parent: %w", err)
+	}
+
+	if result.MatchedCount > 0 {
+		// Suite was found and updated
+		r.logger.Info("suite begin (nested, updated)", "id", suite.ID, "parent", parentSuiteID)
+		return nil
+	}
+
+	// Suite doesn't exist, append it to root document
+	filter = bson.M{"_id": parentSuiteID}
+	update = bson.M{
 		"$push": bson.M{
 			"suites": suite,
 		},
@@ -101,14 +162,50 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 		},
 	}
 
-	result, err := r.collection.UpdateOne(ctx, filter, update)
+	result, err = r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("append suite to parent: %w", err)
 	}
 
 	if result.MatchedCount == 0 {
 		// Parent not found at root level, try nested update
-		// Use array filters to find nested parent suite
+		// First check if suite already exists in nested structure
+		filter = bson.M{
+			"suites.id":        parentSuiteID,
+			"suites.suites.id": suite.ID,
+		}
+		update = bson.M{
+			"$set": bson.M{
+				"suites.$[parent].suites.$[suite].name":               suite.Name,
+				"suites.$[parent].suites.$[suite].description":        suite.Description,
+				"suites.$[parent].suites.$[suite].status":             suite.Status,
+				"suites.$[parent].suites.$[suite].metadata":           suite.Metadata,
+				"suites.$[parent].suites.$[suite].test_suite_spec_id": suite.TestSuiteSpecID,
+				"suites.$[parent].suites.$[suite].initiated_by":       suite.InitiatedBy,
+				"suites.$[parent].suites.$[suite].project_name":       suite.ProjectName,
+				"suites.$[parent].suites.$[suite].start_time":         suite.StartTime,
+				"suites.$[parent].suites.$[suite].updated_at":         now,
+				"updated_at": now,
+			},
+		}
+		arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+			Filters: []interface{}{
+				bson.M{"parent.id": parentSuiteID},
+				bson.M{"suite.id": suite.ID},
+			},
+		})
+
+		result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
+		if err != nil {
+			return fmt.Errorf("update nested suite: %w", err)
+		}
+
+		if result.MatchedCount > 0 {
+			r.logger.Info("suite begin (deeply nested, updated)", "id", suite.ID, "parent", parentSuiteID)
+			return nil
+		}
+
+		// Suite doesn't exist in nested structure, append it
 		filter = bson.M{
 			"suites.id": parentSuiteID,
 		}
@@ -120,7 +217,7 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 				"updated_at": now,
 			},
 		}
-		arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+		arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
 			Filters: []interface{}{
 				bson.M{"parent.id": parentSuiteID},
 			},
@@ -130,13 +227,17 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, suite *m.SuiteDo
 		if err != nil {
 			return fmt.Errorf("append suite to nested parent: %w", err)
 		}
+		r.logger.Info("suite begin (deeply nested, inserted)", "id", suite.ID, "parent", parentSuiteID)
+		return nil
 	}
 
 	r.logger.Info("suite begin (nested)", "id", suite.ID, "parent", parentSuiteID)
 	return nil
 }
 
-// UpsertSuiteEnd handles suite end events by updating the suite's attributes
+// UpsertSuiteEnd handles suite end events by finding the suite within the root document
+// structure and updating its attributes (status, end_time, duration).
+// Searches both root-level suites and nested suites.
 func (r *MongoRepository) UpsertSuiteEnd(ctx context.Context, suiteID string, status string, endTime *time.Time, duration *int64) error {
 	now := time.Now()
 
@@ -190,17 +291,49 @@ func (r *MongoRepository) UpsertSuiteEnd(ctx context.Context, suiteID string, st
 	return nil
 }
 
-// UpsertTestBegin handles test begin events by appending to the parent suite
+// UpsertTestBegin handles test begin events by upserting to the parent suite
+// (update if exists, insert if not)
 func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocument, suiteID string) error {
 	now := time.Now()
 	test.CreatedAt = now
 	test.UpdatedAt = now
 	test.SuiteID = suiteID
-	test.Steps = []*m.StepDocument{}
+	if test.Steps == nil {
+		test.Steps = []*m.StepDocument{}
+	}
 
-	// Try to append to root document's tests array
-	filter := bson.M{"_id": suiteID}
+	// First, try to update existing test if it already exists in root document's tests array
+	filter := bson.M{
+		"_id":      suiteID,
+		"tests.id": test.ID,
+	}
 	update := bson.M{
+		"$set": bson.M{
+			"tests.$.title":       test.Title,
+			"tests.$.status":      test.Status,
+			"tests.$.metadata":    test.Metadata,
+			"tests.$.duration":    test.Duration,
+			"tests.$.retry_count": test.RetryCount,
+			"tests.$.retry_index": test.RetryIndex,
+			"tests.$.timeout":     test.Timeout,
+			"tests.$.updated_at":  now,
+		},
+	}
+
+	result, err := r.collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("update existing test in suite: %w", err)
+	}
+
+	if result.MatchedCount > 0 {
+		// Test was found and updated
+		r.logger.Info("test begin (updated)", "id", test.ID, "title", test.Title, "suite", suiteID)
+		return nil
+	}
+
+	// Test doesn't exist, append it to root document
+	filter = bson.M{"_id": suiteID}
+	update = bson.M{
 		"$push": bson.M{
 			"tests": test,
 		},
@@ -209,13 +342,49 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 		},
 	}
 
-	result, err := r.collection.UpdateOne(ctx, filter, update)
+	result, err = r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("append test to suite: %w", err)
 	}
 
 	if result.MatchedCount == 0 {
-		// Suite not found at root level, try nested
+		// Suite not found at root level, try nested suite
+		// First check if test already exists in nested suite
+		filter = bson.M{
+			"suites.id":        suiteID,
+			"suites.tests.id": test.ID,
+		}
+		update = bson.M{
+			"$set": bson.M{
+				"suites.$[suite].tests.$[test].title":       test.Title,
+				"suites.$[suite].tests.$[test].status":      test.Status,
+				"suites.$[suite].tests.$[test].metadata":    test.Metadata,
+				"suites.$[suite].tests.$[test].duration":    test.Duration,
+				"suites.$[suite].tests.$[test].retry_count": test.RetryCount,
+				"suites.$[suite].tests.$[test].retry_index": test.RetryIndex,
+				"suites.$[suite].tests.$[test].timeout":     test.Timeout,
+				"suites.$[suite].tests.$[test].updated_at":  now,
+				"updated_at": now,
+			},
+		}
+		arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+			Filters: []interface{}{
+				bson.M{"suite.id": suiteID},
+				bson.M{"test.id": test.ID},
+			},
+		})
+
+		result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
+		if err != nil {
+			return fmt.Errorf("update test in nested suite: %w", err)
+		}
+
+		if result.MatchedCount > 0 {
+			r.logger.Info("test begin (nested, updated)", "id", test.ID, "title", test.Title, "suite", suiteID)
+			return nil
+		}
+
+		// Test doesn't exist in nested suite, try to append it
 		filter = bson.M{"suites.id": suiteID}
 		update = bson.M{
 			"$push": bson.M{
@@ -225,23 +394,62 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 				"updated_at": now,
 			},
 		}
-		arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+		arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
 			Filters: []interface{}{
 				bson.M{"suite.id": suiteID},
 			},
 		})
 
-		_, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
+		result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 		if err != nil {
 			return fmt.Errorf("append test to nested suite: %w", err)
 		}
+
+		if result.MatchedCount > 0 {
+			r.logger.Info("test begin (nested, inserted)", "id", test.ID, "title", test.Title, "suite", suiteID)
+			return nil
+		}
+
+		// Suite not found anywhere - need to determine root suite ID and store test there
+		// Extract root suite ID from the suite ID (before first "-suite-" occurrence after initial ID)
+		rootSuiteID := extractRootSuiteID(suiteID)
+
+		r.logger.Warn("suite not found, storing test at root level",
+			"test_id", test.ID,
+			"requested_suite", suiteID,
+			"root_suite", rootSuiteID)
+
+		// Try to add test to root suite instead
+		filter = bson.M{"_id": rootSuiteID}
+		update = bson.M{
+			"$push": bson.M{
+				"tests": test,
+			},
+			"$set": bson.M{
+				"updated_at": now,
+			},
+		}
+
+		result, err = r.collection.UpdateOne(ctx, filter, update)
+		if err != nil {
+			return fmt.Errorf("append test to root suite (fallback): %w", err)
+		}
+
+		if result.MatchedCount == 0 {
+			return fmt.Errorf("root suite not found (id: %s) for fallback storage of test %s", rootSuiteID, test.ID)
+		}
+
+		r.logger.Info("test begin (root fallback)", "id", test.ID, "title", test.Title, "root_suite", rootSuiteID)
+		return nil
 	}
 
-	r.logger.Info("test begin", "id", test.ID, "title", test.Title, "suite", suiteID)
+	r.logger.Info("test begin (inserted)", "id", test.ID, "title", test.Title, "suite", suiteID)
 	return nil
 }
 
-// UpsertTestEnd handles test end events by updating the test's attributes
+// UpsertTestEnd handles test end events by finding the test within the root document
+// structure and updating its attributes (status, duration).
+// Searches both root-level tests and nested suite tests.
 func (r *MongoRepository) UpsertTestEnd(ctx context.Context, testID string, status string, duration *int64) error {
 	now := time.Now()
 
@@ -297,19 +505,54 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, testID string, stat
 	return nil
 }
 
-// UpsertStepBegin handles step begin events
+// UpsertStepBegin handles step begin events by upserting to the parent test
+// (update if exists, insert if not)
 func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocument, testID string, parentStepID string) error {
 	now := time.Now()
 	step.CreatedAt = now
 	step.UpdatedAt = now
 	step.TestCaseRunID = testID
 	step.ParentStepID = parentStepID
-	step.Steps = []*m.StepDocument{}
+	if step.Steps == nil {
+		step.Steps = []*m.StepDocument{}
+	}
 
 	if parentStepID == "" {
-		// Direct child of test - append to test's steps array
-		filter := bson.M{"tests.id": testID}
+		// Direct child of test - check if step already exists, then update or append
+		// First try to update existing step in root-level tests
+		filter := bson.M{
+			"tests.id":       testID,
+			"tests.steps.id": step.ID,
+		}
 		update := bson.M{
+			"$set": bson.M{
+				"tests.$[test].steps.$[step].status":     step.Status,
+				"tests.$[test].steps.$[step].category":   step.Category,
+				"tests.$[test].steps.$[step].title":      step.Title,
+				"tests.$[test].steps.$[step].updated_at": now,
+				"updated_at": now,
+			},
+		}
+		arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+			Filters: []interface{}{
+				bson.M{"test.id": testID},
+				bson.M{"step.id": step.ID},
+			},
+		})
+
+		result, err := r.collection.UpdateMany(ctx, filter, update, arrayFilters)
+		if err != nil {
+			return fmt.Errorf("update existing step in test: %w", err)
+		}
+
+		if result.MatchedCount > 0 {
+			r.logger.Info("step begin (updated)", "id", step.ID, "test", testID)
+			return nil
+		}
+
+		// Step doesn't exist, append it to test
+		filter = bson.M{"tests.id": testID}
+		update = bson.M{
 			"$push": bson.M{
 				"tests.$[test].steps": step,
 			},
@@ -317,19 +560,50 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 				"updated_at": now,
 			},
 		}
-		arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+		arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
 			Filters: []interface{}{
 				bson.M{"test.id": testID},
 			},
 		})
 
-		result, err := r.collection.UpdateMany(ctx, filter, update, arrayFilters)
+		result, err = r.collection.UpdateMany(ctx, filter, update, arrayFilters)
 		if err != nil {
 			return fmt.Errorf("append step to test: %w", err)
 		}
 
 		if result.MatchedCount == 0 {
-			// Try in nested suites
+			// Try in nested suites - first check if step exists
+			filter = bson.M{
+				"suites.tests.id":       testID,
+				"suites.tests.steps.id": step.ID,
+			}
+			update = bson.M{
+				"$set": bson.M{
+					"suites.$[].tests.$[test].steps.$[step].status":     step.Status,
+					"suites.$[].tests.$[test].steps.$[step].category":   step.Category,
+					"suites.$[].tests.$[test].steps.$[step].title":      step.Title,
+					"suites.$[].tests.$[test].steps.$[step].updated_at": now,
+					"updated_at": now,
+				},
+			}
+			arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
+				Filters: []interface{}{
+					bson.M{"test.id": testID},
+					bson.M{"step.id": step.ID},
+				},
+			})
+
+			result, err = r.collection.UpdateMany(ctx, filter, update, arrayFilters)
+			if err != nil {
+				return fmt.Errorf("update step in nested test: %w", err)
+			}
+
+			if result.MatchedCount > 0 {
+				r.logger.Info("step begin (nested, updated)", "id", step.ID, "test", testID)
+				return nil
+			}
+
+			// Step doesn't exist in nested suite, append it
 			filter = bson.M{"suites.tests.id": testID}
 			update = bson.M{
 				"$push": bson.M{
@@ -339,14 +613,21 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 					"updated_at": now,
 				},
 			}
+			arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
+				Filters: []interface{}{
+					bson.M{"test.id": testID},
+				},
+			})
 
 			_, err = r.collection.UpdateMany(ctx, filter, update, arrayFilters)
 			if err != nil {
 				return fmt.Errorf("append step to nested test: %w", err)
 			}
+			r.logger.Info("step begin (nested, inserted)", "id", step.ID, "test", testID)
+			return nil
 		}
 
-		r.logger.Info("step begin", "id", step.ID, "test", testID)
+		r.logger.Info("step begin (inserted)", "id", step.ID, "test", testID)
 		return nil
 	}
 
@@ -359,8 +640,41 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 
 	// Store the nested step at the test level with parent reference
 	// This allows later retrieval and tree reconstruction
-	filter := bson.M{"tests.id": testID}
+	// First check if it exists
+	filter := bson.M{
+		"tests.id":       testID,
+		"tests.steps.id": step.ID,
+	}
 	update := bson.M{
+		"$set": bson.M{
+			"tests.$[test].steps.$[step].status":        step.Status,
+			"tests.$[test].steps.$[step].category":      step.Category,
+			"tests.$[test].steps.$[step].title":         step.Title,
+			"tests.$[test].steps.$[step].parent_step_id": step.ParentStepID,
+			"tests.$[test].steps.$[step].updated_at":    now,
+			"updated_at": now,
+		},
+	}
+	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"test.id": testID},
+			bson.M{"step.id": step.ID},
+		},
+	})
+
+	result, err := r.collection.UpdateMany(ctx, filter, update, arrayFilters)
+	if err != nil {
+		return fmt.Errorf("update nested step in test: %w", err)
+	}
+
+	if result.MatchedCount > 0 {
+		r.logger.Info("step begin (nested, updated)", "id", step.ID, "parent", parentStepID)
+		return nil
+	}
+
+	// Doesn't exist, append it
+	filter = bson.M{"tests.id": testID}
+	update = bson.M{
 		"$push": bson.M{
 			"tests.$[test].steps": step,
 		},
@@ -368,22 +682,24 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 			"updated_at": now,
 		},
 	}
-	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+	arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
 			bson.M{"test.id": testID},
 		},
 	})
 
-	_, err := r.collection.UpdateMany(ctx, filter, update, arrayFilters)
+	_, err = r.collection.UpdateMany(ctx, filter, update, arrayFilters)
 	if err != nil {
 		return fmt.Errorf("append nested step to test: %w", err)
 	}
 
-	r.logger.Info("step begin (nested)", "id", step.ID, "parent", parentStepID)
+	r.logger.Info("step begin (nested, inserted)", "id", step.ID, "parent", parentStepID)
 	return nil
 }
 
-// UpsertStepEnd handles step end events by updating the step's attributes
+// UpsertStepEnd handles step end events by finding the step within the root document
+// structure and updating its status attribute.
+// Searches both root-level test steps and nested suite test steps.
 func (r *MongoRepository) UpsertStepEnd(ctx context.Context, stepID string, status string) error {
 	now := time.Now()
 

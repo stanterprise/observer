@@ -31,7 +31,16 @@ func ptrInt32(v int32) *int32 {
 }
 
 // MongoNATSConsumer wraps a NATS JetStream consumer for processing test events
-// and persisting them to MongoDB using a document-based data model
+// and persisting them to MongoDB using a document-based data model.
+//
+// Event Processing Flow:
+// - Suite Begin (root): Creates a new TestRunDocument if it doesn't exist
+// - Suite Begin (nested): Finds parent suite in root document and upserts the nested suite
+// - Test Begin: Finds parent suite in root document and upserts the test
+// - Step Begin: Finds parent test in root document and upserts the step
+// - End Events: Find and update existing entities within the root document
+//
+// All operations follow an upsert pattern: update if entity exists, insert if not found.
 type MongoNATSConsumer struct {
 	nc         *nats.Conn
 	js         jetstream.JetStream
