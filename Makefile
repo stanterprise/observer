@@ -301,7 +301,7 @@ docker-down: ## Stop all docker compose services
 docker-web-dev-down: ## Stop web development profile services
 	docker compose --profile web-dev down
 
-web-dev-mode: docker-web-dev-down docker-build-all docker-dev-web wevb-dev ## Rebuild and restart all services in Docker and start web UI in development mode
+web-dev-mode: docker-web-dev-down docker-build-all docker-dev-web web-dev ## Rebuild and restart all services in Docker and start web UI in development mode
 
 # Helm chart management
 helm-deps: ## Update Helm chart dependencies
