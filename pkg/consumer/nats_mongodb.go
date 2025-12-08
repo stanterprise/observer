@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -28,6 +29,19 @@ func ptrInt32(v int32) *int32 {
 		return nil
 	}
 	return &v
+}
+
+// extractTestID extracts the test ID from a test case run ID.
+// TestCaseRunId format is typically: {runId}-{testId}
+// This function strips the runId prefix to get just the testId.
+func extractTestID(testCaseRunID, runID string) string {
+	// If testCaseRunID starts with runID-, strip it
+	prefix := runID + "-"
+	if strings.HasPrefix(testCaseRunID, prefix) {
+		return strings.TrimPrefix(testCaseRunID, prefix)
+	}
+	// Otherwise, return as-is (backward compatibility)
+	return testCaseRunID
 }
 
 // MongoNATSConsumer wraps a NATS JetStream consumer for processing test events
@@ -402,9 +416,15 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 		return errors.New("step is nil")
 	}
 
+	// Extract the actual test ID from TestCaseRunId
+	// TestCaseRunId format is typically: {runId}-{testId}
+	// But tests are stored with just {testId}, so we need to extract it
+	testID := extractTestID(req.Step.TestCaseRunId, req.Step.RunId)
+
 	c.logger.Info("step start",
 		"id", req.Step.Id,
-		"test_id", req.Step.TestCaseRunId)
+		"test_case_run_id", req.Step.TestCaseRunId,
+		"extracted_test_id", testID)
 
 	step := &m.StepDocument{
 		ID:            req.Step.Id,
@@ -416,7 +436,7 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 		Title:         req.Step.Title,
 	}
 
-	return c.repo.UpsertStepBegin(ctx, step, req.Step.TestCaseRunId, req.Step.ParentStepId)
+	return c.repo.UpsertStepBegin(ctx, step, testID, req.Step.ParentStepId)
 }
 
 // handleStepEnd processes a step end event
