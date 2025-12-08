@@ -1078,7 +1078,7 @@ func (r *MongoRepository) ListTestRuns(ctx context.Context, filter bson.M, limit
 
 // GetTestFromRun retrieves a specific test from within a test run document
 func (r *MongoRepository) GetTestFromRun(ctx context.Context, testID string) (*m.TestDocument, error) {
-	// Use aggregation to find the specific test
+	// Try to find test in top-level tests array
 	pipeline := mongo.Pipeline{
 		{{Key: "$unwind", Value: "$tests"}},
 		{{Key: "$match", Value: bson.M{"tests.id": testID}}},
@@ -1089,11 +1089,35 @@ func (r *MongoRepository) GetTestFromRun(ctx context.Context, testID string) (*m
 	if err != nil {
 		return nil, fmt.Errorf("aggregate test: %w", err)
 	}
-	defer cursor.Close(ctx)
 
 	var tests []*m.TestDocument
 	if err := cursor.All(ctx, &tests); err != nil {
+		cursor.Close(ctx)
 		return nil, fmt.Errorf("decode test: %w", err)
+	}
+	cursor.Close(ctx)
+
+	if len(tests) > 0 {
+		return tests[0], nil
+	}
+
+	// If not found in top-level tests, search in nested suites
+	nestedPipeline := mongo.Pipeline{
+		{{Key: "$unwind", Value: "$suites"}},
+		{{Key: "$unwind", Value: "$suites.tests"}},
+		{{Key: "$match", Value: bson.M{"suites.tests.id": testID}}},
+		{{Key: "$replaceRoot", Value: bson.M{"newRoot": "$suites.tests"}}},
+	}
+
+	cursor, err = r.collection.Aggregate(ctx, nestedPipeline)
+	if err != nil {
+		return nil, fmt.Errorf("aggregate nested test: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	tests = []*m.TestDocument{}
+	if err := cursor.All(ctx, &tests); err != nil {
+		return nil, fmt.Errorf("decode nested test: %w", err)
 	}
 
 	if len(tests) == 0 {
