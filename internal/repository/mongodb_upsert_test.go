@@ -72,7 +72,7 @@ func TestUpsertSuiteBegin_NestedSuiteUpdateExisting(t *testing.T) {
 
 	// Create root suite
 	rootSuite := &m.SuiteDocument{
-		ID:     "suite-root-upsert-2",
+		ID:     "run-upsert-2-suite-root",
 		Name:   "Root Suite",
 		Status: "RUNNING",
 	}
@@ -83,12 +83,12 @@ func TestUpsertSuiteBegin_NestedSuiteUpdateExisting(t *testing.T) {
 
 	// Create nested suite first time
 	nestedSuite := &m.SuiteDocument{
-		ID:          "suite-nested-upsert-1",
+		ID:          "run-upsert-2-suite-/nested",
 		Name:        "Original Nested",
 		Description: "Original",
 		Status:      "RUNNING",
 	}
-	err = repo.UpsertSuiteBegin(ctx, nestedSuite, "suite-root-upsert-2")
+	err = repo.UpsertSuiteBegin(ctx, nestedSuite, "run-upsert-2-suite-root")
 	if err != nil {
 		t.Fatalf("First UpsertSuiteBegin for nested suite failed: %v", err)
 	}
@@ -97,14 +97,14 @@ func TestUpsertSuiteBegin_NestedSuiteUpdateExisting(t *testing.T) {
 	nestedSuite.Name = "Updated Nested"
 	nestedSuite.Description = "Updated"
 	nestedSuite.Status = "PASSED"
-	err = repo.UpsertSuiteBegin(ctx, nestedSuite, "suite-root-upsert-2")
+	err = repo.UpsertSuiteBegin(ctx, nestedSuite, "run-upsert-2-suite-root")
 	if err != nil {
 		t.Fatalf("Second UpsertSuiteBegin for nested suite failed: %v", err)
 	}
 
 	// Verify nested suite was updated, not duplicated
 	var doc m.TestRunDocument
-	err = testCollection.FindOne(ctx, bson.M{"_id": "suite-root-upsert-2"}).Decode(&doc)
+	err = testCollection.FindOne(ctx, bson.M{"_id": "run-upsert-2-suite-root"}).Decode(&doc)
 	if err != nil {
 		t.Fatalf("Failed to find document: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestUpsertTestBegin_UpdateExisting(t *testing.T) {
 
 	// Create root suite
 	suite := &m.SuiteDocument{
-		ID:     "suite-root-upsert-3",
+		ID:     "run-upsert-3-suite-root",
 		Name:   "Root Suite",
 		Status: "RUNNING",
 	}
@@ -148,7 +148,7 @@ func TestUpsertTestBegin_UpdateExisting(t *testing.T) {
 		Title:  "Original Title",
 		Status: "RUNNING",
 	}
-	err = repo.UpsertTestBegin(ctx, test, "suite-root-upsert-3")
+	err = repo.UpsertTestBegin(ctx, test, "run-upsert-3-suite-root")
 	if err != nil {
 		t.Fatalf("First UpsertTestBegin failed: %v", err)
 	}
@@ -158,14 +158,14 @@ func TestUpsertTestBegin_UpdateExisting(t *testing.T) {
 	test.Title = "Updated Title"
 	test.Status = "PASSED"
 	test.Duration = &duration
-	err = repo.UpsertTestBegin(ctx, test, "suite-root-upsert-3")
+	err = repo.UpsertTestBegin(ctx, test, "run-upsert-3-suite-root")
 	if err != nil {
 		t.Fatalf("Second UpsertTestBegin failed: %v", err)
 	}
 
 	// Verify test was updated, not duplicated
 	var doc m.TestRunDocument
-	err = testCollection.FindOne(ctx, bson.M{"_id": "suite-root-upsert-3"}).Decode(&doc)
+	err = testCollection.FindOne(ctx, bson.M{"_id": "run-upsert-3-suite-root"}).Decode(&doc)
 	if err != nil {
 		t.Fatalf("Failed to find document: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestUpsertStepBegin_UpdateExisting(t *testing.T) {
 
 	// Create root suite and test
 	suite := &m.SuiteDocument{
-		ID:     "suite-root-upsert-4",
+		ID:     "run-upsert-4-suite-root",
 		Name:   "Root Suite",
 		Status: "RUNNING",
 	}
@@ -208,7 +208,7 @@ func TestUpsertStepBegin_UpdateExisting(t *testing.T) {
 		Title:  "Test with steps",
 		Status: "RUNNING",
 	}
-	err = repo.UpsertTestBegin(ctx, test, "suite-root-upsert-4")
+	err = repo.UpsertTestBegin(ctx, test, "run-upsert-4-suite-root")
 	if err != nil {
 		t.Fatalf("Failed to create test: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestUpsertStepBegin_UpdateExisting(t *testing.T) {
 		Category: "action",
 		Title:    "Original Step",
 	}
-	err = repo.UpsertStepBegin(ctx, step, "test-upsert-2", "")
+	err = repo.UpsertStepBegin(ctx, step, "test-upsert-2", "", "")
 	if err != nil {
 		t.Fatalf("First UpsertStepBegin failed: %v", err)
 	}
@@ -232,14 +232,14 @@ func TestUpsertStepBegin_UpdateExisting(t *testing.T) {
 	step.Status = "PASSED"
 	step.Category = "assertion"
 	step.Title = "Updated Step"
-	err = repo.UpsertStepBegin(ctx, step, "test-upsert-2", "")
+	err = repo.UpsertStepBegin(ctx, step, "test-upsert-2", "", "")
 	if err != nil {
 		t.Fatalf("Second UpsertStepBegin failed: %v", err)
 	}
 
 	// Verify step was updated, not duplicated
 	var doc m.TestRunDocument
-	err = testCollection.FindOne(ctx, bson.M{"_id": "suite-root-upsert-4"}).Decode(&doc)
+	err = testCollection.FindOne(ctx, bson.M{"_id": "run-upsert-4-suite-root"}).Decode(&doc)
 	if err != nil {
 		t.Fatalf("Failed to find document: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestUpsertFlow_CompleteScenario(t *testing.T) {
 
 	// Create root suite
 	suite := &m.SuiteDocument{
-		ID:     "suite-scenario",
+		ID:     "run-scenario-suite-root",
 		Name:   "Scenario Suite",
 		Status: "RUNNING",
 	}
@@ -287,13 +287,13 @@ func TestUpsertFlow_CompleteScenario(t *testing.T) {
 		Title:  "Scenario Test",
 		Status: "RUNNING",
 	}
-	err = repo.UpsertTestBegin(ctx, test, "suite-scenario")
+	err = repo.UpsertTestBegin(ctx, test, "run-scenario-suite-root")
 	if err != nil {
 		t.Fatalf("Failed to create test: %v", err)
 	}
 
 	// Simulate event replay - send same test begin event again
-	err = repo.UpsertTestBegin(ctx, test, "suite-scenario")
+	err = repo.UpsertTestBegin(ctx, test, "run-scenario-suite-root")
 	if err != nil {
 		t.Fatalf("Replayed test begin failed: %v", err)
 	}
@@ -305,53 +305,53 @@ func TestUpsertFlow_CompleteScenario(t *testing.T) {
 		Category: "action",
 		Title:    "Step 1",
 	}
-	err = repo.UpsertStepBegin(ctx, step, "test-scenario", "")
+	err = repo.UpsertStepBegin(ctx, step, "test-scenario", "", "")
 	if err != nil {
 		t.Fatalf("Failed to create step: %v", err)
 	}
 
 	// Simulate event replay - send same step begin event again
-	err = repo.UpsertStepBegin(ctx, step, "test-scenario", "")
+	err = repo.UpsertStepBegin(ctx, step, "test-scenario", "", "")
 	if err != nil {
 		t.Fatalf("Replayed step begin failed: %v", err)
 	}
 
 	// End step (twice to simulate replay)
-	err = repo.UpsertStepEnd(ctx, "step-scenario", "PASSED")
+	err = repo.UpsertStepEnd(ctx, "step-scenario", "", "PASSED")
 	if err != nil {
 		t.Fatalf("First step end failed: %v", err)
 	}
-	err = repo.UpsertStepEnd(ctx, "step-scenario", "PASSED")
+	err = repo.UpsertStepEnd(ctx, "step-scenario", "", "PASSED")
 	if err != nil {
 		t.Fatalf("Replayed step end failed: %v", err)
 	}
 
 	// End test (twice to simulate replay)
 	duration := int64(1000000)
-	err = repo.UpsertTestEnd(ctx, "test-scenario", "PASSED", &duration)
+	err = repo.UpsertTestEnd(ctx, "test-scenario", "", "PASSED", &duration)
 	if err != nil {
 		t.Fatalf("First test end failed: %v", err)
 	}
-	err = repo.UpsertTestEnd(ctx, "test-scenario", "PASSED", &duration)
+	err = repo.UpsertTestEnd(ctx, "test-scenario", "", "PASSED", &duration)
 	if err != nil {
 		t.Fatalf("Replayed test end failed: %v", err)
 	}
 
 	// End suite (twice to simulate replay)
 	now := time.Now()
-	suiteDuration := int64(5000000)
-	err = repo.UpsertSuiteEnd(ctx, "suite-scenario", "PASSED", &now, &suiteDuration)
+	suiteDuration := int64(2000000)
+	err = repo.UpsertSuiteEnd(ctx, "run-scenario-suite-root", "PASSED", &now, &suiteDuration)
 	if err != nil {
 		t.Fatalf("First suite end failed: %v", err)
 	}
-	err = repo.UpsertSuiteEnd(ctx, "suite-scenario", "PASSED", &now, &suiteDuration)
+	err = repo.UpsertSuiteEnd(ctx, "run-scenario-suite-root", "PASSED", &now, &suiteDuration)
 	if err != nil {
 		t.Fatalf("Replayed suite end failed: %v", err)
 	}
 
 	// Verify final state - should have exactly 1 suite, 1 test, 1 step
 	var doc m.TestRunDocument
-	err = testCollection.FindOne(ctx, bson.M{"_id": "suite-scenario"}).Decode(&doc)
+	err = testCollection.FindOne(ctx, bson.M{"_id": "run-scenario-suite-root"}).Decode(&doc)
 	if err != nil {
 		t.Fatalf("Failed to find document: %v", err)
 	}

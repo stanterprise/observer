@@ -125,7 +125,7 @@ func TestUpsertSuiteBegin_NestedSuite(t *testing.T) {
 
 	// First create root suite
 	rootSuite := &m.SuiteDocument{
-		ID:     "suite-root-2",
+		ID:     "run2-suite-root",
 		Name:   "Root Suite",
 		Status: "RUNNING",
 	}
@@ -136,19 +136,19 @@ func TestUpsertSuiteBegin_NestedSuite(t *testing.T) {
 
 	// Create nested suite
 	nestedSuite := &m.SuiteDocument{
-		ID:     "suite-nested-1",
+		ID:     "run2-suite-/nested",
 		Name:   "Nested Suite",
 		Status: "RUNNING",
 	}
 
-	err = repo.UpsertSuiteBegin(ctx, nestedSuite, "suite-root-2")
+	err = repo.UpsertSuiteBegin(ctx, nestedSuite, "run2-suite-root")
 	if err != nil {
 		t.Fatalf("UpsertSuiteBegin for nested suite failed: %v", err)
 	}
 
 	// Verify nested suite was appended
 	var doc m.TestRunDocument
-	err = testCollection.FindOne(ctx, bson.M{"_id": "suite-root-2"}).Decode(&doc)
+	err = testCollection.FindOne(ctx, bson.M{"_id": "run2-suite-root"}).Decode(&doc)
 	if err != nil {
 		t.Fatalf("Failed to find document: %v", err)
 	}
@@ -156,8 +156,8 @@ func TestUpsertSuiteBegin_NestedSuite(t *testing.T) {
 	if len(doc.Suites) != 1 {
 		t.Fatalf("Suites length = %v, want 1", len(doc.Suites))
 	}
-	if doc.Suites[0].ID != "suite-nested-1" {
-		t.Errorf("Nested suite ID = %v, want suite-nested-1", doc.Suites[0].ID)
+	if doc.Suites[0].ID != "run2-suite-/nested" {
+		t.Errorf("Nested suite ID = %v, want run2-suite-/nested", doc.Suites[0].ID)
 	}
 }
 
@@ -167,7 +167,7 @@ func TestUpsertTestBegin_RootLevel(t *testing.T) {
 
 	// Create root suite
 	suite := &m.SuiteDocument{
-		ID:     "suite-root-3",
+		ID:     "run3-suite-root",
 		Name:   "Root Suite",
 		Status: "RUNNING",
 	}
@@ -183,23 +183,26 @@ func TestUpsertTestBegin_RootLevel(t *testing.T) {
 		Status: "RUNNING",
 	}
 
-	err = repo.UpsertTestBegin(ctx, test, "suite-root-3")
+	err = repo.UpsertTestBegin(ctx, test, "run3-suite-root")
 	if err != nil {
 		t.Fatalf("UpsertTestBegin failed: %v", err)
 	}
 
-	// Verify test was appended
+	// Verify test was appended to the root suite (which is in the suites array)
 	var doc m.TestRunDocument
-	err = testCollection.FindOne(ctx, bson.M{"_id": "suite-root-3"}).Decode(&doc)
+	err = testCollection.FindOne(ctx, bson.M{"_id": "run3-suite-root"}).Decode(&doc)
 	if err != nil {
 		t.Fatalf("Failed to find document: %v", err)
 	}
 
-	if len(doc.Tests) != 1 {
-		t.Fatalf("Tests length = %v, want 1", len(doc.Tests))
+	if len(doc.Suites) != 1 {
+		t.Fatalf("Suites length = %v, want 1", len(doc.Suites))
 	}
-	if doc.Tests[0].ID != "test-1" {
-		t.Errorf("Test ID = %v, want test-1", doc.Tests[0].ID)
+	if len(doc.Suites[0].Tests) != 1 {
+		t.Fatalf("Tests length = %v, want 1", len(doc.Suites[0].Tests))
+	}
+	if doc.Suites[0].Tests[0].ID != "test-1" {
+		t.Errorf("Test ID = %v, want test-1", doc.Suites[0].Tests[0].ID)
 	}
 }
 
@@ -207,9 +210,9 @@ func TestUpsertStepBegin_DirectChild(t *testing.T) {
 	repo := setupTest(t)
 	ctx := context.Background()
 
-	// Create root suite and test
+	// Create root suite
 	suite := &m.SuiteDocument{
-		ID:     "suite-root-4",
+		ID:     "run4-suite-root",
 		Name:   "Root Suite",
 		Status: "RUNNING",
 	}
@@ -223,7 +226,7 @@ func TestUpsertStepBegin_DirectChild(t *testing.T) {
 		Title:  "Test with steps",
 		Status: "RUNNING",
 	}
-	err = repo.UpsertTestBegin(ctx, test, "suite-root-4")
+	err = repo.UpsertTestBegin(ctx, test, "run4-suite-root")
 	if err != nil {
 		t.Fatalf("Failed to create test: %v", err)
 	}
@@ -236,14 +239,14 @@ func TestUpsertStepBegin_DirectChild(t *testing.T) {
 		Title:    "Click button",
 	}
 
-	err = repo.UpsertStepBegin(ctx, step, "test-2", "")
+	err = repo.UpsertStepBegin(ctx, step, "test-2", "", "")
 	if err != nil {
 		t.Fatalf("UpsertStepBegin failed: %v", err)
 	}
 
 	// Verify step was appended
 	var doc m.TestRunDocument
-	err = testCollection.FindOne(ctx, bson.M{"_id": "suite-root-4"}).Decode(&doc)
+	err = testCollection.FindOne(ctx, bson.M{"_id": "run4-suite-root"}).Decode(&doc)
 	if err != nil {
 		t.Fatalf("Failed to find document: %v", err)
 	}
@@ -323,7 +326,7 @@ func TestConcurrentUpserts(t *testing.T) {
 
 	// Create root suite
 	suite := &m.SuiteDocument{
-		ID:     "suite-concurrent-1",
+		ID:     "run-concurrent-1-suite-root",
 		Name:   "Concurrent Suite",
 		Status: "RUNNING",
 	}
@@ -343,7 +346,7 @@ func TestConcurrentUpserts(t *testing.T) {
 				Title:  fmt.Sprintf("Test %d", index),
 				Status: "RUNNING",
 			}
-			errChan <- repo.UpsertTestBegin(ctx, test, "suite-concurrent-1")
+			errChan <- repo.UpsertTestBegin(ctx, test, "run-concurrent-1-suite-root")
 		}(i)
 	}
 
@@ -356,7 +359,7 @@ func TestConcurrentUpserts(t *testing.T) {
 
 	// Verify all tests were added
 	var doc m.TestRunDocument
-	err = testCollection.FindOne(ctx, bson.M{"_id": "suite-concurrent-1"}).Decode(&doc)
+	err = testCollection.FindOne(ctx, bson.M{"_id": "run-concurrent-1-suite-root"}).Decode(&doc)
 	if err != nil {
 		t.Fatalf("Failed to find document: %v", err)
 	}

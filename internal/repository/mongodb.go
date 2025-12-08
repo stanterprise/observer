@@ -369,7 +369,6 @@ func (r *MongoRepository) UpsertSuiteEnd(ctx context.Context, suiteID string, st
 
 // UpsertTestBegin handles test begin events by upserting to the parent suite
 // (update if exists, insert if not)
-// Tests should always be added to suite's tests array, never to root document's tests array
 func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocument, suiteID string) error {
 	now := time.Now()
 	test.CreatedAt = now
@@ -449,16 +448,8 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 		return nil
 	}
 
-	// Suite not found in level 1, this means the suiteID might be the root document ID
-	// In this case, we should NOT add to root document's tests array
-	// Instead, log a warning - tests should always belong to a suite
-	r.logger.Warn("test has no parent suite, suite may not have been created yet",
-		"test_id", test.ID,
-		"suite_id", suiteID,
-		"run_id", test.RunID)
-
 	// As a fallback, check if the root document exists with this ID
-	// If it does, we should NOT add tests to root level - they need a suite
+	// (for nested suites where the nested suite doesn't exist yet)
 	var doc m.TestRunDocument
 	err = r.collection.FindOne(ctx, bson.M{"_id": suiteID}).Decode(&doc)
 	if err == nil {
@@ -564,14 +555,12 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 		return nil
 	}
 
-	// Root document doesn't exist - extract root suite ID and try there
-	// Root document ID should be {runID}-suite-root
-	rootSuiteID := test.RunID + "-suite-root"
-
+	// Root document doesn't exist with suiteID - extract root suite ID and try there
+	// rootDocID was already extracted at the beginning of the function
 	r.logger.Warn("test arrived before suite, creating placeholder suite",
 		"test_id", test.ID,
 		"suite_id", suiteID,
-		"root_suite_id", rootSuiteID)
+		"root_suite_id", rootDocID)
 
 	// Create placeholder suite
 	placeholderSuite := &m.SuiteDocument{
@@ -588,7 +577,7 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 	}
 
 	// Try to add placeholder suite to root document
-	filter = bson.M{"_id": rootSuiteID}
+	filter = bson.M{"_id": rootDocID}
 	update = bson.M{
 		"$push": bson.M{
 			"suites": placeholderSuite,
@@ -604,7 +593,7 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 	}
 
 	if result.MatchedCount == 0 {
-		return fmt.Errorf("root suite document not found: %s (for suite: %s, test: %s)", rootSuiteID, suiteID, test.ID)
+		return fmt.Errorf("root suite document not found: %s (for suite: %s, test: %s)", rootDocID, suiteID, test.ID)
 	}
 
 	r.logger.Info("test begin (placeholder suite created)", "id", test.ID, "title", test.Title, "suite", suiteID)

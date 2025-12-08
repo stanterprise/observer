@@ -79,7 +79,7 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 	// be configured with a MongoDB repository to handle events.
 
 	// Publish suite begin event
-	suiteID := "suite-integration-1"
+	suiteID := "run-integration-1-suite-root"
 	suiteBeginEvent := &m.SuiteDocument{
 		ID:          suiteID,
 		Name:        "Integration Test Suite",
@@ -117,20 +117,20 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 		Title:    "Perform action",
 	}
 
-	err = repo.UpsertStepBegin(ctx, stepBeginEvent, testID, "")
+	err = repo.UpsertStepBegin(ctx, stepBeginEvent, testID, "", "")
 	if err != nil {
 		t.Fatalf("Failed to upsert step begin: %v", err)
 	}
 
 	// Publish step end event
-	err = repo.UpsertStepEnd(ctx, stepID, "PASSED")
+	err = repo.UpsertStepEnd(ctx, stepID, "", "PASSED")
 	if err != nil {
 		t.Fatalf("Failed to upsert step end: %v", err)
 	}
 
 	// Publish test end event
 	testDuration := int64(1000000000)
-	err = repo.UpsertTestEnd(ctx, testID, "PASSED", &testDuration)
+	err = repo.UpsertTestEnd(ctx, testID, "", "PASSED", &testDuration)
 	if err != nil {
 		t.Fatalf("Failed to upsert test end: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestNATSToMongoDB_NestedSuites(t *testing.T) {
 	repo := repository.NewMongoRepository(collection, logger)
 
 	// Create root suite
-	rootSuiteID := "suite-root-nested"
+	rootSuiteID := "run-nested-suite-root"
 	rootSuite := &m.SuiteDocument{
 		ID:     rootSuiteID,
 		Name:   "Root Suite",
@@ -240,7 +240,7 @@ func TestNATSToMongoDB_NestedSuites(t *testing.T) {
 	}
 
 	// Create nested suite level 1
-	nestedSuite1ID := "suite-nested-1"
+	nestedSuite1ID := "run-nested-suite-/level1"
 	nestedSuite1 := &m.SuiteDocument{
 		ID:     nestedSuite1ID,
 		Name:   "Nested Suite Level 1",
@@ -252,7 +252,7 @@ func TestNATSToMongoDB_NestedSuites(t *testing.T) {
 	}
 
 	// Create nested suite level 2
-	nestedSuite2ID := "suite-nested-2"
+	nestedSuite2ID := "run-nested-suite-/level1/level2"
 	nestedSuite2 := &m.SuiteDocument{
 		ID:     nestedSuite2ID,
 		Name:   "Nested Suite Level 2",
