@@ -74,6 +74,7 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
     if (!onWebSocketEvent) return;
 
     const { type, data } = onWebSocketEvent;
+
     if (type === "test.begin" || type === "test.end") {
       const testData = data as WebSocketTestData;
       const runId = testData.run_id || testData.test_case?.run_id;
@@ -82,8 +83,22 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
       let status = "RUNNING";
       if (type === "test.end") {
         const rawStatus = testData.test_case?.status || testData.status;
-        status =
-          typeof rawStatus === "string" ? rawStatus.toUpperCase() : "UNKNOWN";
+        // Handle numeric status codes (protobuf enums) - need to map them
+        if (typeof rawStatus === "number") {
+          // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
+          const statusMap: Record<number, string> = {
+            0: "UNKNOWN",
+            1: "PASSED",
+            2: "FAILED",
+            3: "SKIPPED",
+            4: "BROKEN",
+            5: "TIMEDOUT",
+            6: "INTERRUPTED",
+          };
+          status = statusMap[rawStatus] || "UNKNOWN";
+        } else if (typeof rawStatus === "string") {
+          status = rawStatus.toUpperCase();
+        }
       }
 
       if (runId) {
@@ -93,7 +108,7 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
 
             if (existingIndex >= 0) {
               const updated = [...prevRuns];
-              const currentRun = updated[existingIndex];
+              const currentRun = { ...updated[existingIndex] };
 
               // Update statistics based on event type
               if (type === "test.begin") {
@@ -131,7 +146,7 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
               }
 
               currentRun.lastUpdated = new Date().toISOString();
-              updated[existingIndex] = { ...currentRun };
+              updated[existingIndex] = currentRun;
               return updated;
             } else if (type === "test.begin") {
               // New run started

@@ -79,7 +79,6 @@ export function TestSuiteRunDetailPage({
         throw new Error(`Failed to fetch run details: ${response.statusText}`);
       }
       const data = await response.json();
-      console.log("Fetched run details:", data);
       setRunDetail(data);
       setError(null);
     } catch (err) {
