@@ -3,12 +3,7 @@ import { Link } from "react-router-dom";
 import { apiUrl } from "../lib/config";
 import { Card, CardContent } from "./Card";
 import { Badge } from "./Badge";
-import type {
-  WebSocketEvent,
-  TestStatus,
-  TestCaseResponse,
-  WebSocketTestData,
-} from "../types";
+import type { WebSocketEvent, TestStatus, WebSocketTestData } from "../types";
 import {
   Play,
   CheckCircle,
@@ -49,47 +44,13 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
   const fetchRuns = async () => {
     try {
       setLoading(true);
-      const response = await fetch(apiUrl("/runs"));
+      // Fetch all run statistics in a single request
+      const response = await fetch(apiUrl("/runs/stats"));
       if (!response.ok) {
         throw new Error(`Failed to fetch runs: ${response.statusText}`);
       }
       const data = await response.json();
-      const runIds = data.runs || [];
-
-      // Fetch stats for each run
-      const statsPromises = runIds.map(async (runId: string) => {
-        const statsResponse = await fetch(apiUrl(`/runs/${runId}`));
-        if (!statsResponse.ok) {
-          return null;
-        }
-        const statsData = await statsResponse.json();
-        return {
-          runId: statsData.runId,
-          total: statsData.statistics.total || 0,
-          passed: statsData.statistics.passed || 0,
-          failed: statsData.statistics.failed || 0,
-          skipped: statsData.statistics.skipped || 0,
-          running: statsData.statistics.running || 0,
-          broken: statsData.statistics.broken || 0,
-          timedout: statsData.statistics.timedout || 0,
-          interrupted: statsData.statistics.interrupted || 0,
-          unknown: statsData.statistics.unknown || 0,
-          lastUpdated:
-            statsData.tests && statsData.tests.length > 0
-              ? new Date(
-                  Math.max(
-                    ...statsData.tests.map((t: TestCaseResponse) =>
-                      new Date(t.UpdatedAt).getTime()
-                    )
-                  )
-                ).toISOString()
-              : undefined,
-        };
-      });
-
-      const stats = (await Promise.all(statsPromises)).filter(
-        (s): s is TestRunStats => s !== null
-      );
+      const stats = (data.runs || []) as TestRunStats[];
 
       // Sort by lastUpdated (most recent first by default)
       stats.sort((a, b) => {
@@ -108,7 +69,7 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
     }
   };
 
-  // Handle WebSocket events to update run statistics
+  // Handle WebSocket events to update run statistics locally
   useEffect(() => {
     if (!onWebSocketEvent) return;
 
@@ -117,39 +78,85 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
       const testData = data as WebSocketTestData;
       const runId = testData.run_id || testData.test_case?.run_id;
 
+      // Safely extract status - handle both string and non-string values
+      let status = "RUNNING";
+      if (type === "test.end") {
+        const rawStatus = testData.test_case?.status || testData.status;
+        status =
+          typeof rawStatus === "string" ? rawStatus.toUpperCase() : "UNKNOWN";
+      }
+
       if (runId) {
-        // Refetch statistics for the affected run
-        fetch(apiUrl(`/runs/${runId}`))
-          .then((res) => res.json())
-          .then((statsData) => {
-            setRuns((prevRuns) => {
-              const existingIndex = prevRuns.findIndex(
-                (r) => r.runId === runId
-              );
-              const updatedRun: TestRunStats = {
-                runId: statsData.runId,
-                total: statsData.statistics.total || 0,
-                passed: statsData.statistics.passed || 0,
-                failed: statsData.statistics.failed || 0,
-                skipped: statsData.statistics.skipped || 0,
-                running: statsData.statistics.running || 0,
-                broken: statsData.statistics.broken || 0,
-                timedout: statsData.statistics.timedout || 0,
-                interrupted: statsData.statistics.interrupted || 0,
-                unknown: statsData.statistics.unknown || 0,
+        setRuns((prevRuns) => {
+          try {
+            const existingIndex = prevRuns.findIndex((r) => r.runId === runId);
+
+            if (existingIndex >= 0) {
+              const updated = [...prevRuns];
+              const currentRun = updated[existingIndex];
+
+              // Update statistics based on event type
+              if (type === "test.begin") {
+                currentRun.running = (currentRun.running || 0) + 1;
+                currentRun.total = currentRun.total + 1;
+              } else if (type === "test.end") {
+                // Decrement running count
+                if (currentRun.running && currentRun.running > 0) {
+                  currentRun.running--;
+                }
+
+                // Increment appropriate status counter
+                switch (status) {
+                  case "PASSED":
+                    currentRun.passed++;
+                    break;
+                  case "FAILED":
+                    currentRun.failed++;
+                    break;
+                  case "SKIPPED":
+                    currentRun.skipped++;
+                    break;
+                  case "BROKEN":
+                    currentRun.broken = (currentRun.broken || 0) + 1;
+                    break;
+                  case "TIMEDOUT":
+                    currentRun.timedout = (currentRun.timedout || 0) + 1;
+                    break;
+                  case "INTERRUPTED":
+                    currentRun.interrupted = (currentRun.interrupted || 0) + 1;
+                    break;
+                  default:
+                    currentRun.unknown = (currentRun.unknown || 0) + 1;
+                }
+              }
+
+              currentRun.lastUpdated = new Date().toISOString();
+              updated[existingIndex] = { ...currentRun };
+              return updated;
+            } else if (type === "test.begin") {
+              // New run started
+              const newRun: TestRunStats = {
+                runId,
+                total: 1,
+                passed: 0,
+                failed: 0,
+                skipped: 0,
+                running: 1,
+                broken: 0,
+                timedout: 0,
+                interrupted: 0,
+                unknown: 0,
                 lastUpdated: new Date().toISOString(),
               };
+              return [newRun, ...prevRuns];
+            }
 
-              if (existingIndex >= 0) {
-                const updated = [...prevRuns];
-                updated[existingIndex] = updatedRun;
-                return updated;
-              } else {
-                return [updatedRun, ...prevRuns];
-              }
-            });
-          })
-          .catch((err) => console.error("Failed to update run stats:", err));
+            return prevRuns;
+          } catch (error) {
+            console.error("Error updating runs from WebSocket:", error);
+            return prevRuns;
+          }
+        });
       }
     }
   }, [onWebSocketEvent]);

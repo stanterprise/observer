@@ -42,7 +42,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onErrorRef.current = onError;
     autoReconnectRef.current = autoReconnect;
     reconnectIntervalRef.current = reconnectInterval;
-  }, [onMessage, onConnect, onDisconnect, onError, autoReconnect, reconnectInterval]);
+  }, [
+    onMessage,
+    onConnect,
+    onDisconnect,
+    onError,
+    autoReconnect,
+    reconnectInterval,
+  ]);
 
   // Create the connect function
   const connect = useRef<() => void>(() => {});
@@ -57,13 +64,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       }
 
       const url = wsUrl();
-      console.log("Connecting to WebSocket:", url);
 
       try {
         const ws = new WebSocket(url);
 
         ws.onopen = () => {
-          console.log("WebSocket connected");
           setIsConnected(true);
           onConnectRef.current?.();
         };
@@ -93,14 +98,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         };
 
         ws.onclose = () => {
-          console.log("WebSocket disconnected");
           setIsConnected(false);
           wsRef.current = null;
           onDisconnectRef.current?.();
 
           // Auto-reconnect if enabled
           if (autoReconnectRef.current && shouldReconnectRef.current) {
-            console.log(`Reconnecting in ${reconnectIntervalRef.current}ms...`);
             reconnectTimeoutRef.current = window.setTimeout(() => {
               connect.current();
             }, reconnectIntervalRef.current);

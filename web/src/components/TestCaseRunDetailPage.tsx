@@ -81,7 +81,7 @@ export function TestCaseRunDetailPage({
     }
   };
 
-  // Handle WebSocket events to update test and step statuses
+  // Handle WebSocket events to update test and step statuses locally
   useEffect(() => {
     if (!onWebSocketEvent || !testDetail) return;
 
@@ -91,19 +91,89 @@ export function TestCaseRunDetailPage({
       const eventData = data as WebSocketTestData;
       const eventTestId = eventData.test_case?.id || eventData.id;
       if (eventTestId === testId) {
-        // Refetch test details
-        if (testId) {
-          fetchTestDetail(testId);
-        }
+        setTestDetail((prevDetail) => {
+          if (!prevDetail || !prevDetail.test) return prevDetail;
+
+          try {
+            // Safely extract status - handle both string and non-string values
+            const rawStatus = eventData.test_case?.status || eventData.status;
+            const status =
+              typeof rawStatus === "string"
+                ? rawStatus.toUpperCase()
+                : "RUNNING";
+
+            return {
+              ...prevDetail,
+              test: {
+                ...prevDetail.test,
+                Status: status,
+                UpdatedAt: new Date().toISOString(),
+              },
+            };
+          } catch (error) {
+            console.error("Error updating test detail from WebSocket:", error);
+            return prevDetail;
+          }
+        });
       }
     } else if (type === "step.end" || type === "step.begin") {
       const eventData = data as WebSocketStepData;
       const eventTestCaseRunId = eventData.test_case_run_id;
       if (eventTestCaseRunId === testId) {
-        // Refetch test details to get updated steps
-        if (testId) {
-          fetchTestDetail(testId);
-        }
+        setTestDetail((prevDetail) => {
+          if (!prevDetail || !prevDetail.steps) return prevDetail;
+
+          try {
+            const stepId = eventData.id;
+            // Safely extract status - handle both string and non-string values
+            const rawStatus = eventData.status;
+            const status =
+              typeof rawStatus === "string"
+                ? rawStatus.toUpperCase()
+                : "RUNNING";
+            const updatedSteps = [...prevDetail.steps];
+            const stepIndex = updatedSteps.findIndex((s) => s.ID === stepId);
+
+            if (type === "step.begin") {
+              if (stepIndex === -1) {
+                // Add new step
+                updatedSteps.push({
+                  ID: stepId || "",
+                  RunID: prevDetail.test.RunID,
+                  TestCaseRunID: testId || "",
+                  ParentStepID: eventData.parent_step_id,
+                  Status: "RUNNING",
+                  Category: eventData.category || "",
+                  Title: eventData.title || "",
+                  CreatedAt: new Date().toISOString(),
+                  UpdatedAt: new Date().toISOString(),
+                });
+              } else {
+                updatedSteps[stepIndex] = {
+                  ...updatedSteps[stepIndex],
+                  Status: "RUNNING",
+                  UpdatedAt: new Date().toISOString(),
+                };
+              }
+            } else if (type === "step.end") {
+              if (stepIndex >= 0) {
+                updatedSteps[stepIndex] = {
+                  ...updatedSteps[stepIndex],
+                  Status: status,
+                  UpdatedAt: new Date().toISOString(),
+                };
+              }
+            }
+
+            return {
+              ...prevDetail,
+              steps: updatedSteps,
+            };
+          } catch (error) {
+            console.error("Error updating steps from WebSocket:", error);
+            return prevDetail;
+          }
+        });
       }
     }
   }, [onWebSocketEvent, testDetail, testId]);
@@ -195,7 +265,7 @@ export function TestCaseRunDetailPage({
                   <dt className="text-gray-600">Run ID:</dt>
                   <dd className="font-mono text-gray-900">
                     <Link
-                      to={`/runs/${test.RunID}`}
+                      to={`/suite_runs/${test.RunID}`}
                       className="text-blue-600 hover:underline"
                     >
                       {test.RunID}

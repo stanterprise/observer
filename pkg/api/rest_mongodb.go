@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository"
@@ -34,6 +35,7 @@ func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/tests", h.handleTests)
 	mux.HandleFunc("/api/tests/", h.handleTestDetail)
 	mux.HandleFunc("/api/runs", h.handleRuns)
+	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
 }
 
@@ -170,7 +172,6 @@ func (h *MongoHandler) handleRuns(w http.ResponseWriter, r *http.Request) {
 	for _, doc := range docs {
 		runIDs = append(runIDs, doc.ID)
 	}
-
 	response := map[string]interface{}{
 		"runs": runIDs,
 	}
@@ -179,6 +180,117 @@ func (h *MongoHandler) handleRuns(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// handleRunsStats handles GET /api/runs/stats - get statistics for all test runs in one request
+func (h *MongoHandler) handleRunsStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	limit := int64(50)
+	offset := int64(0)
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsedLimit, err := strconv.ParseInt(l, 10, 64); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if parsedOffset, err := strconv.ParseInt(o, 10, 64); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	// Fetch all test runs
+	docs, _, err := h.repo.ListTestRuns(r.Context(), bson.M{}, limit, offset)
+	if err != nil {
+		h.logger.Error("failed to fetch test runs", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate statistics for each run
+	runStats := make([]map[string]interface{}, 0, len(docs))
+	for _, doc := range docs {
+		// Collect all tests (from root and nested suites)
+		var allTests []*m.TestDocument
+		allTests = append(allTests, doc.Tests...)
+		for _, suite := range doc.Suites {
+			allTests = append(allTests, suite.Tests...)
+		}
+
+		// Calculate statistics
+		stats := map[string]int{
+			"total":       len(allTests),
+			"passed":      0,
+			"failed":      0,
+			"skipped":     0,
+			"running":     0,
+			"broken":      0,
+			"timedout":    0,
+			"interrupted": 0,
+			"unknown":     0,
+		}
+
+		var lastUpdated time.Time
+		for _, test := range allTests {
+			switch test.Status {
+			case "PASSED":
+				stats["passed"]++
+			case "FAILED":
+				stats["failed"]++
+			case "SKIPPED":
+				stats["skipped"]++
+			case "RUNNING":
+				stats["running"]++
+			case "BROKEN":
+				stats["broken"]++
+			case "TIMEDOUT":
+				stats["timedout"]++
+			case "INTERRUPTED":
+				stats["interrupted"]++
+			case "UNKNOWN":
+				stats["unknown"]++
+			case "":
+				stats["running"]++
+			default:
+				stats["unknown"]++
+			}
+
+			// Track last updated time
+			if !test.UpdatedAt.IsZero() && (lastUpdated.IsZero() || test.UpdatedAt.After(lastUpdated)) {
+				lastUpdated = test.UpdatedAt
+			}
+		}
+
+		runStat := map[string]interface{}{
+			"runId":       doc.ID,
+			"total":       stats["total"],
+			"passed":      stats["passed"],
+			"failed":      stats["failed"],
+			"skipped":     stats["skipped"],
+			"running":     stats["running"],
+			"broken":      stats["broken"],
+			"timedout":    stats["timedout"],
+			"interrupted": stats["interrupted"],
+			"unknown":     stats["unknown"],
+		}
+
+		if !lastUpdated.IsZero() {
+			runStat["lastUpdated"] = lastUpdated.Format(time.RFC3339)
+		}
+
+		runStats = append(runStats, runStat)
+	}
+
+	response := map[string]interface{}{
+		"runs": runStats,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleRunDetail handles GET /api/runs/{runId} - get statistics and tests for a specific run
 // handleRunDetail handles GET /api/runs/{runId} - get statistics and tests for a specific run
 func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
