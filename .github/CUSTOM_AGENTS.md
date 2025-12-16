@@ -1,10 +1,79 @@
 # Observer Custom Agents
 
-This directory contains specialized AI agent definitions for the Observer test observability system. These agents are designed to work with GitHub Copilot and provide domain-specific expertise for different aspects of the project.
+This document describes the specialized AI agent definitions for the Observer test observability system. These agents are designed to work with GitHub Copilot and provide domain-specific expertise for different aspects of the project.
+
+## Agent Files Location
+
+All agent definitions are located in `.github/agents/`:
+- `architect.md` - System design and architecture
+- `developer.md` - Go backend and React/TypeScript frontend implementation  
+- `ux-designer.md` - UI/UX design and user experience
+- `devops.md` - Infrastructure, deployment, and operations
+- `testing.md` - Test strategy and implementation
+- `documentation.md` - Technical writing and documentation
+
+## Coding Guidelines for Agent Files
+
+### File Size Management
+
+To maintain cognitive load and readability:
+
+**Target File Size**: 400-600 lines per agent file
+- **Minimum**: 200 lines (ensures comprehensive coverage)
+- **Maximum**: 1000 lines (prevents cognitive overload)
+- **Sweet Spot**: 400-600 lines (detailed but manageable)
+
+**Current Status**:
+| Agent | Lines | Status |
+|-------|-------|--------|
+| architect.md | ~192 | ✅ Within range |
+| developer.md | ~393 | ✅ Within range |
+| ux-designer.md | ~451 | ✅ Optimal |
+| devops.md | ~553 | ✅ Optimal |
+| testing.md | ~612 | ⚠️ Above optimal (but acceptable) |
+| documentation.md | ~931 | ⚠️ Consider splitting |
+
+### Organization Principles
+
+1. **Clear Structure**: Use consistent heading hierarchy (H1 → H2 → H3)
+2. **Scannable Content**: Break large sections into subsections
+3. **Concrete Examples**: Include 3-5 practical examples per major topic
+4. **Progressive Disclosure**: Start with overview, then drill into details
+5. **Cross-References**: Link to related agents and sections
+
+### Content Guidelines
+
+**Essential Sections** (every agent should have):
+- Agent name and role (H1)
+- Core Expertise (H2)
+- Observer-Specific Knowledge (H2)
+- Responsibilities (H2)
+- Guidelines (H2)
+- Collaboration (H2)
+- Example Scenarios (H2)
+
+**Optional Sections** (add as needed):
+- Anti-Patterns
+- Context Awareness  
+- Output Format
+- Tool/Technology-specific guidance
+
+### When to Split an Agent
+
+Consider splitting when:
+- File exceeds 1000 lines
+- Agent covers multiple distinct domains
+- Sections become too deep (H4+)
+- Examples dominate the content
+
+**Example**: If Documentation agent grows beyond 1000 lines, consider:
+- `documentation-api.md` - API documentation
+- `documentation-architecture.md` - Architecture docs
+- `documentation-user-guides.md` - User-facing docs
 
 ## Available Agents
 
-### 🏗️ [Architect](./architect.md)
+### 🏗️ [Architect](./agents/architect.md)
 **Expertise**: System design, distributed architecture, event-driven patterns
 
 Use the Architect agent when you need help with:
@@ -21,7 +90,7 @@ Use the Architect agent when you need help with:
 - "Help refactor ingestion service to remove dual-write pattern"
 - "Design a caching strategy for the API service"
 
-### 👨‍💻 [Developer](./developer.md)
+### 👨‍💻 [Developer](./agents/developer.md)
 **Expertise**: Go backend, React/TypeScript frontend, implementation patterns
 
 Use the Developer agent when you need help with:
@@ -39,7 +108,7 @@ Use the Developer agent when you need help with:
 - "Review this PR for code quality issues"
 - "Implement the test detail view component"
 
-### 🎨 [UX Designer](./ux-designer.md)
+### 🎨 [UX Designer](./agents/ux-designer.md)
 **Expertise**: UI/UX design, React components, accessibility, Tailwind CSS
 
 Use the UX Designer agent when you need help with:
@@ -57,7 +126,7 @@ Use the UX Designer agent when you need help with:
 - "Design real-time update indicators for test cards"
 - "Improve the error handling UX"
 
-### 🚀 [DevOps](./devops.md)
+### 🚀 [DevOps](./agents/devops.md)
 **Expertise**: Docker, Kubernetes, Helm, CI/CD, infrastructure
 
 Use the DevOps agent when you need help with:
@@ -75,7 +144,7 @@ Use the DevOps agent when you need help with:
 - "Create a CI pipeline for multi-arch Docker builds"
 - "Design a disaster recovery plan"
 
-### 🧪 [Testing](./testing.md)
+### 🧪 [Testing](./agents/testing.md)
 **Expertise**: Test strategy, Go testing, React testing, integration tests
 
 Use the Testing agent when you need help with:
@@ -93,7 +162,7 @@ Use the Testing agent when you need help with:
 - "Create E2E tests for the web UI"
 - "Implement performance benchmarks"
 
-### 📝 [Documentation](./documentation.md)
+### 📝 [Documentation](./agents/documentation.md)
 **Expertise**: Technical writing, API docs, architecture docs, user guides
 
 Use the Documentation agent when you need help with:
@@ -219,6 +288,23 @@ When the project evolves, update agents to reflect:
 - Changed deployment strategies
 - New features or components
 
+### File Size Management
+
+Monitor agent file sizes:
+```bash
+# Check current sizes
+wc -l .github/agents/*.md
+
+# Target: Keep files under 1000 lines
+# Optimal: 400-600 lines for best readability
+```
+
+If an agent file grows beyond 1000 lines:
+1. Review content for redundancy
+2. Move detailed examples to separate docs
+3. Consider splitting into sub-agents
+4. Archive outdated content
+
 ### Adding New Agents
 
 Consider adding specialized agents for:
@@ -238,6 +324,8 @@ Good agent definitions should:
 - [ ] Include anti-patterns to avoid
 - [ ] Use consistent formatting and structure
 - [ ] Be regularly updated with project evolution
+- [ ] Stay within 200-1000 line range
+- [ ] Have 3+ practical examples per major topic
 
 ## Feedback and Improvements
 
@@ -246,19 +334,20 @@ These agents are living documents that should evolve with the project. If you fi
 - Outdated patterns or conventions
 - Unclear guidance or examples
 - New areas requiring specialized expertise
+- Files becoming too large or unwieldy
 
 Please update the relevant agent file or create a new agent definition!
 
 ## Quick Reference
 
-| Agent | Primary Use Case | Key Expertise |
-|-------|------------------|---------------|
-| **Architect** | System design & review | Distributed systems, event-driven, microservices |
-| **Developer** | Code implementation | Go, TypeScript, React, testing |
-| **UX Designer** | UI/UX design | React components, Tailwind, accessibility |
-| **DevOps** | Infrastructure & deployment | Docker, Kubernetes, CI/CD, monitoring |
-| **Testing** | Test strategy & implementation | Unit tests, integration, E2E, performance |
-| **Documentation** | Technical writing | User guides, API docs, architecture docs |
+| Agent | Primary Use Case | Key Expertise | File Size |
+|-------|------------------|---------------|-----------|
+| **Architect** | System design & review | Distributed systems, event-driven, microservices | ~192 lines |
+| **Developer** | Code implementation | Go, TypeScript, React, testing | ~393 lines |
+| **UX Designer** | UI/UX design | React components, Tailwind, accessibility | ~451 lines |
+| **DevOps** | Infrastructure & deployment | Docker, Kubernetes, CI/CD, monitoring | ~553 lines |
+| **Testing** | Test strategy & implementation | Unit tests, integration, E2E, performance | ~612 lines |
+| **Documentation** | Technical writing | User guides, API docs, architecture docs | ~931 lines |
 
 ---
 

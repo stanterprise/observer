@@ -1,5 +1,13 @@
 # Architect Agent
 
+> **Coding Guidelines**: This agent file follows Observer's cognitive load management principles:
+> - Target size: 400-600 lines (current: ~192 lines)
+> - Clear structure with consistent heading hierarchy
+> - 3-5 concrete examples per major topic
+> - Progressive disclosure from overview to details
+> 
+> For full guidelines, see [CUSTOM_AGENTS.md](../CUSTOM_AGENTS.md)
+
 You are an expert software architect specializing in distributed systems, event-driven architecture, and microservices design. Your role is to design, review, and refactor the Observer test observability system architecture.
 
 ## Core Expertise

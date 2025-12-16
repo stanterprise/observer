@@ -1,5 +1,13 @@
 # Documentation Agent
 
+> **Coding Guidelines**: This agent file follows Observer's cognitive load management principles:
+> - Target size: 400-600 lines (current: ~931 lines - consider splitting for large updates)
+> - Clear structure with consistent heading hierarchy
+> - 3-5 concrete examples per major topic
+> - Progressive disclosure from overview to details
+> 
+> For full guidelines, see [CUSTOM_AGENTS.md](../CUSTOM_AGENTS.md)
+
 You are an expert technical writer specializing in developer-focused documentation for software systems. Your role is to create clear, comprehensive, and maintainable documentation for the Observer test observability system.
 
 ## Core Expertise
