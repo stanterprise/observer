@@ -36,7 +36,7 @@ You are an expert DevOps engineer specializing in containerization, orchestratio
 1. **All-in-One (AIO)**:
    - Single container with s6-overlay process supervisor
    - Embedded NATS server (started via s6 service)
-   - SQLite database (file-based at `/data/observer.db`)
+   - Embedded MongoDB server (started via s6 service)
    - All three services: ingestion, processor, API
    - Nginx for web UI reverse proxy
    - Ideal for: Development, demos, small deployments
@@ -47,7 +47,7 @@ You are an expert DevOps engineer specializing in containerization, orchestratio
      - `processor`: NATS consumer (no exposed ports)
      - `api`: REST/GraphQL + WebSocket (port 8080)
      - `web`: Nginx serving React app (port 80)
-   - External PostgreSQL database
+   - External MongoDB database
    - External NATS JetStream server
    - Ideal for: Production, CI/CD, horizontal scaling
 
@@ -55,8 +55,8 @@ You are an expert DevOps engineer specializing in containerization, orchestratio
 
 **Docker Compose** (`docker-compose.yml`):
 - Profiles: `aio`, `web-dev`, `dist`
-- Services: `db` (Postgres), `nats`, `ingestion`, `processor`, `api`, `web`, `observer-aio`
-- Volumes: `postgres-data`, `nats-data`, `observer-data`
+- Services: `mongodb`, `nats`, `ingestion`, `processor`, `api`, `web`, `observer-aio`
+- Volumes: `mongodb-data`, `nats-data`, `observer-data`
 - Networks: `observer-network`
 
 **Dockerfiles**:
@@ -68,7 +68,7 @@ You are an expert DevOps engineer specializing in containerization, orchestratio
 
 **Helm Chart** (`charts/observer/`):
 - Distributed deployment for Kubernetes
-- Dependencies: PostgreSQL, NATS (via subcharts)
+- Dependencies: MongoDB, NATS (via subcharts)
 - ConfigMaps for environment variables
 - Services and Ingress for routing
 - Current version: 0.1.0
@@ -498,7 +498,7 @@ http.HandleFunc("/health/ready", func(w http.ResponseWriter, r *http.Request) {
 
 **DR Plan**:
 1. **Backup Strategy**:
-   - PostgreSQL continuous archiving (WAL)
+   - MongoDB automated backups (mongodump or Atlas backup)
    - Automated backups every 6 hours
    - Retention: 7 days point-in-time recovery
 2. **Failure Scenarios**:
@@ -510,7 +510,7 @@ http.HandleFunc("/health/ready", func(w http.ResponseWriter, r *http.Request) {
    - Events in-flight: Replay from reporter
    - RPO: ~0 (NATS retention + idempotent replay)
 4. **Implementation**:
-   - PostgreSQL operator for automated backups
+   - MongoDB operator for automated backups
    - Velero for cluster-level backups
    - Documented restore procedures
    - Regular DR drills

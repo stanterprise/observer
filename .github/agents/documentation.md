@@ -432,7 +432,7 @@ Rate limit information if applicable.
                                      ▼                         ▼
                           ┌──────────────────┐    ┌──────────────────┐
                           │ Database         │    │ Web UI           │
-                          │ (PostgreSQL)     │    │ (React)          │
+                          │ (MongoDB)        │    │ (React)          │
                           └──────────────────┘    └──────────────────┘
 ```
 

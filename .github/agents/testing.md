@@ -28,7 +28,7 @@ You are an expert software testing engineer specializing in test strategy, test 
 - Mock implementations: In-memory structures, interfaces
 - gRPC testing: bufconn for in-process connections
 - NATS testing: Real NATS server via Docker for integration tests
-- Database testing: SQLite in-memory or PostgreSQL testcontainer
+- Database testing: MongoDB testcontainer or in-memory MongoDB
 
 **Test Structure:**
 ```
@@ -240,24 +240,41 @@ func TestValidation_InvalidInput_ReturnsError(t *testing.T) {
 **Database Integration Tests:**
 ```go
 func TestDatabaseIntegration(t *testing.T) {
-    // Use in-memory SQLite or test PostgreSQL
-    db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-    require.NoError(t, err)
+    // Use MongoDB testcontainer
+    ctx := context.Background()
     
-    // Run migrations
-    err = db.AutoMigrate(&models.TestCaseRun{})
+    req := testcontainers.ContainerRequest{
+        Image:        "mongo:7",
+        ExposedPorts: []string{"27017/tcp"},
+    }
+    
+    container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+        ContainerRequest: req,
+        Started:          true,
+    })
     require.NoError(t, err)
+    defer container.Terminate(ctx)
+    
+    // Get MongoDB connection string
+    endpoint, _ := container.Endpoint(ctx, "")
+    mongoURI := fmt.Sprintf("mongodb://%s", endpoint)
+    
+    // Connect to MongoDB
+    client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+    require.NoError(t, err)
+    defer client.Disconnect(ctx)
     
     // Test database operations
-    tc := &models.TestCaseRun{ID: uuid.NewString()}
-    err = db.Create(tc).Error
+    collection := client.Database("testdb").Collection("testcases")
+    tc := bson.M{"_id": uuid.NewString(), "name": "test"}
+    _, err = collection.InsertOne(ctx, tc)
     require.NoError(t, err)
     
     // Verify
-    var found models.TestCaseRun
-    err = db.First(&found, "id = ?", tc.ID).Error
+    var found bson.M
+    err = collection.FindOne(ctx, bson.M{"_id": tc["_id"]}).Decode(&found)
     require.NoError(t, err)
-    assert.Equal(t, tc.ID, found.ID)
+    assert.Equal(t, tc["_id"], found["_id"])
 }
 ```
 
@@ -301,16 +318,12 @@ func TestNATSEventFlow(t *testing.T) {
 // Use testcontainers for dependencies
 import "github.com/testcontainers/testcontainers-go"
 
-func setupPostgres(t *testing.T) *gorm.DB {
+func setupMongoDB(t *testing.T) *mongo.Client {
     ctx := context.Background()
     
     req := testcontainers.ContainerRequest{
-        Image:        "postgres:15-alpine",
-        ExposedPorts: []string{"5432/tcp"},
-        Env: map[string]string{
-            "POSTGRES_PASSWORD": "test",
-            "POSTGRES_DB":       "testdb",
-        },
+        Image:        "mongo:7",
+        ExposedPorts: []string{"27017/tcp"},
     }
     
     container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -323,8 +336,13 @@ func setupPostgres(t *testing.T) *gorm.DB {
         container.Terminate(ctx)
     })
     
-    // Get connection details and return DB
-    // ...
+    // Get MongoDB connection and return client
+    endpoint, _ := container.Endpoint(ctx, "")
+    mongoURI := fmt.Sprintf("mongodb://%s", endpoint)
+    client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+    require.NoError(t, err)
+    
+    return client
 }
 ```
 

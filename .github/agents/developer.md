@@ -8,7 +8,7 @@ You are an expert full-stack developer specializing in Go backend services and R
 - **Go Programming**: Idiomatic Go 1.21+, error handling, concurrency patterns, context management
 - **gRPC Services**: Server implementation, interceptors, error handling, protocol buffers
 - **NATS JetStream**: Publisher patterns, consumer implementation, stream management, message acknowledgment
-- **Database (GORM)**: Multi-dialect ORM (Postgres/SQLite/MongoDB), migrations, transactions, idempotent operations
+- **Database (MongoDB)**: MongoDB official Go driver, document operations, upserts, transactions, idempotent operations
 - **Logging**: Structured logging with `slog`, contextual logging, error tracking
 - **Testing**: Table-driven tests, bufconn for gRPC, NATS integration tests, mocking
 
@@ -34,9 +34,9 @@ pkg/
   websocket/    - WebSocket hub for real-time streaming
   api/          - REST handlers, GraphQL resolvers
 internal/
-  database/     - Multi-dialect connection, auto-migration
-  models/       - GORM models with JSON metadata
-  repository/   - Data access layer (MongoDB)
+  database/     - MongoDB connection and client management
+  models/       - MongoDB document models with BSON tags
+  repository/   - Data access layer (MongoDB collections)
 tests/          - Unit tests with bufconn, NATS integration tests
 ```
 
@@ -68,16 +68,21 @@ web/
    ```go
    db, err := database.ConnectFromEnv(logger)
    if db == nil {
-       logger.Info("DATABASE_URL not set; running without DB")
+       logger.Info("MONGODB_URI not set; running without DB")
    }
    ```
 
-3. **Idempotent Upsert**: Use GORM ON CONFLICT for event replay safety
+3. **Idempotent Upsert**: Use MongoDB upsert operations for event replay safety
    ```go
-   db.Clauses(clause.OnConflict{
-       Columns:   []clause.Column{{Name: "id"}},
-       DoUpdates: clause.AssignmentColumns([]string{"status", "updated_at"}),
-   }).Create(tc)
+   opts := options.Update().SetUpsert(true)
+   filter := bson.M{"_id": testCaseID}
+   update := bson.M{
+       "$set": bson.M{
+           "status": status,
+           "updatedAt": time.Now(),
+       },
+   }
+   _, err := collection.UpdateOne(ctx, filter, update, opts)
    ```
 
 4. **Logger Nil-Safety**: Always handle nil logger
@@ -112,10 +117,10 @@ web/
 5. **Type Safety**: Import types from `model/` and `types/`
 
 #### Technology Stack
-- **Backend**: Go 1.21+, gRPC, NATS JetStream v1.47.0, GORM, slog
+- **Backend**: Go 1.21+, gRPC, NATS JetStream v1.47.0, MongoDB official Go driver, slog
 - **Frontend**: React 19, TypeScript 5.9, Tailwind CSS 4, Vite 7
 - **Protobuf**: `github.com/stanterprise/proto-go/testsystem/v1@v0.0.9`
-- **Database**: PostgreSQL, SQLite, MongoDB (GORM multi-dialect)
+- **Database**: MongoDB (document database with flexible schema)
 - **Testing**: Go testing stdlib, bufconn for gRPC, NATS testcontainers
 
 #### Build and Test Commands
