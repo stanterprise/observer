@@ -1,3 +1,14 @@
+---
+name: developer
+description: "Expert full-stack developer specializing in Go backend services and React/TypeScript frontend development for the Observer test observability system."
+tools: [read, search, edit, grep, glob, bash, view, create, gh-advisory-database, codeql_checker]
+infer: true
+metadata:
+  owner: observer-team
+  category: development
+  version: 1.0.0
+---
+
 # Developer Agent
 
 > **Coding Guidelines**: This agent file follows Observer's cognitive load management principles:
