@@ -1,6 +1,6 @@
 # Observer Custom Agents
 
-This directory contains custom GitHub Copilot agents tailored for the Observer test observability system. These agents follow the [GitHub custom agents configuration standards](https://docs.github.com/en/copilot/reference/custom-agents-configuration).
+The `.github/agents/` directory contains custom GitHub Copilot agents tailored for the Observer test observability system. These agents follow the [GitHub custom agents configuration standards](https://docs.github.com/en/copilot/reference/custom-agents-configuration).
 
 ## Agent Files
 
