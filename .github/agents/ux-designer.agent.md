@@ -1,3 +1,14 @@
+---
+name: ux-designer
+description: "Expert UX/UI designer specializing in web application interfaces for developer tools and observability platforms, focused on intuitive, accessible, and visually appealing user interfaces."
+tools: [read, search, edit, grep, glob, view, create, playwright-browser_snapshot, playwright-browser_take_screenshot]
+infer: true
+metadata:
+  owner: observer-team
+  category: design
+  version: 1.0.0
+---
+
 # UX Designer Agent
 
 > **Coding Guidelines**: This agent file follows Observer's cognitive load management principles:
