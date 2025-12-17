@@ -41,7 +41,8 @@ web/
 ├── package.json
 ├── vite.config.ts
 ├── tailwind.config.js
-└── tsconfig.json
+├── tsconfig.json
+└── tsconfig.app.json
 ```
 
 **Key Features:**
@@ -231,13 +232,6 @@ See `docs/WEB_UI_TESTING.md` for comprehensive testing guide:
 - gRPC: `localhost:50051`
 - NATS Monitoring: `http://localhost:8222`
 
-**Architecture:**
-
-- Single container with s6-overlay managing all processes
-- Nginx serves Web UI and proxies to localhost:8080 API
-- Embedded MongoDB, embedded NATS
-- All services communicate via localhost
-
 ### Distributed
 
 **Use Case**: Production, scalable deployments
@@ -248,33 +242,6 @@ See `docs/WEB_UI_TESTING.md` for comprehensive testing guide:
 - gRPC: `localhost:50051`
 - API: Internal (proxied by Web UI)
 - NATS: `localhost:4222`
-
-**Architecture:**
-
-- Separate containers for each service
-- Web UI container with Nginx proxies to `api:8080`
-- MongoDB database, standalone NATS
-- Services communicate via Docker network
-
-## Performance Considerations
-
-### Web UI
-
-- **Bundle Size**: ~260KB (gzipped: ~83KB)
-- **Load Time**: <1s on localhost
-- **Build Time**: ~5s (TypeScript + Vite)
-
-### Docker Images
-
-- **observer:web**: ~50MB (Nginx + static files)
-- **observer:aio**: ~500MB (all services + Web UI)
-
-### Optimizations
-
-- Gzip compression enabled in Nginx
-- Static assets cached with 1h expiration
-- Code splitting via Vite
-- CSS purging via Tailwind
 
 ## Known Limitations & Future Enhancements
 
@@ -296,80 +263,6 @@ See `docs/WEB_UI_TESTING.md` for comprehensive testing guide:
 6. Performance metrics dashboard
 7. Dark mode support
 
-## Configuration Reference
-
-### Web UI Environment Variables
-
-| Variable       | Description               | Default       | Used In    |
-| -------------- | ------------------------- | ------------- | ---------- |
-| `VITE_API_URL` | Base URL for API requests | `/api`        | Build time |
-| `VITE_WS_URL`  | WebSocket endpoint URL    | Auto-detected | Build time |
-
-### Nginx Environment Variables
-
-| Variable           | Description      | Default     | Used In |
-| ------------------ | ---------------- | ----------- | ------- |
-| `API_BACKEND_HOST` | Backend hostname | `localhost` | Runtime |
-| `API_BACKEND_PORT` | Backend port     | `8080`      | Runtime |
-
-### Docker Compose Variables
-
-| Variable        | Description              | Default |
-| --------------- | ------------------------ | ------- |
-| `AIO_WEB_PORT`  | AIO Web UI external port | `3000`  |
-| `WEB_PORT`      | Distributed Web UI port  | `3000`  |
-| `AIO_GRPC_PORT` | AIO gRPC port            | `50051` |
-| `AIO_API_PORT`  | AIO API internal port    | `8080`  |
-
-## Documentation
-
-### User Documentation
-
-- [Main README](../README.md) - Quick start and overview
-- [Web UI README](../web/README.md) - Development guide
-- [Testing Guide](docs/WEB_UI_TESTING.md) - Comprehensive testing instructions
-
-### Architecture Documentation
-
-- [Components](docs/architecture/01-components.md) - Component overview (updated)
-- [Deployment Modes](docs/architecture/03-modes.md) - AIO vs Distributed modes
-
-### Scripts
-
-- `scripts/start-dev.sh` - Start all services for local development
-
-## Success Metrics
-
-✅ **Complete Implementation**
-
-- All required features implemented
-- Both deployment modes supported
-- Documentation complete
-- Docker images build successfully
-
-✅ **Code Quality**
-
-- TypeScript strict mode enabled
-- Tailwind CSS best practices
-- Proper component structure
-- Clean separation of concerns
-
-✅ **DevOps Ready**
-
-- Docker images optimized
-- Multi-stage builds
-- Environment-based configuration
-- Health checks implemented
-
 ## Conclusion
 
-The Web UI implementation is **complete and production-ready** for integration testing. All core features have been implemented according to the requirements:
-
-1. ✅ TypeScript/React/Tailwind CSS application
-2. ✅ Configurable REST API and WebSocket endpoints
-3. ✅ Support for both AIO and Distributed modes
-4. ✅ Nginx reverse proxy for routing
-5. ✅ Docker images for both deployment modes
-6. ✅ Comprehensive documentation
-
-The implementation provides a solid foundation for the Observer Web UI and can be extended with additional features as needed.
+The Web UI implementation is **complete and production-ready** for integration testing. All core features have been implemented according to the requirements.

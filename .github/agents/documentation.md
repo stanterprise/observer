@@ -39,7 +39,7 @@ You are an expert technical writer specializing in developer-focused documentati
   README.md                          - Main project overview and quick start
   QUICKSTART.md                      - Detailed quick start guide
   DEPLOYMENT.md                      - Deployment scenarios and options
-  PROJECT_STATUS.md                  - Current status and roadmap
+  docs/STATUS.md                     - Maintained short status (start here for project status)
   CODESPACES.md                      - GitHub Codespaces setup
 
   .github/
@@ -47,6 +47,9 @@ You are an expert technical writer specializing in developer-focused documentati
     agents/                          - Custom agent definitions
 
   docs/
+    README.md                        - Documentation hub (start here for deeper docs)
+    STATUS.md                        - Maintained short status
+    archive/                         - Historical Copilot task reports and snapshots
     architecture/
       00-overview.md                 - Architecture overview
       01-components.md               - Component details

@@ -194,6 +194,8 @@ None. This is a backward-compatible addition of missing functionality.
 
 ## Related Documentation
 
-- [Playwright Reporter Integration](../CODESPACES.md)
-- [NATS JetStream Architecture](../docs/architecture.md)
-- [WebSocket API](../WEB_UI_IMPLEMENTATION.md)
+- [Playwright integration](./PLAYWRIGHT_INTEGRATION.md)
+- [Architecture overview](./architecture/00-overview.md)
+- [Data flow](./architecture/02-dataflow.md)
+- [WebSocket real-time events](./WEBSOCKET_IMPLEMENTATION.md)
+- [Web UI](../web/README.md)
