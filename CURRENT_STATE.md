@@ -18,10 +18,12 @@ The Observer test observability system has evolved significantly beyond the orig
 ## Implementation Status by Component
 
 ### ✅ Ingestion Service (100% Complete)
+
 **Location**: `cmd/ingestion/`  
-**Status**: Production Ready  
+**Status**: Production Ready
 
 **Features**:
+
 - gRPC endpoint for test event collection
 - NATS JetStream publisher integration
 - Dual-write pattern (NATS + optional DB)
@@ -32,10 +34,12 @@ The Observer test observability system has evolved significantly beyond the orig
 **Endpoints**: gRPC port 50051
 
 ### ✅ Processor Service (100% Complete)
+
 **Location**: `cmd/processor/`  
-**Status**: Production Ready  
+**Status**: Production Ready
 
 **Features**:
+
 - NATS JetStream consumer with pull-based fetching
 - Database persistence with idempotent upserts
 - Durable consumer for horizontal scaling
@@ -43,13 +47,15 @@ The Observer test observability system has evolved significantly beyond the orig
 - Graceful shutdown with context cancellation
 - Database migration support
 
-**Dependencies**: NATS, Database (PostgreSQL or SQLite)
+**Dependencies**: NATS, MongoDB
 
 ### ✅ API Service (90% Complete)
+
 **Location**: `cmd/api/`  
-**Status**: Production Ready (GraphQL enhancements pending)  
+**Status**: Production Ready (GraphQL enhancements pending)
 
 **Features**:
+
 - ✅ REST API endpoints for test data
   - `GET /api/tests` - List all tests with filtering
   - `GET /api/tests/{id}` - Get test details with steps
@@ -61,15 +67,18 @@ The Observer test observability system has evolved significantly beyond the orig
 - ✅ Health check endpoint (`/health`)
 - 🚧 GraphQL schema (basic implementation, needs enhancement)
 
-**Endpoints**: 
+**Endpoints**:
+
 - HTTP port 8080
 - WebSocket: `ws://localhost:8080/ws`
 
 ### ✅ Web UI (85% Complete)
+
 **Location**: `web/`  
-**Status**: Production Ready (enhanced features pending)  
+**Status**: Production Ready (enhanced features pending)
 
 **Technology Stack**:
+
 - React 19
 - TypeScript
 - Vite 7.2
@@ -78,6 +87,7 @@ The Observer test observability system has evolved significantly beyond the orig
 - Lucide React (icons)
 
 **Features Implemented**:
+
 - ✅ Test run listing page
 - ✅ Real-time WebSocket updates
 - ✅ Connection status indicator
@@ -89,6 +99,7 @@ The Observer test observability system has evolved significantly beyond the orig
 - ✅ Nginx reverse proxy for routing
 
 **Features Pending**:
+
 - 🚧 Test detail page with step execution
 - 🚧 Artifact viewer
 - 🚧 Advanced filtering and search
@@ -96,15 +107,18 @@ The Observer test observability system has evolved significantly beyond the orig
 - 🚧 Dark mode
 - 🚧 Performance metrics dashboard
 
-**Access**: 
+**Access**:
+
 - Development: `http://localhost:3000` (Vite dev server)
 - Production: `http://localhost:3000` (Nginx on port 80)
 
 ### ✅ WebSocket Component (100% Complete)
+
 **Location**: `pkg/websocket/`  
-**Status**: Production Ready  
+**Status**: Production Ready
 
 **Features**:
+
 - WebSocket hub with connection management
 - NATS JetStream consumer for event relay
 - Support for multiple concurrent connections
@@ -118,18 +132,20 @@ The Observer test observability system has evolved significantly beyond the orig
 ### ✅ Infrastructure (100% Complete)
 
 **NATS JetStream**:
+
 - Stream: `tests_events`
 - Consumers: `processor`, `websocket`
 - Storage: File-based with 24h retention
 - Monitoring: HTTP port 8222
 
 **Database**:
-- PostgreSQL (distributed mode)
-- SQLite (AIO mode)
-- Auto-migration support
-- Multi-dialect GORM integration
+
+- MongoDB (distributed mode)
+- Embedded MongoDB (AIO mode)
+- Official MongoDB Go driver (no SQL migrations)
 
 **Docker Compose**:
+
 - AIO profile: Single container with s6-overlay
 - Distributed profile: Separate containers per service
 - Health checks for all services
@@ -138,17 +154,20 @@ The Observer test observability system has evolved significantly beyond the orig
 ## Deployment Modes
 
 ### All-In-One (AIO) Mode ✅
+
 **Status**: Fully implemented and tested
 
 **Components in Single Container**:
+
 - Ingestion service
 - Processor service
 - API service
 - Nginx (Web UI)
 - Embedded NATS
-- SQLite database
+- Embedded MongoDB
 
 **Ports**:
+
 - 3000: Web UI (Nginx on port 80)
 - 50051: gRPC ingestion
 - 8080: API service (internal)
@@ -160,23 +179,26 @@ The Observer test observability system has evolved significantly beyond the orig
 **Start Command**: `docker compose --profile aio up -d`
 
 ### Distributed Mode ✅
+
 **Status**: Fully implemented and tested
 
 **Services**:
+
 - `ingestion` - gRPC endpoint
 - `processor` - NATS consumer + DB writer
 - `api` - HTTP API + WebSocket
 - `web` - Nginx + React UI
-- `db` - PostgreSQL
+- `mongodb` - MongoDB
 - `nats` - NATS JetStream
 
 **Ports**:
+
 - 3000: Web UI
 - 50051: gRPC ingestion
 - 8080: API (internal, proxied by web)
 - 4222: NATS client
 - 8222: NATS monitoring
-- 5432: PostgreSQL
+- 27017: MongoDB
 
 **Use Case**: Production, CI/CD, scalable deployments
 
@@ -185,6 +207,7 @@ The Observer test observability system has evolved significantly beyond the orig
 ## Testing Status
 
 ### Unit Tests: ✅ All Passing
+
 - `tests/api_test.go` - 8 tests
 - `tests/e2e_integration_test.go` - 2 tests
 - `tests/nats_integration_test.go` - 1 test
@@ -200,12 +223,14 @@ The Observer test observability system has evolved significantly beyond the orig
 **Total**: 44+ tests, 100% passing
 
 ### Integration Tests: ✅ Validated
+
 - End-to-end gRPC → NATS → DB flow
 - WebSocket real-time event relay
 - Playwright reporter compatibility
 - Docker Compose deployment in both modes
 
 ### Manual Testing: ✅ Completed
+
 - Web UI functionality
 - Real-time WebSocket updates
 - REST API endpoints
@@ -217,32 +242,35 @@ The Observer test observability system has evolved significantly beyond the orig
 
 All documentation is complete and up-to-date:
 
-| Document | Location | Status |
-|----------|----------|--------|
-| Main README | `README.md` | ✅ Updated |
-| Project Status | `PROJECT_STATUS.md` | ✅ Updated |
-| Copilot Instructions | `.github/copilot-instructions.md` | ✅ Updated |
-| Architecture Overview | `docs/architecture/00-overview.md` | ✅ Current |
-| Components | `docs/architecture/01-components.md` | ✅ Current |
-| Data Flow | `docs/architecture/02-dataflow.md` | ✅ Current |
-| Deployment Modes | `docs/architecture/03-modes.md` | ✅ Current |
-| Next Steps | `docs/architecture/10-next-steps.md` | ✅ Updated |
-| WebSocket Implementation | `docs/WEBSOCKET_IMPLEMENTATION.md` | ✅ Complete |
-| Web UI Implementation | `WEB_UI_IMPLEMENTATION.md` | ✅ Complete |
-| Web UI Testing | `docs/WEB_UI_TESTING.md` | ✅ Complete |
-| Web UI README | `web/README.md` | ✅ Complete |
-| Playwright Integration | `docs/PLAYWRIGHT_INTEGRATION.md` | ✅ Current |
-| Test Report | `docs/TEST_REPORT.md` | ✅ Current |
+| Document                 | Location                             | Status      |
+| ------------------------ | ------------------------------------ | ----------- |
+| Main README              | `README.md`                          | ✅ Updated  |
+| Project Status           | `PROJECT_STATUS.md`                  | ✅ Updated  |
+| Copilot Instructions     | `.github/copilot-instructions.md`    | ✅ Updated  |
+| Architecture Overview    | `docs/architecture/00-overview.md`   | ✅ Current  |
+| Components               | `docs/architecture/01-components.md` | ✅ Current  |
+| Data Flow                | `docs/architecture/02-dataflow.md`   | ✅ Current  |
+| Deployment Modes         | `docs/architecture/03-modes.md`      | ✅ Current  |
+| Next Steps               | `docs/architecture/10-next-steps.md` | ✅ Updated  |
+| WebSocket Implementation | `docs/WEBSOCKET_IMPLEMENTATION.md`   | ✅ Complete |
+| Web UI Implementation    | `WEB_UI_IMPLEMENTATION.md`           | ✅ Complete |
+| Web UI Testing           | `docs/WEB_UI_TESTING.md`             | ✅ Complete |
+| Web UI README            | `web/README.md`                      | ✅ Complete |
+| Playwright Integration   | `docs/PLAYWRIGHT_INTEGRATION.md`     | ✅ Current  |
+| Test Report              | `docs/TEST_REPORT.md`                | ✅ Current  |
 
 ## Known Limitations
 
 ### Minor Issues
+
 1. **Database Model**: Doesn't persist some fields (step title, error messages)
 2. **Multiple Steps**: Current implementation limited to one step per test
 3. **GraphQL**: Basic schema implemented, needs enhancement for complex queries
 
 ### Missing Features (Planned)
+
 1. **Web UI Enhancements**:
+
    - Test detail page
    - Artifact viewer
    - Advanced filtering
@@ -258,6 +286,7 @@ All documentation is complete and up-to-date:
 ## Production Readiness Assessment
 
 ### ✅ Ready for Production
+
 - Ingestion service
 - Processor service
 - API service (REST + WebSocket)
@@ -267,6 +296,7 @@ All documentation is complete and up-to-date:
 - Docker deployment (both modes)
 
 ### 🚧 Needs Work Before Production
+
 - Authentication/authorization
 - Complete GraphQL implementation
 - Enhanced Web UI features
@@ -278,18 +308,21 @@ All documentation is complete and up-to-date:
 ## Recommended Next Steps
 
 ### Immediate (Sprint 1-2)
+
 1. **Phase 3**: Remove dual-write from ingestion (make fully stateless)
 2. **Web UI**: Implement test detail page with step execution timeline
 3. **Web UI**: Add filtering and search functionality
 4. **GraphQL**: Complete schema with all models and relationships
 
 ### Short-term (Sprint 3-4)
+
 1. **Object Storage**: MinIO/S3 integration for artifacts
 2. **Web UI**: Artifact viewer for screenshots, videos, traces
 3. **Authentication**: Basic token-based auth
 4. **Metrics**: Prometheus metrics export
 
 ### Medium-term (Sprint 5-8)
+
 1. **Enhanced GraphQL**: Subscriptions, batch queries, advanced filtering
 2. **Web UI**: Performance dashboard, dark mode
 3. **Observability**: OpenTelemetry tracing
@@ -306,9 +339,10 @@ The Observer service has evolved significantly beyond the original Phase 2 scope
 ✅ **GraphQL API** with interactive playground  
 ✅ **Dual deployment modes** (AIO + Distributed)  
 ✅ **Comprehensive testing** (44+ tests, all passing)  
-✅ **Complete documentation** (15+ documents)  
+✅ **Complete documentation** (15+ documents)
 
 The system is **production-ready for core functionality** but would benefit from:
+
 - Enhanced Web UI features (details, artifacts, filtering)
 - Authentication layer
 - Object storage for artifacts

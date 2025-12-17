@@ -4,19 +4,18 @@
 
 Before testing the Web UI, ensure the following services are running:
 
-1. **PostgreSQL Database**: `make db-up`
+1. **MongoDB Database**: `make mongo-up`
 2. **NATS Server**: `make nats-up`
 3. **Ingestion Service** (creates NATS stream): `NATS_URL='nats://localhost:4222' ./bin/ingestion`
-4. **Processor Service** (processes events): 
+4. **Processor Service** (processes events):
    ```bash
-   DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
+   MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
    NATS_URL='nats://localhost:4222' \
-   APPLY_MIGRATIONS=1 \
    ./bin/processor
    ```
 5. **API Service** (provides REST API and WebSocket):
    ```bash
-   DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
+   MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
    NATS_URL='nats://localhost:4222' \
    ./bin/api
    ```
@@ -32,6 +31,7 @@ npm run dev
 ```
 
 The development server will start at `http://localhost:3000` with:
+
 - API proxy: `/api/*` → `http://localhost:8080/api/*`
 - WebSocket proxy: `/ws` → `ws://localhost:8080/ws`
 
@@ -57,6 +57,7 @@ open http://localhost:3000
 ```
 
 Services in distributed mode:
+
 - **Web UI**: `http://localhost:3000` (Nginx serving React app)
 - **API**: Internal (proxied through Web UI)
 - **Ingestion**: `localhost:50051` (gRPC)
@@ -80,22 +81,26 @@ In AIO mode, all services run in a single container with Nginx serving the Web U
 ## Manual UI Testing Checklist
 
 ### Navigation
+
 - [ ] Logo displays correctly
 - [ ] Connection status shows (green = connected, red = disconnected)
 - [ ] "Test Runs" link works
 
 ### Test Runs Page
+
 - [ ] Empty state shows when no tests exist
 - [ ] Refresh button works
 - [ ] Real-time updates work when WebSocket receives events
 
 ### API Integration
+
 - [ ] GET `/api/tests` endpoint returns test data
 - [ ] Test cards display with correct information
 - [ ] Status badges show correct colors (green=passed, red=failed, etc.)
 - [ ] Timestamps format correctly
 
 ### WebSocket Integration
+
 - [ ] WebSocket connects automatically on page load
 - [ ] Connection status updates in header
 - [ ] Events received from WebSocket trigger UI refresh
@@ -104,34 +109,38 @@ In AIO mode, all services run in a single container with Nginx serving the Web U
 ## Troubleshooting
 
 ### Web UI won't load
+
 - Check that API service is running: `curl http://localhost:8080/health`
 - Check browser console for errors
 - Verify proxy configuration in `vite.config.ts`
 
 ### WebSocket not connecting
+
 - Verify NATS is running: `docker ps | grep nats`
 - Check API logs for WebSocket initialization errors
 - Ensure NATS stream exists (created by ingestion service)
 
 ### API requests failing
+
 - Verify database connection
 - Check processor service logs
-- Ensure migrations have run (`APPLY_MIGRATIONS=1`)
+- Ensure MongoDB is running and reachable via `MONGODB_URI`
 
 ## Environment Variables
 
 For production deployment, configure:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_URL` | Base URL for API requests | `/api` |
-| `VITE_WS_URL` | WebSocket endpoint URL | Auto-detected |
+| Variable           | Description                  | Default             |
+| ------------------ | ---------------------------- | ------------------- |
+| `VITE_API_URL`     | Base URL for API requests    | `/api`              |
+| `VITE_WS_URL`      | WebSocket endpoint URL       | Auto-detected       |
 | `API_BACKEND_HOST` | Nginx upstream host (Docker) | `localhost` / `api` |
-| `API_BACKEND_PORT` | Nginx upstream port (Docker) | `8080` |
+| `API_BACKEND_PORT` | Nginx upstream port (Docker) | `8080`              |
 
 ## Screenshots
 
 When testing, take screenshots of:
+
 1. Empty state (no tests)
 2. Test list with sample data
 3. Connection status indicators

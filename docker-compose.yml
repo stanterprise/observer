@@ -32,7 +32,7 @@ services:
       - observer-net
 
   # ============================================================================
-  # Distributed Profile - Multi-container deployment (PostgreSQL)
+  # Distributed Profile - Multi-container deployment (MongoDB)
   # Usage: docker compose --profile dist up -d
   # ============================================================================
 

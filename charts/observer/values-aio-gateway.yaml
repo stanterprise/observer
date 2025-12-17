@@ -22,7 +22,7 @@ distributed:
   enabled: false
 
 # Disable external dependencies in AIO mode
-postgresql:
+mongodb:
   enabled: false
 
 nats:
@@ -46,30 +46,30 @@ ingress:
 gateway:
   enabled: true
   gatewayClassName: gke-l7-global-external-managed
-  
+
   # Annotations for Google Cloud integration
   annotations:
     networking.gke.io/certmap: observer-cert-map
-  
+
   # Static IP addresses (optional, will be allocated if not specified)
   addresses: []
-  
+
   # TLS configuration using Google-managed certificates
   tls:
-    enabled: false  # Start without TLS, add later
+    enabled: false # Start without TLS, add later
     certificateName: observer-cert
-    gcpCertificateName: ""  # GCP Certificate Manager certificate name
-  
+    gcpCertificateName: "" # GCP Certificate Manager certificate name
+
   # Web UI route
   web:
     enabled: true
     hostname: observer.stanterprise.dev
-  
+
   # API route
   api:
     enabled: true
     hostname: api.observer.stanterprise.dev
-  
+
   # gRPC route with native GRPCRoute support
   grpc:
     enabled: true

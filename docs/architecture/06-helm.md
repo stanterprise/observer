@@ -45,12 +45,12 @@ charts/observer/
   templates/
     _helpers.tpl          # Reusable template functions
     serviceaccount.yaml   # Service account
-    
+
     # AIO mode resources
     aio-deployment.yaml
     aio-service.yaml
     aio-pvc.yaml
-    
+
     # Distributed mode resources
     ingestion-deployment.yaml
     ingestion-service.yaml
@@ -59,11 +59,11 @@ charts/observer/
     api-service.yaml
     web-deployment.yaml
     web-service.yaml
-    
+
     # Scaling and networking
     hpa.yaml              # HorizontalPodAutoscaler
     ingress.yaml          # HTTP and gRPC ingress
-    
+
     NOTES.txt             # Post-installation instructions
 ```
 
@@ -71,20 +71,20 @@ charts/observer/
 
 ### AIO (All-in-One)
 
-Single pod with embedded SQLite and NATS. Best for development and testing.
+Single pod with embedded MongoDB and NATS. Best for development and testing.
 
 ```bash
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
   --set mode=aio \
   --set aio.enabled=true \
   --set distributed.enabled=false \
-  --set postgresql.enabled=false \
+  --set mongodb.enabled=false \
   --set nats.enabled=false
 ```
 
 ### Distributed
 
-Separate services with PostgreSQL and NATS. Best for production.
+Separate services with MongoDB and NATS. Best for production.
 
 ```bash
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer
@@ -94,65 +94,64 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer
 
 ### Deployment Mode
 
-| Key | Description | Default |
-|-----|-------------|---------|
-| `mode` | Deployment mode: `aio` or `distributed` | `distributed` |
-| `aio.enabled` | Enable AIO deployment | `false` |
-| `distributed.enabled` | Enable distributed deployment | `true` |
+| Key                   | Description                             | Default       |
+| --------------------- | --------------------------------------- | ------------- |
+| `mode`                | Deployment mode: `aio` or `distributed` | `distributed` |
+| `aio.enabled`         | Enable AIO deployment                   | `false`       |
+| `distributed.enabled` | Enable distributed deployment           | `true`        |
 
 ### Service Scaling (Distributed Mode)
 
-| Key | Description | Default |
-|-----|-------------|---------|
-| `distributed.ingestion.replicaCount` | gRPC ingestion service replicas | `2` |
-| `distributed.processor.replicaCount` | Event processor replicas | `2` |
-| `distributed.api.replicaCount` | API service replicas | `2` |
-| `distributed.web.replicaCount` | Web UI replicas | `2` |
+| Key                                  | Description                     | Default |
+| ------------------------------------ | ------------------------------- | ------- |
+| `distributed.ingestion.replicaCount` | gRPC ingestion service replicas | `2`     |
+| `distributed.processor.replicaCount` | Event processor replicas        | `2`     |
+| `distributed.api.replicaCount`       | API service replicas            | `2`     |
+| `distributed.web.replicaCount`       | Web UI replicas                 | `2`     |
 
 ### Auto-Scaling
 
-| Key | Description | Default |
-|-----|-------------|---------|
-| `distributed.*.autoscaling.enabled` | Enable HPA | `false` |
-| `distributed.*.autoscaling.minReplicas` | Minimum replicas | `2` |
-| `distributed.*.autoscaling.maxReplicas` | Maximum replicas | `10` |
-| `distributed.*.autoscaling.targetCPUUtilizationPercentage` | CPU threshold | `80` |
+| Key                                                        | Description      | Default |
+| ---------------------------------------------------------- | ---------------- | ------- |
+| `distributed.*.autoscaling.enabled`                        | Enable HPA       | `false` |
+| `distributed.*.autoscaling.minReplicas`                    | Minimum replicas | `2`     |
+| `distributed.*.autoscaling.maxReplicas`                    | Maximum replicas | `10`    |
+| `distributed.*.autoscaling.targetCPUUtilizationPercentage` | CPU threshold    | `80`    |
 
 ### Database Configuration
 
-| Key | Description | Default |
-|-----|-------------|---------|
-| `postgresql.enabled` | Deploy PostgreSQL | `true` |
-| `postgresql.auth.username` | Database username | `postgres` |
-| `postgresql.auth.password` | Database password | `postgres` |
-| `postgresql.auth.database` | Database name | `observer` |
-| `externalDatabase.host` | External DB host (when postgresql.enabled=false) | `""` |
+| Key                         | Description                                   | Default    |
+| --------------------------- | --------------------------------------------- | ---------- |
+| `mongodb.enabled`           | Deploy MongoDB                                | `true`     |
+| `mongodb.auth.rootUser`     | MongoDB root username                         | `root`     |
+| `mongodb.auth.rootPassword` | MongoDB root password                         | `password` |
+| `externalDatabase.host`     | External DB host (when mongodb.enabled=false) | `""`       |
 
 ### NATS Configuration
 
-| Key | Description | Default |
-|-----|-------------|---------|
-| `nats.enabled` | Deploy NATS | `true` |
-| `nats.config.jetstream.enabled` | Enable JetStream | `true` |
-| `externalNats.url` | External NATS URL (when nats.enabled=false) | `""` |
+| Key                             | Description                                 | Default |
+| ------------------------------- | ------------------------------------------- | ------- |
+| `nats.enabled`                  | Deploy NATS                                 | `true`  |
+| `nats.config.jetstream.enabled` | Enable JetStream                            | `true`  |
+| `externalNats.url`              | External NATS URL (when nats.enabled=false) | `""`    |
 
 ### Ingress Configuration
 
-| Key | Description | Default |
-|-----|-------------|---------|
-| `ingress.enabled` | Enable ingress for Web UI | `false` |
-| `ingress.className` | Ingress class name | `nginx` |
-| `ingress.hosts[0].host` | Hostname for Web UI | `observer.example.com` |
-| `ingress.grpc.enabled` | Enable gRPC ingress | `false` |
+| Key                     | Description               | Default                |
+| ----------------------- | ------------------------- | ---------------------- |
+| `ingress.enabled`       | Enable ingress for Web UI | `false`                |
+| `ingress.className`     | Ingress class name        | `nginx`                |
+| `ingress.hosts[0].host` | Hostname for Web UI       | `observer.example.com` |
+| `ingress.grpc.enabled`  | Enable gRPC ingress       | `false`                |
 
 ### Resources
 
-| Key | Description | Default |
-|-----|-------------|---------|
-| `distributed.*.resources.requests.cpu` | CPU request | varies by service |
+| Key                                       | Description    | Default           |
+| ----------------------------------------- | -------------- | ----------------- |
+| `distributed.*.resources.requests.cpu`    | CPU request    | varies by service |
 | `distributed.*.resources.requests.memory` | Memory request | varies by service |
-| `distributed.*.resources.limits.cpu` | CPU limit | varies by service |
-| `distributed.*.resources.limits.memory` | Memory limit | varies by service |
+| `distributed.*.resources.limits.cpu`      | CPU limit      | varies by service |
+| `distributed.*.resources.limits.memory`   | Memory limit   | varies by service |
 
 ## Typical Workflow
 
@@ -201,8 +200,8 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
 
 ```bash
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
-  --set postgresql.enabled=false \
-  --set externalDatabase.host=postgres.prod.example.com \
+  --set mongodb.enabled=false \
+  --set externalDatabase.host=mongodb.prod.example.com \
   --set externalDatabase.username=observer \
   --set externalDatabase.password=<secret-password>
 ```
@@ -211,7 +210,7 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
 
 The chart depends on:
 
-- **PostgreSQL** (Bitnami chart): Database for distributed mode
+- **MongoDB** (Bitnami chart): Database for distributed mode
 - **NATS** (Official chart): Message broker for event streaming
 
 Dependencies are automatically managed when installing from OCI registry or GitHub Pages. When installing from source, run:

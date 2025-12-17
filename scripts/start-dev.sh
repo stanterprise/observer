@@ -11,8 +11,8 @@ NC='\033[0m' # No Color
 echo -e "${GREEN}Starting Observer Services...${NC}"
 
 # Start infrastructure
-echo -e "${YELLOW}1. Starting PostgreSQL...${NC}"
-make db-up
+echo -e "${YELLOW}1. Starting MongoDB...${NC}"
+make mongo-up
 
 echo -e "${YELLOW}2. Starting NATS...${NC}"
 make nats-up
@@ -37,9 +37,8 @@ echo "Ingestion PID: $INGESTION_PID"
 sleep 2
 
 echo -e "${YELLOW}6. Starting Processor service...${NC}"
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
 NATS_URL='nats://localhost:4222' \
-APPLY_MIGRATIONS=1 \
     ./bin/processor > /tmp/observer-processor.log 2>&1 &
 PROCESSOR_PID=$!
 echo "Processor PID: $PROCESSOR_PID"
@@ -47,7 +46,7 @@ echo "Processor PID: $PROCESSOR_PID"
 sleep 2
 
 echo -e "${YELLOW}7. Starting API service...${NC}"
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
 NATS_URL='nats://localhost:4222' \
     ./bin/api > /tmp/observer-api.log 2>&1 &
 API_PID=$!
@@ -70,7 +69,7 @@ echo "  API:       tail -f /tmp/observer-api.log"
 echo ""
 echo "To stop services:"
 echo "  kill $INGESTION_PID $PROCESSOR_PID $API_PID"
-echo "  make db-down nats-down"
+echo "  make mongo-down nats-down"
 echo ""
 echo "To start Web UI:"
 echo "  cd web && npm run dev"

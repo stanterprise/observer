@@ -15,6 +15,7 @@ The API service provides:
 ## Current State
 
 The API service is **production-ready** with:
+
 - ✅ Complete GraphQL API with schema and resolvers
 - ✅ REST endpoints for test and run queries
 - ✅ Health check endpoint
@@ -23,6 +24,7 @@ The API service is **production-ready** with:
 - ✅ Comprehensive test coverage (11 tests)
 
 The API service includes:
+
 - **WebSocket endpoint (`/ws`) for real-time event streaming** ✅
 - **NATS JetStream consumer for event relay** ✅
 - Health check endpoint (`/health`)
@@ -42,7 +44,7 @@ make build-api && ./bin/api
 ### With database (recommended)
 
 ```bash
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' ./bin/api
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' ./bin/api
 ```
 
 ### With NATS for WebSocket events
@@ -54,7 +56,7 @@ NATS_URL='nats://localhost:4222' ./bin/api
 ### Full configuration (database + WebSocket)
 
 ```bash
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
 NATS_URL='nats://localhost:4222' \
 ./bin/api
 ```
@@ -71,20 +73,20 @@ PORT=3000 ./bin/api
 
 ### General
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Service information |
-| `/health` | GET | Health check |
-| `/ws` | WebSocket | Real-time event stream ✅ |
-| `/api/graphql` | POST | GraphQL endpoint (future) |
-| `/metrics` | GET | Prometheus metrics (future) |
+| Endpoint       | Method    | Description                 |
+| -------------- | --------- | --------------------------- |
+| `/`            | GET       | Service information         |
+| `/health`      | GET       | Health check                |
+| `/ws`          | WebSocket | Real-time event stream ✅   |
+| `/api/graphql` | POST      | GraphQL endpoint (future)   |
+| `/metrics`     | GET       | Prometheus metrics (future) |
 
 ### GraphQL API
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/graphql` | POST | GraphQL API endpoint |
-| `/api/playground` | GET | GraphQL Playground (interactive UI) |
+| Endpoint          | Method | Description                         |
+| ----------------- | ------ | ----------------------------------- |
+| `/api/graphql`    | POST   | GraphQL API endpoint                |
+| `/api/playground` | GET    | GraphQL Playground (interactive UI) |
 
 **Example GraphQL Query:**
 
@@ -110,14 +112,15 @@ query {
 
 ### REST API
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/tests` | GET | List test cases (supports filtering/pagination) |
-| `/api/tests/{id}` | GET | Get specific test case with steps |
-| `/api/runs` | GET | List all test run IDs |
-| `/api/runs/{runId}` | GET | Get run statistics and tests |
+| Endpoint            | Method | Description                                     |
+| ------------------- | ------ | ----------------------------------------------- |
+| `/api/tests`        | GET    | List test cases (supports filtering/pagination) |
+| `/api/tests/{id}`   | GET    | Get specific test case with steps               |
+| `/api/runs`         | GET    | List all test run IDs                           |
+| `/api/runs/{runId}` | GET    | Get run statistics and tests                    |
 
 **Query Parameters for `/api/tests`:**
+
 - `runId` - Filter by run ID
 - `status` - Filter by status (PASSED, FAILED, SKIPPED)
 - `search` - Search in test titles (case-insensitive)
@@ -126,7 +129,7 @@ query {
 
 **Example REST Queries:**
 
-```bash
+````bash
 # List all tests
 curl http://localhost:8080/api/tests
 
@@ -157,7 +160,7 @@ ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
   console.log('Event:', data.type, data);
 };
-```
+````
 
 ### Event Format
 
@@ -167,7 +170,9 @@ All events follow this structure:
 {
   "type": "test.begin|test.end|step.begin|step.end",
   "timestamp": "2025-11-14T05:00:00Z",
-  "data": { /* event-specific protobuf data */ }
+  "data": {
+    /* event-specific protobuf data */
+  }
 }
 ```
 
@@ -186,25 +191,27 @@ A simple HTML test client is available at [`../../docs/websocket-test-client.htm
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8080` | HTTP listening port |
-| `DATABASE_URL` | - | PostgreSQL connection string (optional) |
-| `NATS_URL` | - | NATS server URL for WebSocket (optional) |
-| `NATS_STREAM` | `tests_events` | JetStream stream name |
-| `NATS_WS_CONSUMER` | `websocket` | Consumer name for WebSocket |
-| `AUTH_MODE` | `dev` | Authentication mode: `dev` or `oidc` (future) |
-| `OIDC_ISSUER` | - | OIDC issuer URL (future) |
+| Variable           | Default        | Description                                   |
+| ------------------ | -------------- | --------------------------------------------- |
+| `PORT`             | `8080`         | HTTP listening port                           |
+| `MONGODB_URI`      | -              | MongoDB connection string (required)          |
+| `NATS_URL`         | -              | NATS server URL for WebSocket (optional)      |
+| `NATS_STREAM`      | `tests_events` | JetStream stream name                         |
+| `NATS_WS_CONSUMER` | `websocket`    | Consumer name for WebSocket                   |
+| `AUTH_MODE`        | `dev`          | Authentication mode: `dev` or `oidc` (future) |
+| `OIDC_ISSUER`      | -              | OIDC issuer URL (future)                      |
 
 ## GraphQL Schema
 
 ### Types
 
 - **TestCaseRun** - Represents a test execution
+
   - `id`, `runId`, `title`, `status`, `metadata`, `createdAt`, `updatedAt`
   - `steps` - Associated step runs
 
 - **StepRun** - Represents a test step execution
+
   - `id`, `runId`, `testCaseRunId`, `status`, `createdAt`, `updatedAt`
   - `testCase` - Parent test case
 
@@ -246,25 +253,29 @@ curl http://localhost:8080/api/tests
 ### WebSocket connection
 
 1. Start NATS:
+
    ```bash
    make nats-up
    ```
 
 2. Start API service with NATS:
+
    ```bash
    NATS_URL='nats://localhost:4222' ./bin/api
    ```
 
 3. Open the test client:
+
    ```bash
    open docs/websocket-test-client.html
    ```
 
 4. In another terminal, send test events via ingestion service:
+
    ```bash
    # Start ingestion
    NATS_URL='nats://localhost:4222' ./bin/ingestion
-   
+
    # Send test events (use your test reporter or manual gRPC calls)
    ```
 

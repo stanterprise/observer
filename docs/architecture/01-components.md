@@ -25,10 +25,10 @@
 
 ## 4. Databases
 
-| Mode        | Engine                | Notes                 |
-| ----------- | --------------------- | --------------------- |
-| AIO         | SQLite (WAL)          | Zero-setup local file |
-| Distributed | Postgres / ClickHouse | Scalable SQL backend  |
+| Mode        | Engine  | Notes                                |
+| ----------- | ------- | ------------------------------------ |
+| AIO         | MongoDB | Embedded for local/dev               |
+| Distributed | MongoDB | External service in distributed mode |
 
 ## 5. Artifact Storage
 

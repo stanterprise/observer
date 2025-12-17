@@ -55,7 +55,7 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
   --set mode=aio \
   --set aio.enabled=true \
   --set distributed.enabled=false \
-  --set postgresql.enabled=false \
+  --set mongodb.enabled=false \
   --set nats.enabled=false
 
 # Wait for pod to be ready
@@ -71,7 +71,7 @@ kubectl port-forward svc/observer-aio 50051:50051
 #### Distributed Mode (Production)
 
 ```bash
-# Install in distributed mode with embedded PostgreSQL and NATS
+# Install in distributed mode with embedded MongoDB and NATS
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
   --version 0.1.0
 
@@ -90,6 +90,7 @@ kubectl port-forward svc/observer-ingestion 50051:50051
 ### Check Web UI
 
 Open your browser and navigate to the Web UI:
+
 - Docker/Compose: http://localhost:3000
 - Kubernetes: http://localhost:3000 (after port-forward)
 
@@ -128,14 +129,17 @@ npm install github:stanterprise/stanterprise-playwright-reporter
 Configure in `playwright.config.ts`:
 
 ```typescript
-import { defineConfig } from '@playwright/test';
+import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   reporter: [
-    ['list'],
-    ['github:stanterprise/stanterprise-playwright-reporter', {
-      endpoint: 'localhost:50051', // or your Kubernetes endpoint
-    }]
+    ["list"],
+    [
+      "github:stanterprise/stanterprise-playwright-reporter",
+      {
+        endpoint: "localhost:50051", // or your Kubernetes endpoint
+      },
+    ],
   ],
 });
 ```
@@ -143,6 +147,7 @@ export default defineConfig({
 ### Production Deployment
 
 For production use, see:
+
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Comprehensive deployment guide
 - [charts/observer/README.md](charts/observer/README.md) - Helm chart documentation
 - [charts/observer/values-production.yaml](charts/observer/values-production.yaml) - Production configuration example
@@ -161,6 +166,7 @@ services:
 ```
 
 Then:
+
 ```bash
 docker compose --profile dist up -d --scale ingestion=3
 ```
@@ -202,15 +208,17 @@ kubectl describe pod <pod-name>
 ### Can't Access Web UI
 
 1. Check if service is running:
+
    ```bash
    # Docker
    docker ps | grep observer
-   
+
    # Kubernetes
    kubectl get pods -l app.kubernetes.io/instance=observer
    ```
 
 2. Verify port forwarding (Kubernetes):
+
    ```bash
    kubectl port-forward svc/observer-web 3000:80
    # or for AIO
@@ -224,8 +232,8 @@ kubectl describe pod <pod-name>
 For distributed deployments:
 
 ```bash
-# Check PostgreSQL
-kubectl logs -l app.kubernetes.io/name=postgresql
+# Check MongoDB
+kubectl logs -l app.kubernetes.io/name=mongodb
 
 # Check processor logs (connects to database)
 kubectl logs -l app.kubernetes.io/component=processor

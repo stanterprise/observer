@@ -1,71 +1,55 @@
 # Processor Service
 
-The processor service consumes test events and persists them to the database. It's responsible for data persistence and artifact storage.
+The processor service consumes test events from NATS JetStream and persists them to MongoDB. It's responsible for durable storage of test runs.
 
 ## Architecture
 
 The processor service handles:
 
-1. Consuming test events from NATS JetStream (future)
-2. Writing structured data to database (Postgres/SQLite)
-3. Uploading artifacts to object store (future)
-4. Emitting summaries for fast UI queries (future)
+1. Consuming test events from NATS JetStream
+2. Writing structured data to MongoDB with idempotent upserts
+3. (Future) Uploading artifacts to object store
+4. (Future) Emitting summaries for fast UI queries
 
 ## Current State
 
-Currently, the processor service runs as a gRPC server with database persistence. It requires a database connection to operate.
+Currently, the processor service runs as a NATS consumer with MongoDB persistence. It requires both NATS and MongoDB.
 
 ## Running
 
-### With database (required)
+### With MongoDB + NATS (required)
 
-Start the database first:
+Start infrastructure:
+
 ```bash
-make db-up
+make mongo-up nats-up
 ```
 
 Then run the processor:
+
 ```bash
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' ./bin/processor
-# or
 make build-processor
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' ./bin/processor
-```
-
-Default port: `50052`
-
-### Using split environment variables
-
-```bash
-PGHOST=localhost PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=observer PGSSLMODE=disable ./bin/processor
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+NATS_URL='nats://localhost:4222' \
+./bin/processor
 ```
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `50052` | gRPC listening port |
-| `DATABASE_URL` | - | PostgreSQL connection string (required) |
-| `PGHOST` | - | PostgreSQL host (alternative to DATABASE_URL) |
-| `PGPORT` | `5432` | PostgreSQL port |
-| `PGUSER` | - | PostgreSQL user |
-| `PGPASSWORD` | - | PostgreSQL password |
-| `PGDATABASE` | - | PostgreSQL database name |
-| `PGSSLMODE` | `disable` | PostgreSQL SSL mode |
-| `APPLY_MIGRATIONS` | - | Set to `1` to enable auto-migrations |
-| `NATS_URL` | - | NATS server URL (future) |
+| Variable                                                                                          | Default        | Description                                       |
+| ------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------- |
+| `MONGODB_URI` or `MONGO_URI`                                                                      | -              | MongoDB connection string (required)              |
+| `MONGO_HOST`, `MONGO_PORT`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_DATABASE`, `MONGO_AUTH_SOURCE` | -              | Split MongoDB vars (alternative to `MONGODB_URI`) |
+| `NATS_URL`                                                                                        | -              | NATS server URL (required)                        |
+| `NATS_STREAM`                                                                                     | `tests_events` | JetStream stream name                             |
+| `NATS_CONSUMER`                                                                                   | `processor`    | Durable consumer name                             |
 
 ## Database
 
-The processor automatically applies schema migrations on startup when `APPLY_MIGRATIONS=1` is set.
-
-Supported databases:
-- PostgreSQL (distributed mode)
-- SQLite (AIO mode, future)
+The processor uses MongoDB and does not run SQL migrations.
 
 ## Future Enhancements
 
-- [ ] NATS JetStream consumer integration
 - [ ] Object storage integration (MinIO/S3)
 - [ ] Summary generation and caching
 - [ ] Consumer group scaling

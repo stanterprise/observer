@@ -14,7 +14,7 @@ The architecture follows the same principles in both modes — identical binarie
 
 - Unified schema and ingestion protocol (protobuf)
 - Real-time event streaming via NATS or Kafka
-- Flexible storage backends (SQLite, Postgres, ClickHouse)
+- MongoDB-backed storage for test runs and events
 - Pluggable artifact storage (local, S3, MinIO)
 - Extensible APIs for custom dashboards, analytics, and alerting
 - Simple onboarding (AIO) + horizontal scalability (distributed)

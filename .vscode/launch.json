@@ -1,120 +1,119 @@
 {
-	"version": "0.2.0",
-	"configurations": [
-		{
-			"name": "Debug Ingestion Service",
-			"type": "go",
-			"request": "launch",
-			"mode": "debug",
-			"program": "${workspaceFolder}/cmd/ingestion",
-			"env": {
-				"PORT": "50051",
-				"NATS_URL": "nats://localhost:4222",
-				"NATS_STREAM": "tests_events",
-				"NATS_SUBJECT_PREFIX": "tests.events.v1"
-			},
-			"args": [],
-			"showLog": true,
-			"preLaunchTask": "Start All Infrastructure"
-		},
-		{
-			"name": "Debug Processor Service",
-			"type": "go",
-			"request": "launch",
-			"mode": "debug",
-			"program": "${workspaceFolder}/cmd/processor",
-			"env": {
-				"PORT": "50052",
-				"DATABASE_URL": "postgres://postgres:postgres@localhost:5432/observer?sslmode=disable",
-				"APPLY_MIGRATIONS": "1"
-			},
-			"args": [],
-			"showLog": true,
-			"preLaunchTask": "Start All Infrastructure"
-		},
-		{
-			"name": "Debug API Service",
-			"type": "go",
-			"request": "launch",
-			"mode": "debug",
-			"program": "${workspaceFolder}/cmd/api",
-			"env": {
-				"PORT": "8080",
-				"DATABASE_URL": "postgres://postgres:postgres@localhost:5432/observer?sslmode=disable"
-			},
-			"args": [],
-			"showLog": true,
-			"preLaunchTask": "Start All Infrastructure"
-		},
-		{
-			"name": "Debug Legacy Server",
-			"type": "go",
-			"request": "launch",
-			"mode": "debug",
-			"program": "${workspaceFolder}/server",
-			"env": {
-				"DATABASE_URL": "postgres://postgres:postgres@localhost:5432/observer?sslmode=disable",
-				"APPLY_MIGRATIONS": "1"
-			},
-			"args": [],
-			"showLog": true,
-			"preLaunchTask": "Start All Infrastructure"
-		},
-		{
-			"name": "Debug Current Test",
-			"type": "go",
-			"request": "launch",
-			"mode": "test",
-			"program": "${workspaceFolder}",
-			"env": {},
-			"args": [
-				"-test.run",
-				"${selectedText}"
-			],
-			"showLog": true
-		},
-		{
-			"name": "Debug All Tests",
-			"type": "go",
-			"request": "launch",
-			"mode": "test",
-			"program": "${workspaceFolder}",
-			"env": {},
-			"args": [],
-			"showLog": true
-		},
-		{
-			"name": "Debug Package Tests",
-			"type": "go",
-			"request": "launch",
-			"mode": "test",
-			"program": "${fileDirname}",
-			"env": {},
-			"args": [],
-			"showLog": true
-		},
-		{
-			"name": "Attach to Process",
-			"type": "go",
-			"request": "attach",
-			"mode": "local",
-			"processId": "${command:pickProcess}"
-		}
-	],
-	"compounds": [
-		{
-			"name": "Debug All Services",
-			"configurations": [
-				"Debug Ingestion Service",
-				"Debug Processor Service",
-				"Debug API Service"
-			],
-			"stopAll": true,
-			"presentation": {
-				"hidden": false,
-				"group": "all",
-				"order": 1
-			}
-		}
-	]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Ingestion Service",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/ingestion",
+      "env": {
+        "PORT": "50051",
+        "NATS_URL": "nats://localhost:4222",
+        "NATS_STREAM": "tests_events",
+        "NATS_SUBJECT_PREFIX": "tests.events.v1"
+      },
+      "args": [],
+      "showLog": true,
+      "preLaunchTask": "Start All Infrastructure"
+    },
+    {
+      "name": "Debug Processor Service",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/processor",
+      "env": {
+        "NATS_URL": "nats://localhost:4222",
+        "NATS_STREAM": "tests_events",
+        "MONGODB_URI": "mongodb://root:password@localhost:27017/observer?authSource=admin"
+      },
+      "args": [],
+      "showLog": true,
+      "preLaunchTask": "Start All Infrastructure"
+    },
+    {
+      "name": "Debug API Service",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/api",
+      "env": {
+        "PORT": "8080",
+        "NATS_URL": "nats://localhost:4222",
+        "NATS_STREAM": "tests_events",
+        "MONGODB_URI": "mongodb://root:password@localhost:27017/observer?authSource=admin"
+      },
+      "args": [],
+      "showLog": true,
+      "preLaunchTask": "Start All Infrastructure"
+    },
+    {
+      "name": "Debug Legacy Server",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/server",
+      "env": {
+        "MONGODB_URI": "mongodb://root:password@localhost:27017/observer?authSource=admin",
+        "NATS_URL": "nats://localhost:4222"
+      },
+      "args": [],
+      "showLog": true,
+      "preLaunchTask": "Start All Infrastructure"
+    },
+    {
+      "name": "Debug Current Test",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${workspaceFolder}",
+      "env": {},
+      "args": ["-test.run", "${selectedText}"],
+      "showLog": true
+    },
+    {
+      "name": "Debug All Tests",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${workspaceFolder}",
+      "env": {},
+      "args": [],
+      "showLog": true
+    },
+    {
+      "name": "Debug Package Tests",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${fileDirname}",
+      "env": {},
+      "args": [],
+      "showLog": true
+    },
+    {
+      "name": "Attach to Process",
+      "type": "go",
+      "request": "attach",
+      "mode": "local",
+      "processId": "${command:pickProcess}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug All Services",
+      "configurations": [
+        "Debug Ingestion Service",
+        "Debug Processor Service",
+        "Debug API Service"
+      ],
+      "stopAll": true,
+      "presentation": {
+        "hidden": false,
+        "group": "all",
+        "order": 1
+      }
+    }
+  ]
 }

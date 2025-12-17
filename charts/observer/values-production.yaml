@@ -5,7 +5,7 @@ mode: distributed
 
 distributed:
   enabled: true
-  
+
   ingestion:
     replicaCount: 3
     autoscaling:
@@ -14,7 +14,7 @@ distributed:
       maxReplicas: 10
       targetCPUUtilizationPercentage: 70
       targetMemoryUtilizationPercentage: 80
-    
+
     resources:
       limits:
         cpu: 1000m
@@ -22,7 +22,7 @@ distributed:
       requests:
         cpu: 200m
         memory: 256Mi
-  
+
   processor:
     replicaCount: 3
     autoscaling:
@@ -31,7 +31,7 @@ distributed:
       maxReplicas: 10
       targetCPUUtilizationPercentage: 70
       targetMemoryUtilizationPercentage: 80
-    
+
     resources:
       limits:
         cpu: 2000m
@@ -39,7 +39,7 @@ distributed:
       requests:
         cpu: 500m
         memory: 512Mi
-  
+
   api:
     replicaCount: 3
     autoscaling:
@@ -48,7 +48,7 @@ distributed:
       maxReplicas: 8
       targetCPUUtilizationPercentage: 70
       targetMemoryUtilizationPercentage: 80
-    
+
     resources:
       limits:
         cpu: 1000m
@@ -56,7 +56,7 @@ distributed:
       requests:
         cpu: 200m
         memory: 256Mi
-  
+
   web:
     replicaCount: 2
     autoscaling:
@@ -64,7 +64,7 @@ distributed:
       minReplicas: 2
       maxReplicas: 5
       targetCPUUtilizationPercentage: 70
-    
+
     resources:
       limits:
         cpu: 500m
@@ -76,20 +76,19 @@ distributed:
 aio:
   enabled: false
 
-# Use embedded PostgreSQL and NATS with increased resources
-postgresql:
+# Use embedded MongoDB and NATS with increased resources
+mongodb:
   enabled: true
-  primary:
-    persistence:
-      enabled: true
-      size: 50Gi
-    resources:
-      limits:
-        cpu: 2000m
-        memory: 2Gi
-      requests:
-        cpu: 500m
-        memory: 512Mi
+  persistence:
+    enabled: true
+    size: 50Gi
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
 
 nats:
   enabled: true
@@ -125,7 +124,7 @@ ingress:
       - secretName: observer-web-tls
         hosts:
           - observer.example.com
-  
+
   # API ingress (optional - can use same host as web with path prefix)
   api:
     enabled: true
@@ -144,7 +143,7 @@ ingress:
       - secretName: observer-api-tls
         hosts:
           - api.observer.example.com
-  
+
   # gRPC ingress for test reporters
   grpc:
     enabled: true

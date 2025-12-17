@@ -20,6 +20,7 @@ Successfully implemented a modern Web UI component for the Observer test observa
 ### 1. React Application (`web/`)
 
 **Directory Structure:**
+
 ```
 web/
 ├── src/
@@ -44,6 +45,7 @@ web/
 ```
 
 **Key Features:**
+
 - Real-time WebSocket connection with automatic reconnection
 - Connection status indicator in navigation
 - Test runs listing with status badges
@@ -55,6 +57,7 @@ web/
 **File**: `docker/nginx/nginx.conf.template`
 
 **Features:**
+
 - Static file serving from `/usr/share/nginx/html`
 - API proxy: `/api/*` → `http://{backend}:8080/api/*`
 - WebSocket proxy: `/ws` → `http://{backend}:8080/ws`
@@ -63,12 +66,14 @@ web/
 - Long WebSocket timeout (7 days)
 
 **Environment Variables:**
+
 - `API_BACKEND_HOST`: Backend hostname (localhost for AIO, api for distributed)
 - `API_BACKEND_PORT`: Backend port (default: 8080)
 
 ### 3. Docker Configuration
 
 #### Standalone Web UI (`Dockerfile.web`)
+
 - **Base**: node:20-bookworm (builder), nginx:alpine (runtime)
 - **Build Process**:
   1. Copy package files and source
@@ -79,6 +84,7 @@ web/
 - **Size**: ~50MB (compressed)
 
 #### All-In-One Mode (`Dockerfile.aio`)
+
 - **Additions**:
   - Web UI builder stage using node:20-bookworm
   - Nginx installation in runtime stage
@@ -90,6 +96,7 @@ web/
 ### 4. Docker Compose Integration
 
 #### Distributed Mode
+
 ```yaml
 services:
   web:
@@ -104,20 +111,22 @@ services:
 ```
 
 #### AIO Mode
+
 ```yaml
 services:
   aio:
     build: Dockerfile.aio
     ports:
-      - "3000:80"        # Web UI
-      - "50051:50051"    # gRPC
-      - "8080:8080"      # API (internal)
-      - "4222:4222"      # NATS
+      - "3000:80" # Web UI
+      - "50051:50051" # gRPC
+      - "8080:8080" # API (internal)
+      - "4222:4222" # NATS
 ```
 
 ### 5. s6-overlay Integration (AIO Mode)
 
 **New Service**: `docker/s6-overlay/s6-rc.d/nginx/`
+
 - Type: longrun
 - Dependencies: api (ensures API starts before Nginx)
 - Run command: `nginx -g "daemon off;"`
@@ -125,9 +134,10 @@ services:
 ### 6. Development Workflow
 
 **Local Development:**
+
 ```bash
 # Start infrastructure
-make db-up nats-up
+make mongo-up nats-up
 
 # Build Go services
 make build-all
@@ -141,6 +151,7 @@ npm run dev
 ```
 
 **Development Server** (`vite.config.ts`):
+
 - Port: 3000
 - API Proxy: `/api` → `http://localhost:8080`
 - WebSocket Proxy: `/ws` → `ws://localhost:8080`
@@ -148,6 +159,7 @@ npm run dev
 ### 7. Build & Deployment
 
 **Makefile Targets:**
+
 - `make web-install` - Install dependencies
 - `make web-dev` - Start dev server
 - `make web-build` - Build for production
@@ -157,6 +169,7 @@ npm run dev
 - `make docker-up-aio` - Start AIO mode
 
 **Environment Variables:**
+
 - `VITE_API_URL` - Base URL for API requests (default: `/api`)
 - `VITE_WS_URL` - WebSocket endpoint (default: auto-detected)
 - `AIO_WEB_PORT` - AIO Web UI port (default: 3000)
@@ -165,16 +178,18 @@ npm run dev
 ## Files Added/Modified
 
 ### New Files (40+)
+
 - **Web Application**: `web/` directory with complete React app
 - **Nginx Config**: `docker/nginx/nginx.conf.template`
 - **Dockerfiles**: `Dockerfile.web`
 - **s6-overlay**: `docker/s6-overlay/s6-rc.d/nginx/*`
 - **Scripts**: `scripts/start-dev.sh`
-- **Documentation**: 
+- **Documentation**:
   - `web/README.md`
   - `docs/WEB_UI_TESTING.md`
 
 ### Modified Files (5)
+
 - `Dockerfile.aio` - Added Web UI builder and Nginx
 - `docker-compose.yml` - Added web service, updated AIO ports
 - `Makefile` - Added web-related targets
@@ -184,7 +199,9 @@ npm run dev
 ## Testing Strategy
 
 ### Manual Testing
+
 See `docs/WEB_UI_TESTING.md` for comprehensive testing guide:
+
 - Development mode testing with hot reload
 - Docker distributed mode testing
 - Docker AIO mode testing
@@ -192,6 +209,7 @@ See `docs/WEB_UI_TESTING.md` for comprehensive testing guide:
 - API integration testing
 
 ### Test Checklist
+
 - [x] Web UI builds successfully
 - [x] Docker image builds successfully (observer:web)
 - [x] Nginx configuration is valid
@@ -204,46 +222,55 @@ See `docs/WEB_UI_TESTING.md` for comprehensive testing guide:
 ## Deployment Modes
 
 ### All-In-One (AIO)
+
 **Use Case**: Local development, demos, single-node deployments
 
 **Access Points:**
+
 - Web UI: `http://localhost:3000`
 - gRPC: `localhost:50051`
 - NATS Monitoring: `http://localhost:8222`
 
 **Architecture:**
+
 - Single container with s6-overlay managing all processes
 - Nginx serves Web UI and proxies to localhost:8080 API
-- SQLite database, embedded NATS
+- Embedded MongoDB, embedded NATS
 - All services communicate via localhost
 
 ### Distributed
+
 **Use Case**: Production, scalable deployments
 
 **Access Points:**
+
 - Web UI: `http://localhost:3000`
 - gRPC: `localhost:50051`
 - API: Internal (proxied by Web UI)
 - NATS: `localhost:4222`
 
 **Architecture:**
+
 - Separate containers for each service
 - Web UI container with Nginx proxies to `api:8080`
-- PostgreSQL database, standalone NATS
+- MongoDB database, standalone NATS
 - Services communicate via Docker network
 
 ## Performance Considerations
 
 ### Web UI
+
 - **Bundle Size**: ~260KB (gzipped: ~83KB)
 - **Load Time**: <1s on localhost
 - **Build Time**: ~5s (TypeScript + Vite)
 
 ### Docker Images
+
 - **observer:web**: ~50MB (Nginx + static files)
 - **observer:aio**: ~500MB (all services + Web UI)
 
 ### Optimizations
+
 - Gzip compression enabled in Nginx
 - Static assets cached with 1h expiration
 - Code splitting via Vite
@@ -252,6 +279,7 @@ See `docs/WEB_UI_TESTING.md` for comprehensive testing guide:
 ## Known Limitations & Future Enhancements
 
 ### Current Limitations
+
 1. No authentication/authorization
 2. No test detail view (only listing)
 3. No artifact viewer
@@ -259,6 +287,7 @@ See `docs/WEB_UI_TESTING.md` for comprehensive testing guide:
 5. No filtering/search functionality
 
 ### Planned Enhancements
+
 1. GraphQL integration (when Phase 4 is complete)
 2. Test detail page with step-by-step execution
 3. Artifact viewer (screenshots, videos, traces)
@@ -270,54 +299,63 @@ See `docs/WEB_UI_TESTING.md` for comprehensive testing guide:
 ## Configuration Reference
 
 ### Web UI Environment Variables
-| Variable | Description | Default | Used In |
-|----------|-------------|---------|---------|
-| `VITE_API_URL` | Base URL for API requests | `/api` | Build time |
-| `VITE_WS_URL` | WebSocket endpoint URL | Auto-detected | Build time |
+
+| Variable       | Description               | Default       | Used In    |
+| -------------- | ------------------------- | ------------- | ---------- |
+| `VITE_API_URL` | Base URL for API requests | `/api`        | Build time |
+| `VITE_WS_URL`  | WebSocket endpoint URL    | Auto-detected | Build time |
 
 ### Nginx Environment Variables
-| Variable | Description | Default | Used In |
-|----------|-------------|---------|---------|
+
+| Variable           | Description      | Default     | Used In |
+| ------------------ | ---------------- | ----------- | ------- |
 | `API_BACKEND_HOST` | Backend hostname | `localhost` | Runtime |
-| `API_BACKEND_PORT` | Backend port | `8080` | Runtime |
+| `API_BACKEND_PORT` | Backend port     | `8080`      | Runtime |
 
 ### Docker Compose Variables
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `AIO_WEB_PORT` | AIO Web UI external port | `3000` |
-| `WEB_PORT` | Distributed Web UI port | `3000` |
-| `AIO_GRPC_PORT` | AIO gRPC port | `50051` |
-| `AIO_API_PORT` | AIO API internal port | `8080` |
+
+| Variable        | Description              | Default |
+| --------------- | ------------------------ | ------- |
+| `AIO_WEB_PORT`  | AIO Web UI external port | `3000`  |
+| `WEB_PORT`      | Distributed Web UI port  | `3000`  |
+| `AIO_GRPC_PORT` | AIO gRPC port            | `50051` |
+| `AIO_API_PORT`  | AIO API internal port    | `8080`  |
 
 ## Documentation
 
 ### User Documentation
+
 - [Main README](../README.md) - Quick start and overview
 - [Web UI README](../web/README.md) - Development guide
 - [Testing Guide](docs/WEB_UI_TESTING.md) - Comprehensive testing instructions
 
 ### Architecture Documentation
+
 - [Components](docs/architecture/01-components.md) - Component overview (updated)
 - [Deployment Modes](docs/architecture/03-modes.md) - AIO vs Distributed modes
 
 ### Scripts
+
 - `scripts/start-dev.sh` - Start all services for local development
 
 ## Success Metrics
 
 ✅ **Complete Implementation**
+
 - All required features implemented
 - Both deployment modes supported
 - Documentation complete
 - Docker images build successfully
 
 ✅ **Code Quality**
+
 - TypeScript strict mode enabled
 - Tailwind CSS best practices
 - Proper component structure
 - Clean separation of concerns
 
 ✅ **DevOps Ready**
+
 - Docker images optimized
 - Multi-stage builds
 - Environment-based configuration

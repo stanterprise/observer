@@ -51,11 +51,9 @@ aio:
     # existingClaim: ""
 
   env:
-    DB_DRIVER: sqlite
-    DATABASE_URL: /data/db/observer.db
+    MONGODB_URI: mongodb://root:password@localhost:27017/observer?authSource=admin
     STORAGE_DRIVER: local
     ARTIFACTS_DIR: /data/artifacts
-    APPLY_MIGRATIONS: "1"
     NATS_URL: nats://localhost:4222
     NATS_STREAM: tests_events
     NATS_WS_CONSUMER: websocket
@@ -124,7 +122,6 @@ distributed:
     env:
       NATS_STREAM: tests_events
       NATS_CONSUMER: processor
-      APPLY_MIGRATIONS: "1"
 
   # API service configuration
   api:

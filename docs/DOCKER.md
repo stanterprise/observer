@@ -64,10 +64,9 @@ docker compose --profile aio down
 
 - `50051` - gRPC ingestion endpoint
 - `8080` - HTTP API and UI
+- `27017` - MongoDB
 - `4222` - NATS client connections
 - `8222` - NATS monitoring
-
-**Note:** AIO mode currently requires SQLite support which is not yet implemented in the database layer. The processor service will fail to start until SQLite support is added to `internal/database/`.
 
 #### Distributed Mode
 
@@ -93,7 +92,7 @@ docker compose --profile dist down
 - `processor` - NATS consumer and database writer
 - `api` - HTTP API and UI (port 8080)
 - `nats` - Message broker (ports 4222, 8222)
-- `db` - PostgreSQL database (port 5432)
+- `mongodb` - MongoDB database (port 27017)
 
 ## Configuration
 
@@ -101,15 +100,14 @@ docker compose --profile dist down
 
 All services support these environment variables:
 
-| Variable           | Description                                                 | Default                           | Required                 |
-| ------------------ | ----------------------------------------------------------- | --------------------------------- | ------------------------ |
-| `MODE`             | Deployment mode: `aio` or `service`                         | `service`                         | Yes                      |
-| `SERVICE_TYPE`     | Service to run: `ingestion`, `processor`, `api`, `observer` | `ingestion`                       | When `MODE=service`      |
-| `PORT`             | Service listen port                                         | `50051` (ingestion), `8080` (api) | No                       |
-| `DATABASE_URL`     | Database connection URL                                     | -                                 | For processor, api       |
-| `NATS_URL`         | NATS server URL                                             | `nats://localhost:4222`           | For ingestion, processor |
-| `NATS_STREAM`      | NATS stream name                                            | `tests_events`                    | No                       |
-| `APPLY_MIGRATIONS` | Run database migrations on startup                          | -                                 | No                       |
+| Variable       | Description                                                 | Default                           | Required                 |
+| -------------- | ----------------------------------------------------------- | --------------------------------- | ------------------------ |
+| `MODE`         | Deployment mode: `aio` or `service`                         | `service`                         | Yes                      |
+| `SERVICE_TYPE` | Service to run: `ingestion`, `processor`, `api`, `observer` | `ingestion`                       | When `MODE=service`      |
+| `PORT`         | Service listen port                                         | `50051` (ingestion), `8080` (api) | No                       |
+| `MONGODB_URI`  | MongoDB connection string                                   | -                                 | For processor, api       |
+| `NATS_URL`     | NATS server URL                                             | `nats://localhost:4222`           | For ingestion, processor |
+| `NATS_STREAM`  | NATS stream name                                            | `tests_events`                    | No                       |
 
 ### Distributed Mode Configuration
 
@@ -130,8 +128,7 @@ environment:
   MODE: service
   SERVICE_TYPE: processor
   NATS_URL: nats://nats:4222
-  DATABASE_URL: postgres://user:pass@db:5432/observer?sslmode=disable
-  APPLY_MIGRATIONS: "1"
+  MONGODB_URI: mongodb://user:pass@mongodb:27017/observer?authSource=admin
 ```
 
 #### API Service
@@ -140,7 +137,7 @@ environment:
 environment:
   MODE: service
   SERVICE_TYPE: api
-  DATABASE_URL: postgres://user:pass@db:5432/observer?sslmode=disable
+  MONGODB_URI: mongodb://user:pass@mongodb:27017/observer?authSource=admin
 ```
 
 ## Architecture
@@ -158,7 +155,7 @@ environment:
 │       └────────────┼────────────────┐   │
 │                    │                │   │
 │               ┌────▼────┐      ┌────▼──┐│
-│               │Processor│      │SQLite ││
+│               │Processor│      │MongoDB ││
 │               └─────────┘      └───────┘│
 └─────────────────────────────────────────┘
 ```
@@ -172,10 +169,10 @@ environment:
 └───────────┘    └───────────┘    └─────┬────┘
                                          │
                                          ▼
-                                  ┌──────────┐
-                                  │Postgres  │
-                                  │  :5432   │
-                                  └─────┬────┘
+                                      ┌──────────┐
+                                      │ MongoDB  │
+                                      │ :27017   │
+                                      └─────┬────┘
                                         │
                                         ▼
                                   ┌──────────┐
@@ -215,7 +212,7 @@ All services include healthchecks:
 - **Processor**: Checks if process is running
 - **API**: Checks `/health` endpoint
 - **NATS**: Checks `/healthz` endpoint
-- **Postgres**: Checks `pg_isready`
+- **MongoDB**: Checks `db.adminCommand({ ping: 1 })`
 
 ## Makefile Targets
 
@@ -234,7 +231,7 @@ make docker-down             # Stop all services
 
 ### Processor fails in AIO mode
 
-The processor requires a database connection. AIO mode is designed to use SQLite, but SQLite support is not yet implemented in `internal/database/database.go`. Until then, use distributed mode with PostgreSQL.
+The processor requires a MongoDB connection. Ensure `MONGODB_URI` is set correctly for your deployment mode.
 
 ### Services can't connect to NATS
 
@@ -257,24 +254,23 @@ For local development, use the development database:
 
 ```bash
 # Start just the database
-make db-up
+make mongo-up
 
 # Run services locally
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
+NATS_URL='nats://localhost:4222' \
   ./bin/ingestion &
 
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
-  APPLY_MIGRATIONS=1 \
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+  NATS_URL='nats://localhost:4222' \
   ./bin/processor &
 
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+  NATS_URL='nats://localhost:4222' \
   ./bin/api &
 ```
 
 ## Next Steps
 
-- [ ] Implement SQLite support for AIO mode
 - [ ] Add MinIO for artifact storage in distributed mode
-- [ ] Add Helm charts for Kubernetes deployment
 - [ ] Add multi-arch builds (amd64, arm64)
 - [ ] Add container image scanning in CI

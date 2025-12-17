@@ -1,139 +1,139 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"label": "Build All Components",
-			"type": "shell",
-			"command": "make build-all",
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			},
-			"problemMatcher": ["$go"],
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared"
-			}
-		},
-		{
-			"label": "Build Ingestion Service",
-			"type": "shell",
-			"command": "make build-ingestion",
-			"group": "build",
-			"problemMatcher": ["$go"]
-		},
-		{
-			"label": "Build Processor Service",
-			"type": "shell",
-			"command": "make build-processor",
-			"group": "build",
-			"problemMatcher": ["$go"]
-		},
-		{
-			"label": "Build API Service",
-			"type": "shell",
-			"command": "make build-api",
-			"group": "build",
-			"problemMatcher": ["$go"]
-		},
-		{
-			"label": "Run Tests",
-			"type": "shell",
-			"command": "make test",
-			"group": {
-				"kind": "test",
-				"isDefault": true
-			},
-			"problemMatcher": ["$go"],
-			"presentation": {
-				"echo": true,
-				"reveal": "always",
-				"focus": false,
-				"panel": "shared"
-			}
-		},
-		{
-			"label": "Run Tests with Coverage",
-			"type": "shell",
-			"command": "make test-cover",
-			"group": "test",
-			"problemMatcher": ["$go"]
-		},
-		{
-			"label": "Run Tests with Race Detector",
-			"type": "shell",
-			"command": "make test-race",
-			"group": "test",
-			"problemMatcher": ["$go"]
-		},
-		{
-			"label": "Start Database",
-			"type": "shell",
-			"command": "make db-up",
-			"problemMatcher": []
-		},
-		{
-			"label": "Start NATS",
-			"type": "shell",
-			"command": "make nats-up",
-			"problemMatcher": []
-		},
-		{
-			"label": "Start All Infrastructure",
-			"type": "shell",
-			"command": "docker compose up -d db nats",
-			"problemMatcher": []
-		},
-		{
-			"label": "Stop All Infrastructure",
-			"type": "shell",
-			"command": "docker compose down",
-			"problemMatcher": []
-		},
-		{
-			"label": "Database Shell",
-			"type": "shell",
-			"command": "make db-psql",
-			"problemMatcher": []
-		},
-		{
-			"label": "Format Code",
-			"type": "shell",
-			"command": "make fmt",
-			"problemMatcher": []
-		},
-		{
-			"label": "Lint Code",
-			"type": "shell",
-			"command": "make lint",
-			"problemMatcher": ["$go"]
-		},
-		{
-			"label": "Vet Code",
-			"type": "shell",
-			"command": "make vet",
-			"problemMatcher": ["$go"]
-		},
-		{
-			"label": "Generate Protobuf",
-			"type": "shell",
-			"command": "make proto",
-			"problemMatcher": []
-		},
-		{
-			"label": "Clean Build Artifacts",
-			"type": "shell",
-			"command": "make clean",
-			"problemMatcher": []
-		},
-		{
-			"label": "NATS Integration Tests",
-			"type": "shell",
-			"command": "make test-nats-integration",
-			"group": "test",
-			"problemMatcher": ["$go"]
-		}
-	]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build All Components",
+      "type": "shell",
+      "command": "make build-all",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$go"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Build Ingestion Service",
+      "type": "shell",
+      "command": "make build-ingestion",
+      "group": "build",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Build Processor Service",
+      "type": "shell",
+      "command": "make build-processor",
+      "group": "build",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Build API Service",
+      "type": "shell",
+      "command": "make build-api",
+      "group": "build",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Run Tests",
+      "type": "shell",
+      "command": "make test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": ["$go"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run Tests with Coverage",
+      "type": "shell",
+      "command": "make test-cover",
+      "group": "test",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Run Tests with Race Detector",
+      "type": "shell",
+      "command": "make test-race",
+      "group": "test",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Start MongoDB",
+      "type": "shell",
+      "command": "make mongo-up",
+      "problemMatcher": []
+    },
+    {
+      "label": "Start NATS",
+      "type": "shell",
+      "command": "make nats-up",
+      "problemMatcher": []
+    },
+    {
+      "label": "Start All Infrastructure",
+      "type": "shell",
+      "command": "docker compose up -d mongodb nats",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stop All Infrastructure",
+      "type": "shell",
+      "command": "docker compose down",
+      "problemMatcher": []
+    },
+    {
+      "label": "MongoDB Shell",
+      "type": "shell",
+      "command": "make mongo-shell",
+      "problemMatcher": []
+    },
+    {
+      "label": "Format Code",
+      "type": "shell",
+      "command": "make fmt",
+      "problemMatcher": []
+    },
+    {
+      "label": "Lint Code",
+      "type": "shell",
+      "command": "make lint",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Vet Code",
+      "type": "shell",
+      "command": "make vet",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Generate Protobuf",
+      "type": "shell",
+      "command": "make proto",
+      "problemMatcher": []
+    },
+    {
+      "label": "Clean Build Artifacts",
+      "type": "shell",
+      "command": "make clean",
+      "problemMatcher": []
+    },
+    {
+      "label": "NATS Integration Tests",
+      "type": "shell",
+      "command": "make test-nats-integration",
+      "group": "test",
+      "problemMatcher": ["$go"]
+    }
+  ]
 }
