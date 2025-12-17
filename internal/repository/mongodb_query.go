@@ -148,3 +148,66 @@ func (r *MongoRepository) UpdateTestStatus(ctx context.Context, testID string, s
 	r.logger.Info("test status updated (nested)", "id", testID, "status", status)
 	return nil
 }
+
+// SuiteExists checks if a suite exists in the repository
+// For nested suites, it extracts the root document ID and checks if the suite exists in the document hierarchy
+func (r *MongoRepository) SuiteExists(ctx context.Context, suiteID string) (bool, error) {
+	// Root suite check - suite is the document itself
+	count, err := r.collection.CountDocuments(ctx, bson.M{"_id": suiteID})
+	if err != nil {
+		return false, fmt.Errorf("count root suite: %w", err)
+	}
+	if count > 0 {
+		return true, nil
+	}
+
+	// Check if suite exists in nested suites array
+	count, err = r.collection.CountDocuments(ctx, bson.M{"suites.id": suiteID})
+	if err != nil {
+		return false, fmt.Errorf("count nested suite: %w", err)
+	}
+
+	return count > 0, nil
+}
+
+// TestExists checks if a test exists in the repository
+// It checks both root-level tests array and nested suite tests arrays
+func (r *MongoRepository) TestExists(ctx context.Context, testID string) (bool, error) {
+	// Check root-level tests array
+	count, err := r.collection.CountDocuments(ctx, bson.M{"tests.id": testID})
+	if err != nil {
+		return false, fmt.Errorf("count root test: %w", err)
+	}
+	if count > 0 {
+		return true, nil
+	}
+
+	// Check nested suite tests
+	count, err = r.collection.CountDocuments(ctx, bson.M{"suites.tests.id": testID})
+	if err != nil {
+		return false, fmt.Errorf("count nested test: %w", err)
+	}
+
+	return count > 0, nil
+}
+
+// StepExists checks if a step exists within a test
+// It checks both root-level and nested suite tests
+func (r *MongoRepository) StepExists(ctx context.Context, stepID string) (bool, error) {
+	// Check steps in root-level tests
+	count, err := r.collection.CountDocuments(ctx, bson.M{"tests.steps.id": stepID})
+	if err != nil {
+		return false, fmt.Errorf("count root test step: %w", err)
+	}
+	if count > 0 {
+		return true, nil
+	}
+
+	// Check steps in nested suite tests
+	count, err = r.collection.CountDocuments(ctx, bson.M{"suites.tests.steps.id": stepID})
+	if err != nil {
+		return false, fmt.Errorf("count nested test step: %w", err)
+	}
+
+	return count > 0, nil
+}
