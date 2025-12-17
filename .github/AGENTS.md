@@ -78,7 +78,7 @@ metadata:
 - `search`, `grep`, `glob` - Find infrastructure configurations
 - `bash` - Execute Docker, kubectl, helm commands
 - `github-mcp-server-actions_list` - List GitHub Actions workflows
-- `github-mcp-server-actions_get` - Get workflow details and logs
+- `github-mcp-server-actions_get` - Get workflow details
 - `github-mcp-server-get_job_logs` - Retrieve CI/CD job logs for debugging
 
 **When to use**: Deployment configuration, CI/CD issues, infrastructure setup, container optimization
