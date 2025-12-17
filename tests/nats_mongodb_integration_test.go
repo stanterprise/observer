@@ -59,18 +59,31 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 		t.Fatalf("Failed to get NATS connection string: %v", err)
 	}
 
+	// Wait for NATS to be fully ready with retries
+	time.Sleep(2 * time.Second)
+
 	// Create unique stream for this test
 	streamName := "test_events_" + time.Now().Format("20060102150405")
 	subjectPrefix := "test.events"
 
-	// Initialize publisher
-	pub, err := publisher.NewNATSPublisher(publisher.NATSConfig{
-		URL:           natsURL,
-		StreamName:    streamName,
-		SubjectPrefix: subjectPrefix,
-	}, logger)
+	// Initialize publisher with retry logic
+	var pub *publisher.NATSPublisher
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		pub, err = publisher.NewNATSPublisher(publisher.NATSConfig{
+			URL:           natsURL,
+			StreamName:    streamName,
+			SubjectPrefix: subjectPrefix,
+		}, logger)
+		if err == nil {
+			break
+		}
+		if i < maxRetries-1 {
+			time.Sleep(time.Duration(i+1) * time.Second)
+		}
+	}
 	if err != nil {
-		t.Fatalf("Failed to create publisher: %v", err)
+		t.Fatalf("Failed to create publisher after %d retries: %v", maxRetries, err)
 	}
 	defer pub.Close()
 

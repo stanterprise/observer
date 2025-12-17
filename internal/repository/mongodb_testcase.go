@@ -24,6 +24,62 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 	// Extract root document ID to ensure we only update tests in the correct test run
 	rootDocID := extractRootSuiteID(suiteID)
 
+	// Check if we're adding to root document's tests array
+	if suiteID == rootDocID {
+		// First, try to update existing test in root document
+		filter := bson.M{
+			"_id":      rootDocID,
+			"tests.id": test.ID,
+		}
+		update := bson.M{
+			"$set": bson.M{
+				"tests.$[test].title":       test.Title,
+				"tests.$[test].status":      test.Status,
+				"tests.$[test].metadata":    test.Metadata,
+				"tests.$[test].duration":    test.Duration,
+				"tests.$[test].retry_count": test.RetryCount,
+				"tests.$[test].retry_index": test.RetryIndex,
+				"tests.$[test].timeout":     test.Timeout,
+				"tests.$[test].updated_at":  now,
+				"updated_at": now,
+			},
+		}
+		arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+			Filters: []interface{}{
+				bson.M{"test.id": test.ID},
+			},
+		})
+
+		result, err := r.collection.UpdateOne(ctx, filter, update, arrayFilters)
+		if err != nil {
+			return fmt.Errorf("update test in root document: %w", err)
+		}
+
+		if result.MatchedCount > 0 {
+			r.logger.Info("test begin (root, updated)", "id", test.ID, "title", test.Title)
+			return nil
+		}
+
+		// Test doesn't exist, append to root document's tests array
+		filter = bson.M{"_id": rootDocID}
+		update = bson.M{
+			"$push": bson.M{
+				"tests": test,
+			},
+			"$set": bson.M{
+				"updated_at": now,
+			},
+		}
+
+		_, err = r.collection.UpdateOne(ctx, filter, update)
+		if err != nil {
+			return fmt.Errorf("append test to root document: %w", err)
+		}
+
+		r.logger.Info("test begin (root, inserted)", "id", test.ID, "title", test.Title)
+		return nil
+	}
+
 	// First, try to find and update the test in a nested suite (level 1 - direct child of root)
 	filter := bson.M{
 		"_id":             rootDocID, // CRITICAL: Prevent cross-document mutation
@@ -61,7 +117,7 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 		return nil
 	}
 
-	// Test doesn't exist in nested suite, try to append it
+	// Test doesn't exist in nested suite, try to append it at level 1
 	filter = bson.M{
 		"_id":       rootDocID, // CRITICAL: Prevent cross-document mutation
 		"suites.id": suiteID,
@@ -86,8 +142,38 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 	}
 
 	if result.MatchedCount > 0 {
-		// Test was appended to nested suite
+		// Test was appended to nested suite (level 1)
 		r.logger.Info("test begin (nested, inserted)", "id", test.ID, "title", test.Title, "suite", suiteID)
+		return nil
+	}
+
+	// Try level 2 nested suite (suites.suites.id)
+	filter = bson.M{
+		"_id":              rootDocID, // CRITICAL: Prevent cross-document mutation
+		"suites.suites.id": suiteID,
+	}
+	update = bson.M{
+		"$push": bson.M{
+			"suites.$[].suites.$[suite].tests": test,
+		},
+		"$set": bson.M{
+			"updated_at": now,
+		},
+	}
+	arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"suite.id": suiteID},
+		},
+	})
+
+	result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
+	if err != nil {
+		return fmt.Errorf("append test to level-2 nested suite: %w", err)
+	}
+
+	if result.MatchedCount > 0 {
+		// Test was appended to level-2 nested suite
+		r.logger.Info("test begin (level-2 nested, inserted)", "id", test.ID, "title", test.Title, "suite", suiteID)
 		return nil
 	}
 
@@ -250,7 +336,11 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, testID string, runI
 	now := time.Now()
 
 	// Extract root document ID to ensure we only update tests in the correct test run
-	rootDocID := extractRootSuiteID(runID)
+	// If runID is empty, we'll search without the root document ID filter
+	rootDocID := ""
+	if runID != "" {
+		rootDocID = extractRootSuiteID(runID)
+	}
 
 	updateFields := bson.M{
 		"tests.$[test].updated_at": now,
@@ -264,8 +354,10 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, testID string, runI
 
 	// Update test in root document's tests array
 	filter := bson.M{
-		"_id":      rootDocID, // CRITICAL: Prevent cross-document mutation
 		"tests.id": testID,
+	}
+	if rootDocID != "" {
+		filter["_id"] = rootDocID // Add root document ID filter if available
 	}
 	update := bson.M{"$set": updateFields}
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{

@@ -22,15 +22,21 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 	}
 
 	// Extract root document ID to ensure we only update steps in the correct test run
-	rootDocID := extractRootSuiteID(runID)
+	// If runID is empty, we'll search without the root document ID filter
+	rootDocID := ""
+	if runID != "" {
+		rootDocID = extractRootSuiteID(runID)
+	}
 
 	if parentStepID == "" {
 		// Direct child of test - check if step already exists, then update or append
 		// First try to update existing step in root-level tests
 		filter := bson.M{
-			"_id":            rootDocID, // CRITICAL: Prevent cross-document mutation
 			"tests.id":       testID,
 			"tests.steps.id": step.ID,
+		}
+		if rootDocID != "" {
+			filter["_id"] = rootDocID // Add root document ID filter if available
 		}
 		update := bson.M{
 			"$set": bson.M{
@@ -60,8 +66,10 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 
 		// Step doesn't exist, append it to test
 		filter = bson.M{
-			"_id":       rootDocID, // CRITICAL: Prevent cross-document mutation
 			"tests.id": testID,
+		}
+		if rootDocID != "" {
+			filter["_id"] = rootDocID // Add root document ID filter if available
 		}
 		update = bson.M{
 			"$push": bson.M{
@@ -85,7 +93,7 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 		if result.MatchedCount == 0 {
 			// Try in nested suites - first check if step exists
 			filter = bson.M{
-				"_id":                   rootDocID, // CRITICAL: Prevent cross-document mutation
+				"_id": rootDocID, // CRITICAL (conditionally added): Prevent cross-document mutation
 				"suites.tests.id":       testID,
 				"suites.tests.steps.id": step.ID,
 			}
@@ -165,7 +173,7 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 			}
 
 			filter = bson.M{
-				"_id":              rootDocID, // CRITICAL: Prevent cross-document mutation
+				"_id": rootDocID, // CRITICAL (conditionally added): Prevent cross-document mutation
 				"suites.tests.id": testID,
 			}
 			_, err = r.collection.UpdateMany(ctx, filter, pipeline)
@@ -191,7 +199,7 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 	// This allows later retrieval and tree reconstruction
 	// First check if it exists
 	filter := bson.M{
-		"_id":            rootDocID, // CRITICAL: Prevent cross-document mutation
+		"_id": rootDocID, // CRITICAL (conditionally added): Prevent cross-document mutation
 		"tests.id":       testID,
 		"tests.steps.id": step.ID,
 	}
@@ -224,7 +232,7 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 
 	// Doesn't exist, append it
 	filter = bson.M{
-		"_id":       rootDocID, // CRITICAL: Prevent cross-document mutation
+		"_id": rootDocID, // CRITICAL (conditionally added): Prevent cross-document mutation
 		"tests.id": testID,
 	}
 	update = bson.M{
@@ -257,7 +265,11 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, stepID string, runI
 	now := time.Now()
 
 	// Extract root document ID to ensure we only update steps in the correct test run
-	rootDocID := extractRootSuiteID(runID)
+	// If runID is empty, we'll search without the root document ID filter
+	rootDocID := ""
+	if runID != "" {
+		rootDocID = extractRootSuiteID(runID)
+	}
 
 	updateFields := bson.M{
 		"tests.$[].steps.$[step].updated_at": now,
@@ -267,8 +279,10 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, stepID string, runI
 	}
 
 	filter := bson.M{
-		"_id":           rootDocID, // CRITICAL: Prevent cross-document mutation
 		"tests.steps.id": stepID,
+	}
+	if rootDocID != "" {
+		filter["_id"] = rootDocID // Add root document ID filter if available
 	}
 	update := bson.M{"$set": updateFields}
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
@@ -345,7 +359,7 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, stepID string, runI
 	}
 
 	filter = bson.M{
-		"_id":                   rootDocID, // CRITICAL: Prevent cross-document mutation
+		"_id": rootDocID, // CRITICAL (conditionally added): Prevent cross-document mutation
 		"suites.tests.steps.id": stepID,
 	}
 	_, err = r.collection.UpdateMany(ctx, filter, pipeline)
