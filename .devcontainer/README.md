@@ -15,14 +15,17 @@ This directory contains the configuration for GitHub Codespaces and VS Code Dev 
 ### VS Code Extensions
 
 **Go Development:**
+
 - **golang.go** - Go language support with IntelliSense, debugging, and testing
 
 **Web Development:**
+
 - **ms-vscode.vscode-typescript-next** - TypeScript and JavaScript language support
 - **dbaeumer.vscode-eslint** - JavaScript/TypeScript linting
 - **bradlc.vscode-tailwindcss** - Tailwind CSS IntelliSense
 
 **General:**
+
 - **ms-azuretools.vscode-docker** - Docker container management
 - **github.copilot** & **github.copilot-chat** - AI-powered coding assistance
 - **zxh404.vscode-proto3** - Protocol Buffers syntax highlighting
@@ -35,6 +38,7 @@ This directory contains the configuration for GitHub Codespaces and VS Code Dev 
 The setup script (`setup.sh`) automatically installs:
 
 **Go Tools:**
+
 - `protoc-gen-go` and `protoc-gen-go-grpc` - Protobuf code generators
 - `golangci-lint` - Go linter
 - `gopls` - Go language server
@@ -42,6 +46,7 @@ The setup script (`setup.sh`) automatically installs:
 - `staticcheck` - Go static analyzer
 
 **Web Tools:**
+
 - `TypeScript` - TypeScript compiler and language tools
 - `npm` - Node package manager
 - `Yarn` - Alternative package manager
@@ -50,7 +55,7 @@ The setup script (`setup.sh`) automatically installs:
 
 Automatically started on container creation:
 
-- **PostgreSQL 16** on port 5432
+- **MongoDB** on port 27017
 - **NATS JetStream** on port 4222 (monitoring on 8222)
 
 ### Pre-configured Environment Variables
@@ -58,9 +63,8 @@ Automatically started on container creation:
 All necessary environment variables are set from `.env.example`:
 
 ```bash
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/observer?sslmode=disable
+MONGODB_URI=mongodb://root:password@localhost:27017/observer?authSource=admin
 NATS_URL=nats://localhost:4222
-APPLY_MIGRATIONS=1
 ```
 
 ## Using the Dev Container
@@ -74,11 +78,12 @@ APPLY_MIGRATIONS=1
 5. Wait for the container to build and initialize
 
 The setup process will:
+
 - Install all development tools
 - Download Go dependencies
 - Build all service components
 - Run tests to verify the setup
-- Start PostgreSQL and NATS containers
+- Start MongoDB and NATS containers
 
 ### VS Code with Dev Containers Extension
 
@@ -91,32 +96,34 @@ The setup process will:
 
 The following ports are forwarded and labeled:
 
-| Port  | Service               | Auto-forward |
-|-------|-----------------------|--------------|
-| 50051 | gRPC Ingestion        | Notify       |
-| 50052 | gRPC Processor        | Notify       |
-| 8080  | HTTP API              | Notify       |
-| 5432  | PostgreSQL            | Ignore       |
-| 4222  | NATS                  | Ignore       |
-| 8222  | NATS Monitoring       | Silent       |
+| Port  | Service         | Auto-forward |
+| ----- | --------------- | ------------ |
+| 50051 | gRPC Ingestion  | Notify       |
+| 8080  | HTTP API        | Notify       |
+| 27017 | MongoDB         | Ignore       |
+| 4222  | NATS            | Ignore       |
+| 8222  | NATS Monitoring | Silent       |
 
 ## VS Code Tasks
 
 Available via Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P`) → "Tasks: Run Task":
 
 ### Build Tasks
+
 - **Build All Components** (default build task)
 - Build Ingestion Service
 - Build Processor Service
 - Build API Service
 
 ### Test Tasks
+
 - **Run Tests** (default test task)
 - Run Tests with Coverage
 - Run Tests with Race Detector
 - NATS Integration Tests
 
 ### Infrastructure Tasks
+
 - Start Database
 - Start NATS
 - Start All Infrastructure
@@ -124,6 +131,7 @@ Available via Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P`) → "Tasks: Run 
 - Database Shell
 
 ### Code Quality Tasks
+
 - Format Code
 - Lint Code
 - Vet Code
@@ -135,20 +143,24 @@ Available via Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P`) → "Tasks: Run 
 Launch configurations are available in the Debug panel (F5):
 
 ### Single Service Debugging
+
 - **Debug Ingestion Service** - Launch ingestion with NATS
 - **Debug Processor Service** - Launch processor with DB
 - **Debug API Service** - Launch API with DB
 - **Debug Legacy Server** - Launch monolithic server
 
 ### Test Debugging
+
 - **Debug Current Test** - Debug selected test function
 - **Debug All Tests** - Debug all tests
 - **Debug Package Tests** - Debug tests in current package
 
 ### Multi-Service Debugging
+
 - **Debug All Services** - Launch ingestion, processor, and API together
 
 ### Advanced
+
 - **Attach to Process** - Attach debugger to running process
 
 ## Common Workflows
@@ -173,12 +185,12 @@ make lint
 
 ```bash
 # Start infrastructure
-make db-up
+make mongo-up
 make nats-up
 
 # Run individual services
 ./bin/ingestion    # Port 50051
-./bin/processor    # Port 50052
+./bin/processor    # Background consumer (no public port)
 ./bin/api          # Port 8080
 
 # Or use the legacy monolithic server
@@ -188,14 +200,14 @@ make run-dev
 ### Database Operations
 
 ```bash
-# Open PostgreSQL shell
-make db-psql
+# Open MongoDB shell
+make mongo-shell
 
 # Reset database
-make db-reset
+make mongo-reset
 
 # View logs
-make db-logs
+make mongo-logs
 ```
 
 ### NATS Operations
@@ -243,12 +255,14 @@ Edit `.devcontainer/setup.sh` to add initialization steps.
 ### Services not starting
 
 Check if Docker is running:
+
 ```bash
 docker ps
 docker compose ps
 ```
 
 Restart services:
+
 ```bash
 docker compose down
 docker compose up -d db nats
@@ -257,6 +271,7 @@ docker compose up -d db nats
 ### Build failures
 
 Clean and rebuild:
+
 ```bash
 make clean
 make clean-cache
@@ -266,6 +281,7 @@ make build-all
 ### Go tools missing
 
 Reinstall tools:
+
 ```bash
 make tools
 ```
@@ -273,9 +289,10 @@ make tools
 ### Port conflicts
 
 Check for processes using ports:
+
 ```bash
 lsof -i :50051
-lsof -i :5432
+lsof -i :27017
 ```
 
 ## Architecture
@@ -283,8 +300,8 @@ lsof -i :5432
 This development environment supports the Observer Service architecture:
 
 - **Ingestion Service** - Stateless gRPC ingestion, publishes to NATS
-- **Processor Service** - NATS consumer, persists to PostgreSQL
-- **API Service** - HTTP/GraphQL API for queries
+- **Processor Service** - NATS consumer, persists to MongoDB
+- **API Service** - HTTP REST + WebSocket API for queries/streaming
 
 See [Architecture Documentation](../docs/architecture/) for more details.
 

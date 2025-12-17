@@ -13,7 +13,7 @@ The Observer service is a **test observability system** that collects test execu
 
 - **Architecture**: Fully decomposed microservices with real-time streaming
 - **Event Bus**: Complete NATS JetStream integration (publisher + 2 consumers)
-- **Database**: Multi-dialect support (PostgreSQL + SQLite)
+- **Database**: MongoDB document model (mongo-driver)
 - **Real-Time**: WebSocket streaming with NATS consumer
 - **Web UI**: React + TypeScript + Tailwind CSS interface
 - **API**: REST endpoints for test data and statistics
@@ -114,8 +114,7 @@ The Observer service is a **test observability system** that collects test execu
                                   │ Write                   │ Relay Events
                                   ▼                         │
                          ┌─────────────────┐               │
-                         │ PostgreSQL/     │               │
-                         │ SQLite          │               │
+                         │ MongoDB         │               │
                          └────────┬────────┘               │
                                   │                         │
                                   │ Read                    │
@@ -146,14 +145,14 @@ The Observer service is a **test observability system** that collects test execu
 
 ## Service Status
 
-| Service       | Status              | Port       | Purpose                        | Dependencies        |
-| ------------- | ------------------- | ---------- | ------------------------------ | ------------------- |
-| **Ingestion** | ✅ Production Ready | 50051      | gRPC event ingestion           | NATS (optional DB)  |
-| **Processor** | ✅ Production Ready | N/A        | NATS consumer + DB persistence | NATS, Database      |
-| **API**       | ✅ Production Ready | 8080       | HTTP/GraphQL + WebSocket       | Database, NATS      |
-| **Web UI**    | ✅ Production Ready | 3000 (80)  | React dashboard                | API (via Nginx)     |
-| **NATS**      | ✅ Deployed         | 4222, 8222 | Event streaming                | None                |
-| **Database**  | ✅ Deployed         | 5432       | Event storage                  | None                |
+| Service       | Status              | Port       | Purpose                        | Dependencies       |
+| ------------- | ------------------- | ---------- | ------------------------------ | ------------------ |
+| **Ingestion** | ✅ Production Ready | 50051      | gRPC event ingestion           | NATS (optional DB) |
+| **Processor** | ✅ Production Ready | N/A        | NATS consumer + DB persistence | NATS, Database     |
+| **API**       | ✅ Production Ready | 8080       | HTTP/GraphQL + WebSocket       | Database, NATS     |
+| **Web UI**    | ✅ Production Ready | 3000 (80)  | React dashboard                | API (via Nginx)    |
+| **NATS**      | ✅ Deployed         | 4222, 8222 | Event streaming                | None               |
+| **Database**  | ✅ Deployed         | 5432       | Event storage                  | None               |
 
 ## Test Suite Status
 
@@ -164,19 +163,19 @@ The Observer service is a **test observability system** that collects test execu
 
 ### Test Breakdown
 
-| Test File                            | Tests | Status      | Notes                                      |
-| ------------------------------------ | ----- | ----------- | ------------------------------------------ |
-| `tests/api_test.go`                  | 8     | ✅ All Pass | Full lifecycle, concurrency, idempotency   |
-| `tests/e2e_integration_test.go`      | 2     | ✅ All Pass | gRPC → NATS → DB validation                |
-| `tests/nats_integration_test.go`     | 1     | ✅ Pass     | Event format validation                    |
-| `tests/main_test.go`                 | 4     | ✅ All Pass | Legacy unit tests                          |
-| `pkg/publisher/nats_test.go`         | 5     | ✅ All Pass | Publisher unit tests                       |
-| `pkg/consumer/nats_test.go`          | 3     | ✅ All Pass | Consumer unit tests                        |
-| `pkg/websocket/websocket_test.go`    | 4     | ✅ All Pass | WebSocket hub tests                        |
-| `cmd/api/api_test.go`                | 1     | ✅ Pass     | API service tests                          |
-| `internal/database/database_test.go` | 8     | ✅ All Pass | Database connection tests                  |
-| `internal/models/models_test.go`     | 3     | ✅ All Pass | Model validation tests                     |
-| `pkg/server/server_test.go`          | 5     | ✅ All Pass | gRPC server tests                          |
+| Test File                            | Tests | Status      | Notes                                    |
+| ------------------------------------ | ----- | ----------- | ---------------------------------------- |
+| `tests/api_test.go`                  | 8     | ✅ All Pass | Full lifecycle, concurrency, idempotency |
+| `tests/e2e_integration_test.go`      | 2     | ✅ All Pass | gRPC → NATS → DB validation              |
+| `tests/nats_integration_test.go`     | 1     | ✅ Pass     | Event format validation                  |
+| `tests/main_test.go`                 | 4     | ✅ All Pass | Legacy unit tests                        |
+| `pkg/publisher/nats_test.go`         | 5     | ✅ All Pass | Publisher unit tests                     |
+| `pkg/consumer/nats_test.go`          | 3     | ✅ All Pass | Consumer unit tests                      |
+| `pkg/websocket/websocket_test.go`    | 4     | ✅ All Pass | WebSocket hub tests                      |
+| `cmd/api/api_test.go`                | 1     | ✅ Pass     | API service tests                        |
+| `internal/database/database_test.go` | 8     | ✅ All Pass | Database connection tests                |
+| `internal/models/models_test.go`     | 3     | ✅ All Pass | Model validation tests                   |
+| `pkg/server/server_test.go`          | 5     | ✅ All Pass | gRPC server tests                        |
 
 ## Deployment Status
 
@@ -187,7 +186,7 @@ The Observer service is a **test observability system** that collects test execu
 **Status**: Deployed and running  
 **Components**:
 
-- PostgreSQL (postgres:16-alpine)
+- MongoDB (mongo:7)
 - NATS (nats:2.10-alpine)
 - Ingestion service (observer:ingestion)
 - Processor service (observer:processor)
@@ -197,11 +196,12 @@ The Observer service is a **test observability system** that collects test execu
 **Health**: All services healthy
 
 **Access Points**:
+
 - Web UI: `http://localhost:3000`
 - gRPC: `localhost:50051`
 - NATS: `localhost:4222`
 - NATS Monitoring: `http://localhost:8222`
-- Database: `localhost:5432`
+- Database: `localhost:27017`
 
 ```bash
 $ docker compose --profile dist up -d
@@ -218,11 +218,12 @@ $ docker compose ps
 - Embedded NATS server
 - All services in one process tree
 - Nginx for Web UI
-- SQLite database
+- Embedded MongoDB
 
 **Use Case**: Local development, testing, demos
 
 **Access Points**:
+
 - Web UI: `http://localhost:3000`
 - gRPC: `localhost:50051`
 - NATS: `localhost:4222`
@@ -290,12 +291,14 @@ See: `docs/PLAYWRIGHT_INTEGRATION.md`
 ### Additional Features to Consider
 
 1. **Enhanced Web UI**:
+
    - Test detail page with step-by-step execution
    - Artifact viewer for screenshots, videos, traces
    - Advanced filtering and search
    - Performance metrics dashboard
 
 2. **GraphQL Enhancements**:
+
    - Complete GraphQL schema implementation
    - Subscription support for real-time updates
    - Batch query optimization
@@ -350,31 +353,31 @@ See: `docs/PLAYWRIGHT_INTEGRATION.md`
 
 ### ✅ Complete Documentation
 
-| Document                  | Status | Location                                  |
-| ------------------------- | ------ | ----------------------------------------- |
-| Architecture Overview     | ✅     | `docs/architecture/00-overview.md`        |
-| Component Details         | ✅     | `docs/architecture/01-components.md`      |
-| Data Flow                 | ✅     | `docs/architecture/02-dataflow.md`        |
-| Deployment Modes          | ✅     | `docs/architecture/03-modes.md`           |
-| Docker Compose            | ✅     | `docs/architecture/04-docker-compose.md`  |
-| Dockerfile Guide          | ✅     | `docs/architecture/05-dockerfile.md`      |
-| Database Schema           | ✅     | `docs/architecture/07-database-schema.md` |
-| Playwright Integration    | ✅     | `docs/PLAYWRIGHT_INTEGRATION.md`          |
-| Test Report               | ✅     | `docs/TEST_REPORT.md`                     |
-| Test Suite Guide          | ✅     | `tests/README.md`                         |
-| WebSocket Implementation  | ✅     | `docs/WEBSOCKET_IMPLEMENTATION.md`        |
-| Web UI Implementation     | ✅     | `WEB_UI_IMPLEMENTATION.md`                |
-| Web UI Testing            | ✅     | `docs/WEB_UI_TESTING.md`                  |
-| Web UI README             | ✅     | `web/README.md`                           |
-| Next Steps                | ✅     | `docs/architecture/10-next-steps.md`      |
-| Copilot Instructions      | ✅     | `.github/copilot-instructions.md`         |
+| Document                 | Status | Location                                  |
+| ------------------------ | ------ | ----------------------------------------- |
+| Architecture Overview    | ✅     | `docs/architecture/00-overview.md`        |
+| Component Details        | ✅     | `docs/architecture/01-components.md`      |
+| Data Flow                | ✅     | `docs/architecture/02-dataflow.md`        |
+| Deployment Modes         | ✅     | `docs/architecture/03-modes.md`           |
+| Docker Compose           | ✅     | `docs/architecture/04-docker-compose.md`  |
+| Dockerfile Guide         | ✅     | `docs/architecture/05-dockerfile.md`      |
+| Database Schema          | ✅     | `docs/architecture/07-database-schema.md` |
+| Playwright Integration   | ✅     | `docs/PLAYWRIGHT_INTEGRATION.md`          |
+| Test Report              | ✅     | `docs/TEST_REPORT.md`                     |
+| Test Suite Guide         | ✅     | `tests/README.md`                         |
+| WebSocket Implementation | ✅     | `docs/WEBSOCKET_IMPLEMENTATION.md`        |
+| Web UI Implementation    | ✅     | `WEB_UI_IMPLEMENTATION.md`                |
+| Web UI Testing           | ✅     | `docs/WEB_UI_TESTING.md`                  |
+| Web UI README            | ✅     | `web/README.md`                           |
+| Next Steps               | ✅     | `docs/architecture/10-next-steps.md`      |
+| Copilot Instructions     | ✅     | `.github/copilot-instructions.md`         |
 
 ## Recommendations
 
 ### For Production Deployment
 
 1. **Use Distributed Profile**: Better scalability and resilience
-2. **PostgreSQL Required**: Use managed Postgres (RDS, Cloud SQL, etc.)
+2. **MongoDB Required**: Use managed MongoDB (Atlas, DocumentDB, etc.)
 3. **NATS Clustering**: Deploy NATS in cluster mode for HA
 4. **Resource Limits**: Set appropriate CPU/memory limits in k8s
 5. **Monitoring**: Implement Phase 8 (metrics + tracing) before production
@@ -383,7 +386,7 @@ See: `docs/PLAYWRIGHT_INTEGRATION.md`
 ### For Development
 
 1. **Use AIO Profile**: Faster startup, simpler debugging
-2. **SQLite**: Adequate for local development
+2. **MongoDB**: Adequate for local development
 3. **Embedded NATS**: Reduces infrastructure complexity
 4. **Docker Compose**: Easy local testing
 
@@ -443,14 +446,16 @@ The Observer service has successfully completed Phase 2 and delivered additional
 - ✅ Multiple deployment modes
 - ✅ Playwright integration
 
-**Next Steps**: 
-1. Phase 3 (Stateless Ingestion) 
+**Next Steps**:
+
+1. Phase 3 (Stateless Ingestion)
 2. Enhanced Web UI features (test details, artifact viewer, filtering)
 3. Complete GraphQL implementation
 4. Object storage for artifacts
 
-**Production Ready**: ✅ Yes, for distributed deployment with PostgreSQL + NATS + Web UI
+**Production Ready**: ✅ Yes, for distributed deployment with MongoDB + NATS + Web UI
 
 **Web UI Access**:
+
 - AIO Mode: `http://localhost:3000`
 - Distributed Mode: `http://localhost:3000`

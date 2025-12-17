@@ -73,7 +73,7 @@ The `web-dev` profile starts backend services with:
 
 - **API service** exposed on port 8080
 - **CORS enabled** (`CORS_ALLOWED_ORIGINS=*`)
-- All other services (ingestion, processor, db, NATS) running
+- All other services (ingestion, processor, mongodb, NATS) running
 
 ### Environment Variables
 
@@ -92,12 +92,13 @@ Available variables:
 
 ### Database Tables Missing
 
-If you see errors like "relation does not exist" in API or processor logs:
+If the API shows no runs/tests or you see database-related errors in API/processor logs:
 
-1. Ensure migrations ran: `make db-migrate`
-2. Check tables exist: `docker compose exec db psql -U postgres -d observer -c "\dt"`
-3. If using `docker-dev-web`, migrations should run automatically
-4. For manual setup, always run `make db-migrate` after starting database
+1. Ensure MongoDB is running: `docker compose --profile web-dev ps mongodb`
+2. Ensure the processor is running (it persists events to MongoDB): `docker compose --profile web-dev ps processor`
+3. Check MongoDB connectivity:
+
+- `docker compose exec mongodb mongosh --username root --password password --authenticationDatabase admin --eval "db.adminCommand({ ping: 1 })" observer`
 
 ### CORS Errors
 
@@ -150,7 +151,7 @@ docker compose --profile web-dev down
 open http://localhost:8222
 
 # View database
-docker compose exec db psql -U postgres -d observer
+docker compose exec mongodb mongosh --username root --password password --authenticationDatabase admin observer
 ```
 
 ## Production Build

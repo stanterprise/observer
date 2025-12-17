@@ -47,80 +47,81 @@ The chart supports two deployment modes:
 
 1. **AIO (All-in-One)**: Single container with all services embedded
    - Best for: Development, testing, small-scale deployments
-   - Includes: Embedded SQLite, NATS, all services in one pod
+
+- Includes: Embedded MongoDB, NATS, all services in one pod
 
 2. **Distributed**: Multi-container deployment with separate services
    - Best for: Production, CI/CD, high-scale deployments
    - Includes: Separate pods for ingestion, processor, API, web UI
-   - Requires: PostgreSQL and NATS (can be embedded or external)
+
+- Requires: MongoDB and NATS (can be embedded or external)
 
 ### Key Configuration Parameters
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `mode` | Deployment mode: `aio` or `distributed` | `distributed` |
-| `image.registry` | Docker registry for images | `ghcr.io` |
-| `image.repository` | Repository path for images | `stanterprise/observer` |
-| `image.tag` | Image tag (overrides appVersion) | `""` |
-| `image.pullPolicy` | Image pull policy | `IfNotPresent` |
+| Parameter          | Description                             | Default                 |
+| ------------------ | --------------------------------------- | ----------------------- |
+| `mode`             | Deployment mode: `aio` or `distributed` | `distributed`           |
+| `image.registry`   | Docker registry for images              | `ghcr.io`               |
+| `image.repository` | Repository path for images              | `stanterprise/observer` |
+| `image.tag`        | Image tag (overrides appVersion)        | `""`                    |
+| `image.pullPolicy` | Image pull policy                       | `IfNotPresent`          |
 
 #### AIO Mode Parameters
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `aio.enabled` | Enable AIO mode | `false` |
-| `aio.replicaCount` | Number of replicas | `1` |
-| `aio.persistence.enabled` | Enable persistent storage | `true` |
-| `aio.persistence.size` | Storage size | `10Gi` |
-| `aio.resources.requests.cpu` | CPU request | `500m` |
-| `aio.resources.requests.memory` | Memory request | `512Mi` |
+| Parameter                       | Description               | Default |
+| ------------------------------- | ------------------------- | ------- |
+| `aio.enabled`                   | Enable AIO mode           | `false` |
+| `aio.replicaCount`              | Number of replicas        | `1`     |
+| `aio.persistence.enabled`       | Enable persistent storage | `true`  |
+| `aio.persistence.size`          | Storage size              | `10Gi`  |
+| `aio.resources.requests.cpu`    | CPU request               | `500m`  |
+| `aio.resources.requests.memory` | Memory request            | `512Mi` |
 
 #### Distributed Mode Parameters
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `distributed.enabled` | Enable distributed mode | `true` |
-| `distributed.ingestion.replicaCount` | Ingestion replicas | `2` |
-| `distributed.processor.replicaCount` | Processor replicas | `2` |
-| `distributed.api.replicaCount` | API replicas | `2` |
-| `distributed.web.replicaCount` | Web UI replicas | `2` |
+| Parameter                            | Description             | Default |
+| ------------------------------------ | ----------------------- | ------- |
+| `distributed.enabled`                | Enable distributed mode | `true`  |
+| `distributed.ingestion.replicaCount` | Ingestion replicas      | `2`     |
+| `distributed.processor.replicaCount` | Processor replicas      | `2`     |
+| `distributed.api.replicaCount`       | API replicas            | `2`     |
+| `distributed.web.replicaCount`       | Web UI replicas         | `2`     |
 
 #### Database Parameters
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `postgresql.enabled` | Deploy PostgreSQL | `true` |
-| `postgresql.auth.username` | Database username | `postgres` |
-| `postgresql.auth.password` | Database password | `postgres` |
-| `postgresql.auth.database` | Database name | `observer` |
-| `externalDatabase.host` | External DB host (when postgresql.enabled=false) | `""` |
+| Parameter                   | Description                                   | Default    |
+| --------------------------- | --------------------------------------------- | ---------- |
+| `mongodb.enabled`           | Deploy MongoDB                                | `true`     |
+| `mongodb.auth.rootUser`     | MongoDB root username                         | `root`     |
+| `mongodb.auth.rootPassword` | MongoDB root password                         | `password` |
+| `externalDatabase.host`     | External DB host (when mongodb.enabled=false) | `""`       |
 
 #### NATS Parameters
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `nats.enabled` | Deploy NATS | `true` |
-| `nats.config.jetstream.enabled` | Enable JetStream | `true` |
-| `externalNats.url` | External NATS URL (when nats.enabled=false) | `""` |
+| Parameter                       | Description                                 | Default |
+| ------------------------------- | ------------------------------------------- | ------- |
+| `nats.enabled`                  | Deploy NATS                                 | `true`  |
+| `nats.config.jetstream.enabled` | Enable JetStream                            | `true`  |
+| `externalNats.url`              | External NATS URL (when nats.enabled=false) | `""`    |
 
 #### Ingress Parameters
 
 The chart provides configurable ingresses for each service:
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `ingress.web.enabled` | Enable Web UI ingress | `false` |
-| `ingress.web.className` | Web ingress class | `nginx` |
-| `ingress.web.hosts[0].host` | Web UI hostname | `observer.example.com` |
-| `ingress.web.tls` | Web TLS configuration | `[]` |
-| `ingress.api.enabled` | Enable API ingress | `false` |
-| `ingress.api.className` | API ingress class | `nginx` |
-| `ingress.api.hosts[0].host` | API hostname | `api.observer.example.com` |
-| `ingress.api.tls` | API TLS configuration | `[]` |
-| `ingress.grpc.enabled` | Enable gRPC ingress | `false` |
-| `ingress.grpc.className` | gRPC ingress class | `nginx` |
-| `ingress.grpc.hosts[0].host` | gRPC hostname | `grpc.observer.example.com` |
-| `ingress.grpc.tls` | gRPC TLS configuration | `[]` |
+| Parameter                    | Description            | Default                     |
+| ---------------------------- | ---------------------- | --------------------------- |
+| `ingress.web.enabled`        | Enable Web UI ingress  | `false`                     |
+| `ingress.web.className`      | Web ingress class      | `nginx`                     |
+| `ingress.web.hosts[0].host`  | Web UI hostname        | `observer.example.com`      |
+| `ingress.web.tls`            | Web TLS configuration  | `[]`                        |
+| `ingress.api.enabled`        | Enable API ingress     | `false`                     |
+| `ingress.api.className`      | API ingress class      | `nginx`                     |
+| `ingress.api.hosts[0].host`  | API hostname           | `api.observer.example.com`  |
+| `ingress.api.tls`            | API TLS configuration  | `[]`                        |
+| `ingress.grpc.enabled`       | Enable gRPC ingress    | `false`                     |
+| `ingress.grpc.className`     | gRPC ingress class     | `nginx`                     |
+| `ingress.grpc.hosts[0].host` | gRPC hostname          | `grpc.observer.example.com` |
+| `ingress.grpc.tls`           | gRPC TLS configuration | `[]`                        |
 
 ### Example Configurations
 
@@ -145,15 +146,16 @@ distributed:
     autoscaling:
       enabled: true
 
-postgresql:
+mongodb:
   enabled: false
 
 externalDatabase:
-  host: "postgres.example.com"
-  port: 5432
+  host: "mongo.example.com"
+  port: 27017
   username: "observer"
   password: "secure-password"
   database: "observer"
+  authSource: admin
 
 nats:
   enabled: true
@@ -232,7 +234,7 @@ aio:
 distributed:
   enabled: false
 
-postgresql:
+mongodb:
   enabled: false
 
 nats:
@@ -296,7 +298,7 @@ The Observer system consists of:
 - **Processor Service**: Consumes events from NATS and persists to database
 - **API Service**: REST/GraphQL API and WebSocket for real-time updates
 - **Web UI**: React-based web interface
-- **PostgreSQL**: Database for storing test results (optional, can use external)
+- **MongoDB**: Database for storing test results (optional, can use external)
 - **NATS**: Message broker for event streaming (optional, can use external)
 
 ## Support

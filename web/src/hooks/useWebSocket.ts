@@ -25,6 +25,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const shouldReconnectRef = useRef(true);
+  const isIntentionalCloseRef = useRef(false);
 
   // Use refs for callbacks to avoid recreating connect function
   const onMessageRef = useRef(onMessage);
@@ -42,7 +43,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onErrorRef.current = onError;
     autoReconnectRef.current = autoReconnect;
     reconnectIntervalRef.current = reconnectInterval;
-  }, [onMessage, onConnect, onDisconnect, onError, autoReconnect, reconnectInterval]);
+  }, [
+    onMessage,
+    onConnect,
+    onDisconnect,
+    onError,
+    autoReconnect,
+    reconnectInterval,
+  ]);
 
   // Create the connect function
   const connect = useRef<() => void>(() => {});
@@ -57,13 +65,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       }
 
       const url = wsUrl();
-      console.log("Connecting to WebSocket:", url);
 
       try {
         const ws = new WebSocket(url);
 
         ws.onopen = () => {
-          console.log("WebSocket connected");
           setIsConnected(true);
           onConnectRef.current?.();
         };
@@ -88,23 +94,48 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         };
 
         ws.onerror = (error) => {
-          console.error("WebSocket error:", error);
-          onErrorRef.current?.(error);
+          // Only log errors if it's not an intentional disconnect
+          // The close event will provide more detailed information
+          if (!isIntentionalCloseRef.current) {
+            onErrorRef.current?.(error);
+          }
         };
 
-        ws.onclose = () => {
-          console.log("WebSocket disconnected");
+        ws.onclose = (event) => {
+          const wasConnected = isConnected;
           setIsConnected(false);
           wsRef.current = null;
+
+          // Log close details only if it's unexpected (not a normal close)
+          if (!isIntentionalCloseRef.current && event.code !== 1000) {
+            console.warn(
+              `WebSocket closed unexpectedly: code=${event.code}, reason="${
+                event.reason || "none"
+              }", wasClean=${event.wasClean}`
+            );
+          }
+
           onDisconnectRef.current?.();
 
-          // Auto-reconnect if enabled
-          if (autoReconnectRef.current && shouldReconnectRef.current) {
-            console.log(`Reconnecting in ${reconnectIntervalRef.current}ms...`);
+          // Auto-reconnect if enabled and not an intentional close
+          if (
+            autoReconnectRef.current &&
+            shouldReconnectRef.current &&
+            !isIntentionalCloseRef.current
+          ) {
+            // Only log reconnection attempts if we were previously connected
+            if (wasConnected) {
+              console.info(
+                `WebSocket disconnected, reconnecting in ${reconnectIntervalRef.current}ms...`
+              );
+            }
             reconnectTimeoutRef.current = window.setTimeout(() => {
               connect.current();
             }, reconnectIntervalRef.current);
           }
+
+          // Reset intentional close flag
+          isIntentionalCloseRef.current = false;
         };
 
         wsRef.current = ws;
@@ -116,6 +147,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
   const disconnect = () => {
     shouldReconnectRef.current = false;
+    isIntentionalCloseRef.current = true;
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
@@ -133,6 +165,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     return () => {
       shouldReconnectRef.current = false;
+      isIntentionalCloseRef.current = true;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;

@@ -4,8 +4,8 @@
 
 This is a **test observability system** that ingests test execution events via gRPC. The system operates in two deployment modes:
 
-- **All-in-One (AIO)**: Single container with embedded services (SQLite, embedded NATS via s6-overlay) for dev/local use
-- **Distributed**: Multi-container deployment (Postgres, separate NATS, independent services) for production/CI
+- **All-in-One (AIO)**: Single container with embedded services (MongoDB, embedded NATS via s6-overlay) for dev/local use
+- **Distributed**: Multi-container deployment (MongoDB, separate NATS, independent services) for production/CI
 
 **Current implementation status**: **Phase 3+ In Progress** - System has completed distributed architecture with WebSocket real-time streaming and Web UI implementation.
 
@@ -16,14 +16,14 @@ Test Reporter → Ingestion (gRPC) → NATS JetStream ──┬→ Processor (Co
                                                      │
                                                      └→ API Consumer (WebSocket) → Web UI (React)
 
-                                          Database ← API Service (REST/GraphQL + WebSocket) → Web UI
+                                          Database ← API Service (REST + WebSocket; GraphQL planned) → Web UI
 ```
 
 **Components:**
 
-1. **Ingestion Service** (`cmd/ingestion/`) - Stateless gRPC endpoint that validates events and publishes to NATS (dual-write with optional DB)
+1. **Ingestion Service** (`cmd/ingestion/`) - Stateless gRPC endpoint that validates events and publishes to NATS (no DB writes)
 2. **Processor Service** (`cmd/processor/`) - NATS JetStream consumer that persists events to database (requires DB and NATS)
-3. **API Service** (`cmd/api/`) - HTTP REST/GraphQL server + WebSocket endpoint for real-time events (✅ Implemented)
+3. **API Service** (`cmd/api/`) - HTTP REST server + WebSocket endpoint for real-time events (GraphQL planned)
 4. **Web UI** (`web/`) - React + TypeScript + Tailwind CSS dashboard with real-time updates (✅ Implemented)
 5. **Legacy Server** (`server/main.go`) - Monolithic backward-compatible server (direct DB writes, optional NATS publish)
 
@@ -40,17 +40,18 @@ Test Reporter → Ingestion (gRPC) → NATS JetStream ──┬→ Processor (Co
 - `pkg/consumer/` - NATS consumer with event routing and DB persistence logic
 - `pkg/server/` - gRPC service implementation with panic recovery + logging interceptors
 - `pkg/websocket/` - WebSocket hub for real-time event streaming to web clients
-- `pkg/api/` - REST API handlers and GraphQL schema
+- `pkg/api/` - REST API handlers (GraphQL planned/stubbed)
 - `web/` - React + TypeScript + Tailwind CSS web interface
-- `internal/database/` - GORM connection supporting both Postgres and SQLite
-- `internal/models/` - GORM models (`TestCaseRun`, `StepRun`) with JSON metadata fields
+- `internal/database/` - MongoDB connection helper (`ConnectMongoDBFromEnv`)
+- `internal/models/` - MongoDB document models (`TestRunDocument`, `SuiteDocument`, `TestDocument`, `StepDocument`)
+- `internal/repository/` - MongoDB repository (document upserts, nested updates)
 - `tests/` - In-process `bufconn` tests + NATS integration tests
 
 ## Critical Dependencies
 
 - **Protobuf schema**: `github.com/stanterprise/proto-go/testsystem/v1` (external, versioned at v0.0.9)
 - **NATS JetStream**: Event bus for service decoupling (nats.go v1.47.0)
-- **GORM**: Multi-dialect ORM (Postgres + SQLite); uses `datatypes.JSONMap` for metadata
+- **MongoDB**: Document database via official Go driver (`go.mongodb.org/mongo-driver`)
 - **slog**: Go 1.21+ structured logging (always use `*slog.Logger`, never `log.Printf`)
 - **Playwright Reporter**: `github.com/stanterprise/stanterprise-playwright-reporter` - Custom reporter for integration testing
 
@@ -84,7 +85,7 @@ When developing or testing Observer:
 git clone https://github.com/stanterprise/stanterprise-playwright-reporter
 
 # Start Observer locally
-make db-up nats-up
+make mongo-up nats-up
 ./bin/ingestion &
 ./bin/processor &
 
@@ -97,54 +98,90 @@ npm test  # Configure reporter to use localhost:50051
 
 ### Connection Strategy
 
-All services support **optional database mode** via `internal/database/ConnectFromEnv()`:
+Services connect to MongoDB via `internal/database/ConnectMongoDBFromEnv()`.
+
+- **Ingestion** is stateless and does not require MongoDB.
+- **Processor** requires MongoDB (it persists events).
+- **API** requires MongoDB (it serves REST queries).
+
+Connection pattern:
 
 ```go
-db, err := database.ConnectFromEnv(logger)
-if db == nil {
-    logger.Info("DATABASE_URL not set; running without DB")
+mongoDB, err := database.ConnectMongoDBFromEnv(logger)
+if err != nil {
+    logger.Error("mongodb connect failed", "error", err)
+    os.Exit(1)
 }
+if mongoDB == nil {
+    logger.Error("MONGODB_URI or MONGO_URI not set")
+    os.Exit(1)
+}
+defer mongoDB.Close(context.Background())
+
+repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
 ```
 
-**Two DSN formats supported** (auto-detected by driver prefix):
+**MongoDB URI formats supported**:
 
-1. **Postgres**: `DATABASE_URL=postgres://user:pass@host:5432/dbname?sslmode=disable`
-2. **SQLite**: `DATABASE_URL=/path/to/db.db` or `DATABASE_URL=file:/path/to/db.db`
-3. **Split PG vars**: `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`, `PGSSLMODE`
+1. **Single URI env var**: `MONGODB_URI` (preferred) or `MONGO_URI`
+   - Example: `MONGODB_URI=mongodb://user:pass@host:27017/observer?authSource=admin`
+   - Atlas example: `mongodb+srv://user:pass@cluster/observer`
+2. **Split vars** (assembled automatically):
+   - `MONGO_HOST`, `MONGO_PORT` (default `27017`)
+   - `MONGO_USER`, `MONGO_PASSWORD`
+   - `MONGO_DATABASE` (default `observer`)
+   - `MONGO_AUTH_SOURCE` (default `admin`)
 
-SQLite auto-creates parent directories. Postgres uses connection pooling (50 max open, 10 idle, 30min lifetime).
+MongoDB connections use conservative pooling defaults (see `internal/database/mongodb.go`).
 
-### Auto-Migration
+### Schema Evolution (MongoDB)
 
-Controlled by `APPLY_MIGRATIONS=1` (or legacy `GORM_AUTO_MIGRATE`). Always check before calling `AutoMigrateSchema()`:
+MongoDB is schema-flexible. Prefer **additive** changes:
 
-```go
-if err := database.AutoMigrateSchema(db, logger); err != nil {
-    // Only runs if APPLY_MIGRATIONS=1
-}
-```
+- Add new fields with sensible defaults (treat missing fields as zero values).
+- Avoid renaming fields; if needed, read both old and new fields during a transition.
+- Keep document growth bounded (steps can be large; be mindful of the 16MB document limit).
 
 ### Idempotent Upsert Pattern
 
-All event handlers (both in-process and NATS consumer) use **GORM upsert via ON CONFLICT** for idempotency:
+All persistence handlers use **idempotent upserts** so JetStream redelivery and event replay are safe.
+
+For root suite begin, the repository uses an `UpdateOne` with `upsert=true` + `$setOnInsert`:
 
 ```go
-db.Clauses(clause.OnConflict{
-    Columns:   []clause.Column{{Name: "id"}},
-    DoUpdates: clause.AssignmentColumns([]string{"status", "updated_at"}),
-}).Create(tc)
+opts := options.Update().SetUpsert(true)
+filter := bson.M{"_id": suite.ID}
+update := bson.M{
+    "$setOnInsert": bson.M{
+        "_id":        suite.ID,
+        "created_at": now,
+        "tests":      []*m.TestDocument{},
+    },
+    "$set": bson.M{
+        "name":       suite.Name,
+        "metadata":   suite.Metadata,
+        "updated_at": now,
+    },
+}
+_, err := r.collection.UpdateOne(ctx, filter, update, opts)
 ```
 
-This enables event replay and handles out-of-order delivery. Consumer uses this pattern in `pkg/consumer/nats.go` handlers.
+For nested suite/test/step updates, the repository uses **single-document atomic updates** with `$set`/`$push` and `arrayFilters`.
 
 ### Transaction Safety
 
-Row-level locking for read-modify-write operations (see `handleStepEnd` in `pkg/consumer/nats.go`):
+MongoDB updates are designed to be safe without explicit locks by using atomic updates.
+
+Critical safety rule used throughout the repository: **always include the root `_id` in filters** when updating nested arrays to avoid cross-document mutations.
+
+Example (note the `_id` guard):
 
 ```go
-tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-    Where("test_case_run_id = ?", runID).
-    Order("created_at DESC").Limit(1).Take(&step)
+filter := bson.M{
+    "_id":             rootDocID, // CRITICAL: Prevent cross-document mutation
+    "suites.id":       suiteID,
+    "suites.tests.id": test.ID,
+}
 ```
 
 ## NATS Integration Patterns
@@ -165,7 +202,7 @@ type Event struct {
 
 - Name: `tests_events` (configurable via `NATS_STREAM`)
 - Subjects: `tests.events.v1.>` (prefix configurable via `NATS_SUBJECT_PREFIX`)
-- Retention: WorkQueue policy, 24h max age
+- Retention: Limits policy, 24h max age (supports multiple independent consumers)
 - Storage: File-based (survives restarts)
 
 **Usage pattern** (see `cmd/ingestion/main.go`):
@@ -183,18 +220,24 @@ pub.Publish(ctx, publisher.EventTypeTestBegin, protoRequest)
 
 ### Consumer (Processor Service) ✅ **Phase 2 Complete**
 
-Located in `pkg/consumer/nats.go`. Pull-based consumer with batch fetching:
+Located in `pkg/consumer/nats_mongodb.go`. Pull-based JetStream consumer with batch fetching, persisting to MongoDB via `internal/repository`:
 
 ```go
-consumer, err := consumer.NewNATSConsumer(consumer.NATSConsumerConfig{
+mongoDB, err := database.ConnectMongoDBFromEnv(logger)
+if err != nil || mongoDB == nil {
+    // processor requires MongoDB
+}
+repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
+
+natsConsumer, err := consumer.NewMongoNATSConsumer(consumer.MongoNATSConsumerConfig{
     URL:          natsURL,
     StreamName:   "tests_events",
-    ConsumerName: "processor",  // Durable consumer name (enables horizontal scaling)
-    BatchSize:    10,            // Fetch up to 10 messages at once
+    ConsumerName: "processor", // Durable consumer name (enables horizontal scaling)
+    BatchSize:    10,
     MaxWait:      5 * time.Second,
-}, logger, db)
+}, logger, repo)
 
-consumer.Start(ctx, cfg)  // Blocks until context cancelled
+natsConsumer.Start(ctx, cfg) // Blocks until context cancelled
 ```
 
 **Consumer configuration:**
@@ -208,7 +251,7 @@ consumer.Start(ctx, cfg)  // Blocks until context cancelled
 
 - Unmarshals event envelope → routes by `event.Type`
 - Calls dedicated handlers: `handleTestBegin()`, `handleTestEnd()`, etc.
-- Handlers use same GORM upsert patterns as legacy in-process code
+- Handlers delegate persistence to MongoDB repository upsert methods
 - Unknown event types are acked to prevent redelivery loop
 
 **Processor Service Architecture:**
@@ -243,30 +286,16 @@ if err := validateTestID(in.TestCase.Id); err != nil {
 ### Error Handling
 
 - Client errors (bad input): `codes.InvalidArgument`
-- DB failures: `codes.Internal` (don't leak internal details)
-- NATS publish failures: Log error, continue with DB write (best-effort dual-write in Phase 1)
+- MongoDB failures: `codes.Internal` (don't leak internal details)
+- NATS publish failures: return `codes.Internal` (ingestion is NATS-first)
 - Always log errors with context: `logger.Error("persist failed", "id", id, "error", err)`
 
-### Dual-Write Pattern (Phase 1)
+### Persistence Boundary
 
-Ingestion service optionally writes to both NATS and DB (see `pkg/server/server.go:ReportTestBegin`):
+The ingestion service is stateless: it validates gRPC requests and publishes to JetStream.
 
-```go
-// Publish to NATS if publisher is configured
-if s.publisher != nil {
-    if err := s.publisher.Publish(ctx, publisher.EventTypeTestBegin, in); err != nil {
-        s.logger.Error("publish to NATS failed", "id", in.TestCase.Id, "error", err)
-        // Continue with DB write even if NATS publish fails (best-effort)
-    }
-}
-
-// Persist to DB if configured (optional in ingestion, required in processor)
-if s.db != nil {
-    // ... GORM upsert logic
-}
-```
-
-**Future Phase 3**: Remove DB dependency from ingestion entirely (NATS-only).
+- Persistence happens in the processor (JetStream consumer) via MongoDB.
+- The API reads from MongoDB and can optionally relay events over WebSocket by consuming from JetStream.
 
 ## Testing Strategy
 
@@ -327,14 +356,14 @@ cd web && npm install && npm run dev  # Opens http://localhost:3000
 
 ```bash
 # Start infrastructure only
-make db-up nats-up
+make mongo-up nats-up
 
 # Run services individually (separate terminals)
 NATS_URL=nats://localhost:4222 ./bin/ingestion
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
-  NATS_URL=nats://localhost:4222 ./bin/processor
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
-  NATS_URL=nats://localhost:4222 ./bin/api
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+    NATS_URL=nats://localhost:4222 ./bin/processor
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+    NATS_URL=nats://localhost:4222 ./bin/api
 
 # Run web UI
 cd web && npm run dev
@@ -343,7 +372,7 @@ cd web && npm run dev
 **Option 3: Legacy Monolithic Mode**
 
 ```bash
-make run-dev  # Single process with DATABASE_URL from docker-compose Postgres
+make run-dev  # Single process with MONGODB_URI (see Makefile defaults)
 ```
 
 ### Docker Compose Profiles
@@ -352,7 +381,7 @@ make run-dev  # Single process with DATABASE_URL from docker-compose Postgres
 
 ```bash
 docker compose --profile web-dev up -d
-# Starts: db, nats, ingestion, processor, api
+# Starts: mongodb, nats, ingestion, processor, api
 # Run web UI locally: cd web && npm run dev
 ```
 
@@ -360,7 +389,7 @@ docker compose --profile web-dev up -d
 
 ```bash
 docker compose --profile dist up -d
-# Starts: db, nats, ingestion, processor, api, web (Nginx)
+# Starts: mongodb, nats, ingestion, processor, api, web (Nginx)
 # Access web UI at http://localhost:3000
 ```
 
@@ -368,24 +397,15 @@ docker compose --profile dist up -d
 
 ```bash
 docker compose --profile aio up -d
-# Single container with embedded NATS, SQLite, all services
+# Single container with embedded NATS, MongoDB, all services
 # Exposes: :3000 (Web), :50051 (gRPC), :8080 (API), :4222 (NATS)
 ```
 
-### Database Migrations
-
-Migrations run automatically when `APPLY_MIGRATIONS=1` is set. To run manually:
+### MongoDB Reset / Clear
 
 ```bash
-make db-migrate  # Uses DATABASE_URL or PG* environment variables
-```
-
-To reset database completely:
-
-```bash
-make db-reset  # Recreates container and volume
-# OR
-make db-clear  # Drops and recreates schema only
+make mongo-reset
+make mongo-clear
 ```
 
 ### Environment Variables
@@ -401,13 +421,13 @@ make db-clear  # Drops and recreates schema only
 
 - `NATS_URL` - NATS server URL (required)
 - `NATS_STREAM`, `NATS_CONSUMER` - Stream and consumer names
-- `DATABASE_URL` - Postgres or SQLite DSN (required)
-- `APPLY_MIGRATIONS` - Set to `1` to enable auto-migrations
+- `MONGODB_URI` or `MONGO_URI` - MongoDB connection string (required)
+- `MONGO_HOST`, `MONGO_PORT`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_DATABASE`, `MONGO_AUTH_SOURCE` - Split MongoDB vars (alternative)
 
 **API Service:**
 
 - `PORT` - HTTP listen port (default: 8080)
-- `DATABASE_URL` - Postgres or SQLite DSN (optional for read-only access)
+- `MONGODB_URI` or `MONGO_URI` - MongoDB connection string (required)
 - `NATS_URL` - NATS server URL (optional, for WebSocket relay)
 - `NATS_STREAM` - JetStream stream name (default: `tests_events`)
 - `NATS_WS_CONSUMER` - Consumer name for WebSocket (default: `websocket`)
@@ -432,7 +452,7 @@ make db-clear  # Drops and recreates schema only
 
 ### Import Aliases
 
-Consistent alias for models: `import m "github.com/stanterprise/observer/internal/models"`
+Consistent alias for document models: `import m "github.com/stanterprise/observer/internal/models"`
 
 ### Logger Nil-Safety
 
@@ -448,14 +468,14 @@ Pattern used in: `pkg/server/New()`, `pkg/publisher/NewNATSPublisher()`, `pkg/co
 
 ### Metadata Conversion
 
-Protobuf `map[string]string` → GORM `datatypes.JSONMap` (map[string]any):
+Protobuf `map[string]string` → MongoDB document metadata (`map[string]interface{}`):
 
 ```go
-md := map[string]any{}
+md := make(map[string]interface{})
 for k, v := range protoMetadata {
     md[k] = v
 }
-tc.Metadata = md  // Stored as JSONB in Postgres, TEXT in SQLite
+doc.Metadata = md
 ```
 
 ### Graceful Shutdown Pattern
@@ -493,18 +513,24 @@ defer cancel()
 
 ### Add DB Migration
 
-1. Update GORM model in `internal/models/models.go`
-2. Test locally: `APPLY_MIGRATIONS=1 make run-dev`
-3. For production, consider dedicated migration tool (Goose, golang-migrate) instead of GORM auto-migrate
+MongoDB does not require schema migrations in the same way as SQL.
+
+1. Update document structs in `internal/models/` (additive fields preferred)
+2. Update repository write paths in `internal/repository/` (keep `_id` guards and arrayFilters)
+3. Update API read/response shapes in `pkg/api/rest_mongodb.go` (if needed)
+4. Add/adjust tests (unit + integration) to cover new fields
 
 ### Debug Database Connection
 
 ```bash
-make env-print  # Shows resolved DSN values
-make db-psql    # Opens psql shell in Postgres container
+make mongo-env-print  # Shows resolved Mongo env values
+make mongo-shell      # Opens mongosh in MongoDB container
 ```
 
-GORM logs slow queries (>200ms) at `logger.Warn` level. Check connection pool stats in Postgres with `pg_stat_activity`.
+For connectivity issues:
+
+- Verify container health: `docker compose ps mongodb`
+- Ping from shell: `mongosh --eval "db.adminCommand('ping')"`
 
 ### Debug NATS Connection
 
@@ -519,11 +545,12 @@ Check consumer lag: Fetch consumer info via NATS CLI or monitoring endpoint.
 
 **Completed:**
 
-- ✅ **Phase 1**: NATS JetStream publisher in ingestion service (dual-write mode)
+- ✅ **Phase 1**: NATS JetStream publisher in ingestion service (stateless ingestion)
 - ✅ **Phase 2**: NATS JetStream consumer in processor service
 - ✅ **WebSocket Component**: Real-time event streaming via WebSocket
 - ✅ **Web UI**: React + TypeScript + Tailwind CSS interface with real-time updates
 - ✅ **REST API**: Test listing, run statistics, and detail endpoints
+- ✅ **MongoDB backend**: Processor/API persistence and queries
 - ✅ Separate service entrypoints (`cmd/ingestion`, `cmd/processor`, `cmd/api`)
 - ✅ NATS consumer with event routing and database persistence
 - ✅ Docker Compose profiles (AIO + distributed)
@@ -534,10 +561,8 @@ Check consumer lag: Fetch consumer info via NATS CLI or monitoring endpoint.
 
 **Future phases:**
 
-- [ ] **Phase 3**: Remove dual-write from ingestion (NATS-only, fully stateless)
 - [ ] **Phase 4**: Complete GraphQL API implementation
 - [ ] Object storage integration (MinIO/S3) for test artifacts
 - [ ] Enhanced Web UI features (test details, artifact viewer, filtering)
 - [ ] Authentication layer (dev token, OIDC)
 - [ ] Observability (Prometheus metrics, OpenTelemetry tracing)
-- [ ] Replace Postgres with Document based Database (e.g., MongoDB) for flexible schema

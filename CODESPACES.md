@@ -7,12 +7,14 @@ This repository is fully configured for [GitHub Codespaces](https://github.com/f
 ### Launch a Codespace
 
 1. **From GitHub Web UI:**
+
    - Navigate to this repository on GitHub
    - Click the **Code** button (green)
    - Select the **Codespaces** tab
    - Click **Create codespace on main**
 
 2. **From VS Code Desktop:**
+
    - Install the [GitHub Codespaces extension](https://marketplace.visualstudio.com/items?itemName=GitHub.codespaces)
    - Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
    - Select "Codespaces: Create New Codespace"
@@ -27,12 +29,13 @@ This repository is fully configured for [GitHub Codespaces](https://github.com/f
 ### Initial Setup
 
 The Codespace will automatically:
+
 1. ✅ Build the Go 1.23 development container with Node.js LTS
 2. ✅ Install development tools (golangci-lint, protoc, gopls, delve, TypeScript)
 3. ✅ Download Go dependencies
 4. ✅ Build all service components
 5. ✅ Run tests to verify setup
-6. ✅ Start PostgreSQL and NATS containers
+6. ✅ Start MongoDB and NATS containers
 7. ✅ Create `.env` file from template
 
 This process takes **2-3 minutes** on first launch. Subsequent launches are faster.
@@ -41,10 +44,11 @@ This process takes **2-3 minutes** on first launch. Subsequent launches are fast
 
 ### Infrastructure Services (Auto-Started)
 
-- **PostgreSQL 16** - Database on port 5432
+- **MongoDB** - Database on port 27017
 - **NATS JetStream** - Message broker on port 4222
 
 Check status:
+
 ```bash
 docker compose ps
 ```
@@ -52,16 +56,19 @@ docker compose ps
 ### Development Tools
 
 **Backend:**
+
 - **Go 1.23** with gopls language server
 - **Delve** debugger
 - **golangci-lint** for code quality
 - **protoc** for gRPC code generation
 
 **Frontend:**
+
 - **Node.js LTS** with npm and Yarn
 - **TypeScript** compiler and language tools
 
 **Infrastructure:**
+
 - **Docker and Docker Compose**
 - **Make** for build automation
 
@@ -70,12 +77,12 @@ docker compose ps
 All required variables are pre-set:
 
 ```bash
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/observer?sslmode=disable
+MONGODB_URI=mongodb://root:password@localhost:27017/observer?authSource=admin
 NATS_URL=nats://localhost:4222
-APPLY_MIGRATIONS=1
 ```
 
 View all variables:
+
 ```bash
 make env-print
 ```
@@ -83,6 +90,7 @@ make env-print
 ### VS Code Extensions
 
 Pre-installed and configured:
+
 - Go language support with debugging
 - TypeScript and JavaScript language support
 - ESLint for JavaScript/TypeScript linting
@@ -101,6 +109,7 @@ make build-all
 ```
 
 Builds:
+
 - `bin/observer` - Legacy monolithic server
 - `bin/ingestion` - Ingestion service
 - `bin/processor` - Processor service
@@ -125,11 +134,13 @@ make test-nats-integration
 ### Start Services
 
 **Legacy Monolithic Mode:**
+
 ```bash
 make run-dev
 ```
 
 **Distributed Mode:**
+
 ```bash
 # Terminal 1: Ingestion
 ./bin/ingestion
@@ -144,14 +155,14 @@ make run-dev
 ### Database Operations
 
 ```bash
-# Open PostgreSQL shell
-make db-psql
+# Open MongoDB shell
+make mongo-shell
 
 # View logs
-make db-logs
+make mongo-logs
 
 # Reset database
-make db-reset
+make mongo-reset
 ```
 
 ### Code Quality
@@ -197,17 +208,20 @@ Breakpoints, variable inspection, and step debugging work out of the box.
 Access via **Terminal → Run Task** or `Ctrl+Shift+P` → "Tasks: Run Task":
 
 ### Build Tasks
+
 - **Build All Components** - `Ctrl+Shift+B`
 - Build Ingestion Service
 - Build Processor Service
 - Build API Service
 
 ### Test Tasks
+
 - **Run Tests** - `Ctrl+Shift+T`
 - Run Tests with Coverage
 - Run Tests with Race Detector
 
 ### Infrastructure Tasks
+
 - Start Database
 - Start NATS
 - Start All Infrastructure
@@ -217,14 +231,13 @@ Access via **Terminal → Run Task** or `Ctrl+Shift+P` → "Tasks: Run Task":
 
 Codespaces automatically forwards ports. Click the **Ports** panel at the bottom to see:
 
-| Port  | Service          | Access                                    |
-|-------|------------------|-------------------------------------------|
-| 50051 | gRPC Ingestion   | Use gRPC client or grpcurl                |
-| 50052 | gRPC Processor   | Use gRPC client or grpcurl                |
-| 8080  | HTTP API         | Click "Open in Browser" in Ports panel    |
-| 5432  | PostgreSQL       | psql or any PostgreSQL client             |
-| 4222  | NATS             | NATS client or CLI                        |
-| 8222  | NATS Monitoring  | Open in browser for NATS dashboard        |
+| Port  | Service         | Access                                 |
+| ----- | --------------- | -------------------------------------- |
+| 50051 | gRPC Ingestion  | Use gRPC client or grpcurl             |
+| 8080  | HTTP API        | Click "Open in Browser" in Ports panel |
+| 27017 | MongoDB         | mongosh or any MongoDB client          |
+| 4222  | NATS            | NATS client or CLI                     |
+| 8222  | NATS Monitoring | Open in browser for NATS dashboard     |
 
 ### Testing gRPC Endpoints
 
@@ -245,6 +258,7 @@ grpcurl -plaintext -d '{"test_case": {"id": "test-123"}}' \
 ### Multiple Terminals
 
 Codespaces supports split terminals:
+
 - `Ctrl+Shift+5` - Split terminal
 - `Ctrl+` ` - Focus terminal
 
@@ -253,26 +267,29 @@ Run different services in separate terminals for easier monitoring.
 ### Custom Environment Variables
 
 Edit `.env` file:
+
 ```bash
-nano .env
+export MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin'
+export NATS_URL='nats://localhost:4222'
 ```
 
-Changes take effect immediately for new terminals.
-
-### Performance Optimization
-
 For faster iteration:
-```bash
+Start MongoDB and NATS:
+
 # Use cached test results when appropriate
-go test -count=1 ./...  # Skip cache
+
+go test -count=1 ./... # Skip cache
+make mongo-up nats-up
 
 # Focus on specific package
+
 go test ./pkg/server -v
+
 ```
 
 ### Docker Compose Logs
 
-```bash
+MONGODB_URI=mongodb://root:password@localhost:27017/observer?authSource=admin
 # All services
 docker compose logs -f
 
@@ -314,6 +331,7 @@ docker compose up -d db nats
 ### Rebuild Codespace
 
 If you need a fresh start:
+
 1. Open Command Palette
 2. "Codespaces: Rebuild Container"
 3. Wait for rebuild to complete
@@ -375,14 +393,14 @@ go install golang.org/x/tools/gopls@latest
 ### Database Connection Issues
 
 ```bash
-# Check PostgreSQL is running
-docker compose ps db
+# Check MongoDB is running
+docker compose ps mongodb
 
 # Test connection
-docker compose exec db psql -U postgres -d observer -c "SELECT 1;"
+docker compose exec mongodb mongosh --username root --password password --authenticationDatabase admin --eval "db.adminCommand({ ping: 1 })" observer
 
 # Reset database
-make db-reset
+make mongo-reset
 ```
 
 ## 💬 Getting Help

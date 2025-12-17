@@ -18,9 +18,8 @@
 
 ### 3. Storage Layer ✅
 
-- ✅ SQLite support for development/AIO mode
-- ✅ PostgreSQL support for production
-- ✅ Multi-dialect GORM integration
+- ✅ MongoDB support for development/AIO mode
+- ✅ MongoDB support for production/distributed mode
 - ✅ Idempotent upsert patterns
 
 ### 4. AIO Runtime ✅
@@ -143,13 +142,15 @@
 3. Complete GraphQL implementation
 4. Phase 6: Object storage for artifacts (MinIO/S3)
 
-**Medium Priority:** 
+**Medium Priority:**
+
 1. Phase 8: Basic observability (Prometheus metrics)
 2. Enhanced GraphQL features (subscriptions, advanced queries)
 3. Performance metrics dashboard in Web UI
 4. Dark mode support
 
-**Low Priority:** 
+**Low Priority:**
+
 1. Phase 7: Authentication
 2. Phase 9: Advanced CI/CD
 3. Phase 10: Production hardening

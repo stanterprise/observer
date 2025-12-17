@@ -130,7 +130,7 @@
 
 ### Test Infrastructure
 
-- **Database**: In-memory SQLite with unique instances per test
+- **Database**: MongoDB-backed persistence (document model)
 - **NATS**: Unique streams per test run with auto-cleanup
 - **gRPC**: In-process bufconn (no TCP ports needed)
 - **Isolation**: Complete test isolation, no shared state
@@ -168,7 +168,7 @@ NATS JetStream
     ↓
 Processor
     ↓
-Database (Postgres/SQLite)
+Database (MongoDB)
 ```
 
 ✅ **Protocol Compatibility**
@@ -224,7 +224,7 @@ NATS_TEST_URL=nats://localhost:4222 go test ./tests -v
 
 ```bash
 # GitHub Actions / CI pipeline
-make db-up nats-up
+make mongo-up nats-up
 make build-all
 NATS_TEST_URL=nats://localhost:4222 make test
 ```
@@ -243,7 +243,7 @@ NATS_TEST_URL=nats://localhost:4222 make test
 
 ### For Production Deployment
 
-1. **Database**: Use PostgreSQL with connection pooling
+1. **Database**: Use MongoDB with appropriate indexing and sizing
 2. **NATS**: Enable persistence and clustering
 3. **Monitoring**: Add Prometheus metrics
 4. **Observability**: Implement OpenTelemetry tracing

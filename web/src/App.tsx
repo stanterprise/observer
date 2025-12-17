@@ -13,15 +13,11 @@ function App() {
   const [lastEvent, setLastEvent] = useState<WebSocketEvent | null>(null);
 
   const handleWebSocketMessage = useCallback((event: WebSocketEvent) => {
-    console.log("WebSocket event received:", event);
     setLastEvent(event);
   }, []);
 
   const { isConnected } = useWebSocket({
     onMessage: handleWebSocketMessage,
-    onConnect: () => console.log("WebSocket connected"),
-    onDisconnect: () => console.log("WebSocket disconnected"),
-    onError: (error) => console.error("WebSocket error:", error),
   });
 
   return (

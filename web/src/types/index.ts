@@ -82,7 +82,9 @@ export interface WebSocketTestData {
   test_case?: {
     id?: string;
     title?: string;
+    name?: string;
     run_id?: string;
+    status?: string; // Status is in test_case for test.end events
     location?: {
       file?: string;
     };

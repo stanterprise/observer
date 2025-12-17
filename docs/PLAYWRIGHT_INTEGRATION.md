@@ -18,7 +18,7 @@ Playwright Tests → Playwright Reporter → Observer Ingestion (gRPC) → NATS 
 
 - Node.js 16+ (for Playwright)
 - Observer services running (ingestion, processor, API)
-- NATS and PostgreSQL (for distributed mode) or AIO container
+- NATS and MongoDB (for distributed mode) or AIO container
 
 ## Installation
 
@@ -48,7 +48,7 @@ Start all services:
 
 ```bash
 # Start infrastructure
-make db-up nats-up
+make mongo-up nats-up
 
 # Build and start services
 make build-all
@@ -57,13 +57,12 @@ make build-all
 NATS_URL='nats://localhost:4222' ./bin/ingestion &
 
 # Start processor service (consumes NATS, writes to DB)
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
 NATS_URL='nats://localhost:4222' \
-APPLY_MIGRATIONS=1 \
 ./bin/processor &
 
 # Start API service (optional, for future web UI)
-DATABASE_URL='postgres://postgres:postgres@localhost:5432/observer?sslmode=disable' \
+MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
 ./bin/api &
 ```
 
@@ -74,42 +73,46 @@ docker compose --profile aio up -d
 ```
 
 This starts a single container with:
+
 - Ingestion service on port 50051
 - API service on port 8080
 - Embedded NATS on port 4222
-- SQLite database
+- Embedded MongoDB
 
 ## Playwright Configuration
 
 Configure Playwright to use the Observer reporter in your `playwright.config.ts`:
 
 ```typescript
-import { defineConfig } from '@playwright/test';
+import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   reporter: [
-    ['list'],  // Keep console output
-    ['stanterprise-playwright-reporter', {
-      // Observer ingestion endpoint
-      endpoint: 'localhost:50051',
-      
-      // Optional: TLS configuration (for production)
-      // useTLS: true,
-      // tlsCert: '/path/to/cert.pem',
-      
-      // Optional: Additional metadata
-      metadata: {
-        environment: 'ci',
-        branch: process.env.GITHUB_REF_NAME || 'main',
-        buildId: process.env.GITHUB_RUN_ID || 'local',
+    ["list"], // Keep console output
+    [
+      "stanterprise-playwright-reporter",
+      {
+        // Observer ingestion endpoint
+        endpoint: "localhost:50051",
+
+        // Optional: TLS configuration (for production)
+        // useTLS: true,
+        // tlsCert: '/path/to/cert.pem',
+
+        // Optional: Additional metadata
+        metadata: {
+          environment: "ci",
+          branch: process.env.GITHUB_REF_NAME || "main",
+          buildId: process.env.GITHUB_RUN_ID || "local",
+        },
+
+        // Optional: Batch configuration
+        // batchSize: 10,
+        // flushInterval: 1000,
       },
-      
-      // Optional: Batch configuration
-      // batchSize: 10,
-      // flushInterval: 1000,
-    }],
+    ],
   ],
-  
+
   // ... rest of your Playwright config
 });
 ```
@@ -126,27 +129,28 @@ npx playwright test
 ## Example Test
 
 ```typescript
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test.describe('Login Flow', () => {
-  test('should login successfully', async ({ page }) => {
+test.describe("Login Flow", () => {
+  test("should login successfully", async ({ page }) => {
     // Navigate
-    await page.goto('https://example.com/login');
-    
+    await page.goto("https://example.com/login");
+
     // Fill form
-    await page.fill('[name="username"]', 'testuser');
-    await page.fill('[name="password"]', 'password123');
-    
+    await page.fill('[name="username"]', "testuser");
+    await page.fill('[name="password"]', "password123");
+
     // Submit
     await page.click('button[type="submit"]');
-    
+
     // Verify
-    await expect(page.locator('.welcome')).toBeVisible();
+    await expect(page.locator(".welcome")).toBeVisible();
   });
 });
 ```
 
 The reporter automatically captures:
+
 - Test start/end events
 - Step execution (each Playwright action)
 - Test status (passed, failed, skipped)
@@ -156,22 +160,13 @@ The reporter automatically captures:
 
 ## Verifying Data Collection
 
-### Check Database (PostgreSQL)
+### Check Database (MongoDB)
 
 ```bash
-make db-psql
+make mongo-shell
 
-# List test runs
-SELECT id, run_id, title, status, created_at 
-FROM test_case_runs 
-ORDER BY created_at DESC 
-LIMIT 10;
-
-# List steps for a test
-SELECT id, test_case_run_id, status, created_at 
-FROM step_runs 
-WHERE test_case_run_id = 'your-test-id'
-ORDER BY created_at;
+# List recent test runs (collection names may vary by implementation)
+db.test_runs.find({}, { _id: 1, run_id: 1, title: 1, status: 1, created_at: 1 }).sort({ created_at: -1 }).limit(10)
 ```
 
 ### Check NATS Stream
@@ -193,6 +188,7 @@ Current version: `v0.0.9`
 ### Supported Events
 
 1. **TestBeginEvent** - Sent when a test starts
+
    - `id` - Unique test identifier
    - `runId` - Test run identifier (shared across related tests)
    - `title` - Test name
@@ -202,11 +198,13 @@ Current version: `v0.0.9`
    - `timeout` - Timeout in milliseconds (optional)
 
 2. **TestEndEvent** - Sent when a test completes
+
    - `id` - Test identifier
    - `status` - PASSED, FAILED, SKIPPED, BROKEN, TIMEDOUT, INTERRUPTED
    - `duration` - Execution time (protobuf Duration type)
 
 3. **StepBeginEvent** - Sent when a test step starts
+
    - `id` - Step identifier
    - `testCaseRunId` - Parent test identifier
    - `title` - Step description
@@ -222,6 +220,7 @@ Current version: `v0.0.9`
 ### Suite Events
 
 5. **SuiteBeginEvent** - Sent when a test suite starts
+
    - `suite.id` - Unique suite run identifier
    - `suite.name` - Suite name
    - `suite.description` - Suite description
@@ -242,6 +241,7 @@ Current version: `v0.0.9`
 **Problem**: Reporter can't connect to Observer
 
 **Solutions**:
+
 1. Verify Observer ingestion service is running: `ps aux | grep ingestion`
 2. Check port is open: `netstat -an | grep 50051`
 3. Ensure no firewall blocking: `telnet localhost 50051`
@@ -251,6 +251,7 @@ Current version: `v0.0.9`
 **Problem**: Tests run but no data appears
 
 **Solutions**:
+
 1. Check NATS connection: `curl http://localhost:8222/varz`
 2. Verify processor is running: `ps aux | grep processor`
 3. Check processor logs for errors
@@ -261,6 +262,7 @@ Current version: `v0.0.9`
 **Problem**: Tests run slower with reporter enabled
 
 **Solutions**:
+
 1. Increase batch size in reporter config
 2. Use async mode for event sending
 3. Run Observer ingestion service locally to reduce network latency
@@ -279,39 +281,38 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       observer-db:
-        image: postgres:16-alpine
+        image: mongo:7
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: observer
-      
+          MONGO_INITDB_ROOT_USERNAME: root
+          MONGO_INITDB_ROOT_PASSWORD: password
+
       observer-nats:
         image: nats:2.10-alpine
         options: --health-cmd "wget --spider http://localhost:8222/healthz"
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Start Observer Services
         run: |
           docker compose up -d ingestion processor
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run Playwright tests
         run: npx playwright test
         env:
           OBSERVER_ENDPOINT: localhost:50051
-      
+
       - name: View test results
         if: always()
         run: |
-          docker compose exec -T db psql -U postgres -d observer \
-            -c "SELECT id, title, status FROM test_case_runs ORDER BY created_at DESC LIMIT 10"
+          docker compose exec -T observer-db mongosh --username root --password password --authenticationDatabase admin --eval \
+            "db.getSiblingDB('observer').test_runs.find({}, { _id: 1, title: 1, status: 1 }).sort({ created_at: -1 }).limit(10).toArray()"
 ```
 
 ### Custom Metadata
@@ -324,17 +325,17 @@ metadata: {
   // Git information
   gitCommit: process.env.GITHUB_SHA?.slice(0, 8),
   gitBranch: process.env.GITHUB_REF_NAME,
-  
+
   // CI information
   ciProvider: 'github-actions',
-  ciJobUrl: process.env.GITHUB_SERVER_URL + '/' + 
-            process.env.GITHUB_REPOSITORY + '/actions/runs/' + 
+  ciJobUrl: process.env.GITHUB_SERVER_URL + '/' +
+            process.env.GITHUB_REPOSITORY + '/actions/runs/' +
             process.env.GITHUB_RUN_ID,
-  
+
   // Environment
   nodeVersion: process.version,
   platform: process.platform,
-  
+
   // Custom tags
   team: 'qa',
   feature: 'authentication',

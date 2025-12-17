@@ -80,8 +80,8 @@ Services deployed:
 - API: REST/GraphQL API and WebSocket
 - Web: React-based web interface
 
-{{- if .Values.postgresql.enabled }}
-- PostgreSQL: Database (embedded)
+{{- if .Values.mongodb.enabled }}
+- MongoDB: Database (embedded)
 {{- end }}
 {{- if .Values.nats.enabled }}
 - NATS: Message broker (embedded)

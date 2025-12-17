@@ -33,6 +33,11 @@ interface RunStatistics {
   passed: number;
   failed: number;
   skipped: number;
+  running?: number;
+  broken?: number;
+  timedout?: number;
+  interrupted?: number;
+  unknown?: number;
 }
 
 interface RunDetail {
@@ -74,7 +79,6 @@ export function TestSuiteRunDetailPage({
         throw new Error(`Failed to fetch run details: ${response.statusText}`);
       }
       const data = await response.json();
-      console.log("Fetched run details:", data);
       setRunDetail(data);
       setError(null);
     } catch (err) {
@@ -87,7 +91,7 @@ export function TestSuiteRunDetailPage({
     }
   };
 
-  // Handle WebSocket events to update test statuses
+  // Handle WebSocket events to update test statuses locally
   useEffect(() => {
     if (!onWebSocketEvent || !runDetail) return;
 
@@ -97,10 +101,102 @@ export function TestSuiteRunDetailPage({
       const testRunId = testData.run_id || testData.test_case?.run_id;
 
       if (testRunId === runId) {
-        // Refetch the run details to get updated statistics
-        if (runId) {
-          fetchRunDetail(runId);
-        }
+        setRunDetail((prevDetail) => {
+          if (!prevDetail || !prevDetail.tests) return prevDetail;
+
+          try {
+            const testId = testData.test_case?.id || testData.id;
+            // Safely extract status - handle both string and non-string values
+            const rawStatus = testData.test_case?.status || testData.status;
+            const status =
+              typeof rawStatus === "string"
+                ? rawStatus.toUpperCase()
+                : "RUNNING";
+
+            // Update or add test in the tests array
+            const updatedTests = [...prevDetail.tests];
+            const testIndex = updatedTests.findIndex((t) => t.ID === testId);
+
+            if (type === "test.begin") {
+              if (testIndex === -1) {
+                // Add new test
+                updatedTests.push({
+                  ID: testId || "",
+                  RunID: testRunId || "",
+                  Title: testData.test_case?.title || "",
+                  Status: "RUNNING",
+                  CreatedAt: new Date().toISOString(),
+                  UpdatedAt: new Date().toISOString(),
+                });
+              } else {
+                // Update existing test
+                updatedTests[testIndex] = {
+                  ...updatedTests[testIndex],
+                  Status: "RUNNING",
+                  UpdatedAt: new Date().toISOString(),
+                };
+              }
+            } else if (type === "test.end") {
+              if (testIndex >= 0) {
+                updatedTests[testIndex] = {
+                  ...updatedTests[testIndex],
+                  Status: status,
+                  UpdatedAt: new Date().toISOString(),
+                };
+              }
+            }
+
+            // Recalculate statistics
+            const newStats = {
+              total: updatedTests.length,
+              passed: 0,
+              failed: 0,
+              skipped: 0,
+              running: 0,
+              broken: 0,
+              timedout: 0,
+              interrupted: 0,
+              unknown: 0,
+            };
+
+            updatedTests.forEach((test) => {
+              switch (test.Status) {
+                case "PASSED":
+                  newStats.passed++;
+                  break;
+                case "FAILED":
+                  newStats.failed++;
+                  break;
+                case "SKIPPED":
+                  newStats.skipped++;
+                  break;
+                case "RUNNING":
+                  newStats.running++;
+                  break;
+                case "BROKEN":
+                  newStats.broken++;
+                  break;
+                case "TIMEDOUT":
+                  newStats.timedout++;
+                  break;
+                case "INTERRUPTED":
+                  newStats.interrupted++;
+                  break;
+                default:
+                  newStats.unknown++;
+              }
+            });
+
+            return {
+              ...prevDetail,
+              tests: updatedTests,
+              statistics: newStats,
+            };
+          } catch (error) {
+            console.error("Error updating run detail from WebSocket:", error);
+            return prevDetail;
+          }
+        });
       }
     }
   }, [onWebSocketEvent, runDetail, runId]);
