@@ -161,7 +161,7 @@ With `infer: true`, Copilot can automatically select the appropriate agent based
 ## References
 
 - [GitHub Custom Agents Configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration)
-- [GitHub Copilot CLI Custom Agents](https://deepwiki.com/github/copilot-cli/3.6-custom-agents)
+- [GitHub Copilot CLI Custom Agents](https://docs.github.com/en/copilot/github-copilot-in-the-cli)
 - [Observer Custom Agents Guidelines](./CUSTOM_AGENTS.md)
 
 ## Contributing
