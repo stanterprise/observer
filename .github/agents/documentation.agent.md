@@ -1,3 +1,14 @@
+---
+name: documentation
+description: "Expert technical writer specializing in developer-focused documentation for the Observer test observability system, including API docs, architecture guides, and user documentation."
+tools: [read, search, edit, grep, glob, view, create, web_search]
+infer: true
+metadata:
+  owner: observer-team
+  category: documentation
+  version: 1.0.0
+---
+
 # Documentation Agent
 
 > **Coding Guidelines**: This agent file follows Observer's cognitive load management principles:
