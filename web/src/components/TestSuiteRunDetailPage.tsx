@@ -213,11 +213,11 @@ export function TestSuiteRunDetailPage({
     return (
       <div className="space-y-4">
         <Link
-          to="/runs"
+          to="/suite_runs"
           className="inline-flex items-center text-blue-600 hover:text-blue-700"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Runs
+          Back to Test Runs
         </Link>
         <div className="flex items-center justify-center h-64">
           <div className="text-red-600">Error: {error || "Run not found"}</div>

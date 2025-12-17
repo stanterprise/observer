@@ -21,12 +21,6 @@ export function Layout({ isConnected }: LayoutProps) {
             </div>
             <div className="flex items-center space-x-8">
               <Link
-                to="/runs"
-                className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Test Cases
-              </Link>
-              <Link
                 to="/suite_runs"
                 className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
               >
