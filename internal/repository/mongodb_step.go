@@ -174,7 +174,7 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 			}
 
 			filter = bson.M{
-				"_id": rootDocID, // CRITICAL (conditionally added): Prevent cross-document mutation
+				"_id":             rootDocID, // CRITICAL: Prevent cross-document mutation (only reaches here when rootDocID is valid)
 				"suites.tests.id": testID,
 			}
 			_, err = r.collection.UpdateMany(ctx, filter, pipeline)

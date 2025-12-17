@@ -21,10 +21,13 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, test *m.TestDocum
 		test.Steps = []*m.StepDocument{}
 	}
 
-	// Extract root document ID to ensure we only update tests in the correct test run
+	// Extract root document ID to ensure we only update tests in the correct test run.
+	// Note: extractRootSuiteID appends "-suite-root" to the base suite ID. Therefore,
+	// suiteID == rootDocID is only true when the incoming suiteID already represents
+	// the root suite (i.e., it ends with "-suite-root").
 	rootDocID := extractRootSuiteID(suiteID)
 
-	// Check if we're adding to root document's tests array
+	// Check if we're adding to root document's tests array (root suite tests)
 	if suiteID == rootDocID {
 		// First, try to update existing test in root document
 		filter := bson.M{

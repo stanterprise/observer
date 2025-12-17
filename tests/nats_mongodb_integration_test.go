@@ -59,9 +59,6 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 		t.Fatalf("Failed to get NATS connection string: %v", err)
 	}
 
-	// Wait for NATS to be fully ready with retries
-	time.Sleep(2 * time.Second)
-
 	// Create unique stream for this test
 	streamName := "test_events_" + time.Now().Format("20060102150405")
 	subjectPrefix := "test.events"
