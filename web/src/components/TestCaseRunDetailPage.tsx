@@ -190,15 +190,28 @@ export function TestCaseRunDetailPage({
     return (
       <div className="space-y-4">
         <Link
-          to="/"
-          className="inline-flex items-center text-blue-600 hover:text-blue-700"
+          to="/suite_runs"
+          className="inline-flex items-center text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-2 py-1"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Tests
+          Back to Test Runs
         </Link>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-red-600">Error: {error || "Test not found"}</div>
-        </div>
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <AlertCircle className="h-16 w-16 text-red-500" />
+              <div className="text-red-600 text-center">
+                <p className="font-semibold">
+                  Error: {error || "Test not found"}
+                </p>
+                <p className="text-sm mt-1">
+                  The test case you're looking for doesn't exist or couldn't be
+                  loaded.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -234,54 +247,70 @@ export function TestCaseRunDetailPage({
         <div className="flex items-center space-x-4">
           <Link
             to={`/suite_runs/${test.RunID}`}
-            className="inline-flex items-center text-blue-600 hover:text-blue-700"
+            className="inline-flex items-center text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md p-1"
+            aria-label="Back to test run"
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Test Case Detail</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Test Case</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Detailed view of test execution and steps
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Test Case Summary Card */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl">{test.Title || test.ID}</CardTitle>
-            <Badge status={testStatus} className="text-lg px-4 py-2" />
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-xl mb-2 break-words">
+                {test.Title || test.ID}
+              </CardTitle>
+              <p className="text-sm text-gray-500 font-mono">{test.ID}</p>
+            </div>
+            <Badge
+              status={testStatus}
+              className="text-lg px-4 py-2 flex-shrink-0 ml-4"
+            />
           </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-3">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
                 Test Information
               </h3>
-              <dl className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Test ID:</dt>
-                  <dd className="font-mono text-gray-900">{test.ID}</dd>
+              <dl className="space-y-3 text-sm">
+                <div className="flex justify-between items-start">
+                  <dt className="text-gray-600 font-medium">Test ID:</dt>
+                  <dd className="font-mono text-gray-900 text-right break-all ml-4">
+                    {test.ID}
+                  </dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Run ID:</dt>
-                  <dd className="font-mono text-gray-900">
+                <div className="flex justify-between items-start">
+                  <dt className="text-gray-600 font-medium">Run ID:</dt>
+                  <dd className="text-right ml-4">
                     <Link
                       to={`/suite_runs/${test.RunID}`}
-                      className="text-blue-600 hover:underline"
+                      className="font-mono text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
                     >
                       {test.RunID}
                     </Link>
                   </dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Duration:</dt>
-                  <dd className="text-gray-900">
+                <div className="flex justify-between items-start">
+                  <dt className="text-gray-600 font-medium">Duration:</dt>
+                  <dd className="text-gray-900 font-semibold text-right ml-4">
                     {formatDuration(test.Duration)}
                   </dd>
                 </div>
                 {test.RetryCount !== undefined && test.RetryCount > 0 && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">Retries:</dt>
-                    <dd className="text-gray-900">
+                  <div className="flex justify-between items-start">
+                    <dt className="text-gray-600 font-medium">Retries:</dt>
+                    <dd className="text-gray-900 text-right ml-4">
                       {test.RetryIndex !== undefined
                         ? `${test.RetryIndex} / ${test.RetryCount}`
                         : test.RetryCount}
@@ -289,33 +318,37 @@ export function TestCaseRunDetailPage({
                   </div>
                 )}
                 {test.Timeout !== undefined && (
-                  <div className="flex justify-between">
-                    <dt className="text-gray-600">Timeout:</dt>
-                    <dd className="text-gray-900">{test.Timeout}ms</dd>
+                  <div className="flex justify-between items-start">
+                    <dt className="text-gray-600 font-medium">Timeout:</dt>
+                    <dd className="text-gray-900 text-right ml-4">
+                      {test.Timeout}ms
+                    </dd>
                   </div>
                 )}
               </dl>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-3">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
                 Execution Timeline
               </h3>
-              <dl className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Started:</dt>
-                  <dd className="text-gray-900">
+              <dl className="space-y-3 text-sm">
+                <div className="flex justify-between items-start">
+                  <dt className="text-gray-600 font-medium">Started:</dt>
+                  <dd className="text-gray-900 text-right ml-4">
                     {new Date(test.CreatedAt).toLocaleString()}
                   </dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Last Updated:</dt>
-                  <dd className="text-gray-900">
+                <div className="flex justify-between items-start">
+                  <dt className="text-gray-600 font-medium">Last Updated:</dt>
+                  <dd className="text-gray-900 text-right ml-4">
                     {new Date(test.UpdatedAt).toLocaleString()}
                   </dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Total Steps:</dt>
-                  <dd className="text-gray-900">{safeSteps.length}</dd>
+                <div className="flex justify-between items-start">
+                  <dt className="text-gray-600 font-medium">Total Steps:</dt>
+                  <dd className="text-gray-900 font-semibold text-right ml-4">
+                    {safeSteps.length}
+                  </dd>
                 </div>
               </dl>
             </div>
@@ -324,11 +357,11 @@ export function TestCaseRunDetailPage({
           {/* Metadata Section */}
           {test.Metadata && Object.keys(test.Metadata).length > 0 && (
             <div className="mt-6 pt-6 border-t border-gray-200">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
                 Metadata
               </h3>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <pre className="text-xs text-gray-800 overflow-x-auto">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <pre className="text-xs text-gray-800 overflow-x-auto whitespace-pre-wrap break-words">
                   {JSON.stringify(test.Metadata, null, 2)}
                 </pre>
               </div>
@@ -339,14 +372,23 @@ export function TestCaseRunDetailPage({
 
       {/* Steps Section */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Execution Steps ({safeSteps.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Execution Steps
+          </h2>
+          <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+            {safeSteps.length} {safeSteps.length === 1 ? "step" : "steps"}
+          </span>
+        </div>
         {safeSteps.length === 0 ? (
           <Card>
             <CardContent>
               <div className="text-center py-8 text-gray-500">
-                No steps recorded for this test case.
+                <Clock className="mx-auto h-8 w-8 mb-2 text-gray-400" />
+                <p>No steps recorded for this test case.</p>
+                <p className="text-sm mt-1">
+                  Steps will appear here as the test executes.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -375,48 +417,75 @@ function renderStepHierarchy(
   return childSteps.map((step, index) => {
     const stepStatus = getTestStatus(step.Status);
     const hasChildren = allSteps.some((s) => s.ParentStepID === step.ID);
+    const isTopLevel = level === 0;
 
     return (
       <div key={step.ID}>
         <div style={{ marginLeft: level > 0 ? `${level * 2}rem` : "0" }}>
           <Card
-            className={`${
-              stepStatus === "failed" ? "border-red-200 bg-red-50" : ""
+            className={`transition-all duration-200 ${
+              stepStatus === "failed"
+                ? "border-red-300 bg-red-50"
+                : stepStatus === "passed"
+                ? "border-green-200 bg-green-50/30"
+                : ""
             }`}
           >
             <CardContent className="py-4">
               <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-700">
-                  {level > 0 ? "↳" : index + 1}
+                <div
+                  className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    stepStatus === "passed"
+                      ? "bg-green-100 text-green-700"
+                      : stepStatus === "failed"
+                      ? "bg-red-100 text-red-700"
+                      : stepStatus === "running"
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-100 text-gray-700"
+                  }`}
+                  aria-hidden="true"
+                >
+                  {isTopLevel ? index + 1 : "↳"}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                     <div className="flex items-center space-x-3">
-                      <Badge status={stepStatus} />
-                      <span className="text-sm font-medium text-gray-700">
+                      <Badge status={stepStatus} showIcon={true} />
+                      <span className="text-sm font-medium text-gray-900">
                         {step.Title || step.Category || "Step"}
                       </span>
                     </div>
-                    {stepStatus === "passed" && (
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    )}
-                    {stepStatus === "failed" && (
-                      <AlertCircle className="h-5 w-5 text-red-600" />
-                    )}
+                    <div className="flex items-center space-x-2">
+                      {stepStatus === "passed" && (
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      )}
+                      {stepStatus === "failed" && (
+                        <AlertCircle className="h-5 w-5 text-red-600" />
+                      )}
+                    </div>
                   </div>
                   {step.Category && step.Title && (
-                    <div className="text-xs text-gray-500 mb-1">
-                      Category: {step.Category}
+                    <div className="text-xs text-gray-600 mb-2 flex items-center">
+                      <span className="font-medium mr-1">Category:</span>
+                      <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">
+                        {step.Category}
+                      </span>
                     </div>
                   )}
-                  <div className="flex items-center space-x-4 text-xs text-gray-500">
+                  <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                     <div className="flex items-center">
                       <Clock className="h-3 w-3 mr-1" />
-                      Started: {new Date(step.CreatedAt).toLocaleString()}
+                      <span className="font-medium">Started:</span>
+                      <span className="ml-1">
+                        {new Date(step.CreatedAt).toLocaleString()}
+                      </span>
                     </div>
                     {step.UpdatedAt !== step.CreatedAt && (
-                      <div>
-                        Completed: {new Date(step.UpdatedAt).toLocaleString()}
+                      <div className="flex items-center">
+                        <span className="font-medium">Completed:</span>
+                        <span className="ml-1">
+                          {new Date(step.UpdatedAt).toLocaleString()}
+                        </span>
                       </div>
                     )}
                   </div>
