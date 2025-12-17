@@ -90,10 +90,11 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 			return fmt.Errorf("append step to test: %w", err)
 		}
 
-		if result.MatchedCount == 0 {
-			// Try in nested suites - first check if step exists
+		if result.MatchedCount == 0 && rootDocID != "" {
+			// Try in nested suites - only if we have a valid rootDocID
+			// First check if step exists
 			filter = bson.M{
-				"_id": rootDocID, // CRITICAL (conditionally added): Prevent cross-document mutation
+				"_id":                   rootDocID, // CRITICAL: Prevent cross-document mutation
 				"suites.tests.id":       testID,
 				"suites.tests.steps.id": step.ID,
 			}
@@ -199,9 +200,11 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 	// This allows later retrieval and tree reconstruction
 	// First check if it exists
 	filter := bson.M{
-		"_id": rootDocID, // CRITICAL (conditionally added): Prevent cross-document mutation
 		"tests.id":       testID,
 		"tests.steps.id": step.ID,
+	}
+	if rootDocID != "" {
+		filter["_id"] = rootDocID // Add root document ID filter if available
 	}
 	update := bson.M{
 		"$set": bson.M{
@@ -232,8 +235,10 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, step *m.StepDocum
 
 	// Doesn't exist, append it
 	filter = bson.M{
-		"_id": rootDocID, // CRITICAL (conditionally added): Prevent cross-document mutation
 		"tests.id": testID,
+	}
+	if rootDocID != "" {
+		filter["_id"] = rootDocID // Add root document ID filter if available
 	}
 	update = bson.M{
 		"$push": bson.M{
@@ -301,8 +306,9 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, stepID string, runI
 		return nil
 	}
 
-	// Try in nested suites using aggregation pipeline
-	pipeline := bson.A{
+	// Try in nested suites using aggregation pipeline (only if we have a valid rootDocID)
+	if rootDocID != "" {
+		pipeline := bson.A{
 		bson.M{
 			"$set": bson.M{
 				"suites": bson.M{
@@ -358,15 +364,17 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, stepID string, runI
 		},
 	}
 
-	filter = bson.M{
-		"_id": rootDocID, // CRITICAL (conditionally added): Prevent cross-document mutation
-		"suites.tests.steps.id": stepID,
-	}
-	_, err = r.collection.UpdateMany(ctx, filter, pipeline)
-	if err != nil {
-		return fmt.Errorf("update nested step end: %w", err)
+		filter = bson.M{
+			"_id":                   rootDocID, // CRITICAL: Prevent cross-document mutation
+			"suites.tests.steps.id": stepID,
+		}
+		_, err = r.collection.UpdateMany(ctx, filter, pipeline)
+		if err != nil {
+			return fmt.Errorf("update nested step end: %w", err)
+		}
+
+		r.logger.Info("step end (nested)", "id", stepID, "status", status)
 	}
 
-	r.logger.Info("step end (nested)", "id", stepID, "status", status)
 	return nil
 }
