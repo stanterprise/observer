@@ -1,33 +1,86 @@
 import { cn } from "../lib/utils";
 import type { TestStatus } from "../types";
+import {
+  CheckCircle,
+  XCircle,
+  Circle,
+  Play,
+  Clock,
+  AlertTriangle,
+  MinusCircle,
+  Ban,
+} from "lucide-react";
 
 interface BadgeProps {
   status: TestStatus;
   className?: string;
+  showIcon?: boolean;
 }
 
-export function Badge({ status, className }: BadgeProps) {
-  const statusColors = {
-    passed: "bg-green-100 text-green-800 border-green-200",
-    failed: "bg-red-100 text-red-800 border-red-200",
-    skipped: "bg-gray-100 text-gray-800 border-gray-200",
-    running: "bg-blue-100 text-blue-800 border-blue-200",
-    pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    unknown: "bg-gray-100 text-gray-800 border-gray-200",
-    broken: "bg-orange-100 text-orange-800 border-orange-200",
-    timedout: "bg-purple-100 text-purple-800 border-purple-200",
-    interrupted: "bg-pink-100 text-pink-800 border-pink-200",
+export function Badge({ status, className, showIcon = true }: BadgeProps) {
+  const statusConfig = {
+    passed: {
+      color: "bg-green-100 text-green-800 border-green-200",
+      icon: CheckCircle,
+      label: "passed",
+    },
+    failed: {
+      color: "bg-red-100 text-red-800 border-red-200",
+      icon: XCircle,
+      label: "failed",
+    },
+    skipped: {
+      color: "bg-gray-100 text-gray-800 border-gray-200",
+      icon: MinusCircle,
+      label: "skipped",
+    },
+    running: {
+      color: "bg-blue-100 text-blue-800 border-blue-200",
+      icon: Play,
+      label: "running",
+    },
+    pending: {
+      color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      icon: Clock,
+      label: "pending",
+    },
+    unknown: {
+      color: "bg-gray-100 text-gray-800 border-gray-200",
+      icon: Circle,
+      label: "unknown",
+    },
+    broken: {
+      color: "bg-orange-100 text-orange-800 border-orange-200",
+      icon: AlertTriangle,
+      label: "broken",
+    },
+    timedout: {
+      color: "bg-purple-100 text-purple-800 border-purple-200",
+      icon: Clock,
+      label: "timed out",
+    },
+    interrupted: {
+      color: "bg-pink-100 text-pink-800 border-pink-200",
+      icon: Ban,
+      label: "interrupted",
+    },
   };
+
+  const config = statusConfig[status];
+  const Icon = config.icon;
 
   return (
     <span
       className={cn(
-        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
-        statusColors[status],
+        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border",
+        config.color,
         className
       )}
+      role="status"
+      aria-label={`Test status: ${config.label}`}
     >
-      {status}
+      {showIcon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
+      <span className="capitalize">{config.label}</span>
     </span>
   );
 }

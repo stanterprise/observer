@@ -257,40 +257,64 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
                       Run ID
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
                       Status
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
                       <div className="flex items-center justify-center">
                         <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
                         Passed
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
                       <div className="flex items-center justify-center">
                         <XCircle className="h-4 w-4 mr-1 text-red-600" />
                         Failed
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
                       <div className="flex items-center justify-center">
                         <CircleDashed className="h-4 w-4 mr-1 text-gray-600" />
                         Skipped
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
                       <div className="flex items-center justify-center">
                         <Play className="h-4 w-4 mr-1 text-blue-600" />
                         Total
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
                       <button
                         onClick={toggleSortOrder}
-                        className="flex items-center hover:text-gray-700 transition-colors"
+                        className="flex items-center hover:text-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-2 py-1 -mx-2 -my-1"
+                        aria-label={`Sort by last updated, currently ${
+                          sortOrder === "desc" ? "newest first" : "oldest first"
+                        }`}
                       >
                         <Clock className="h-4 w-4 mr-1" />
                         Last Updated
@@ -308,7 +332,7 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link
                           to={`/suite_runs/${run.runId}`}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
+                          className="text-blue-600 hover:text-blue-800 font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
                         >
                           {run.runId}
                         </Link>
