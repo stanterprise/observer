@@ -9,6 +9,7 @@ This implementation adds real-time event streaming capabilities to the Observer 
 ### Component Design
 
 The WebSocket component follows the same architecture pattern as the processor service:
+
 - Acts as a **NATS JetStream consumer**
 - Subscribes to the same `tests_events` stream
 - Relays events to connected WebSocket clients
@@ -18,11 +19,13 @@ The WebSocket component follows the same architecture pattern as the processor s
 ### Integration Points
 
 1. **API Service** (`cmd/api/main.go`)
+
    - Initializes WebSocket hub on startup
    - Exposes `/ws` endpoint for client connections
    - Optional NATS integration (works standalone or with NATS)
 
 2. **NATS Stream** (`tests_events`)
+
    - Publisher: Ingestion service
    - Consumers:
      - `processor` - Database persistence
@@ -62,9 +65,9 @@ Every message sent to the client is a JSON object with this shape:
 
 ```json
 {
-   "type": "test.begin",
-   "timestamp": "2025-11-14T05:00:00Z",
-   "data": {}
+  "type": "test.begin",
+  "timestamp": "2025-11-14T05:00:00Z",
+  "data": {}
 }
 ```
 
@@ -91,34 +94,34 @@ The WebSocket relay depends on NATS JetStream.
 
 ### API service environment variables
 
-| Variable           | Default        | Description |
-| ------------------ | -------------- | ----------- |
+| Variable           | Default        | Description                                                                             |
+| ------------------ | -------------- | --------------------------------------------------------------------------------------- |
 | `NATS_URL`         | (empty)        | NATS server URL. If empty, WebSocket will accept connections but will not relay events. |
-| `NATS_STREAM`      | `tests_events` | JetStream stream name |
-| `NATS_WS_CONSUMER` | `websocket`    | Durable consumer name used by the API’s WebSocket relay |
+| `NATS_STREAM`      | `tests_events` | JetStream stream name                                                                   |
+| `NATS_WS_CONSUMER` | `websocket`    | Durable consumer name used by the API’s WebSocket relay                                 |
 
 ## Client examples
 
 ### Browser
 
 ```js
-const ws = new WebSocket('ws://localhost:8080/ws');
+const ws = new WebSocket("ws://localhost:8080/ws");
 
 ws.onmessage = (event) => {
-   const msg = JSON.parse(event.data);
-   console.log(msg.type, msg.timestamp, msg.data);
+  const msg = JSON.parse(event.data);
+  console.log(msg.type, msg.timestamp, msg.data);
 };
 ```
 
 ### Node.js
 
 ```js
-const WebSocket = require('ws');
-const ws = new WebSocket('ws://localhost:8080/ws');
+const WebSocket = require("ws");
+const ws = new WebSocket("ws://localhost:8080/ws");
 
-ws.on('message', (data) => {
-   const msg = JSON.parse(data.toString());
-   console.log(msg.type);
+ws.on("message", (data) => {
+  const msg = JSON.parse(data.toString());
+  console.log(msg.type);
 });
 ```
 
@@ -152,21 +155,24 @@ go run tests/send-events/main.go
 - Ensure ingestion is publishing to the same JetStream stream/subject prefix.
 - Ensure the NATS server is up and JetStream is enabled (see `make nats-up`).
 
-
 5. **`cmd/api/README.md`**
+
    - Comprehensive WebSocket documentation
    - Connection examples
    - Testing instructions
 
 6. **`docs/architecture/01-components.md`**
+
    - Updated API component description
    - Marked WebSocket as implemented
 
 7. **`docs/architecture/02-dataflow.md`**
+
    - Updated dataflow diagram with WebSocket consumer
    - Updated event lifecycle description
 
 8. **`docs/architecture/10-next-steps.md`**
+
    - Marked WebSocket as complete
    - Updated priority order
 
@@ -182,6 +188,7 @@ go test ./pkg/websocket/... -v
 ```
 
 **Results**: 4/4 tests passing
+
 - `TestNewHub`
 - `TestNewHub_NilLogger`
 - `TestHub_Run_Shutdown`
@@ -218,10 +225,12 @@ go run tests/send-events/main.go
 ### Security
 
 **CodeQL Analysis**: ✅ No vulnerabilities found
+
 - Go code: 0 alerts
 - JavaScript code: 0 alerts
 
 **Dependency Check**: ✅ No vulnerabilities
+
 - `github.com/gorilla/websocket` v1.5.3: Clean
 
 ## Configuration
@@ -239,6 +248,7 @@ go run tests/send-events/main.go
 ### Docker Compose
 
 **Distributed Mode:**
+
 ```yaml
 api:
   environment:
@@ -250,6 +260,7 @@ api:
 ```
 
 **AIO Mode:**
+
 ```yaml
 environment:
   NATS_URL: nats://localhost:4222
@@ -262,23 +273,23 @@ environment:
 ### JavaScript/Browser
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/ws');
+const ws = new WebSocket("ws://localhost:8080/ws");
 
-ws.onopen = () => console.log('Connected');
+ws.onopen = () => console.log("Connected");
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  console.log('Event:', data.type, data);
+  console.log("Event:", data.type, data);
 };
 ```
 
 ### Node.js
 
 ```javascript
-const WebSocket = require('ws');
-const ws = new WebSocket('ws://localhost:8080/ws');
+const WebSocket = require("ws");
+const ws = new WebSocket("ws://localhost:8080/ws");
 
-ws.on('message', (data) => {
+ws.on("message", (data) => {
   const event = JSON.parse(data.toString());
   console.log(`${event.type}:`, event.data);
 });

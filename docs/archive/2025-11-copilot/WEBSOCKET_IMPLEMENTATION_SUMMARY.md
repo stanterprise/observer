@@ -9,6 +9,7 @@ This implementation adds real-time event streaming capabilities to the Observer 
 ### Component Design
 
 The WebSocket component follows the same architecture pattern as the processor service:
+
 - Acts as a **NATS JetStream consumer**
 - Subscribes to the same `tests_events` stream
 - Relays events to connected WebSocket clients
@@ -18,25 +19,28 @@ The WebSocket component follows the same architecture pattern as the processor s
 ### Integration Points
 
 1. **API Service** (`cmd/api/main.go`)
-	- Initializes WebSocket hub on startup
-	- Exposes `/ws` endpoint for client connections
-	- Optional NATS integration (works standalone or with NATS)
+
+   - Initializes WebSocket hub on startup
+   - Exposes `/ws` endpoint for client connections
+   - Optional NATS integration (works standalone or with NATS)
 
 2. **NATS Stream** (`tests_events`)
-	- Publisher: Ingestion service
-	- Consumers:
-	  - `processor` - Database persistence
-	  - `websocket` - Real-time client relay
+
+   - Publisher: Ingestion service
+   - Consumers:
+     - `processor` - Database persistence
+     - `websocket` - Real-time client relay
 
 3. **Docker Deployment**
-	- **Distributed mode**: API service depends on NATS
-	- **AIO mode**: Uses embedded NATS server
+   - **Distributed mode**: API service depends on NATS
+   - **AIO mode**: Uses embedded NATS server
 
 ## Implementation Details
 
 ### WebSocket Hub (`pkg/websocket/websocket.go`)
 
 **Key Features:**
+
 - Connection registry with thread-safe access (`sync.RWMutex`)
 - Automatic client registration/unregistration
 - Broadcast channel for event distribution
@@ -45,6 +49,7 @@ The WebSocket component follows the same architecture pattern as the processor s
 - Graceful shutdown on context cancellation
 
 **Event Flow:**
+
 ```
 NATS → WebSocket Hub → Broadcast Channel → All Connected Clients
 ```
@@ -65,7 +70,9 @@ All events follow the standard envelope format:
 {
   "type": "test.begin|test.end|step.begin|step.end",
   "timestamp": "2025-11-14T05:00:00Z",
-  "data": { /* protobuf event data */ }
+  "data": {
+    /* protobuf event data */
+  }
 }
 ```
 
@@ -74,65 +81,77 @@ All events follow the standard envelope format:
 ### New Files
 
 1. **`pkg/websocket/websocket.go`** (8754 bytes)
-	- WebSocket hub implementation
-	- NATS consumer for event relay
-	- Client connection management
+
+   - WebSocket hub implementation
+   - NATS consumer for event relay
+   - Client connection management
 
 2. **`pkg/websocket/websocket_test.go`** (1458 bytes)
-	- Unit tests for WebSocket hub
-	- 4 tests: NewHub, NilLogger, Run/Shutdown, InitNATS
+
+   - Unit tests for WebSocket hub
+   - 4 tests: NewHub, NilLogger, Run/Shutdown, InitNATS
 
 3. **`docs/websocket-test-client.html`** (10895 bytes)
-	- Interactive HTML test client
-	- Real-time event visualization
-	- Statistics tracking
+
+   - Interactive HTML test client
+   - Real-time event visualization
+   - Statistics tracking
 
 4. **`tests/websocket-test.js`** (1191 bytes)
-	- Node.js WebSocket client for testing
-	- Displays events in terminal
+
+   - Node.js WebSocket client for testing
+   - Displays events in terminal
 
 5. **`tests/send-events/main.go`** (2375 bytes)
-	- Go program to send test events
-	- Used for E2E testing
+   - Go program to send test events
+   - Used for E2E testing
 
 ### Modified Files
 
 1. **`cmd/api/main.go`**
-	- Added WebSocket hub initialization
-	- Added `/ws` endpoint
-	- Integrated NATS consumer lifecycle
+
+   - Added WebSocket hub initialization
+   - Added `/ws` endpoint
+   - Integrated NATS consumer lifecycle
 
 2. **`docker-compose.yml`**
-	- Added NATS environment variables to API service
-	- Added NATS dependency for distributed mode
+
+   - Added NATS environment variables to API service
+   - Added NATS dependency for distributed mode
 
 3. **`Dockerfile.aio`**
-	- Added WebSocket environment variables
+
+   - Added WebSocket environment variables
 
 4. **`README.md`**
-	- Added WebSocket section with usage examples
-	- Updated API service configuration table
-	- Marked WebSocket as complete in roadmap
+
+   - Added WebSocket section with usage examples
+   - Updated API service configuration table
+   - Marked WebSocket as complete in roadmap
 
 5. **`cmd/api/README.md`**
-	- Comprehensive WebSocket documentation
-	- Connection examples
-	- Testing instructions
+
+   - Comprehensive WebSocket documentation
+   - Connection examples
+   - Testing instructions
 
 6. **`docs/architecture/01-components.md`**
-	- Updated API component description
-	- Marked WebSocket as implemented
+
+   - Updated API component description
+   - Marked WebSocket as implemented
 
 7. **`docs/architecture/02-dataflow.md`**
-	- Updated dataflow diagram with WebSocket consumer
-	- Updated event lifecycle description
+
+   - Updated dataflow diagram with WebSocket consumer
+   - Updated event lifecycle description
 
 8. **`docs/architecture/10-next-steps.md`**
-	- Marked WebSocket as complete
-	- Updated priority order
+
+   - Marked WebSocket as complete
+   - Updated priority order
 
 9. **`.gitignore`**
-	- Added Node.js test artifacts
+   - Added Node.js test artifacts
 
 ## Testing
 
@@ -143,6 +162,7 @@ go test ./pkg/websocket/... -v
 ```
 
 **Results**: 4/4 tests passing
+
 - `TestNewHub`
 - `TestNewHub_NilLogger`
 - `TestHub_Run_Shutdown`
@@ -179,10 +199,12 @@ go run tests/send-events/main.go
 ### Security
 
 **CodeQL Analysis**: ✅ No vulnerabilities found
+
 - Go code: 0 alerts
 - JavaScript code: 0 alerts
 
 **Dependency Check**: ✅ No vulnerabilities
+
 - `github.com/gorilla/websocket` v1.5.3: Clean
 
 ## Configuration
@@ -200,6 +222,7 @@ go run tests/send-events/main.go
 ### Docker Compose
 
 **Distributed Mode:**
+
 ```yaml
 api:
   environment:
@@ -211,6 +234,7 @@ api:
 ```
 
 **AIO Mode:**
+
 ```yaml
 environment:
   NATS_URL: nats://localhost:4222
@@ -223,23 +247,23 @@ environment:
 ### JavaScript/Browser
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/ws');
+const ws = new WebSocket("ws://localhost:8080/ws");
 
-ws.onopen = () => console.log('Connected');
+ws.onopen = () => console.log("Connected");
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  console.log('Event:', data.type, data);
+  console.log("Event:", data.type, data);
 };
 ```
 
 ### Node.js
 
 ```javascript
-const WebSocket = require('ws');
-const ws = new WebSocket('ws://localhost:8080/ws');
+const WebSocket = require("ws");
+const ws = new WebSocket("ws://localhost:8080/ws");
 
-ws.on('message', (data) => {
+ws.on("message", (data) => {
   const event = JSON.parse(data.toString());
   console.log(`${event.type}:`, event.data);
 });
@@ -292,4 +316,3 @@ The WebSocket component is fully implemented and tested. It provides a scalable,
 **Implemented by**: GitHub Copilot Agent  
 **Date**: November 14, 2025  
 **PR**: copilot/implement-websocket-component
-
