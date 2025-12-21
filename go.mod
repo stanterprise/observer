@@ -8,7 +8,7 @@ require (
 	github.com/99designs/gqlgen v0.17.83
 	github.com/gorilla/websocket v1.5.3
 	github.com/nats-io/nats.go v1.47.0
-	github.com/stanterprise/proto-go v0.0.10
+	github.com/stanterprise/proto-go v0.0.11
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/mongodb v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/nats v0.40.0

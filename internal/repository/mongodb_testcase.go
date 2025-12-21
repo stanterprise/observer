@@ -1,13 +1,13 @@
 package repository
 
 import (
-"context"
-"fmt"
-"time"
+	"context"
+	"fmt"
+	"time"
 
-m "github.com/stanterprise/observer/internal/models"
-"go.mongodb.org/mongo-driver/bson"
-"go.mongodb.org/mongo-driver/mongo/options"
+	m "github.com/stanterprise/observer/internal/models"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // UpsertTestBegin creates or updates a test within the document identified by runID.
@@ -28,16 +28,14 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 	test.UpdatedAt = now
 	test.SuiteID = suiteID
 	test.RunID = runID
-	
+
 	if test.Steps == nil {
 		test.Steps = []*m.StepDocument{}
 	}
 
 	// Try to update existing test in root-level suite
 	filter := bson.M{
-		"_id":             runID,
-		"suites.id":       suiteID,
-		"suites.tests.id": test.ID,
+		"_id": runID,
 	}
 	update := bson.M{
 		"$set": bson.M{
@@ -53,11 +51,11 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		},
 	}
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
-Filters: []interface{}{
-bson.M{"suite.id": suiteID},
-bson.M{"test.id": test.ID},
-},
-})
+		Filters: []interface{}{
+			bson.M{"suite.id": suiteID},
+			bson.M{"test.id": test.ID},
+		},
+	})
 
 	result, err := r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 	if err != nil {
@@ -71,18 +69,17 @@ bson.M{"test.id": test.ID},
 
 	// Test doesn't exist, append it to suite's tests array
 	filter = bson.M{
-		"_id":       runID,
-		"suites.id": suiteID,
+		"_id": runID,
 	}
 	update = bson.M{
 		"$push": bson.M{"suites.$[suite].tests": test},
 		"$set":  bson.M{"updated_at": now},
 	}
 	arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
-Filters: []interface{}{
-bson.M{"suite.id": suiteID},
-},
-})
+		Filters: []interface{}{
+			bson.M{"suite.id": suiteID},
+		},
+	})
 
 	result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 	if err != nil {
@@ -92,18 +89,17 @@ bson.M{"suite.id": suiteID},
 	if result.MatchedCount == 0 {
 		// Try nested suite (one level deep)
 		filter = bson.M{
-			"_id":               runID,
-			"suites.suites.id": suiteID,
+			"_id": runID,
 		}
 		update = bson.M{
 			"$push": bson.M{"suites.$[].suites.$[suite].tests": test},
 			"$set":  bson.M{"updated_at": now},
 		}
 		arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
-Filters: []interface{}{
-bson.M{"suite.id": suiteID},
-},
-})
+			Filters: []interface{}{
+				bson.M{"suite.id": suiteID},
+			},
+		})
 
 		result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 		if err != nil {
@@ -151,10 +147,10 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 	}
 
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
-Filters: []interface{}{
-bson.M{"test.id": testID},
-},
-})
+		Filters: []interface{}{
+			bson.M{"test.id": testID},
+		},
+	})
 
 	result, err := r.collection.UpdateOne(ctx, filter, bson.M{"$set": setFields}, arrayFilters)
 	if err != nil {

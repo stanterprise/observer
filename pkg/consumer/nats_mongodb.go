@@ -302,12 +302,7 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 		parentSuiteID = parentID
 	}
 
-	// For root suites, use suite ID as runID
-	// For nested suites, get runID from metadata (should be provided by reporter)
-	runID := req.Suite.Id
-	if runIDMeta, ok := req.Suite.Metadata["run_id"]; ok && runIDMeta != "" {
-		runID = runIDMeta
-	}
+	runID := req.Suite.RunId
 
 	return c.repo.UpsertSuiteBegin(ctx, runID, suite, parentSuiteID)
 }
