@@ -104,48 +104,67 @@ func (r *MongoRepository) GetTestFromRun(ctx context.Context, testID string) (*m
 }
 
 // UpdateTestStatus updates the status of a test case run
-func (r *MongoRepository) UpdateTestStatus(ctx context.Context, testID string, status string) error {
-	now := time.Now()
-
-	updateFields := bson.M{
-		"tests.$[test].updated_at": now,
-		"tests.$[test].status":     status,
+func (r *MongoRepository) UpdateTestStatus(ctx context.Context, runID string, testID string, status string) error {
+	if err := validateRunID(runID); err != nil {
+		return err
+	}
+	if testID == "" {
+		return fmt.Errorf("testID is required")
 	}
 
-	// Update test in root document's tests array
-	filter := bson.M{"tests.id": testID}
-	update := bson.M{"$set": updateFields}
+	now := time.Now()
+
+	// Try root-level suite tests
+	filter := bson.M{
+		"_id":             runID,
+		"suites.tests.id": testID,
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"suites.$[].tests.$[test].status":     status,
+			"suites.$[].tests.$[test].updated_at": now,
+			"updated_at":                          now,
+		},
+	}
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
 			bson.M{"test.id": testID},
 		},
 	})
 
-	result, err := r.collection.UpdateMany(ctx, filter, update, arrayFilters)
+	result, err := r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 	if err != nil {
 		return fmt.Errorf("update test status: %w", err)
 	}
 
 	if result.MatchedCount > 0 {
-		r.logger.Info("test status updated", "id", testID, "status", status)
+		r.logger.Info("test status updated", "runID", runID, "testID", testID, "status", status)
 		return nil
 	}
 
-	// Try nested suite's tests
-	nestedFields := bson.M{
-		"suites.$[].tests.$[test].updated_at": now,
-		"suites.$[].tests.$[test].status":     status,
+	// Try nested suite tests
+	filter = bson.M{
+		"_id":                    runID,
+		"suites.suites.tests.id": testID,
+	}
+	update = bson.M{
+		"$set": bson.M{
+			"suites.$[].suites.$[].tests.$[test].status":     status,
+			"suites.$[].suites.$[].tests.$[test].updated_at": now,
+			"updated_at": now,
+		},
 	}
 
-	filter = bson.M{"suites.tests.id": testID}
-	update = bson.M{"$set": nestedFields}
-
-	_, err = r.collection.UpdateMany(ctx, filter, update, arrayFilters)
+	result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 	if err != nil {
 		return fmt.Errorf("update nested test status: %w", err)
 	}
 
-	r.logger.Info("test status updated (nested)", "id", testID, "status", status)
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("test not found: runID=%s, testID=%s", runID, testID)
+	}
+
+	r.logger.Info("test status updated", "runID", runID, "testID", testID, "status", status)
 	return nil
 }
 
