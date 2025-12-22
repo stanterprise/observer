@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -35,11 +34,6 @@ func ptrInt32(v int32) *int32 {
 // TestCaseRunId format is typically: {runId}-{testId}
 // This function strips the runId prefix to get just the testId.
 func extractTestID(testCaseRunID, runID string) string {
-	// If testCaseRunID starts with runID-, strip it
-	prefix := runID + "-"
-	if strings.HasPrefix(testCaseRunID, prefix) {
-		return strings.TrimPrefix(testCaseRunID, prefix)
-	}
 	// Otherwise, return as-is (backward compatibility)
 	return testCaseRunID
 }
@@ -249,6 +243,8 @@ func (c *MongoNATSConsumer) processMessage(ctx context.Context, msg jetstream.Ms
 		return c.handleStdError(ctx, event.Data)
 	case publisher.EventTypeHeartbeat:
 		return c.handleHeartbeat(ctx, event.Data)
+	case publisher.MapSuitesEvent:
+		return c.handleMapSuites(ctx, event.Data)
 	default:
 		c.logger.Warn("unknown event type", "type", event.Type)
 		return nil
@@ -432,12 +428,10 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 	// Extract the actual test ID from TestCaseRunId
 	// TestCaseRunId format is typically: {runId}-{testId}
 	// But tests are stored with just {testId}, so we need to extract it
-	testID := extractTestID(req.Step.TestCaseRunId, req.Step.RunId)
 
 	c.logger.Info("step start",
 		"id", req.Step.Id,
-		"test_case_run_id", req.Step.TestCaseRunId,
-		"extracted_test_id", testID)
+		"test_case_run_id", req.Step.TestCaseRunId)
 
 	step := &m.StepDocument{
 		ID:            req.Step.Id,
@@ -450,7 +444,7 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 	}
 
 	runID := req.Step.RunId
-	return c.repo.UpsertStepBegin(ctx, runID, step, testID, req.Step.ParentStepId)
+	return c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseRunId, req.Step.ParentStepId)
 }
 
 // handleStepEnd processes a step end event
@@ -548,6 +542,67 @@ func (c *MongoNATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMe
 
 	c.logger.Debug("heartbeat", "source_id", req.SourceId)
 	return nil
+}
+
+func (c *MongoNATSConsumer) handleMapSuites(ctx context.Context, data json.RawMessage) error {
+	var req events.MapTestRunEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal map suites event: %w", err)
+	}
+
+	c.logger.Info("map suites",
+		"run_id", req.RunId,
+		"suite_mappings", req.GetTestSuites())
+
+	// Convert protobuf entities to SuiteDocument models
+	suites := make([]m.SuiteDocument, 0, len(req.TestSuites))
+	for _, protoSuite := range req.TestSuites {
+		if protoSuite == nil {
+			continue
+		}
+
+		// Convert metadata
+		md := make(map[string]interface{})
+		for k, v := range protoSuite.Metadata {
+			md[k] = v
+		}
+
+		var startTime *time.Time
+		if protoSuite.StartTime != nil {
+			t := protoSuite.StartTime.AsTime()
+			startTime = &t
+		}
+
+		var endTime *time.Time
+		if protoSuite.EndTime != nil {
+			t := protoSuite.EndTime.AsTime()
+			endTime = &t
+		}
+
+		var duration *int64
+		if protoSuite.Duration != nil {
+			d := protoSuite.Duration.AsDuration().Nanoseconds()
+			duration = &d
+		}
+
+		suite := m.SuiteDocument{
+			ID:          protoSuite.Id,
+			Name:        protoSuite.Name,
+			Description: protoSuite.Description,
+			Metadata:    md,
+
+			InitiatedBy: protoSuite.InitiatedBy,
+			ProjectName: protoSuite.Project,
+			StartTime:   startTime,
+			EndTime:     endTime,
+			Duration:    duration,
+			Status:      protoSuite.Status.String(),
+		}
+
+		suites = append(suites, suite)
+	}
+
+	return c.repo.MapSuites(ctx, req.RunId, suites)
 }
 
 // mongoStatusToString converts protobuf status to string
