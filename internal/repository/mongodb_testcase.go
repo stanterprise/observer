@@ -14,7 +14,7 @@ import (
 // - runID: Required. Identifies the document (_id).
 // - test: The test to create/update (test.ID identifies the test).
 // - suiteID: Required. ID of parent suite containing this test.
-// Returns error if runID is empty or parent suite not found.
+// Returns error if runID is empty.
 func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, test *m.TestDocument, suiteID string) error {
 	if err := validateRunID(runID); err != nil {
 		return err
@@ -33,26 +33,28 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		test.Steps = []*m.StepDocument{}
 	}
 
-	// Try to update existing test in root-level suite
+	// Try to update existing test in root-level tests array
 	filter := bson.M{
 		"_id": runID,
+		"tests.id": test.ID,
 	}
 	update := bson.M{
 		"$set": bson.M{
-			"suites.$[suite].tests.$[test].title":       test.Title,
-			"suites.$[suite].tests.$[test].status":      test.Status,
-			"suites.$[suite].tests.$[test].metadata":    test.Metadata,
-			"suites.$[suite].tests.$[test].duration":    test.Duration,
-			"suites.$[suite].tests.$[test].retry_count": test.RetryCount,
-			"suites.$[suite].tests.$[test].retry_index": test.RetryIndex,
-			"suites.$[suite].tests.$[test].timeout":     test.Timeout,
-			"suites.$[suite].tests.$[test].updated_at":  now,
-			"updated_at": now,
+			"tests.$[test].title":       test.Title,
+			"tests.$[test].status":      test.Status,
+			"tests.$[test].metadata":    test.Metadata,
+			"tests.$[test].duration":    test.Duration,
+			"tests.$[test].retry_count": test.RetryCount,
+			"tests.$[test].retry_index": test.RetryIndex,
+			"tests.$[test].timeout":     test.Timeout,
+			"tests.$[test].suite_id":    test.SuiteID,
+			"tests.$[test].updated_at":  now,
+			"tests.$[test].run_id":      runID,
+			"updated_at":                now,
 		},
 	}
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
-			bson.M{"suite.id": suiteID},
 			bson.M{"test.id": test.ID},
 		},
 	})
@@ -67,48 +69,22 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		return nil
 	}
 
-	// Test doesn't exist, append it to suite's tests array
+	// Test doesn't exist, append it to root-level tests array
 	filter = bson.M{
 		"_id": runID,
 	}
 	update = bson.M{
-		"$push": bson.M{"suites.$[suite].tests": test},
+		"$push": bson.M{"tests": test},
 		"$set":  bson.M{"updated_at": now},
 	}
-	arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
-		Filters: []interface{}{
-			bson.M{"suite.id": suiteID},
-		},
-	})
 
-	result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
+	result, err = r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("append test: %w", err)
 	}
 
 	if result.MatchedCount == 0 {
-		// Try nested suite (one level deep)
-		filter = bson.M{
-			"_id": runID,
-		}
-		update = bson.M{
-			"$push": bson.M{"suites.$[].suites.$[suite].tests": test},
-			"$set":  bson.M{"updated_at": now},
-		}
-		arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
-			Filters: []interface{}{
-				bson.M{"suite.id": suiteID},
-			},
-		})
-
-		result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
-		if err != nil {
-			return fmt.Errorf("append test to nested suite: %w", err)
-		}
-
-		if result.MatchedCount == 0 {
-			return fmt.Errorf("parent suite not found: runID=%s, suiteID=%s", runID, suiteID)
-		}
+		return fmt.Errorf("test run document not found: runID=%s", runID)
 	}
 
 	r.logger.Info("test begin (inserted)", "runID", runID, "testID", test.ID, "suiteID", suiteID)
@@ -136,14 +112,14 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 		updateFields["duration"] = duration
 	}
 
-	// Try root-level suite tests
+	// Update test in root-level tests array
 	filter := bson.M{
-		"_id":             runID,
-		"suites.tests.id": testID,
+		"_id":      runID,
+		"tests.id": testID,
 	}
 	setFields := bson.M{"updated_at": now}
 	for k, v := range updateFields {
-		setFields["suites.$[].tests.$[test]."+k] = v
+		setFields["tests.$[test]."+k] = v
 	}
 
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
@@ -155,26 +131,6 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 	result, err := r.collection.UpdateOne(ctx, filter, bson.M{"$set": setFields}, arrayFilters)
 	if err != nil {
 		return fmt.Errorf("update test end: %w", err)
-	}
-
-	if result.MatchedCount > 0 {
-		r.logger.Info("test end", "runID", runID, "testID", testID, "status", status)
-		return nil
-	}
-
-	// Try nested suite tests
-	filter = bson.M{
-		"_id":                    runID,
-		"suites.suites.tests.id": testID,
-	}
-	setFields = bson.M{"updated_at": now}
-	for k, v := range updateFields {
-		setFields["suites.$[].suites.$[].tests.$[test]."+k] = v
-	}
-
-	result, err = r.collection.UpdateOne(ctx, filter, bson.M{"$set": setFields}, arrayFilters)
-	if err != nil {
-		return fmt.Errorf("update nested test end: %w", err)
 	}
 
 	if result.MatchedCount == 0 {

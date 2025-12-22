@@ -51,7 +51,7 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, runID string, su
 func (r *MongoRepository) upsertRootSuite(ctx context.Context, runID string, suite *m.SuiteDocument, now time.Time) error {
 	// Try to update existing suite
 	filter := bson.M{
-		"_id":       runID,
+		"_id": runID,
 	}
 	update := bson.M{
 		"$set": bson.M{
