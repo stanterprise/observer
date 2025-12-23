@@ -35,7 +35,7 @@ function App() {
             />
           </Route>
           <Route
-            path="tests/:testId"
+            path=":runId/tests/:testId"
             element={<TestCaseRunDetailPage onWebSocketEvent={lastEvent} />}
           />
         </Route>

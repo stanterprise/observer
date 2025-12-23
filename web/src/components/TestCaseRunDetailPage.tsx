@@ -50,7 +50,7 @@ interface TestDetailResponse {
 export function TestCaseRunDetailPage({
   onWebSocketEvent,
 }: TestCaseRunDetailPageProps) {
-  const { testId } = useParams<{ testId: string }>();
+  const { runId, testId } = useParams<{ runId: string; testId: string }>();
   const [testDetail, setTestDetail] = useState<TestDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +64,10 @@ export function TestCaseRunDetailPage({
   const fetchTestDetail = async (id: string) => {
     try {
       setLoading(true);
-      const response = await fetch(apiUrl(`/tests/${id}`));
+      if (!runId) {
+        throw new Error("Run ID is required");
+      }
+      const response = await fetch(apiUrl(`/runs/${runId}/tests/${id}`));
       if (!response.ok) {
         throw new Error(`Failed to fetch test details: ${response.statusText}`);
       }

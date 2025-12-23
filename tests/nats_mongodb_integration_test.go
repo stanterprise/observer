@@ -89,7 +89,8 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 	// be configured with a MongoDB repository to handle events.
 
 	// Publish suite begin event
-	suiteID := "run-integration-1-suite-root"
+	runID := "run-integration-1"
+	suiteID := "suite-integration-1"
 	suiteBeginEvent := &m.SuiteDocument{
 		ID:          suiteID,
 		Name:        "Integration Test Suite",
@@ -99,7 +100,7 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 	}
 
 	// Manually insert via repository (simulating what consumer would do)
-	err = repo.UpsertSuiteBegin(ctx, suiteBeginEvent, "")
+	err = repo.UpsertSuiteBegin(ctx, runID, suiteBeginEvent, "")
 	if err != nil {
 		t.Fatalf("Failed to upsert suite begin: %v", err)
 	}
@@ -108,12 +109,12 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 	testID := "test-integration-1"
 	testBeginEvent := &m.TestDocument{
 		ID:     testID,
-		RunID:  suiteID,
+		RunID:  runID,
 		Title:  "Integration Test Case",
 		Status: "RUNNING",
 	}
 
-	err = repo.UpsertTestBegin(ctx, testBeginEvent, suiteID)
+	err = repo.UpsertTestBegin(ctx, runID, testBeginEvent, suiteID)
 	if err != nil {
 		t.Fatalf("Failed to upsert test begin: %v", err)
 	}
@@ -127,20 +128,20 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 		Title:    "Perform action",
 	}
 
-	err = repo.UpsertStepBegin(ctx, stepBeginEvent, testID, "", "")
+	err = repo.UpsertStepBegin(ctx, runID, stepBeginEvent, testID)
 	if err != nil {
 		t.Fatalf("Failed to upsert step begin: %v", err)
 	}
 
 	// Publish step end event
-	err = repo.UpsertStepEnd(ctx, stepID, "", "PASSED")
+	err = repo.UpsertStepEnd(ctx, runID, stepID, testID, "PASSED")
 	if err != nil {
 		t.Fatalf("Failed to upsert step end: %v", err)
 	}
 
 	// Publish test end event
 	testDuration := int64(1000000000)
-	err = repo.UpsertTestEnd(ctx, testID, "", "PASSED", &testDuration)
+	err = repo.UpsertTestEnd(ctx, runID, testID, "PASSED", &testDuration)
 	if err != nil {
 		t.Fatalf("Failed to upsert test end: %v", err)
 	}
@@ -148,53 +149,65 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 	// Publish suite end event
 	suiteEndTime := time.Now()
 	suiteDuration := int64(5000000000)
-	err = repo.UpsertSuiteEnd(ctx, suiteID, "PASSED", &suiteEndTime, &suiteDuration)
+	err = repo.UpsertSuiteEnd(ctx, runID, suiteID, "PASSED", &suiteEndTime, &suiteDuration)
 	if err != nil {
 		t.Fatalf("Failed to upsert suite end: %v", err)
 	}
 
 	// Verify final document structure
 	var finalDoc m.TestRunDocument
-	err = collection.FindOne(ctx, bson.M{"_id": suiteID}).Decode(&finalDoc)
+	err = collection.FindOne(ctx, bson.M{"_id": runID}).Decode(&finalDoc)
 	if err != nil {
 		t.Fatalf("Failed to retrieve final document: %v", err)
 	}
 
 	// Assertions
-	if finalDoc.ID != suiteID {
-		t.Errorf("Suite ID = %v, want %v", finalDoc.ID, suiteID)
+	if finalDoc.ID != runID {
+		t.Errorf("Document ID = %v, want %v", finalDoc.ID, runID)
 	}
-	if finalDoc.Status != "PASSED" {
-		t.Errorf("Suite status = %v, want PASSED", finalDoc.Status)
+
+	// Document should have suite in suites array
+	if len(finalDoc.Suites) != 1 {
+		t.Fatalf("Suites count = %v, want 1 (suites: %+v)", len(finalDoc.Suites), finalDoc.Suites)
 	}
-	if finalDoc.EndTime == nil {
+
+	suite := finalDoc.Suites[0]
+	if suite.ID != suiteID {
+		t.Errorf("Suite ID = %v, want %v", suite.ID, suiteID)
+	}
+	if suite.Status != "PASSED" {
+		t.Errorf("Suite status = %v, want PASSED", suite.Status)
+	}
+	if suite.EndTime == nil {
 		t.Error("Suite end time is nil")
 	}
-	if finalDoc.Duration == nil || *finalDoc.Duration != suiteDuration {
-		t.Errorf("Suite duration = %v, want %v", finalDoc.Duration, suiteDuration)
+	if suite.Duration == nil || *suite.Duration != suiteDuration {
+		t.Errorf("Suite duration = %v, want %v", suite.Duration, suiteDuration)
 	}
 
-	if len(finalDoc.Tests) != 1 {
-		t.Fatalf("Tests count = %v, want 1", len(finalDoc.Tests))
+	// Test should be in suite's tests array
+	if len(suite.Tests) != 1 {
+		t.Fatalf("Tests count = %v, want 1", len(suite.Tests))
 	}
-	if finalDoc.Tests[0].ID != testID {
-		t.Errorf("Test ID = %v, want %v", finalDoc.Tests[0].ID, testID)
+	if suite.Tests[0].ID != testID {
+		t.Errorf("Test ID = %v, want %v", suite.Tests[0].ID, testID)
 	}
-	if finalDoc.Tests[0].Status != "PASSED" {
-		t.Errorf("Test status = %v, want PASSED", finalDoc.Tests[0].Status)
+	if suite.Tests[0].Status != "PASSED" {
+		t.Errorf("Test status = %v, want PASSED", suite.Tests[0].Status)
 	}
-	if finalDoc.Tests[0].Duration == nil || *finalDoc.Tests[0].Duration != testDuration {
-		t.Errorf("Test duration = %v, want %v", finalDoc.Tests[0].Duration, testDuration)
+	if suite.Tests[0].Duration == nil || *suite.Tests[0].Duration != testDuration {
+		t.Errorf("Test duration = %v, want %v", suite.Tests[0].Duration, testDuration)
 	}
 
-	if len(finalDoc.Tests[0].Steps) != 1 {
-		t.Fatalf("Steps count = %v, want 1", len(finalDoc.Tests[0].Steps))
+	// Step should be in test's steps array
+	if len(suite.Tests[0].Steps) != 1 {
+		t.Fatalf("Steps count = %v, want 1", len(suite.Tests[0].Steps))
 	}
-	if finalDoc.Tests[0].Steps[0].ID != stepID {
-		t.Errorf("Step ID = %v, want %v", finalDoc.Tests[0].Steps[0].ID, stepID)
+	if suite.Tests[0].Steps[0].ID != stepID {
+		t.Errorf("Step ID = %v, want %v", suite.Tests[0].Steps[0].ID, stepID)
 	}
-	if finalDoc.Tests[0].Steps[0].Status != "PASSED" {
-		t.Errorf("Step status = %v, want PASSED", finalDoc.Tests[0].Steps[0].Status)
+	if suite.Tests[0].Steps[0].Status != "PASSED" {
+		t.Errorf("Step status = %v, want PASSED", suite.Tests[0].Steps[0].Status)
 	}
 
 	// Cleanup stream
@@ -238,75 +251,76 @@ func TestNATSToMongoDB_NestedSuites(t *testing.T) {
 	repo := repository.NewMongoRepository(collection, logger)
 
 	// Create root suite
-	rootSuiteID := "run-nested-suite-root"
+	runID := "run-nested-suite-test"
+	rootSuiteID := "suite-root"
 	rootSuite := &m.SuiteDocument{
 		ID:     rootSuiteID,
 		Name:   "Root Suite",
 		Status: "RUNNING",
 	}
-	err = repo.UpsertSuiteBegin(ctx, rootSuite, "")
+	err = repo.UpsertSuiteBegin(ctx, runID, rootSuite, "")
 	if err != nil {
 		t.Fatalf("Failed to create root suite: %v", err)
 	}
 
 	// Create nested suite level 1
-	nestedSuite1ID := "run-nested-suite-/level1"
+	nestedSuite1ID := "suite-level1"
 	nestedSuite1 := &m.SuiteDocument{
 		ID:     nestedSuite1ID,
 		Name:   "Nested Suite Level 1",
 		Status: "RUNNING",
 	}
-	err = repo.UpsertSuiteBegin(ctx, nestedSuite1, rootSuiteID)
+	err = repo.UpsertSuiteBegin(ctx, runID, nestedSuite1, rootSuiteID)
 	if err != nil {
 		t.Fatalf("Failed to create nested suite 1: %v", err)
 	}
 
-	// Create nested suite level 2
-	nestedSuite2ID := "run-nested-suite-/level1/level2"
-	nestedSuite2 := &m.SuiteDocument{
-		ID:     nestedSuite2ID,
-		Name:   "Nested Suite Level 2",
-		Status: "RUNNING",
-	}
-	err = repo.UpsertSuiteBegin(ctx, nestedSuite2, nestedSuite1ID)
-	if err != nil {
-		t.Fatalf("Failed to create nested suite 2: %v", err)
-	}
-
-	// Add test to deeply nested suite
-	testID := "test-deep-nested"
+	// Add test to nested suite
+	testID := "test-in-nested-suite"
 	test := &m.TestDocument{
 		ID:     testID,
-		Title:  "Deep Nested Test",
+		Title:  "Test in Nested Suite",
 		Status: "PASSED",
 	}
-	err = repo.UpsertTestBegin(ctx, test, nestedSuite2ID)
+	err = repo.UpsertTestBegin(ctx, runID, test, nestedSuite1ID)
 	if err != nil {
 		t.Fatalf("Failed to create test: %v", err)
 	}
 
-	// Retrieve and verify structure
-	var doc m.TestRunDocument
-	err = collection.FindOne(ctx, bson.M{"_id": rootSuiteID}).Decode(&doc)
+	// Verify final state
+	var finalDoc m.TestRunDocument
+	err = collection.FindOne(ctx, bson.M{"_id": runID}).Decode(&finalDoc)
 	if err != nil {
-		t.Fatalf("Failed to retrieve document: %v", err)
+		t.Fatalf("Failed to get final document: %v", err)
 	}
 
-	// Verify root suite
-	if doc.ID != rootSuiteID {
-		t.Errorf("Root suite ID = %v, want %v", doc.ID, rootSuiteID)
-	}
-	if len(doc.Suites) != 1 {
-		t.Fatalf("Root suite children count = %v, want 1", len(doc.Suites))
+	// Should have root suite with one nested suite
+	if len(finalDoc.Suites) == 0 {
+		t.Fatal("No root suites found")
 	}
 
-	// Verify level 1 nested suite
-	level1 := doc.Suites[0]
-	if level1.ID != nestedSuite1ID {
-		t.Errorf("Level 1 suite ID = %v, want %v", level1.ID, nestedSuite1ID)
+	verifiedRootSuite := finalDoc.Suites[0]
+	if verifiedRootSuite.ID != rootSuiteID {
+		t.Errorf("Expected root suite ID %s, got %s", rootSuiteID, verifiedRootSuite.ID)
 	}
 
-	// Note: Level 2 nesting may require recursive queries or aggregation
-	// depending on repository implementation
-	t.Logf("✅ Successfully created and retrieved nested suite hierarchy")
+	if len(verifiedRootSuite.Suites) == 0 {
+		t.Fatal("No nested suites found in root suite")
+	}
+
+	nestedSuite := verifiedRootSuite.Suites[0]
+	if nestedSuite.ID != nestedSuite1ID {
+		t.Errorf("Expected nested suite ID %s, got %s", nestedSuite1ID, nestedSuite.ID)
+	}
+
+	if len(nestedSuite.Tests) == 0 {
+		t.Fatal("No tests found in nested suite")
+	}
+
+	foundTest := nestedSuite.Tests[0]
+	if foundTest.ID != testID {
+		t.Errorf("Expected test ID %s, got %s", testID, foundTest.ID)
+	}
+
+	t.Logf("✅ Successfully validated one-level nested suite structure: Root → Nested → Test")
 }
