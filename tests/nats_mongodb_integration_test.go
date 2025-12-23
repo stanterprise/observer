@@ -128,7 +128,7 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 		Title:    "Perform action",
 	}
 
-	err = repo.UpsertStepBegin(ctx, runID, stepBeginEvent, testID, "")
+	err = repo.UpsertStepBegin(ctx, runID, stepBeginEvent, testID)
 	if err != nil {
 		t.Fatalf("Failed to upsert step begin: %v", err)
 	}
