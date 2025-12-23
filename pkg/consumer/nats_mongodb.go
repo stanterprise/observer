@@ -444,7 +444,7 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 	}
 
 	runID := req.Step.RunId
-	return c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseRunId, req.Step.ParentStepId)
+	return c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseRunId)
 }
 
 // handleStepEnd processes a step end event
