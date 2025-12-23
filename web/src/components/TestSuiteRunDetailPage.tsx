@@ -400,7 +400,10 @@ export function TestSuiteRunDetailPage({
         ) : (
           <div className="space-y-3">
             {runDetail.tests.map((test) => (
-              <Link key={test.ID} to={`/tests/${test.ID}`}>
+              <Link
+                key={test.ID}
+                to={`/suite_runs/${runDetail.runId}/tests/${test.ID}`}
+              >
                 <Card className="hover:shadow-md transition-all duration-200 cursor-pointer hover:border-blue-300">
                   <CardContent className="py-4">
                     <div className="flex items-center justify-between">

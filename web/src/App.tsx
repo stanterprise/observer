@@ -33,11 +33,11 @@ function App() {
               path=":runId"
               element={<TestSuiteRunDetailPage onWebSocketEvent={lastEvent} />}
             />
+            <Route
+              path=":runId/tests/:testId"
+              element={<TestCaseRunDetailPage onWebSocketEvent={lastEvent} />}
+            />
           </Route>
-          <Route
-            path=":runId/tests/:testId"
-            element={<TestCaseRunDetailPage onWebSocketEvent={lastEvent} />}
-          />
         </Route>
       </Routes>
     </BrowserRouter>
