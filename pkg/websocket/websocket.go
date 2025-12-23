@@ -342,13 +342,6 @@ func (c *Client) writePump() {
 			}
 			w.Write(message)
 
-			// // Add queued messages to the current WebSocket message
-			// n := len(c.send)
-			// for i := 0; i < n; i++ {
-			// 	w.Write([]byte{'\n'})
-			// 	w.Write(<-c.send)
-			// }
-
 			if err := w.Close(); err != nil {
 				return
 			}
