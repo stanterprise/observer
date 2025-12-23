@@ -1,61 +1,46 @@
 package repository
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// extractRootSuiteID extracts the root suite ID from a potentially nested suite ID
-// Example: "abc123-suite-root" -> "abc123-suite-root"
-// Example: "abc123-suite-/path/to/suite" -> "abc123-suite-root"
-func extractRootSuiteID(suiteID string) string {
-	// Look for the pattern: {base-id}-suite-{path}
-	// We want to return {base-id}-suite-root
-	// Note: base-id itself might contain "-suite-" as part of the UUID
-	// So we look for the LAST occurrence of "-suite-"
-
-	suiteMarker := "-suite-"
-	lastIdx := -1
-
-	// Find last occurrence of "-suite-"
-	for i := 0; i <= len(suiteID)-len(suiteMarker); i++ {
-		if suiteID[i:i+len(suiteMarker)] == suiteMarker {
-			lastIdx = i
-		}
+// validateRunID checks if runID is provided and returns an error if not
+func validateRunID(runID string) error {
+	if runID == "" {
+		return fmt.Errorf("runID is required")
 	}
+	return nil
+}
 
-	if lastIdx >= 0 {
-		// Found "-suite-", extract base ID and append "-suite-root"
-		baseID := suiteID[:lastIdx]
-		return baseID + "-suite-root"
+// ensureDocumentExists creates a document if it doesn't exist
+func (r *MongoRepository) ensureDocumentExists(ctx context.Context, runID string) error {
+	now := time.Now()
+	filter := bson.M{"_id": runID}
+	update := bson.M{
+		"$setOnInsert": bson.M{
+			"_id":        runID,
+			"created_at": now,
+			"updated_at": now,
+			"suites":     bson.A{},
+			"tests":      bson.A{},
+		},
 	}
-
-	// No "-suite-" found, assume it's already a root ID or malformed
-return suiteID + "-suite-root"
-}
-
-// buildTestEndUpdate creates the update document for test.end events
-func buildTestEndUpdate(status string, duration *int64, now time.Time) bson.M {
-update := bson.M{
-"updated_at": now,
-}
-if status != "" {
-update["status"] = status
-}
-if duration != nil {
-update["duration"] = duration
-}
-return update
+	_, err := r.collection.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+	return err
 }
 
 // buildStepEndUpdate creates the update document for step.end events
 func buildStepEndUpdate(status string, now time.Time) bson.M {
-update := bson.M{
-"updated_at": now,
-}
-if status != "" {
-update["status"] = status
-}
-return update
+	update := bson.M{
+		"updated_at": now,
+	}
+	if status != "" {
+		update["status"] = status
+	}
+	return update
 }

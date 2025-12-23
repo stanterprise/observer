@@ -33,7 +33,6 @@ func NewMongoHandler(repo *repository.MongoRepository, logger *slog.Logger) *Mon
 // RegisterRoutes registers all REST API routes on the provided mux
 func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/tests", h.handleTests)
-	mux.HandleFunc("/api/tests/", h.handleTestDetail)
 	mux.HandleFunc("/api/runs", h.handleRuns)
 	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
@@ -103,36 +102,64 @@ func (h *MongoHandler) handleTests(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// handleTestDetail handles GET /api/tests/{id} - get a specific test case with steps
-func (h *MongoHandler) handleTestDetail(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+// handleTestDetailByRunAndTest handles GET /api/runs/{runId}/tests/{testId} - get a specific test case with steps
+func (h *MongoHandler) handleTestDetailByRunAndTest(w http.ResponseWriter, r *http.Request, path string) {
+	// path is already trimmed of "/api/runs/" prefix
+	// Extract runId and testId from path: {runId}/tests/{testId}
+	parts := strings.Split(path, "/tests/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		http.Error(w, "Run ID and Test ID required", http.StatusBadRequest)
 		return
 	}
 
-	// Extract ID from URL path
-	id := strings.TrimPrefix(r.URL.Path, "/api/tests/")
-	if id == "" {
-		http.Error(w, "Test ID required", http.StatusBadRequest)
-		return
-	}
+	runID := parts[0]
+	testID := parts[1]
 
-	// Fetch test from MongoDB
-	test, err := h.repo.GetTestFromRun(r.Context(), id)
+	// Fetch the test run document
+	doc, err := h.repo.GetTestRun(r.Context(), runID)
 	if err != nil {
-		h.logger.Error("failed to fetch test", "id", id, "error", err)
+		h.logger.Error("failed to fetch test run", "run_id", runID, "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	if test == nil {
+	if doc == nil {
+		http.Error(w, "Run not found", http.StatusNotFound)
+		return
+	}
+
+	// Search for the test in root tests and nested suites
+	var foundTest *m.TestDocument
+	for _, test := range doc.Tests {
+		if test.ID == testID {
+			foundTest = test
+			break
+		}
+	}
+
+	if foundTest == nil {
+		for _, suite := range doc.Suites {
+			for _, test := range suite.Tests {
+				if test.ID == testID {
+					foundTest = test
+					break
+				}
+			}
+			if foundTest != nil {
+				break
+			}
+		}
+	}
+
+	if foundTest == nil {
 		http.Error(w, "Test not found", http.StatusNotFound)
 		return
 	}
 
 	response := map[string]interface{}{
-		"test":  test,
-		"steps": test.Steps,
+		"runId": runID,
+		"test":  foundTest,
+		"steps": foundTest.Steps,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -291,7 +318,7 @@ func (h *MongoHandler) handleRunsStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleRunDetail handles GET /api/runs/{runId} - get statistics and tests for a specific run
-// handleRunDetail handles GET /api/runs/{runId} - get statistics and tests for a specific run
+// and also handles GET /api/runs/{runId}/tests/{testId} - get specific test detail
 func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -299,7 +326,15 @@ func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract run ID from URL path
-	runID := strings.TrimPrefix(r.URL.Path, "/api/runs/")
+	path := strings.TrimPrefix(r.URL.Path, "/api/runs/")
+
+	// Check if this is a test detail request: /api/runs/{runId}/tests/{testId}
+	if strings.Contains(path, "/tests/") {
+		h.handleTestDetailByRunAndTest(w, r, path)
+		return
+	}
+
+	runID := path
 	if runID == "" {
 		http.Error(w, "Run ID required", http.StatusBadRequest)
 		return
@@ -344,12 +379,12 @@ func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 		case "PASSED":
 			stats["passed"]++
 			if stats["running"] > 0 {
-			stats["running"]--
+				stats["running"]--
 			}
 		case "FAILED":
 			stats["failed"]++
 			if stats["running"] > 0 {
-			stats["running"]--
+				stats["running"]--
 			}
 		case "SKIPPED":
 			stats["skipped"]++
@@ -358,17 +393,17 @@ func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 		case "BROKEN":
 			stats["broken"]++
 			if stats["running"] > 0 {
-			stats["running"]--
+				stats["running"]--
 			}
 		case "TIMEDOUT":
 			stats["timedout"]++
 			if stats["running"] > 0 {
-			stats["running"]--
+				stats["running"]--
 			}
 		case "INTERRUPTED":
 			stats["interrupted"]++
 			if stats["running"] > 0 {
-			stats["running"]--
+				stats["running"]--
 			}
 		case "UNKNOWN":
 			stats["unknown"]++

@@ -98,7 +98,7 @@ func (p *NATSPublisher) ensureStream(ctx context.Context) error {
 		Name:        p.stream,
 		Subjects:    []string{p.prefix + ".>"},
 		Retention:   jetstream.LimitsPolicy, // Use LimitsPolicy to allow multiple independent consumers
-		MaxAge:      24 * time.Hour, // Keep events for 24 hours
+		MaxAge:      24 * time.Hour,         // Keep events for 24 hours
 		Storage:     jetstream.FileStorage,
 		Replicas:    1,
 		Description: "Test execution events stream",
@@ -117,17 +117,18 @@ func (p *NATSPublisher) ensureStream(ctx context.Context) error {
 type EventType string
 
 const (
-	EventTypeTestBegin    EventType = "test.begin"
-	EventTypeTestEnd      EventType = "test.end"
-	EventTypeStepBegin    EventType = "step.begin"
-	EventTypeStepEnd      EventType = "step.end"
-	EventTypeSuiteBegin   EventType = "suite.begin"
-	EventTypeSuiteEnd     EventType = "suite.end"
-	EventTypeTestFailure  EventType = "test.failure"
-	EventTypeTestError    EventType = "test.error"
-	EventTypeStdOutput    EventType = "stdout"
-	EventTypeStdError     EventType = "stderr"
-	EventTypeHeartbeat    EventType = "heartbeat"
+	EventTypeTestBegin   EventType = "test.begin"
+	EventTypeTestEnd     EventType = "test.end"
+	EventTypeStepBegin   EventType = "step.begin"
+	EventTypeStepEnd     EventType = "step.end"
+	EventTypeSuiteBegin  EventType = "suite.begin"
+	EventTypeSuiteEnd    EventType = "suite.end"
+	EventTypeTestFailure EventType = "test.failure"
+	EventTypeTestError   EventType = "test.error"
+	EventTypeStdOutput   EventType = "stdout"
+	EventTypeStdError    EventType = "stderr"
+	EventTypeHeartbeat   EventType = "heartbeat"
+	MapSuitesEvent       EventType = "map.suites"
 )
 
 // Event represents a generic event wrapper for publishing

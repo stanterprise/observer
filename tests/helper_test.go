@@ -43,7 +43,7 @@ func TestReportLifecycle(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:       "test-id",
 			RunId:    "test-id",
-			Name:    "test-name",
+			Name:     "test-name",
 			Metadata: map[string]string{"k": "v"},
 		},
 	})
@@ -140,4 +140,76 @@ func newTestGRPCServerWithNATS(logger *slog.Logger, pub *publisher.NATSPublisher
 	grpcServer := obsrv.NewGRPCServer(logger)
 	obsrv.RegisterServicesWithPublisher(grpcServer, logger, nil, pub)
 	return grpcServer
+}
+
+// TestMapTestRun tests the MapTestRun endpoint
+func TestMapTestRun(t *testing.T) {
+	conn := dialBufConn(t)
+	defer conn.Close()
+	client := observer.NewTestEventCollectorClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Valid request with run_id and test suites
+	_, err := client.MapTestRun(ctx, &events.MapTestRunEventRequest{
+		RunId: "run-123",
+		TestSuites: []*entities.TestSuiteRun{
+			{
+				Id:       "suite-1",
+				Name:     "Test Suite 1",
+				Metadata: map[string]string{"key": "value"},
+			},
+			{
+				Id:       "suite-2",
+				Name:     "Test Suite 2",
+				Metadata: map[string]string{"env": "prod"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("MapTestRun failed: %v", err)
+	}
+}
+
+// TestMapTestRunInvalidInput tests validation of MapTestRun endpoint
+func TestMapTestRunInvalidInput(t *testing.T) {
+	cases := []struct {
+		name string
+		req  *events.MapTestRunEventRequest
+	}{
+		{"nil-req", nil},
+		{"empty-run-id", &events.MapTestRunEventRequest{
+			RunId:      "",
+			TestSuites: []*entities.TestSuiteRun{{Id: "suite-1"}},
+		}},
+		{"empty-test-suites", &events.MapTestRunEventRequest{
+			RunId:      "run-123",
+			TestSuites: []*entities.TestSuiteRun{},
+		}},
+		{"nil-test-suites", &events.MapTestRunEventRequest{
+			RunId:      "run-123",
+			TestSuites: nil,
+		}},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			conn := dialBufConn(t)
+			defer conn.Close()
+			client := observer.NewTestEventCollectorClient(conn)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_, err := client.MapTestRun(ctx, c.req)
+			if err == nil {
+				t.Fatalf("expected error for case %s", c.name)
+			}
+			st, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("expected status error")
+			}
+			if st.Code() != codes.InvalidArgument {
+				t.Fatalf("expected InvalidArgument, got %v", st.Code())
+			}
+		})
+	}
 }

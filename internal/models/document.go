@@ -5,12 +5,12 @@ import (
 )
 
 // TestRunDocument represents a complete test run as a single MongoDB document.
-// This document-based structure follows the issue requirements where:
-// - Suite begin creates a new document (if root suite) or appends to parent
-// - Suite end updates existing attributes
-// - Test begin appends to parent suite
+// This document-based structure follows the repository implementation where:
+// - New runID creates a new test run document
+// - Suite end updates existing suite attributes
+// - Test begin appends to parent suite's Tests array
 // - Test end updates test attributes
-// - Step begin appends to parent (test or step)
+// - Step begin appends to parent (test or step) Steps array
 // - Step end updates step attributes
 type TestRunDocument struct {
 	ID              string                 `bson:"_id"`
@@ -94,5 +94,7 @@ type StepDocument struct {
 
 // Type aliases for backward compatibility with GraphQL generated code
 // These allow the existing GraphQL schema to work with the new MongoDB document models
-type TestCaseRun = TestDocument
-type StepRun = StepDocument
+type (
+	TestCaseRun = TestDocument
+	StepRun     = StepDocument
+)

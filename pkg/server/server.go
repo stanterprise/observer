@@ -192,6 +192,29 @@ func (s *EventServer) ReportSuiteEnd(ctx context.Context, in *events.SuiteEndEve
 	return &observer.AckResponse{Success: true, Message: "Suite end received"}, nil
 }
 
+func (s *EventServer) MapTestRun(ctx context.Context, in *events.MapTestRunEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if in.RunId == "" {
+		return nil, status.Error(codes.InvalidArgument, "run_id is required")
+	}
+	if len(in.TestSuites) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "test_suites is required")
+	}
+	s.logger.Info("map test run", "run_id", in.RunId, "suite_count", len(in.TestSuites))
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.MapSuitesEvent, in); err != nil {
+			s.logger.Error("publish to NATS failed", "run_id", in.RunId, "error", err)
+			return nil, status.Error(codes.Internal, "failed to publish event")
+		}
+	}
+
+	return &observer.AckResponse{Success: true, Message: "Map test run received"}, nil
+}
+
 // NewGRPCServer creates a gRPC server with panic recovery and logging interceptors.
 func NewGRPCServer(logger *slog.Logger) *grpc.Server {
 	if logger == nil {

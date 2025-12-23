@@ -19,22 +19,22 @@ import (
 type Hub struct {
 	// Registered clients
 	clients map[*Client]bool
-	
+
 	// Inbound messages from clients
 	broadcast chan []byte
-	
+
 	// Register requests from clients
 	register chan *Client
-	
+
 	// Unregister requests from clients
 	unregister chan *Client
-	
+
 	// Mutex for thread-safe access to clients map
 	mu sync.RWMutex
-	
+
 	// Logger
 	logger *slog.Logger
-	
+
 	// NATS consumer for event relay
 	nc       *nats.Conn
 	js       jetstream.JetStream
@@ -72,7 +72,7 @@ func NewHub(logger *slog.Logger) *Hub {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}
-	
+
 	return &Hub{
 		broadcast:  make(chan []byte, 256),
 		register:   make(chan *Client),
@@ -88,40 +88,40 @@ func (h *Hub) InitNATS(cfg NATSConfig) error {
 		h.logger.Info("NATS URL not provided; WebSocket will run without NATS relay")
 		return nil
 	}
-	
+
 	if cfg.StreamName == "" {
 		cfg.StreamName = publisher.DefaultStreamName
 	}
-	
+
 	if cfg.ConsumerName == "" {
 		cfg.ConsumerName = "websocket"
 	}
-	
+
 	if cfg.BatchSize <= 0 {
 		cfg.BatchSize = 10
 	}
-	
+
 	if cfg.MaxWait <= 0 {
 		cfg.MaxWait = 5 * time.Second
 	}
-	
+
 	// Connect to NATS
 	nc, err := nats.Connect(cfg.URL, nats.Name("observer-websocket"))
 	if err != nil {
 		return fmt.Errorf("connect to NATS: %w", err)
 	}
-	
+
 	// Create JetStream context
 	js, err := jetstream.New(nc)
 	if err != nil {
 		nc.Close()
 		return fmt.Errorf("create jetstream context: %w", err)
 	}
-	
+
 	h.nc = nc
 	h.js = js
 	h.stream = cfg.StreamName
-	
+
 	// Ensure consumer exists
 	consumer, err := h.ensureConsumer(context.Background(), cfg.ConsumerName)
 	if err != nil {
@@ -129,12 +129,12 @@ func (h *Hub) InitNATS(cfg NATSConfig) error {
 		return fmt.Errorf("ensure consumer: %w", err)
 	}
 	h.consumer = consumer
-	
+
 	h.logger.Info("NATS consumer initialized for WebSocket",
 		"url", cfg.URL,
 		"stream", cfg.StreamName,
 		"consumer", cfg.ConsumerName)
-	
+
 	return nil
 }
 
@@ -145,14 +145,14 @@ func (h *Hub) ensureConsumer(ctx context.Context, consumerName string) (jetstrea
 	if err != nil {
 		return nil, fmt.Errorf("stream %s not found: %w", h.stream, err)
 	}
-	
+
 	// Try to get existing consumer
 	consumer, err := h.js.Consumer(ctx, h.stream, consumerName)
 	if err == nil {
 		h.logger.Info("consumer already exists", "consumer", consumerName)
 		return consumer, nil
 	}
-	
+
 	// Create consumer with durable name
 	consumerCfg := jetstream.ConsumerConfig{
 		Durable:       consumerName,
@@ -162,12 +162,12 @@ func (h *Hub) ensureConsumer(ctx context.Context, consumerName string) (jetstrea
 		AckWait:       10 * time.Second,
 		Description:   "WebSocket event relay consumer",
 	}
-	
+
 	consumer, err = h.js.CreateOrUpdateConsumer(ctx, h.stream, consumerCfg)
 	if err != nil {
 		return nil, fmt.Errorf("create consumer: %w", err)
 	}
-	
+
 	h.logger.Info("consumer created", "consumer", consumerName)
 	return consumer, nil
 }
@@ -178,7 +178,7 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 	if h.consumer != nil {
 		go h.consumeNATSEvents(ctx, cfg)
 	}
-	
+
 	// Main hub loop
 	for {
 		select {
@@ -187,7 +187,7 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 			h.clients[client] = true
 			h.mu.Unlock()
 			h.logger.Info("client connected", "total_clients", len(h.clients))
-			
+
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
@@ -196,7 +196,7 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 			}
 			h.mu.Unlock()
 			h.logger.Info("client disconnected", "total_clients", len(h.clients))
-			
+
 		case message := <-h.broadcast:
 			h.mu.RLock()
 			for client := range h.clients {
@@ -209,7 +209,7 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 				}
 			}
 			h.mu.RUnlock()
-			
+
 		case <-ctx.Done():
 			h.logger.Info("hub stopping")
 			h.mu.Lock()
@@ -228,7 +228,7 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 // consumeNATSEvents consumes events from NATS and broadcasts to WebSocket clients
 func (h *Hub) consumeNATSEvents(ctx context.Context, cfg NATSConfig) {
 	h.logger.Info("starting NATS consumer for WebSocket relay")
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -246,7 +246,7 @@ func (h *Hub) consumeNATSEvents(ctx context.Context, cfg NATSConfig) {
 				time.Sleep(1 * time.Second)
 				continue
 			}
-			
+
 			// Process each message
 			for msg := range msgs.Messages() {
 				// Parse the event
@@ -256,14 +256,14 @@ func (h *Hub) consumeNATSEvents(ctx context.Context, cfg NATSConfig) {
 					msg.Nak()
 					continue
 				}
-				
+
 				h.logger.Debug("relaying event to WebSocket clients",
 					"type", event.Type,
 					"timestamp", event.Timestamp)
-				
+
 				// Broadcast to all connected WebSocket clients
 				h.broadcast <- msg.Data()
-				
+
 				// Acknowledge message
 				msg.Ack()
 			}
@@ -278,15 +278,15 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("websocket upgrade failed", "error", err)
 		return
 	}
-	
+
 	client := &Client{
 		hub:  h,
 		conn: conn,
 		send: make(chan []byte, 256),
 	}
-	
+
 	client.hub.register <- client
-	
+
 	// Start goroutines for reading and writing
 	go client.writePump()
 	go client.readPump()
@@ -298,13 +298,13 @@ func (c *Client) readPump() {
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
-	
+
 	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.conn.SetPongHandler(func(string) error {
 		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
-	
+
 	for {
 		_, _, err := c.conn.ReadMessage()
 		if err != nil {
@@ -325,7 +325,7 @@ func (c *Client) writePump() {
 		ticker.Stop()
 		c.conn.Close()
 	}()
-	
+
 	for {
 		select {
 		case message, ok := <-c.send:
@@ -335,24 +335,17 @@ func (c *Client) writePump() {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			
+
 			w, err := c.conn.NextWriter(websocket.TextMessage)
 			if err != nil {
 				return
 			}
 			w.Write(message)
-			
-			// Add queued messages to the current WebSocket message
-			n := len(c.send)
-			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
-				w.Write(<-c.send)
-			}
-			
+
 			if err := w.Close(); err != nil {
 				return
 			}
-			
+
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
