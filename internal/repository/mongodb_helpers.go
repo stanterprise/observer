@@ -44,6 +44,7 @@ func buildStepEndUpdate(status string, now time.Time) bson.M {
 	}
 	return update
 }
+
 // UpdateTestRunEnd updates a test run document with final status and metadata
 func (r *MongoRepository) UpdateTestRunEnd(ctx context.Context, runID string, status string, metadata map[string]string) error {
 	if err := validateRunID(runID); err != nil {
