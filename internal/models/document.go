@@ -19,6 +19,7 @@ type TestRunDocument struct {
 	Status          string                 `bson:"status,omitempty"`
 	Metadata        map[string]interface{} `bson:"metadata,omitempty"`
 	Duration        *int64                 `bson:"duration,omitempty"` // Duration in nanoseconds
+	TotalTests      int32                  `bson:"total_tests,omitempty"`
 	TestSuiteSpecID string                 `bson:"test_suite_spec_id,omitempty"`
 	InitiatedBy     string                 `bson:"initiated_by,omitempty"`
 	ProjectName     string                 `bson:"project_name,omitempty"`

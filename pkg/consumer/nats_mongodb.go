@@ -703,7 +703,15 @@ func (c *MongoNATSConsumer) handleMapSuites(ctx context.Context, data json.RawMe
 
 	c.logger.Info("map suites",
 		"run_id", req.RunId,
-		"suite_mappings", req.GetTestSuites())
+		"name", req.Name,
+		"total_tests", req.TotalTests,
+		"suite_count", len(req.TestSuites))
+
+	// Convert run-level metadata
+	runMetadata := make(map[string]interface{})
+	for k, v := range req.Metadata {
+		runMetadata[k] = v
+	}
 
 	// Convert protobuf entities to SuiteDocument models
 	suites := make([]m.SuiteDocument, 0, len(req.TestSuites))
@@ -753,7 +761,7 @@ func (c *MongoNATSConsumer) handleMapSuites(ctx context.Context, data json.RawMe
 		suites = append(suites, suite)
 	}
 
-	return c.repo.MapSuites(ctx, req.RunId, suites)
+	return c.repo.MapSuites(ctx, req.RunId, req.Name, runMetadata, req.TotalTests, suites)
 }
 
 // mongoStatusToString converts protobuf status to string
