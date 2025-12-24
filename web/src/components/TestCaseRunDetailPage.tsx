@@ -98,12 +98,26 @@ export function TestCaseRunDetailPage({
           if (!prevDetail || !prevDetail.test) return prevDetail;
 
           try {
-            // Safely extract status - handle both string and non-string values
+            // Safely extract status - handle both string and numeric values (protobuf enums)
             const rawStatus = eventData.test_case?.status || eventData.status;
-            const status =
-              typeof rawStatus === "string"
-                ? rawStatus.toUpperCase()
-                : "RUNNING";
+            let status = "RUNNING";
+            if (type === "test.end") {
+              if (typeof rawStatus === "number") {
+                // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
+                const statusMap: Record<number, string> = {
+                  0: "UNKNOWN",
+                  1: "PASSED",
+                  2: "FAILED",
+                  3: "SKIPPED",
+                  4: "BROKEN",
+                  5: "TIMEDOUT",
+                  6: "INTERRUPTED",
+                };
+                status = statusMap[rawStatus] || "UNKNOWN";
+              } else if (typeof rawStatus === "string") {
+                status = rawStatus.toUpperCase();
+              }
+            }
 
             return {
               ...prevDetail,
@@ -128,12 +142,26 @@ export function TestCaseRunDetailPage({
 
           try {
             const stepId = eventData.id;
-            // Safely extract status - handle both string and non-string values
+            // Safely extract status - handle both string and numeric values (protobuf enums)
             const rawStatus = eventData.status;
-            const status =
-              typeof rawStatus === "string"
-                ? rawStatus.toUpperCase()
-                : "RUNNING";
+            let status = "RUNNING";
+            if (type === "step.end") {
+              if (typeof rawStatus === "number") {
+                // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
+                const statusMap: Record<number, string> = {
+                  0: "UNKNOWN",
+                  1: "PASSED",
+                  2: "FAILED",
+                  3: "SKIPPED",
+                  4: "BROKEN",
+                  5: "TIMEDOUT",
+                  6: "INTERRUPTED",
+                };
+                status = statusMap[rawStatus] || "UNKNOWN";
+              } else if (typeof rawStatus === "string") {
+                status = rawStatus.toUpperCase();
+              }
+            }
             const updatedSteps = [...prevDetail.steps];
             const stepIndex = updatedSteps.findIndex((s) => s.ID === stepId);
 
@@ -179,7 +207,7 @@ export function TestCaseRunDetailPage({
         });
       }
     }
-  }, [onWebSocketEvent, testDetail, testId]);
+  }, [onWebSocketEvent, testId, runId]);
 
   if (loading) {
     return (
@@ -269,14 +297,14 @@ export function TestCaseRunDetailPage({
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-xl mb-2 break-words">
+              <CardTitle className="text-xl mb-2 wrap-break-word">
                 {test.Title || test.ID}
               </CardTitle>
               <p className="text-sm text-gray-500 font-mono">{test.ID}</p>
             </div>
             <Badge
               status={testStatus}
-              className="text-lg px-4 py-2 flex-shrink-0 ml-4"
+              className="text-lg px-4 py-2 shrink-0 ml-4"
             />
           </div>
         </CardHeader>
@@ -364,7 +392,7 @@ export function TestCaseRunDetailPage({
                 Metadata
               </h3>
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <pre className="text-xs text-gray-800 overflow-x-auto whitespace-pre-wrap break-words">
+                <pre className="text-xs text-gray-800 overflow-x-auto whitespace-pre-wrap wrap-break-word">
                   {JSON.stringify(test.Metadata, null, 2)}
                 </pre>
               </div>
@@ -437,7 +465,7 @@ function renderStepHierarchy(
             <CardContent className="py-4">
               <div className="flex items-start space-x-4">
                 <div
-                  className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                     stepStatus === "passed"
                       ? "bg-green-100 text-green-700"
                       : stepStatus === "failed"

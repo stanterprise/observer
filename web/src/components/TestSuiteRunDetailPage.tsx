@@ -106,12 +106,26 @@ export function TestSuiteRunDetailPage({
 
           try {
             const testId = testData.test_case?.id || testData.id;
-            // Safely extract status - handle both string and non-string values
+            // Safely extract status - handle both string and numeric values (protobuf enums)
             const rawStatus = testData.test_case?.status || testData.status;
-            const status =
-              typeof rawStatus === "string"
-                ? rawStatus.toUpperCase()
-                : "RUNNING";
+            let status = "RUNNING";
+            if (type === "test.end") {
+              if (typeof rawStatus === "number") {
+                // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
+                const statusMap: Record<number, string> = {
+                  0: "UNKNOWN",
+                  1: "PASSED",
+                  2: "FAILED",
+                  3: "SKIPPED",
+                  4: "BROKEN",
+                  5: "TIMEDOUT",
+                  6: "INTERRUPTED",
+                };
+                status = statusMap[rawStatus] || "UNKNOWN";
+              } else if (typeof rawStatus === "string") {
+                status = rawStatus.toUpperCase();
+              }
+            }
 
             // Update or add test in the tests array
             const updatedTests = [...prevDetail.tests];
@@ -199,7 +213,7 @@ export function TestSuiteRunDetailPage({
         });
       }
     }
-  }, [onWebSocketEvent, runDetail, runId]);
+  }, [onWebSocketEvent, runId]);
 
   if (loading) {
     return (
@@ -437,7 +451,7 @@ export function TestSuiteRunDetailPage({
                           </div>
                         </div>
                       </div>
-                      <div className="flex-shrink-0 ml-4">
+                      <div className="shrink-0 ml-4">
                         <svg
                           className="h-5 w-5 text-gray-400"
                           fill="none"
