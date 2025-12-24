@@ -281,15 +281,38 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 		startTime = &t
 	}
 
+	var endTime *time.Time
+	if req.Suite.EndTime != nil {
+		t := req.Suite.EndTime.AsTime()
+		endTime = &t
+	}
+
+	var duration *int64
+	if req.Suite.Duration != nil {
+		d := req.Suite.Duration.AsDuration().Nanoseconds()
+		duration = &d
+	}
+
 	suite := &m.SuiteDocument{
 		ID:              req.Suite.Id,
+		RunID:           req.Suite.RunId,
+		ParentSuiteID:   req.Suite.ParentSuiteId,
 		Name:            req.Suite.Name,
 		Description:     req.Suite.Description,
+		Status:          req.Suite.Status.String(),
 		Metadata:        md,
+		Duration:        duration,
+		Location:        req.Suite.Location,
+		Type:            req.Suite.Type.String(),
 		TestSuiteSpecID: "",
 		InitiatedBy:     req.Suite.InitiatedBy,
 		ProjectName:     req.Suite.Project,
+		Author:          req.Suite.Author,
+		Owner:           req.Suite.Owner,
+		TestCaseIds:     req.Suite.TestCaseIds,
+		SubSuiteIds:     req.Suite.SubSuiteIds,
 		StartTime:       startTime,
+		EndTime:         endTime,
 	}
 
 	// Extract parent suite ID and runID from metadata
