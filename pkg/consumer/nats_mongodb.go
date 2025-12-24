@@ -14,7 +14,6 @@ import (
 	"github.com/stanterprise/observer/internal/repository"
 	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/stanterprise/proto-go/testsystem/v1/common"
-	"github.com/stanterprise/proto-go/testsystem/v1/entities"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 )
 
@@ -798,149 +797,55 @@ func (c *MongoNATSConsumer) handleMapSuites(ctx context.Context, data json.RawMe
 			continue
 		}
 
-		suite := c.convertProtoSuiteToDocument(protoSuite)
+		// Convert metadata
+		md := make(map[string]interface{})
+		for k, v := range protoSuite.Metadata {
+			md[k] = v
+		}
+
+		var startTime *time.Time
+		if protoSuite.StartTime != nil {
+			t := protoSuite.StartTime.AsTime()
+			startTime = &t
+		}
+
+		var endTime *time.Time
+		if protoSuite.EndTime != nil {
+			t := protoSuite.EndTime.AsTime()
+			endTime = &t
+		}
+
+		var duration *int64
+		if protoSuite.Duration != nil {
+			d := protoSuite.Duration.AsDuration().Nanoseconds()
+			duration = &d
+		}
+
+		suite := m.SuiteDocument{
+			ID:            protoSuite.Id,
+			RunID:         protoSuite.RunId,
+			ParentSuiteID: protoSuite.ParentSuiteId,
+			Name:          protoSuite.Name,
+			Description:   protoSuite.Description,
+			Metadata:      md,
+			Location:      protoSuite.Location,
+			Type:          protoSuite.Type.String(),
+			InitiatedBy:   protoSuite.InitiatedBy,
+			ProjectName:   protoSuite.Project,
+			Author:        protoSuite.Author,
+			Owner:         protoSuite.Owner,
+			TestCaseIds:   protoSuite.TestCaseIds,
+			SubSuiteIds:   protoSuite.SubSuiteIds,
+			StartTime:     startTime,
+			EndTime:       endTime,
+			Duration:      duration,
+			Status:        protoSuite.Status.String(),
+		}
+
 		suites = append(suites, suite)
 	}
 
 	return c.repo.MapSuites(ctx, req.RunId, req.Name, runMetadata, req.TotalTests, suites)
-}
-
-// convertProtoSuiteToDocument recursively converts a protobuf TestSuiteRun to SuiteDocument
-func (c *MongoNATSConsumer) convertProtoSuiteToDocument(protoSuite *entities.TestSuiteRun) m.SuiteDocument {
-	// Convert metadata
-	md := make(map[string]interface{})
-	for k, v := range protoSuite.Metadata {
-		md[k] = v
-	}
-
-	var startTime *time.Time
-	if protoSuite.StartTime != nil {
-		t := protoSuite.StartTime.AsTime()
-		startTime = &t
-	}
-
-	var endTime *time.Time
-	if protoSuite.EndTime != nil {
-		t := protoSuite.EndTime.AsTime()
-		endTime = &t
-	}
-
-	var duration *int64
-	if protoSuite.Duration != nil {
-		d := protoSuite.Duration.AsDuration().Nanoseconds()
-		duration = &d
-	}
-
-	suite := m.SuiteDocument{
-		ID:            protoSuite.Id,
-		RunID:         protoSuite.RunId,
-		ParentSuiteID: protoSuite.ParentSuiteId,
-		Name:          protoSuite.Name,
-		Description:   protoSuite.Description,
-		Metadata:      md,
-		Location:      protoSuite.Location,
-		Type:          protoSuite.Type.String(),
-		InitiatedBy:   protoSuite.InitiatedBy,
-		ProjectName:   protoSuite.Project,
-		Author:        protoSuite.Author,
-		Owner:         protoSuite.Owner,
-		TestCaseIds:   protoSuite.TestCaseIds,
-		SubSuiteIds:   protoSuite.SubSuiteIds,
-		StartTime:     startTime,
-		EndTime:       endTime,
-		Duration:      duration,
-		Status:        protoSuite.Status.String(),
-	}
-
-	// Process nested TestCases if present
-	if len(protoSuite.TestCases) > 0 {
-		suite.Tests = make([]*m.TestDocument, 0, len(protoSuite.TestCases))
-		for _, protoTest := range protoSuite.TestCases {
-			if protoTest == nil {
-				continue
-			}
-			testDoc := c.convertProtoTestToDocument(protoTest)
-			suite.Tests = append(suite.Tests, &testDoc)
-		}
-	}
-
-	// Process nested SubSuites if present
-	if len(protoSuite.SubSuites) > 0 {
-		suite.Suites = make([]*m.SuiteDocument, 0, len(protoSuite.SubSuites))
-		for _, protoSubSuite := range protoSuite.SubSuites {
-			if protoSubSuite == nil {
-				continue
-			}
-			subSuiteDoc := c.convertProtoSuiteToDocument(protoSubSuite)
-			suite.Suites = append(suite.Suites, &subSuiteDoc)
-		}
-	}
-
-	return suite
-}
-
-// convertProtoTestToDocument converts a protobuf TestCaseRun to TestDocument
-func (c *MongoNATSConsumer) convertProtoTestToDocument(protoTest *entities.TestCaseRun) m.TestDocument {
-	// Convert metadata
-	md := make(map[string]interface{})
-	for k, v := range protoTest.Metadata {
-		md[k] = v
-	}
-
-	var startTime *time.Time
-	if protoTest.StartTime != nil {
-		t := protoTest.StartTime.AsTime()
-		startTime = &t
-	}
-
-	var endTime *time.Time
-	if protoTest.EndTime != nil {
-		t := protoTest.EndTime.AsTime()
-		endTime = &t
-	}
-
-	var duration *int64
-	if protoTest.Duration != nil {
-		d := protoTest.Duration.AsDuration().Nanoseconds()
-		duration = &d
-	}
-
-	// Convert attachments
-	var attachments []map[string]interface{}
-	for _, att := range protoTest.Attachments {
-		attMap := make(map[string]interface{})
-		attMap["name"] = att.Name
-		attMap["mime_type"] = att.MimeType
-		if content := att.GetContent(); len(content) > 0 {
-			attMap["content"] = string(content)
-		} else if att.GetUri() != "" {
-			attMap["uri"] = att.GetUri()
-		}
-		attachments = append(attachments, attMap)
-	}
-
-	return m.TestDocument{
-		ID:           protoTest.Id,
-		Name:         protoTest.Name,
-		Title:        protoTest.Name,
-		Description:  protoTest.Description,
-		RunID:        protoTest.RunId,
-		SuiteID:      protoTest.TestSuiteRunId,
-		Status:       protoTest.Status.String(),
-		StartTime:    startTime,
-		EndTime:      endTime,
-		Duration:     duration,
-		Metadata:     md,
-		Tags:         protoTest.Tags,
-		Location:     protoTest.Location,
-		RetryCount:   ptrInt32(protoTest.RetryCount),
-		RetryIndex:   ptrInt32(protoTest.RetryIndex),
-		Timeout:      ptrInt32(protoTest.Timeout),
-		Attachments:  attachments,
-		ErrorMessage: protoTest.ErrorMessage,
-		StackTrace:   protoTest.StackTrace,
-		ErrorList:    protoTest.Errors,
-	}
 }
 
 // mongoStatusToString converts protobuf status to string
