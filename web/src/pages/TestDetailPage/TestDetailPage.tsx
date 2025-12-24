@@ -47,9 +47,7 @@ interface TestDetailResponse {
   steps: Step[];
 }
 
-export function TestDetailPage({
-  onWebSocketEvent,
-}: TestDetailPageProps) {
+export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
   const { runId, testId } = useParams<{ runId: string; testId: string }>();
   const [testDetail, setTestDetail] = useState<TestDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);

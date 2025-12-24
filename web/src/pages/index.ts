@@ -3,9 +3,4 @@ import TestDetailPage from "./TestDetailPage";
 import TestSuiteRunsPage from "./TestSuiteRunsPage";
 import TestRunDetailPage from "./TestRunDetailPage";
 
-export {
-  TestRunsPage,
-  TestDetailPage as TestCaseRunDetailPage,
-  TestSuiteRunsPage,
-  TestRunDetailPage as TestSuiteRunDetailPage,
-};
+export { TestRunsPage, TestDetailPage, TestSuiteRunsPage, TestRunDetailPage };
