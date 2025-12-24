@@ -1,11 +1,11 @@
 import TestRunsPage from "./TestRunsPage";
-import TestCaseRunDetailPage from "./TestCaseRunDetailPage";
+import TestDetailPage from "./TestDetailPage";
 import TestSuiteRunsPage from "./TestSuiteRunsPage";
-import TestSuiteRunDetailPage from "./TestSuiteRunDetailPage";
+import TestRunDetailPage from "./TestRunDetailPage";
 
 export {
   TestRunsPage,
-  TestCaseRunDetailPage,
+  TestDetailPage as TestCaseRunDetailPage,
   TestSuiteRunsPage,
-  TestSuiteRunDetailPage,
+  TestRunDetailPage as TestSuiteRunDetailPage,
 };

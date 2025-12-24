@@ -11,7 +11,7 @@ import type {
 } from "@/types";
 import { ArrowLeft, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
 
-interface TestCaseRunDetailPageProps {
+interface TestDetailPageProps {
   onWebSocketEvent?: WebSocketEvent | null;
 }
 
@@ -28,7 +28,7 @@ interface Step {
   Steps?: Step[]; // Nested steps for hierarchical structure
 }
 
-interface TestCaseDetail {
+interface TestDetail {
   ID: string;
   RunID: string;
   Title: string;
@@ -43,13 +43,13 @@ interface TestCaseDetail {
 }
 
 interface TestDetailResponse {
-  test: TestCaseDetail;
+  test: TestDetail;
   steps: Step[];
 }
 
-export function TestCaseRunDetailPage({
+export function TestDetailPage({
   onWebSocketEvent,
-}: TestCaseRunDetailPageProps) {
+}: TestDetailPageProps) {
   const { runId, testId } = useParams<{ runId: string; testId: string }>();
   const [testDetail, setTestDetail] = useState<TestDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);

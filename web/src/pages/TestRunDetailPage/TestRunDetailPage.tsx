@@ -14,13 +14,13 @@ import {
 import type { RunDetail } from "./types";
 import TestCaseRecord from "./TestCaseRecord";
 
-interface TestSuiteRunDetailPageProps {
+interface TestRunDetailPageProps {
   onWebSocketEvent?: WebSocketEvent | null;
 }
 
-export function TestSuiteRunDetailPage({
+export function TestRunDetailPage({
   onWebSocketEvent,
-}: TestSuiteRunDetailPageProps) {
+}: TestRunDetailPageProps) {
   const { runId } = useParams<{ runId: string }>();
   const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
   const [loading, setLoading] = useState(true);
