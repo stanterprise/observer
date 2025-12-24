@@ -1,7 +1,7 @@
 import { Clock } from "lucide-react";
 import { Badge } from "../../components/Badge";
 import { Link } from "react-router-dom";
-import { Card, CardContent } from "../../components/Card";
+import { Card, CardContent } from "@/components/Card";
 
 import type { TestCase } from "./types";
 import { getTestStatus, formatDuration } from "./utils";

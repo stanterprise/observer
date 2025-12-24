@@ -1,18 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { apiUrl } from "../../lib/config";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "../../components/Card";
-import { Badge } from "../../components/Badge";
-import type {
-  WebSocketEvent,
-  TestStatus,
-  WebSocketTestData,
-} from "../../types";
+import { apiUrl } from "@/lib/config";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/Card";
+import { Badge } from "@/components/Badge";
+import type { WebSocketEvent, TestStatus, WebSocketTestData } from "@/types";
 import {
   ArrowLeft,
   CheckCircle,

@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
-import { apiUrl } from "../../lib/config";
-import { Card, CardHeader, CardTitle, CardContent } from "../../components/Card";
-import { Badge } from "../../components/Badge";
-import type { TestCaseRun, WebSocketEvent, TestCaseResponse, WebSocketTestData, TestStatus } from "../../types";
+import { apiUrl } from "@/lib/config";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/Card";
+import { Badge } from "@/components/Badge";
+import type {
+  TestCaseRun,
+  WebSocketEvent,
+  TestCaseResponse,
+  WebSocketTestData,
+  TestStatus,
+} from "@/types";
 import { Play, Clock } from "lucide-react";
 
 interface TestRunsPageProps {
@@ -72,7 +78,8 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
           const updatedTests = [...prevTests];
           updatedTests[existingIndex] = {
             ...updatedTests[existingIndex],
-            status: (testData.status?.toLowerCase() || updatedTests[existingIndex].status) as TestStatus,
+            status: (testData.status?.toLowerCase() ||
+              updatedTests[existingIndex].status) as TestStatus,
             finished_at:
               testData.finished_at || updatedTests[existingIndex].finished_at,
             error_message:
