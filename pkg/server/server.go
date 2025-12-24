@@ -192,6 +192,126 @@ func (s *EventServer) ReportSuiteEnd(ctx context.Context, in *events.SuiteEndEve
 	return &observer.AckResponse{Success: true, Message: "Suite end received"}, nil
 }
 
+func (s *EventServer) ReportTestFailure(ctx context.Context, in *events.TestFailureEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if in.TestId == "" {
+		return nil, status.Error(codes.InvalidArgument, "test_id is required")
+	}
+	s.logger.Info("test failure", "test_id", in.TestId, "message", in.FailureMessage)
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeTestFailure, in); err != nil {
+			s.logger.Error("publish to NATS failed", "test_id", in.TestId, "error", err)
+			return nil, status.Error(codes.Internal, "failed to publish event")
+		}
+	}
+
+	return &observer.AckResponse{Success: true, Message: "Test failure received"}, nil
+}
+
+func (s *EventServer) ReportTestError(ctx context.Context, in *events.TestErrorEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if in.TestId == "" {
+		return nil, status.Error(codes.InvalidArgument, "test_id is required")
+	}
+	s.logger.Info("test error", "test_id", in.TestId, "message", in.ErrorMessage)
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeTestError, in); err != nil {
+			s.logger.Error("publish to NATS failed", "test_id", in.TestId, "error", err)
+			return nil, status.Error(codes.Internal, "failed to publish event")
+		}
+	}
+
+	return &observer.AckResponse{Success: true, Message: "Test error received"}, nil
+}
+
+func (s *EventServer) ReportStdError(ctx context.Context, in *events.StdErrorEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if in.TestId == "" {
+		return nil, status.Error(codes.InvalidArgument, "test_id is required")
+	}
+	s.logger.Info("stderr", "test_id", in.TestId, "length", len(in.Message))
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeStdError, in); err != nil {
+			s.logger.Error("publish to NATS failed", "test_id", in.TestId, "error", err)
+			return nil, status.Error(codes.Internal, "failed to publish event")
+		}
+	}
+
+	return &observer.AckResponse{Success: true, Message: "Stderr received"}, nil
+}
+
+func (s *EventServer) ReportStdOutput(ctx context.Context, in *events.StdOutputEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if in.TestId == "" {
+		return nil, status.Error(codes.InvalidArgument, "test_id is required")
+	}
+	s.logger.Info("stdout", "test_id", in.TestId, "length", len(in.Message))
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeStdOutput, in); err != nil {
+			s.logger.Error("publish to NATS failed", "test_id", in.TestId, "error", err)
+			return nil, status.Error(codes.Internal, "failed to publish event")
+		}
+	}
+
+	return &observer.AckResponse{Success: true, Message: "Stdout received"}, nil
+}
+
+func (s *EventServer) ReportRunEnd(ctx context.Context, in *events.TestRunEndEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if in.RunId == "" {
+		return nil, status.Error(codes.InvalidArgument, "run_id is required")
+	}
+	s.logger.Info("run end", "run_id", in.RunId, "status", in.FinalStatus)
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeRunEnd, in); err != nil {
+			s.logger.Error("publish to NATS failed", "run_id", in.RunId, "error", err)
+			return nil, status.Error(codes.Internal, "failed to publish event")
+		}
+	}
+
+	return &observer.AckResponse{Success: true, Message: "Run end received"}, nil
+}
+
+func (s *EventServer) Heartbeat(ctx context.Context, in *events.HeartbeatEventRequest) (*observer.AckResponse, error) {
+	if in == nil {
+		return nil, status.Error(codes.InvalidArgument, "request required")
+	}
+	if in.SourceId == "" {
+		return nil, status.Error(codes.InvalidArgument, "source_id is required")
+	}
+	s.logger.Debug("heartbeat", "source_id", in.SourceId, "timestamp", in.Timestamp)
+
+	// Publish to NATS if publisher is configured
+	if s.publisher != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeHeartbeat, in); err != nil {
+			s.logger.Error("publish to NATS failed", "source_id", in.SourceId, "error", err)
+			return nil, status.Error(codes.Internal, "failed to publish event")
+		}
+	}
+
+	return &observer.AckResponse{Success: true, Message: "Heartbeat received"}, nil
+}
+
 func (s *EventServer) MapTestRun(ctx context.Context, in *events.MapTestRunEventRequest) (*observer.AckResponse, error) {
 	if in == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")

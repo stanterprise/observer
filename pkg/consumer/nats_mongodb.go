@@ -243,6 +243,8 @@ func (c *MongoNATSConsumer) processMessage(ctx context.Context, msg jetstream.Ms
 		return c.handleStdError(ctx, event.Data)
 	case publisher.EventTypeHeartbeat:
 		return c.handleHeartbeat(ctx, event.Data)
+	case publisher.EventTypeRunEnd:
+		return c.handleRunEnd(ctx, event.Data)
 	case publisher.MapSuitesEvent:
 		return c.handleMapSuites(ctx, event.Data)
 	default:
@@ -541,6 +543,23 @@ func (c *MongoNATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMe
 	}
 
 	c.logger.Debug("heartbeat", "source_id", req.SourceId)
+	return nil
+}
+
+// handleRunEnd processes a test run end event
+func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) error {
+	var req events.TestRunEndEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal run end event: %w", err)
+	}
+
+	c.logger.Info("run end", "run_id", req.RunId, "status", req.FinalStatus)
+
+	// Update the test run document with final status and metadata
+	if err := c.repo.UpdateTestRunEnd(ctx, req.RunId, req.FinalStatus.String(), nil); err != nil {
+		return fmt.Errorf("update run end: %w", err)
+	}
+
 	return nil
 }
 

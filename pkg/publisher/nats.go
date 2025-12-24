@@ -128,6 +128,7 @@ const (
 	EventTypeStdOutput   EventType = "stdout"
 	EventTypeStdError    EventType = "stderr"
 	EventTypeHeartbeat   EventType = "heartbeat"
+	EventTypeRunEnd      EventType = "run.end"
 	MapSuitesEvent       EventType = "map.suites"
 )
 
