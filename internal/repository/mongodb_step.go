@@ -48,11 +48,20 @@ func (r *MongoRepository) upsertStepInTest(ctx context.Context, runID string, te
 	}
 	update := bson.M{
 		"$set": bson.M{
-			"tests.$[test].steps.$[step].status":     step.Status,
-			"tests.$[test].steps.$[step].category":   step.Category,
-			"tests.$[test].steps.$[step].title":      step.Title,
-			"tests.$[test].steps.$[step].updated_at": now,
-			"updated_at":                             now,
+			"tests.$[test].steps.$[step].title":        step.Title,
+			"tests.$[test].steps.$[step].description":  step.Description,
+			"tests.$[test].steps.$[step].start_time":   step.StartTime,
+			"tests.$[test].steps.$[step].duration":     step.Duration,
+			"tests.$[test].steps.$[step].type":         step.Type,
+			"tests.$[test].steps.$[step].metadata":     step.Metadata,
+			"tests.$[test].steps.$[step].worker_index": step.WorkerIndex,
+			"tests.$[test].steps.$[step].status":       step.Status,
+			"tests.$[test].steps.$[step].category":     step.Category,
+			"tests.$[test].steps.$[step].location":     step.Location,
+			"tests.$[test].steps.$[step].error":        step.Error,
+			"tests.$[test].steps.$[step].errors":       step.Errors,
+			"tests.$[test].steps.$[step].updated_at":   now,
+			"updated_at":                               now,
 		},
 	}
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{

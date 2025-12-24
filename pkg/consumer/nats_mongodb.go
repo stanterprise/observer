@@ -363,14 +363,51 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 		md[k] = v
 	}
 
+	var startTime *time.Time
+	if req.TestCase.StartTime != nil {
+		t := req.TestCase.StartTime.AsTime()
+		startTime = &t
+	}
+
+	var endTime *time.Time
+	if req.TestCase.EndTime != nil {
+		t := req.TestCase.EndTime.AsTime()
+		endTime = &t
+	}
+
+	// Convert attachments
+	var attachments []map[string]interface{}
+	for _, att := range req.TestCase.Attachments {
+		attMap := make(map[string]interface{})
+		attMap["name"] = att.Name
+		attMap["mime_type"] = att.MimeType
+		if content := att.GetContent(); len(content) > 0 {
+			attMap["content"] = string(content)
+		} else if att.GetUri() != "" {
+			attMap["uri"] = att.GetUri()
+		}
+		attachments = append(attachments, attMap)
+	}
+
 	test := &m.TestDocument{
-		ID:         req.TestCase.Id,
-		RunID:      req.TestCase.RunId,
-		Title:      req.TestCase.Name,
-		Metadata:   md,
-		RetryCount: ptrInt32(req.TestCase.RetryCount),
-		RetryIndex: ptrInt32(req.TestCase.RetryIndex),
-		Timeout:    ptrInt32(req.TestCase.Timeout),
+		ID:           req.TestCase.Id,
+		Name:         req.TestCase.Name,
+		Title:        req.TestCase.Name,
+		Description:  req.TestCase.Description,
+		RunID:        req.TestCase.RunId,
+		Status:       req.TestCase.Status.String(),
+		StartTime:    startTime,
+		EndTime:      endTime,
+		Metadata:     md,
+		Tags:         req.TestCase.Tags,
+		Location:     req.TestCase.Location,
+		RetryCount:   ptrInt32(req.TestCase.RetryCount),
+		RetryIndex:   ptrInt32(req.TestCase.RetryIndex),
+		Timeout:      ptrInt32(req.TestCase.Timeout),
+		Attachments:  attachments,
+		ErrorMessage: req.TestCase.ErrorMessage,
+		StackTrace:   req.TestCase.StackTrace,
+		ErrorList:    req.TestCase.Errors,
 	}
 
 	if req.TestCase.Duration != nil {
@@ -435,14 +472,39 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 		"id", req.Step.Id,
 		"test_case_run_id", req.Step.TestCaseRunId)
 
+	// Convert metadata
+	md := make(map[string]interface{})
+	for k, v := range req.Step.Metadata {
+		md[k] = v
+	}
+
+	var startTime *time.Time
+	if req.Step.StartTime != nil {
+		t := req.Step.StartTime.AsTime()
+		startTime = &t
+	}
+
 	step := &m.StepDocument{
 		ID:            req.Step.Id,
 		RunID:         req.Step.RunId,
 		TestCaseRunID: req.Step.TestCaseRunId,
 		ParentStepID:  req.Step.ParentStepId,
-		Status:        "RUNNING",
-		Category:      req.Step.Category,
 		Title:         req.Step.Title,
+		Description:   req.Step.Description,
+		StartTime:     startTime,
+		Type:          req.Step.Type,
+		Metadata:      md,
+		WorkerIndex:   req.Step.WorkerIndex,
+		Status:        req.Step.Status.String(),
+		Category:      req.Step.Category,
+		Location:      req.Step.Location,
+		Error:         req.Step.Error,
+		Errors:        req.Step.Errors,
+	}
+
+	if req.Step.Duration != nil {
+		nanos := req.Step.Duration.AsDuration().Nanoseconds()
+		step.Duration = &nanos
 	}
 
 	runID := req.Step.RunId
@@ -745,17 +807,24 @@ func (c *MongoNATSConsumer) handleMapSuites(ctx context.Context, data json.RawMe
 		}
 
 		suite := m.SuiteDocument{
-			ID:          protoSuite.Id,
-			Name:        protoSuite.Name,
-			Description: protoSuite.Description,
-			Metadata:    md,
-
-			InitiatedBy: protoSuite.InitiatedBy,
-			ProjectName: protoSuite.Project,
-			StartTime:   startTime,
-			EndTime:     endTime,
-			Duration:    duration,
-			Status:      protoSuite.Status.String(),
+			ID:            protoSuite.Id,
+			RunID:         protoSuite.RunId,
+			ParentSuiteID: protoSuite.ParentSuiteId,
+			Name:          protoSuite.Name,
+			Description:   protoSuite.Description,
+			Metadata:      md,
+			Location:      protoSuite.Location,
+			Type:          protoSuite.Type.String(),
+			InitiatedBy:   protoSuite.InitiatedBy,
+			ProjectName:   protoSuite.Project,
+			Author:        protoSuite.Author,
+			Owner:         protoSuite.Owner,
+			TestCaseIds:   protoSuite.TestCaseIds,
+			SubSuiteIds:   protoSuite.SubSuiteIds,
+			StartTime:     startTime,
+			EndTime:       endTime,
+			Duration:      duration,
+			Status:        protoSuite.Status.String(),
 		}
 
 		suites = append(suites, suite)

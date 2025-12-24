@@ -35,22 +35,32 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 
 	// Try to update existing test in root-level tests array
 	filter := bson.M{
-		"_id": runID,
+		"_id":      runID,
 		"tests.id": test.ID,
 	}
 	update := bson.M{
 		"$set": bson.M{
-			"tests.$[test].title":       test.Title,
-			"tests.$[test].status":      test.Status,
-			"tests.$[test].metadata":    test.Metadata,
-			"tests.$[test].duration":    test.Duration,
-			"tests.$[test].retry_count": test.RetryCount,
-			"tests.$[test].retry_index": test.RetryIndex,
-			"tests.$[test].timeout":     test.Timeout,
-			"tests.$[test].suite_id":    test.SuiteID,
-			"tests.$[test].updated_at":  now,
-			"tests.$[test].run_id":      runID,
-			"updated_at":                now,
+			"tests.$[test].name":          test.Name,
+			"tests.$[test].title":         test.Title,
+			"tests.$[test].description":   test.Description,
+			"tests.$[test].status":        test.Status,
+			"tests.$[test].start_time":    test.StartTime,
+			"tests.$[test].end_time":      test.EndTime,
+			"tests.$[test].duration":      test.Duration,
+			"tests.$[test].metadata":      test.Metadata,
+			"tests.$[test].tags":          test.Tags,
+			"tests.$[test].location":      test.Location,
+			"tests.$[test].retry_count":   test.RetryCount,
+			"tests.$[test].retry_index":   test.RetryIndex,
+			"tests.$[test].timeout":       test.Timeout,
+			"tests.$[test].attachments":   test.Attachments,
+			"tests.$[test].error_message": test.ErrorMessage,
+			"tests.$[test].stack_trace":   test.StackTrace,
+			"tests.$[test].error_list":    test.ErrorList,
+			"tests.$[test].suite_id":      test.SuiteID,
+			"tests.$[test].updated_at":    now,
+			"tests.$[test].run_id":        runID,
+			"updated_at":                  now,
 		},
 	}
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
