@@ -72,6 +72,14 @@ type TestDocument struct {
 	CreatedAt  time.Time              `bson:"created_at"`
 	UpdatedAt  time.Time              `bson:"updated_at"`
 
+	// Test failures and errors
+	Failures []*TestFailureDocument `bson:"failures,omitempty"`
+	Errors   []*TestErrorDocument   `bson:"errors,omitempty"`
+
+	// Standard output and error streams
+	StdOut []*OutputDocument `bson:"stdout,omitempty"`
+	StdErr []*OutputDocument `bson:"stderr,omitempty"`
+
 	// Embedded steps for this test
 	Steps []*StepDocument `bson:"steps,omitempty"`
 }
@@ -90,6 +98,28 @@ type StepDocument struct {
 
 	// Nested steps (for step hierarchies)
 	Steps []*StepDocument `bson:"steps,omitempty"`
+}
+
+// TestFailureDocument represents a test failure with details
+type TestFailureDocument struct {
+	FailureMessage string                   `bson:"failure_message,omitempty"`
+	StackTrace     string                   `bson:"stack_trace,omitempty"`
+	Timestamp      *time.Time               `bson:"timestamp,omitempty"`
+	Attachments    []map[string]interface{} `bson:"attachments,omitempty"`
+}
+
+// TestErrorDocument represents a test error with details
+type TestErrorDocument struct {
+	ErrorMessage string                   `bson:"error_message,omitempty"`
+	StackTrace   string                   `bson:"stack_trace,omitempty"`
+	Timestamp    *time.Time               `bson:"timestamp,omitempty"`
+	Attachments  []map[string]interface{} `bson:"attachments,omitempty"`
+}
+
+// OutputDocument represents stdout or stderr output
+type OutputDocument struct {
+	Message   string     `bson:"message,omitempty"`
+	Timestamp *time.Time `bson:"timestamp,omitempty"`
 }
 
 // Type aliases for backward compatibility with GraphQL generated code

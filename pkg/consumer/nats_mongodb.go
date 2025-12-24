@@ -479,13 +479,50 @@ func (c *MongoNATSConsumer) handleTestFailure(ctx context.Context, data json.Raw
 	}
 
 	c.logger.Info("test failure",
+		"run_id", req.RunId,
 		"test_id", req.TestId,
 		"message_len", len(req.FailureMessage))
 
-	// These events don't have RunId in protobuf schema
-	// We need to extract it from TestId or make UpdateTestStatus work without runID
-	// For now, log a warning and skip
-	c.logger.Warn("test failure event without runID support", "test_id", req.TestId)
+	if req.RunId == "" {
+		c.logger.Warn("test failure event missing run_id", "test_id", req.TestId)
+		return nil
+	}
+
+	// Convert protobuf Timestamp to *time.Time
+	var timestamp *time.Time
+	if req.Timestamp != nil {
+		t := req.Timestamp.AsTime()
+		timestamp = &t
+	}
+
+	// Convert attachments to map slice
+	attachments := make([]map[string]interface{}, 0, len(req.Attachments))
+	for _, att := range req.Attachments {
+		attMap := map[string]interface{}{
+			"name":      att.Name,
+			"mime_type": att.MimeType,
+		}
+		// Handle oneof payload
+		if content := att.GetContent(); content != nil {
+			attMap["content"] = content
+		}
+		if uri := att.GetUri(); uri != "" {
+			attMap["uri"] = uri
+		}
+		attachments = append(attachments, attMap)
+	}
+
+	failure := m.TestFailureDocument{
+		FailureMessage: req.FailureMessage,
+		StackTrace:     req.StackTrace,
+		Timestamp:      timestamp,
+		Attachments:    attachments,
+	}
+
+	if err := c.repo.AppendTestFailure(ctx, req.RunId, req.TestId, failure); err != nil {
+		return fmt.Errorf("append test failure: %w", err)
+	}
+
 	return nil
 }
 
@@ -497,13 +534,50 @@ func (c *MongoNATSConsumer) handleTestError(ctx context.Context, data json.RawMe
 	}
 
 	c.logger.Info("test error",
+		"run_id", req.RunId,
 		"test_id", req.TestId,
 		"message_len", len(req.ErrorMessage))
 
-	// These events don't have RunId in protobuf schema
-	// We need to extract it from TestId or make UpdateTestStatus work without runID
-	// For now, log a warning and skip
-	c.logger.Warn("test error event without runID support", "test_id", req.TestId)
+	if req.RunId == "" {
+		c.logger.Warn("test error event missing run_id", "test_id", req.TestId)
+		return nil
+	}
+
+	// Convert protobuf Timestamp to *time.Time
+	var timestamp *time.Time
+	if req.Timestamp != nil {
+		t := req.Timestamp.AsTime()
+		timestamp = &t
+	}
+
+	// Convert attachments to map slice
+	attachments := make([]map[string]interface{}, 0, len(req.Attachments))
+	for _, att := range req.Attachments {
+		attMap := map[string]interface{}{
+			"name":      att.Name,
+			"mime_type": att.MimeType,
+		}
+		// Handle oneof payload
+		if content := att.GetContent(); content != nil {
+			attMap["content"] = content
+		}
+		if uri := att.GetUri(); uri != "" {
+			attMap["uri"] = uri
+		}
+		attachments = append(attachments, attMap)
+	}
+
+	errorDoc := m.TestErrorDocument{
+		ErrorMessage: req.ErrorMessage,
+		StackTrace:   req.StackTrace,
+		Timestamp:    timestamp,
+		Attachments:  attachments,
+	}
+
+	if err := c.repo.AppendTestError(ctx, req.RunId, req.TestId, errorDoc); err != nil {
+		return fmt.Errorf("append test error: %w", err)
+	}
+
 	return nil
 }
 
@@ -515,8 +589,30 @@ func (c *MongoNATSConsumer) handleStdOutput(ctx context.Context, data json.RawMe
 	}
 
 	c.logger.Debug("stdout",
+		"run_id", req.RunId,
 		"test_id", req.TestId,
 		"message_len", len(req.Message))
+
+	if req.RunId == "" {
+		c.logger.Warn("stdout event missing run_id", "test_id", req.TestId)
+		return nil
+	}
+
+	// Convert protobuf Timestamp to *time.Time
+	var timestamp *time.Time
+	if req.Timestamp != nil {
+		t := req.Timestamp.AsTime()
+		timestamp = &t
+	}
+
+	output := m.OutputDocument{
+		Message:   req.Message,
+		Timestamp: timestamp,
+	}
+
+	if err := c.repo.AppendStdOutput(ctx, req.RunId, req.TestId, output); err != nil {
+		return fmt.Errorf("append stdout: %w", err)
+	}
 
 	return nil
 }
@@ -529,8 +625,30 @@ func (c *MongoNATSConsumer) handleStdError(ctx context.Context, data json.RawMes
 	}
 
 	c.logger.Debug("stderr",
+		"run_id", req.RunId,
 		"test_id", req.TestId,
 		"message_len", len(req.Message))
+
+	if req.RunId == "" {
+		c.logger.Warn("stderr event missing run_id", "test_id", req.TestId)
+		return nil
+	}
+
+	// Convert protobuf Timestamp to *time.Time
+	var timestamp *time.Time
+	if req.Timestamp != nil {
+		t := req.Timestamp.AsTime()
+		timestamp = &t
+	}
+
+	output := m.OutputDocument{
+		Message:   req.Message,
+		Timestamp: timestamp,
+	}
+
+	if err := c.repo.AppendStdError(ctx, req.RunId, req.TestId, output); err != nil {
+		return fmt.Errorf("append stderr: %w", err)
+	}
 
 	return nil
 }
@@ -555,8 +673,22 @@ func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessa
 
 	c.logger.Info("run end", "run_id", req.RunId, "status", req.FinalStatus)
 
-	// Update the test run document with final status and metadata
-	if err := c.repo.UpdateTestRunEnd(ctx, req.RunId, req.FinalStatus.String(), nil); err != nil {
+	// Convert protobuf Timestamp to *time.Time
+	var startTime *time.Time
+	if req.StartTime != nil {
+		t := req.StartTime.AsTime()
+		startTime = &t
+	}
+
+	// Convert protobuf Duration to *int64 (nanoseconds)
+	var duration *int64
+	if req.Duration != nil {
+		d := req.Duration.AsDuration().Nanoseconds()
+		duration = &d
+	}
+
+	// Update the test run document with final status, times, and duration
+	if err := c.repo.UpdateTestRunEnd(ctx, req.RunId, req.FinalStatus.String(), startTime, duration); err != nil {
 		return fmt.Errorf("update run end: %w", err)
 	}
 
