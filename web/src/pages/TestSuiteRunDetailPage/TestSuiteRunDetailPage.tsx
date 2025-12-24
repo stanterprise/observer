@@ -1,51 +1,30 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { apiUrl } from "../lib/config";
-import { Card, CardHeader, CardTitle, CardContent } from "./Card";
-import { Badge } from "./Badge";
-import type { WebSocketEvent, TestStatus, WebSocketTestData } from "../types";
+import { apiUrl } from "../../lib/config";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "../../components/Card";
+import { Badge } from "../../components/Badge";
+import type {
+  WebSocketEvent,
+  TestStatus,
+  WebSocketTestData,
+} from "../../types";
 import {
   ArrowLeft,
   CheckCircle,
   XCircle,
   CircleDashed,
   Play,
-  Clock,
 } from "lucide-react";
+import type { RunDetail } from "./types";
+import TestCaseRecord from "./TestCaseRecord";
 
 interface TestSuiteRunDetailPageProps {
   onWebSocketEvent?: WebSocketEvent | null;
-}
-
-interface TestCase {
-  ID: string;
-  RunID: string;
-  Title: string;
-  Status: string;
-  Duration?: number;
-  RetryCount?: number;
-  CreatedAt: string;
-  UpdatedAt: string;
-}
-
-interface RunStatistics {
-  total: number;
-  passed: number;
-  failed: number;
-  skipped: number;
-  running?: number;
-  broken?: number;
-  timedout?: number;
-  interrupted?: number;
-  unknown?: number;
-}
-
-interface RunDetail {
-  runId: string;
-  tests: TestCase[]; // Note: lowercase 'tests' in response
-  suites?: RunDetail[];
-  statistics: RunStatistics;
-  totalSteps: number;
 }
 
 export function TestSuiteRunDetailPage({
@@ -240,27 +219,6 @@ export function TestSuiteRunDetailPage({
     );
   }
 
-  const getTestStatus = (status: string): TestStatus => {
-    const statusMap: Record<string, TestStatus> = {
-      PASSED: "passed",
-      FAILED: "failed",
-      SKIPPED: "skipped",
-      RUNNING: "running",
-      UNKNOWN: "unknown",
-      BROKEN: "broken",
-      TIMEDOUT: "timedout",
-      INTERRUPTED: "interrupted",
-    };
-    return (statusMap[status] || "unknown") as TestStatus;
-  };
-
-  const formatDuration = (nanoseconds?: number) => {
-    if (!nanoseconds) return "N/A";
-    const milliseconds = nanoseconds / 1000000;
-    if (milliseconds < 1000) return `${milliseconds.toFixed(0)}ms`;
-    return `${(milliseconds / 1000).toFixed(2)}s`;
-  };
-
   const overallStatus: TestStatus =
     runDetail.statistics.failed > 0
       ? "failed"
@@ -414,61 +372,11 @@ export function TestSuiteRunDetailPage({
         ) : (
           <div className="space-y-3">
             {runDetail.tests.map((test) => (
-              <Link
+              <TestCaseRecord
                 key={test.ID}
-                to={`/suite_runs/${runDetail.runId}/tests/${test.ID}`}
-              >
-                <Card className="hover:shadow-md transition-all duration-200 cursor-pointer hover:border-blue-300">
-                  <CardContent className="py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <Badge status={getTestStatus(test.Status)} />
-                          <h3 className="text-base font-medium text-gray-900 truncate">
-                            {test.Title || test.ID}
-                          </h3>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-1" />
-                            <span className="font-medium">Duration:</span>
-                            <span className="ml-1">
-                              {formatDuration(test.Duration)}
-                            </span>
-                          </div>
-                          {test.RetryCount !== undefined &&
-                            test.RetryCount > 0 && (
-                              <div className="flex items-center">
-                                <span className="font-medium">Retries:</span>
-                                <span className="ml-1">{test.RetryCount}</span>
-                              </div>
-                            )}
-                          <div className="flex items-center">
-                            <span className="font-medium">Started:</span>
-                            <span className="ml-1">
-                              {new Date(test.CreatedAt).toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="shrink-0 ml-4">
-                        <svg
-                          className="h-5 w-5 text-gray-400"
-                          fill="none"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          aria-hidden="true"
-                        >
-                          <path d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                test={test}
+                runId={runDetail.runId}
+              />
             ))}
           </div>
         )}

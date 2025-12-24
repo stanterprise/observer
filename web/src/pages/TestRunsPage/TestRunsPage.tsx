@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { apiUrl } from "../lib/config";
-import { Card, CardHeader, CardTitle, CardContent } from "../components/Card";
-import { Badge } from "../components/Badge";
-import type { TestCaseRun, WebSocketEvent, TestCaseResponse, WebSocketTestData, TestStatus } from "../types";
+import { apiUrl } from "../../lib/config";
+import { Card, CardHeader, CardTitle, CardContent } from "../../components/Card";
+import { Badge } from "../../components/Badge";
+import type { TestCaseRun, WebSocketEvent, TestCaseResponse, WebSocketTestData, TestStatus } from "../../types";
 import { Play, Clock } from "lucide-react";
 
 interface TestRunsPageProps {

@@ -1,9 +1,13 @@
 import { useState, useCallback } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import { TestSuiteRunsPage } from "./components/TestSuiteRunsPage";
-import { TestSuiteRunDetailPage } from "./components/TestSuiteRunDetailPage";
-import { TestCaseRunDetailPage } from "./components/TestCaseRunDetailPage";
+
+import {
+  TestSuiteRunsPage,
+  TestSuiteRunDetailPage,
+  TestCaseRunDetailPage,
+} from "./pages";
+
 import { useWebSocket } from "./hooks/useWebSocket";
 import type { WebSocketEvent } from "./types";
 import DashboardPage from "./components/DashboardPage";

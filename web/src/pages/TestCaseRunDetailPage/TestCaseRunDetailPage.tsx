@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { apiUrl } from "../lib/config";
-import { Card, CardHeader, CardTitle, CardContent } from "./Card";
-import { Badge } from "./Badge";
+import { apiUrl } from "../../lib/config";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "../../components/Card";
+import { Badge } from "../../components/Badge";
 import type {
   WebSocketEvent,
   TestStatus,
   WebSocketTestData,
   WebSocketStepData,
-} from "../types";
+} from "../../types";
 import { ArrowLeft, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface TestCaseRunDetailPageProps {
