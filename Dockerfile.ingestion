@@ -6,6 +6,9 @@
 # ============================================================================
 FROM golang:1.24-alpine AS builder
 
+# Install ca-certificates for HTTPS connections during go mod download
+RUN apk add --no-cache ca-certificates
+
 WORKDIR /build
 
 # Copy go mod files and download dependencies (cached layer)

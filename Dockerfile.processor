@@ -6,8 +6,8 @@
 # ============================================================================
 FROM golang:1.24-alpine AS builder
 
-# Install build dependencies for CGO (required for SQLite support)
-RUN apk add --no-cache gcc musl-dev sqlite-dev
+# Install ca-certificates for HTTPS connections and build dependencies for CGO (required for SQLite support)
+RUN apk add --no-cache ca-certificates gcc musl-dev sqlite-dev
 
 WORKDIR /build
 
