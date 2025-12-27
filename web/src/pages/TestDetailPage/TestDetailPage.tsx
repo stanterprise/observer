@@ -10,6 +10,7 @@ import type {
   WebSocketStepData,
 } from "@/types";
 import { ArrowLeft, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
+import StepContainer from "./StepContainer";
 
 interface TestDetailPageProps {
   onWebSocketEvent?: WebSocketEvent | null;
@@ -23,6 +24,7 @@ interface Step {
   Status: string;
   Category: string;
   Title: string;
+  StartTime?: string;
   CreatedAt: string;
   UpdatedAt: string;
   Steps?: Step[]; // Nested steps for hierarchical structure
@@ -269,7 +271,12 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
   const { test, steps } = testDetail;
   const testStatus = getTestStatus(test.Status);
   const safeSteps = steps || [];
-
+  console.log(
+    "Rendering TestDetailPage for test:",
+    test.ID,
+    "with steps:",
+    safeSteps
+  );
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -399,137 +406,27 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
         </CardContent>
       </Card>
 
-      {/* Steps Section */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Execution Steps
-          </h2>
-          <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-            {safeSteps.length} {safeSteps.length === 1 ? "step" : "steps"}
-          </span>
-        </div>
-        {safeSteps.length === 0 ? (
-          <Card>
-            <CardContent>
-              <div className="text-center py-8 text-gray-500">
-                <Clock className="mx-auto h-8 w-8 mb-2 text-gray-400" />
-                <p>No steps recorded for this test case.</p>
-                <p className="text-sm mt-1">
-                  Steps will appear here as the test executes.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {renderStepHierarchy(safeSteps, null, 0, getTestStatus)}
-          </div>
-        )}
-      </div>
+      <StepContainer
+        test={{
+          id: test.ID,
+          runId: test.RunID,
+          title: test.Title,
+          status: testStatus,
+          steps: steps.map((step) => ({
+            id: step.ID,
+            runId: step.RunID,
+            parentStepId:
+              step.ParentStepID && step.ParentStepID !== ""
+                ? step.ParentStepID
+                : undefined,
+            status: getTestStatus(step.Status),
+            category: step.Category,
+            title: step.Title,
+            startedAt: step.StartTime || step.CreatedAt,
+            finishedAt: step.UpdatedAt,
+          })),
+        }}
+      />
     </div>
   );
-}
-
-// Helper function to render steps hierarchically
-function renderStepHierarchy(
-  allSteps: Step[],
-  parentId: string | null,
-  level: number,
-  getTestStatus: (status: string) => TestStatus
-): React.ReactNode[] {
-  // Find all steps that have the given parent
-  const childSteps = allSteps.filter(
-    (step) => (step.ParentStepID || null) === parentId
-  );
-
-  return childSteps.map((step, index) => {
-    const stepStatus = getTestStatus(step.Status);
-    const hasChildren = allSteps.some((s) => s.ParentStepID === step.ID);
-    const isTopLevel = level === 0;
-
-    return (
-      <div key={step.ID}>
-        <div style={{ marginLeft: level > 0 ? `${level * 2}rem` : "0" }}>
-          <Card
-            className={`transition-all duration-200 ${
-              stepStatus === "failed"
-                ? "border-red-300 bg-red-50"
-                : stepStatus === "passed"
-                ? "border-green-200 bg-green-50/30"
-                : ""
-            }`}
-          >
-            <CardContent className="py-4">
-              <div className="flex items-start space-x-4">
-                <div
-                  className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    stepStatus === "passed"
-                      ? "bg-green-100 text-green-700"
-                      : stepStatus === "failed"
-                      ? "bg-red-100 text-red-700"
-                      : stepStatus === "running"
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-gray-100 text-gray-700"
-                  }`}
-                  aria-hidden="true"
-                >
-                  {isTopLevel ? index + 1 : "↳"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                    <div className="flex items-center space-x-3">
-                      <Badge status={stepStatus} showIcon={true} />
-                      <span className="text-sm font-medium text-gray-900">
-                        {step.Title || step.Category || "Step"}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {stepStatus === "passed" && (
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      )}
-                      {stepStatus === "failed" && (
-                        <AlertCircle className="h-5 w-5 text-red-600" />
-                      )}
-                    </div>
-                  </div>
-                  {step.Category && step.Title && (
-                    <div className="text-xs text-gray-600 mb-2 flex items-center">
-                      <span className="font-medium mr-1">Category:</span>
-                      <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">
-                        {step.Category}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                    <div className="flex items-center">
-                      <Clock className="h-3 w-3 mr-1" />
-                      <span className="font-medium">Started:</span>
-                      <span className="ml-1">
-                        {new Date(step.CreatedAt).toLocaleString()}
-                      </span>
-                    </div>
-                    {step.UpdatedAt !== step.CreatedAt && (
-                      <div className="flex items-center">
-                        <span className="font-medium">Completed:</span>
-                        <span className="ml-1">
-                          {new Date(step.UpdatedAt).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        {/* Recursively render child steps */}
-        {hasChildren && (
-          <div className="space-y-3 mt-3">
-            {renderStepHierarchy(allSteps, step.ID, level + 1, getTestStatus)}
-          </div>
-        )}
-      </div>
-    );
-  });
 }

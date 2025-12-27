@@ -107,3 +107,36 @@ export interface WebSocketStepData {
   category?: string;
   title?: string;
 }
+
+export interface Test {
+  id: string;
+  runId: string;
+  title: string;
+  parentSuiteId?: string;
+  steps?: Step[];
+  metadata?: Record<string, unknown>;
+  owner?: string;
+  author?: string;
+  status?: TestStatus;
+  location?: {
+    file?: string;
+  };
+  startedAt?: string;
+  finishedAt?: string;
+  error?: {
+    message?: string;
+  };
+}
+
+export interface Step {
+  id: string;
+  runId: string;
+  parentStepId?: string;
+  title?: string;
+  category?: string;
+  steps?: Step[];
+  metadata?: Record<string, unknown>;
+  status?: TestStatus;
+  startedAt?: string;
+  finishedAt?: string;
+}

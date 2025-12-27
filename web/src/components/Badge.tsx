@@ -66,7 +66,7 @@ export function Badge({ status, className, showIcon = true }: BadgeProps) {
     },
   };
 
-  const config = statusConfig[status];
+  const config = statusConfig[status] || statusConfig.unknown;
   const Icon = config.icon;
 
   return (
