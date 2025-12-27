@@ -151,7 +151,7 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
       </Card>
       {hasChildren && isExpanded && (
         <div className="pl-6 border-l-2 border-gray-200">
-          {step.steps.map((subStep) => (
+          {step.steps?.map((subStep) => (
             <Step
               key={subStep.id}
               step={subStep}
