@@ -9,7 +9,7 @@ import type {
   WebSocketTestData,
   WebSocketStepData,
 } from "@/types";
-import { ArrowLeft, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 import StepContainer from "./StepContainer";
 
 interface TestDetailPageProps {

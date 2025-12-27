@@ -1,6 +1,14 @@
 import { Card, CardContent } from "@/components/Card";
-
-import { CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { useState } from "react";
+import {
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  ChevronRight,
+  ChevronDown,
+  ChevronsDown,
+  ChevronsRight,
+} from "lucide-react";
 import type { Test, Step as StepType, TestStatus } from "@/types";
 import { Badge } from "@/components/Badge";
 
@@ -8,9 +16,17 @@ type StepContainerProps = {
   test: Test;
 };
 
-type StepProps = { step: StepType };
+type StepProps = {
+  step: StepType;
+  globalExpandAll?: boolean;
+};
 export default ({ test }: StepContainerProps) => {
+  const [expandAll, setExpandAll] = useState(false);
   const steps = buildStepHierarchies(test.steps!);
+  const hasStepsWithChildren = steps.some(
+    (step) => step.steps && step.steps.length > 0
+  );
+
   console.log("Rendering steps for test:", test.id, steps);
   return (
     <div key={test.id}>
@@ -52,15 +68,41 @@ export default ({ test }: StepContainerProps) => {
           </div>
         )}
       </div>
+      {hasStepsWithChildren && (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={() => setExpandAll(!expandAll)}
+            className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            {expandAll ? (
+              <>
+                <ChevronsRight className="w-4 h-4" />
+                <span>Collapse All</span>
+              </>
+            ) : (
+              <>
+                <ChevronsDown className="w-4 h-4" />
+                <span>Expand All</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
       {steps.map((step) => (
-        <Step key={step.id} step={step} />
+        <Step key={step.id} step={step} globalExpandAll={expandAll} />
       ))}
     </div>
   );
 };
 
-export const Step = ({ step }: StepProps) => {
+export const Step = ({ step, globalExpandAll }: StepProps) => {
+  const [localExpanded, setLocalExpanded] = useState(false);
+  const hasChildren = step.steps && step.steps.length > 0;
+  const isExpanded =
+    globalExpandAll !== undefined ? globalExpandAll : localExpanded;
+
   console.log("Rendering step:", step);
+
   return (
     <div>
       <Card className="mb-4">
@@ -68,6 +110,21 @@ export const Step = ({ step }: StepProps) => {
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex items-center space-x-3 mb-2">
+                {hasChildren && (
+                  <button
+                    onClick={() => setLocalExpanded(!localExpanded)}
+                    className="p-0 hover:bg-gray-100 rounded transition-colors"
+                    aria-label={
+                      isExpanded ? "Collapse substeps" : "Expand substeps"
+                    }
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-5 h-5 text-gray-600" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-gray-600" />
+                    )}
+                  </button>
+                )}
                 {step.status === "passed" ? (
                   <>
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
@@ -92,10 +149,14 @@ export const Step = ({ step }: StepProps) => {
           </div>
         </CardContent>
       </Card>
-      {step.steps && step.steps.length > 0 && (
+      {hasChildren && isExpanded && (
         <div className="pl-6 border-l-2 border-gray-200">
           {step.steps.map((subStep) => (
-            <Step key={subStep.id} step={subStep} />
+            <Step
+              key={subStep.id}
+              step={subStep}
+              globalExpandAll={globalExpandAll}
+            />
           ))}
         </div>
       )}

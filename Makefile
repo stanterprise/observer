@@ -278,6 +278,9 @@ docker-build-web: ## Build Web UI Docker image
 # Backward compatibility
 docker-build: docker-build-all ## Build all Docker images (alias)
 
+docker-clean-images: ## Remove all built Docker images
+	docker rmi -f $(IMAGE_NAME):aio $(IMAGE_NAME):ingestion $(IMAGE_NAME):processor $(IMAGE_NAME):api $(IMAGE_NAME):web 2>/dev/null || true
+
 # Docker Compose helpers
 docker-up-aio: docker-build-aio ## Start AIO profile with docker compose
 	docker compose --profile aio up -d
@@ -301,7 +304,7 @@ docker-down: ## Stop all docker compose services
 docker-web-dev-down: ## Stop web development profile services
 	docker compose --profile web-dev down
 
-web-dev-mode: docker-web-dev-down docker-build-all docker-dev-web web-dev ## Rebuild and restart all services in Docker and start web UI in development mode
+web-dev-mode: docker-web-dev-down docker-clean-images docker-build-all docker-dev-web web-dev ## Rebuild and restart all services in Docker and start web UI in development mode
 
 # Helm chart management
 helm-deps: ## Update Helm chart dependencies
