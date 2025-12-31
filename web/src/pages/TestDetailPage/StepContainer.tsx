@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/Card";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   CheckCircle2,
   AlertCircle,
@@ -96,10 +96,13 @@ export default ({ test }: StepContainerProps) => {
 };
 
 export const Step = ({ step, globalExpandAll }: StepProps) => {
-  const [localExpanded, setLocalExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(globalExpandAll ?? false);
   const hasChildren = step.steps && step.steps.length > 0;
-  const isExpanded =
-    globalExpandAll !== undefined ? globalExpandAll : localExpanded;
+
+  // Update local state when global state changes
+  useEffect(() => {
+    setIsExpanded(globalExpandAll ?? false);
+  }, [globalExpandAll]);
 
   console.log("Rendering step:", step);
 
@@ -112,7 +115,7 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
               <div className="flex items-center space-x-3 mb-2">
                 {hasChildren && (
                   <button
-                    onClick={() => setLocalExpanded(!localExpanded)}
+                    onClick={() => setIsExpanded(!isExpanded)}
                     className="p-0 hover:bg-gray-100 rounded transition-colors"
                     aria-label={
                       isExpanded ? "Collapse substeps" : "Expand substeps"
