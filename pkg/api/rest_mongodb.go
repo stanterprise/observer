@@ -417,14 +417,14 @@ func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 		totalSteps += len(test.Steps)
 	}
 
-	response := map[string]interface{}{
-		"runId":      runID,
-		"tests":      allTests,
-		"statistics": stats,
-		"totalSteps": totalSteps,
-		"document":   doc, // Include full document for advanced clients
-	}
+	// response := map[string]interface{}{
+	// 	"runId":      runID,
+	// 	"tests":      allTests,
+	// 	"statistics": stats,
+	// 	"totalSteps": totalSteps,
+	// 	"document":   doc, // Include full document for advanced clients
+	// }
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(doc)
 }

@@ -50,8 +50,8 @@ export function TestRunDetailPage({
         throw new Error(`Failed to fetch run details: ${response.statusText}`);
       }
       const data = await response.json();
-      console.log("Fetched run details:", data);
-      setRunDetail(data.document);
+      console.log("Fetched run details:", data.document);
+      setRunDetail(data);
       setError(null);
     } catch (err) {
       console.error("Error fetching run details:", err);
@@ -228,6 +228,12 @@ export function TestRunDetailPage({
       ? "skipped"
       : "running";
 
+  console.log(
+    "Rendering run detail:",
+    runDetail,
+    "Overall status:",
+    overallStatus
+  );
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -312,7 +318,7 @@ export function TestRunDetailPage({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-xl mb-2">
-                {runDetail.name ?? runDetail.runId}
+                {runDetail.name ?? runDetail.id}
               </CardTitle>
               <div className="text-sm text-gray-500">
                 Total Steps: {runDetail.totalSteps}
@@ -379,11 +385,7 @@ export function TestRunDetailPage({
         ) : (
           <div className="space-y-3">
             {runDetail.tests.map((test) => (
-              <TestCaseRecord
-                key={test.id}
-                test={test}
-                runId={runDetail.runId}
-              />
+              <TestCaseRecord key={test.id} test={test} runId={runDetail.id} />
             ))}
           </div>
         )}
