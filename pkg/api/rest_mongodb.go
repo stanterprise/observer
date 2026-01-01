@@ -290,6 +290,7 @@ func (h *MongoHandler) handleRunsStats(w http.ResponseWriter, r *http.Request) {
 		}
 
 		runStat := map[string]interface{}{
+			"runName":     doc.Name,
 			"runId":       doc.ID,
 			"total":       stats["total"],
 			"passed":      stats["passed"],

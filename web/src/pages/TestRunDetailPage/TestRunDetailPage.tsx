@@ -334,21 +334,14 @@ export function TestRunDetailPage({
                 {runDetail.name ?? runDetail.id}
               </CardTitle>
               <div className="text-sm text-gray-500">
-                Total Steps: {runDetail.totalSteps}
+                Total Tests: {runDetail.tests.length}
               </div>
             </div>
             <Badge status={overallStatus} className="text-lg px-4 py-2" />
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-            <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
-              <Play className="h-8 w-8 text-blue-600 mb-2" />
-              <div className="text-2xl font-bold text-gray-900">
-                {runDetail.statistics.total}
-              </div>
-              <div className="text-sm text-gray-600">Total Tests</div>
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="flex flex-col items-center p-4 bg-green-50 rounded-lg">
               <CheckCircle className="h-8 w-8 text-green-600 mb-2" />
               <div className="text-2xl font-bold text-green-600">

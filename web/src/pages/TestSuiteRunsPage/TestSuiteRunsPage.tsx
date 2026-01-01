@@ -19,6 +19,7 @@ interface TestRunsPageProps {
 
 interface TestRunStats {
   runId: string;
+  runName?: string;
   total: number;
   passed: number;
   failed: number;
@@ -261,7 +262,7 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
                       scope="col"
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
-                      Run ID
+                      Run Name
                     </th>
                     <th
                       scope="col"
@@ -334,7 +335,7 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
                           to={`/suite_runs/${run.runId}`}
                           className="text-blue-600 hover:text-blue-800 font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
                         >
-                          {run.runId}
+                          {run.runName || run.runId}
                         </Link>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
