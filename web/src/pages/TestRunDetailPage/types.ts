@@ -22,6 +22,7 @@ export interface RunStatistics {
 }
 
 export interface RunDetail {
+  name: string;
   runId: string;
   tests: TestCase[]; // Note: lowercase 'tests' in response
   suites?: RunDetail[];

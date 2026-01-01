@@ -10,6 +10,7 @@ import {
   XCircle,
   CircleDashed,
   Play,
+  CircleOff,
 } from "lucide-react";
 import type { RunDetail } from "./types";
 import TestCaseRecord from "./TestCaseRecord";
@@ -238,7 +239,7 @@ export function TestRunDetailPage({
       {/* Run Summary Card */}
       <Card>
         {/* Progress Bar */}
-        <div className="h-2 bg-gray-200 rounded-t-lg overflow-hidden flex">
+        <div className="h-8 bg-gray-200 rounded-t-lg overflow-hidden flex">
           {runDetail.statistics.passed > 0 && (
             <div
               className="bg-green-500 transition-all duration-300"
@@ -304,7 +305,9 @@ export function TestRunDetailPage({
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-xl mb-2">{runDetail.runId}</CardTitle>
+              <CardTitle className="text-xl mb-2">
+                {runDetail.name ?? runDetail.runId}
+              </CardTitle>
               <div className="text-sm text-gray-500">
                 Total Steps: {runDetail.totalSteps}
               </div>
@@ -313,7 +316,7 @@ export function TestRunDetailPage({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
             <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
               <Play className="h-8 w-8 text-blue-600 mb-2" />
               <div className="text-2xl font-bold text-gray-900">
@@ -341,6 +344,13 @@ export function TestRunDetailPage({
                 {runDetail.statistics.skipped}
               </div>
               <div className="text-sm text-gray-600">Skipped</div>
+            </div>
+            <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
+              <CircleOff className="h-8 w-8 text-gray-600 mb-2" />
+              <div className="text-2xl font-bold text-gray-600">
+                {runDetail.statistics.unknown}
+              </div>
+              <div className="text-sm text-gray-600">Unknown</div>
             </div>
           </div>
         </CardContent>
