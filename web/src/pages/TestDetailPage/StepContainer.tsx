@@ -15,7 +15,6 @@ export default ({ test }: StepContainerProps) => {
     (step) => step.steps && step.steps.length > 0
   );
 
-  console.log("Rendering steps for test:", test.id, steps);
   return (
     <div key={test.id}>
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">

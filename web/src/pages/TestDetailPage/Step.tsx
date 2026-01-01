@@ -24,8 +24,6 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
     setIsExpanded(globalExpandAll ?? false);
   }, [globalExpandAll]);
 
-  console.log("Rendering step:", step);
-
   return (
     <div>
       <Card className="mb-4">
