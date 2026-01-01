@@ -50,7 +50,20 @@ export function TestRunDetailPage({
         throw new Error(`Failed to fetch run details: ${response.statusText}`);
       }
       const data = await response.json();
-      console.log("Fetched run details:", data.document);
+
+      data.statistics = {
+        total: data.tests.length,
+        passed: data.tests.filter((t: any) => t.status === "PASSED").length,
+        failed: data.tests.filter((t: any) => t.status === "FAILED").length,
+        skipped: data.tests.filter((t: any) => t.status === "SKIPPED").length,
+        running: data.tests.filter((t: any) => t.status === "RUNNING").length,
+        broken: data.tests.filter((t: any) => t.status === "BROKEN").length,
+        timedout: data.tests.filter((t: any) => t.status === "TIMEDOUT").length,
+        interrupted: data.tests.filter((t: any) => t.status === "INTERRUPTED")
+          .length,
+        unknown: data.tests.filter((t: any) => t.status === "UNKNOWN").length,
+      };
+      console.log("Fetched run details:", data);
       setRunDetail(data);
       setError(null);
     } catch (err) {
