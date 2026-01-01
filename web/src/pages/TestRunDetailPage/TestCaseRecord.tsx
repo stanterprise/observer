@@ -13,33 +13,33 @@ type TestRecordProps = {
 
 export default ({ test, runId }: TestRecordProps) => {
   return (
-    <Link key={test.ID} to={`/suite_runs/${runId}/tests/${test.ID}`}>
+    <Link key={test.id} to={`/suite_runs/${runId}/tests/${test.id}`}>
       <Card className="hover:shadow-md transition-all duration-200 cursor-pointer hover:border-blue-300">
         <CardContent className="py-4">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex items-center space-x-3 mb-2">
-                <Badge status={getTestStatus(test.Status)} />
+                <Badge status={getTestStatus(test.status)} />
                 <h3 className="text-base font-medium text-gray-900 truncate">
-                  {test.Title || test.ID}
+                  {test.title || test.id}
                 </h3>
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
                 <div className="flex items-center">
                   <Clock className="h-4 w-4 mr-1" />
                   <span className="font-medium">Duration:</span>
-                  <span className="ml-1">{formatDuration(test.Duration)}</span>
+                  <span className="ml-1">{formatDuration(test.duration)}</span>
                 </div>
-                {test.RetryCount !== undefined && test.RetryCount > 0 && (
+                {test.retryCount !== undefined && test.retryCount > 0 && (
                   <div className="flex items-center">
                     <span className="font-medium">Retries:</span>
-                    <span className="ml-1">{test.RetryCount}</span>
+                    <span className="ml-1">{test.retryCount}</span>
                   </div>
                 )}
                 <div className="flex items-center">
                   <span className="font-medium">Started:</span>
                   <span className="ml-1">
-                    {new Date(test.CreatedAt).toLocaleString()}
+                    {new Date(test.createdAt).toLocaleString()}
                   </span>
                 </div>
               </div>

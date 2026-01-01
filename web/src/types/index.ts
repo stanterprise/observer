@@ -13,37 +13,37 @@ export type TestStatus =
 
 export interface TestCaseRun {
   id: string;
-  test_case_id: string;
-  test_run_id: string;
+  testCaseId: string;
+  testRunId: string;
   status: TestStatus;
   title: string;
   file: string;
   project: string;
-  error_message?: string;
+  errorMessage?: string;
   metadata?: Record<string, unknown>;
-  started_at: string;
-  finished_at?: string;
-  created_at: string;
-  updated_at: string;
+  startedAt: string;
+  finishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface StepRun {
   id: string;
-  test_case_run_id: string;
-  parent_step_id?: string; // Reference to parent step for nested steps
+  testCaseRunId: string;
+  parentStepId?: string; // Reference to parent step for nested steps
   title: string;
   category: string;
   status: TestStatus;
-  error_message?: string;
+  errorMessage?: string;
   metadata?: Record<string, unknown>;
-  started_at: string;
-  finished_at?: string;
-  created_at: string;
-  updated_at: string;
+  startedAt: string;
+  finishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TestRunStats {
-  run_id: string;
+  runId: string;
   total: number;
   passed: number;
   failed: number;
@@ -66,24 +66,24 @@ export interface WebSocketEvent {
 
 // API Response types
 export interface TestCaseResponse {
-  ID: string;
-  RunID: string;
-  Title: string;
-  Status: string;
-  Metadata?: Record<string, unknown>;
-  Duration?: number;
-  CreatedAt: string;
-  UpdatedAt: string;
+  id: string;
+  runId: string;
+  title: string;
+  status: string;
+  metadata?: Record<string, unknown>;
+  duration?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface WebSocketTestData {
   id?: string;
-  run_id?: string;
-  test_case?: {
+  runId?: string;
+  testCase?: {
     id?: string;
     title?: string;
     name?: string;
-    run_id?: string;
+    runId?: string;
     status?: string; // Status is in test_case for test.end events
     location?: {
       file?: string;
@@ -91,18 +91,18 @@ export interface WebSocketTestData {
     project?: string;
   };
   status?: string;
-  started_at?: string;
-  finished_at?: string;
+  startedAt?: string;
+  finishedAt?: string;
   error?: {
     message?: string;
   };
-  test_run_id?: string;
+  testRunId?: string;
 }
 
 export interface WebSocketStepData {
-  test_case_run_id?: string;
+  testCaseRunId?: string;
   id?: string;
-  parent_step_id?: string;
+  parentStepId?: string;
   status?: string;
   category?: string;
   title?: string;

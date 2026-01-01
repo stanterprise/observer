@@ -77,12 +77,12 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
 
     if (type === "test.begin" || type === "test.end") {
       const testData = data as WebSocketTestData;
-      const runId = testData.run_id || testData.test_case?.run_id;
+      const runId = testData.runId || testData.testCase?.runId;
 
       // Safely extract status - handle both string and non-string values
       let status = "RUNNING";
       if (type === "test.end") {
-        const rawStatus = testData.test_case?.status || testData.status;
+        const rawStatus = testData.testCase?.status || testData.status;
         // Handle numeric status codes (protobuf enums) - need to map them
         if (typeof rawStatus === "number") {
           // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.

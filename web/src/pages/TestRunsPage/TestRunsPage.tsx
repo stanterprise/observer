@@ -34,19 +34,19 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
       const data = await response.json();
       setTests(
         (data.data || []).map((test: TestCaseResponse) => ({
-          id: test.ID,
-          test_case_id: test.ID,
-          test_run_id: test.RunID || "unknown",
-          title: test.Title || "",
+          id: test.id,
+          testCaseId: test.id,
+          testRunId: test.runId || "unknown",
+          title: test.title || "",
           file: "",
           project: "",
-          status: test.Status.toLowerCase() as TestStatus,
-          started_at: new Date(test.CreatedAt).toISOString(),
-          finished_at: new Date(test.UpdatedAt).toISOString(),
-          error_message: undefined,
-          metadata: test.Metadata,
-          created_at: new Date(test.CreatedAt).toISOString(),
-          updated_at: new Date(test.UpdatedAt).toISOString(),
+          status: test.status.toLowerCase() as TestStatus,
+          startedAt: new Date(test.createdAt).toISOString(),
+          finishedAt: new Date(test.updatedAt).toISOString(),
+          errorMessage: undefined,
+          metadata: test.metadata,
+          createdAt: new Date(test.createdAt).toISOString(),
+          updatedAt: new Date(test.updatedAt).toISOString(),
         }))
       );
       setError(null);
@@ -68,7 +68,7 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
     if (type === "test.begin" || type === "test.end") {
       setTests((prevTests) => {
         const testData = data as WebSocketTestData;
-        const testId = testData.test_case?.id || testData.id;
+        const testId = testData.testCase?.id || testData.id;
 
         // Check if we already have this test
         const existingIndex = prevTests.findIndex((t) => t.id === testId);
@@ -80,11 +80,11 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
             ...updatedTests[existingIndex],
             status: (testData.status?.toLowerCase() ||
               updatedTests[existingIndex].status) as TestStatus,
-            finished_at:
-              testData.finished_at || updatedTests[existingIndex].finished_at,
-            error_message:
+            finishedAt:
+              testData.finishedAt || updatedTests[existingIndex].finishedAt,
+            errorMessage:
               testData.error?.message ||
-              updatedTests[existingIndex].error_message,
+              updatedTests[existingIndex].errorMessage,
           };
           return updatedTests;
         } else if (type === "test.begin") {
@@ -92,18 +92,18 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
           const now = new Date().toISOString();
           const newTest: TestCaseRun = {
             id: testId || "unknown",
-            test_case_id: testData.test_case?.id || testId || "unknown",
-            test_run_id: testData.test_run_id || testData.run_id || "unknown",
-            title: testData.test_case?.title || "",
-            file: testData.test_case?.location?.file || "",
-            project: testData.test_case?.project || "",
+            testCaseId: testData.testCase?.id || testId || "unknown",
+            testRunId: testData.testRunId || testData.runId || "unknown",
+            title: testData.testCase?.title || "",
+            file: testData.testCase?.location?.file || "",
+            project: testData.testCase?.project || "",
             status: "running",
-            started_at: testData.started_at || now,
-            finished_at: undefined,
-            error_message: undefined,
+            startedAt: testData.startedAt || now,
+            finishedAt: undefined,
+            errorMessage: undefined,
             metadata: {},
-            created_at: now,
-            updated_at: now,
+            createdAt: now,
+            updatedAt: now,
           };
           return [newTest, ...prevTests];
         }
@@ -161,7 +161,7 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
             <Card key={test.id}>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>{test.title || test.test_case_id}</CardTitle>
+                  <CardTitle>{test.title || test.testCaseId}</CardTitle>
                   <Badge status={test.status} />
                 </div>
               </CardHeader>
@@ -181,23 +181,23 @@ export function TestRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
                     <Clock className="h-4 w-4 mr-1 text-gray-400" />
                     <span className="text-gray-600">Started:</span>{" "}
                     <span className="text-gray-900 ml-1">
-                      {new Date(test.started_at).toLocaleString()}
+                      {new Date(test.startedAt).toLocaleString()}
                     </span>
                   </div>
-                  {test.finished_at && (
+                  {test.finishedAt && (
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 mr-1 text-gray-400" />
                       <span className="text-gray-600">Finished:</span>{" "}
                       <span className="text-gray-900 ml-1">
-                        {new Date(test.finished_at).toLocaleString()}
+                        {new Date(test.finishedAt).toLocaleString()}
                       </span>
                     </div>
                   )}
                 </div>
-                {test.error_message && (
+                {test.errorMessage && (
                   <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
                     <p className="text-sm text-red-900 font-mono">
-                      {test.error_message}
+                      {test.errorMessage}
                     </p>
                   </div>
                 )}

@@ -17,31 +17,31 @@ interface TestDetailPageProps {
 }
 
 interface Step {
-  ID: string;
-  RunID: string;
-  TestCaseRunID: string;
-  ParentStepID?: string;
-  Status: string;
-  Category: string;
-  Title: string;
-  StartTime?: string;
-  CreatedAt: string;
-  UpdatedAt: string;
-  Steps?: Step[]; // Nested steps for hierarchical structure
+  id: string;
+  runId: string;
+  testCaseRunId: string;
+  parentStepId?: string;
+  status: string;
+  category: string;
+  title: string;
+  startTime?: string;
+  createdAt: string;
+  updatedAt: string;
+  steps?: Step[]; // Nested steps for hierarchical structure
 }
 
 interface TestDetail {
-  ID: string;
-  RunID: string;
-  Title: string;
-  Status: string;
-  Metadata?: Record<string, unknown>;
-  Duration?: number;
-  RetryCount?: number;
-  RetryIndex?: number;
-  Timeout?: number;
-  CreatedAt: string;
-  UpdatedAt: string;
+  id: string;
+  runId: string;
+  title: string;
+  status: string;
+  metadata?: Record<string, unknown>;
+  duration?: number;
+  retryCount?: number;
+  retryIndex?: number;
+  timeout?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface TestDetailResponse {
@@ -92,14 +92,14 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
 
     if (type === "test.end" || type === "test.begin") {
       const eventData = data as WebSocketTestData;
-      const eventTestId = eventData.test_case?.id || eventData.id;
+      const eventTestId = eventData.testCase?.id || eventData.id;
       if (eventTestId === testId) {
         setTestDetail((prevDetail) => {
           if (!prevDetail || !prevDetail.test) return prevDetail;
 
           try {
             // Safely extract status - handle both string and numeric values (protobuf enums)
-            const rawStatus = eventData.test_case?.status || eventData.status;
+            const rawStatus = eventData.testCase?.status || eventData.status;
             let status = "RUNNING";
             if (type === "test.end") {
               if (typeof rawStatus === "number") {
@@ -135,7 +135,7 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
       }
     } else if (type === "step.end" || type === "step.begin") {
       const eventData = data as WebSocketStepData;
-      const eventTestCaseRunId = eventData.test_case_run_id;
+      const eventTestCaseRunId = eventData.testCaseRunId;
       if (eventTestCaseRunId === testId) {
         setTestDetail((prevDetail) => {
           if (!prevDetail || !prevDetail.steps) return prevDetail;
@@ -163,35 +163,35 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
               }
             }
             const updatedSteps = [...prevDetail.steps];
-            const stepIndex = updatedSteps.findIndex((s) => s.ID === stepId);
+            const stepIndex = updatedSteps.findIndex((s) => s.id === stepId);
 
             if (type === "step.begin") {
               if (stepIndex === -1) {
                 // Add new step
                 updatedSteps.push({
-                  ID: stepId || "",
-                  RunID: prevDetail.test.RunID,
-                  TestCaseRunID: testId || "",
-                  ParentStepID: eventData.parent_step_id,
-                  Status: "RUNNING",
-                  Category: eventData.category || "",
-                  Title: eventData.title || "",
-                  CreatedAt: new Date().toISOString(),
-                  UpdatedAt: new Date().toISOString(),
+                  id: stepId || "",
+                  runId: prevDetail.test.runId,
+                  testCaseRunId: testId || "",
+                  parentStepId: eventData.parentStepId,
+                  status: "RUNNING",
+                  category: eventData.category || "",
+                  title: eventData.title || "",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
                 });
               } else {
                 updatedSteps[stepIndex] = {
                   ...updatedSteps[stepIndex],
-                  Status: "RUNNING",
-                  UpdatedAt: new Date().toISOString(),
+                  status: "RUNNING",
+                  updatedAt: new Date().toISOString(),
                 };
               }
             } else if (type === "step.end") {
               if (stepIndex >= 0) {
                 updatedSteps[stepIndex] = {
                   ...updatedSteps[stepIndex],
-                  Status: status,
-                  UpdatedAt: new Date().toISOString(),
+                  status: status,
+                  updatedAt: new Date().toISOString(),
                 };
               }
             }
@@ -269,11 +269,11 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
   };
 
   const { test, steps } = testDetail;
-  const testStatus = getTestStatus(test.Status);
+  const testStatus = getTestStatus(test.status);
   const safeSteps = steps || [];
   console.log(
     "Rendering TestDetailPage for test:",
-    test.ID,
+    test.id,
     "with steps:",
     safeSteps
   );
@@ -282,7 +282,7 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link
-            to={`/suite_runs/${test.RunID}`}
+            to={`/suite_runs/${test.runId}`}
             className="inline-flex items-center text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md p-1"
             aria-label="Back to test run"
           >
@@ -303,9 +303,9 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <CardTitle className="text-xl mb-2 wrap-break-word">
-                {test.Title || test.ID}
+                {test.title || test.id}
               </CardTitle>
-              <p className="text-sm text-gray-500 font-mono">{test.ID}</p>
+              <p className="text-sm text-gray-500 font-mono">{test.id}</p>
             </div>
             <Badge
               status={testStatus}
@@ -323,41 +323,41 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
                 <div className="flex justify-between items-start">
                   <dt className="text-gray-600 font-medium">Test ID:</dt>
                   <dd className="font-mono text-gray-900 text-right break-all ml-4">
-                    {test.ID}
+                    {test.id}
                   </dd>
                 </div>
                 <div className="flex justify-between items-start">
                   <dt className="text-gray-600 font-medium">Run ID:</dt>
                   <dd className="text-right ml-4">
                     <Link
-                      to={`/suite_runs/${test.RunID}`}
+                      to={`/suite_runs/${test.runId}`}
                       className="font-mono text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
                     >
-                      {test.RunID}
+                      {test.runId}
                     </Link>
                   </dd>
                 </div>
                 <div className="flex justify-between items-start">
                   <dt className="text-gray-600 font-medium">Duration:</dt>
                   <dd className="text-gray-900 font-semibold text-right ml-4">
-                    {formatDuration(test.Duration)}
+                    {formatDuration(test.duration)}
                   </dd>
                 </div>
-                {test.RetryCount !== undefined && test.RetryCount > 0 && (
+                {test.retryCount !== undefined && test.retryCount > 0 && (
                   <div className="flex justify-between items-start">
                     <dt className="text-gray-600 font-medium">Retries:</dt>
                     <dd className="text-gray-900 text-right ml-4">
-                      {test.RetryIndex !== undefined
-                        ? `${test.RetryIndex} / ${test.RetryCount}`
-                        : test.RetryCount}
+                      {test.retryIndex !== undefined
+                        ? `${test.retryIndex} / ${test.retryCount}`
+                        : test.retryCount}
                     </dd>
                   </div>
                 )}
-                {test.Timeout !== undefined && (
+                {test.timeout !== undefined && (
                   <div className="flex justify-between items-start">
                     <dt className="text-gray-600 font-medium">Timeout:</dt>
                     <dd className="text-gray-900 text-right ml-4">
-                      {test.Timeout}ms
+                      {test.timeout}ms
                     </dd>
                   </div>
                 )}
@@ -371,13 +371,13 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
                 <div className="flex justify-between items-start">
                   <dt className="text-gray-600 font-medium">Started:</dt>
                   <dd className="text-gray-900 text-right ml-4">
-                    {new Date(test.CreatedAt).toLocaleString()}
+                    {new Date(test.createdAt).toLocaleString()}
                   </dd>
                 </div>
                 <div className="flex justify-between items-start">
                   <dt className="text-gray-600 font-medium">Last Updated:</dt>
                   <dd className="text-gray-900 text-right ml-4">
-                    {new Date(test.UpdatedAt).toLocaleString()}
+                    {new Date(test.updatedAt).toLocaleString()}
                   </dd>
                 </div>
                 <div className="flex justify-between items-start">
@@ -391,14 +391,14 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
           </div>
 
           {/* Metadata Section */}
-          {test.Metadata && Object.keys(test.Metadata).length > 0 && (
+          {test.metadata && Object.keys(test.metadata).length > 0 && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
                 Metadata
               </h3>
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                 <pre className="text-xs text-gray-800 overflow-x-auto whitespace-pre-wrap wrap-break-word">
-                  {JSON.stringify(test.Metadata, null, 2)}
+                  {JSON.stringify(test.metadata, null, 2)}
                 </pre>
               </div>
             </div>
@@ -408,22 +408,22 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
 
       <StepContainer
         test={{
-          id: test.ID,
-          runId: test.RunID,
-          title: test.Title,
+          id: test.id,
+          runId: test.runId,
+          title: test.title,
           status: testStatus,
           steps: steps.map((step) => ({
-            id: step.ID,
-            runId: step.RunID,
+            id: step.id,
+            runId: step.runId,
             parentStepId:
-              step.ParentStepID && step.ParentStepID !== ""
-                ? step.ParentStepID
+              step.parentStepId && step.parentStepId !== ""
+                ? step.parentStepId
                 : undefined,
-            status: getTestStatus(step.Status),
-            category: step.Category,
-            title: step.Title,
-            startedAt: step.StartTime || step.CreatedAt,
-            finishedAt: step.UpdatedAt,
+            status: getTestStatus(step.status),
+            category: step.category,
+            title: step.title,
+            startedAt: step.startTime || step.createdAt,
+            finishedAt: step.updatedAt,
           })),
         }}
       />

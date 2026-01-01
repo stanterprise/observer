@@ -1,12 +1,12 @@
 export interface TestCase {
-  ID: string;
-  RunID: string;
-  Title: string;
-  Status: string;
-  Duration?: number;
-  RetryCount?: number;
-  CreatedAt: string;
-  UpdatedAt: string;
+  id: string;
+  runId: string;
+  title: string;
+  status: string;
+  duration?: number;
+  retryCount?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface RunStatistics {

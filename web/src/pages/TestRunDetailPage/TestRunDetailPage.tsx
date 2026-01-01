@@ -51,7 +51,7 @@ export function TestRunDetailPage({
       }
       const data = await response.json();
       console.log("Fetched run details:", data);
-      setRunDetail(data);
+      setRunDetail(data.document);
       setError(null);
     } catch (err) {
       console.error("Error fetching run details:", err);
@@ -70,16 +70,17 @@ export function TestRunDetailPage({
     const { type, data } = onWebSocketEvent;
     if (type === "test.end" || type === "test.begin") {
       const testData = data as WebSocketTestData;
-      const testRunId = testData.run_id || testData.test_case?.run_id;
+      const testRunId = testData.runId || testData.testCase?.runId;
 
       if (testRunId === runId) {
+        console.log("WebSocket event received for run:", testData);
         setRunDetail((prevDetail) => {
           if (!prevDetail || !prevDetail.tests) return prevDetail;
 
           try {
-            const testId = testData.test_case?.id || testData.id;
+            const testId = testData.testCase?.id || testData.id;
             // Safely extract status - handle both string and numeric values (protobuf enums)
-            const rawStatus = testData.test_case?.status || testData.status;
+            const rawStatus = testData.testCase?.status || testData.status;
             let status = "RUNNING";
             if (type === "test.end") {
               if (typeof rawStatus === "number") {
@@ -101,33 +102,33 @@ export function TestRunDetailPage({
 
             // Update or add test in the tests array
             const updatedTests = [...prevDetail.tests];
-            const testIndex = updatedTests.findIndex((t) => t.ID === testId);
+            const testIndex = updatedTests.findIndex((t) => t.id === testId);
 
             if (type === "test.begin") {
               if (testIndex === -1) {
                 // Add new test
                 updatedTests.push({
-                  ID: testId || "",
-                  RunID: testRunId || "",
-                  Title: testData.test_case?.title || "",
-                  Status: "RUNNING",
-                  CreatedAt: new Date().toISOString(),
-                  UpdatedAt: new Date().toISOString(),
+                  id: testId || "",
+                  runId: testRunId || "",
+                  title: testData.testCase?.title || "",
+                  status: "RUNNING",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
                 });
               } else {
                 // Update existing test
                 updatedTests[testIndex] = {
                   ...updatedTests[testIndex],
-                  Status: "RUNNING",
-                  UpdatedAt: new Date().toISOString(),
+                  status: "RUNNING",
+                  updatedAt: new Date().toISOString(),
                 };
               }
             } else if (type === "test.end") {
               if (testIndex >= 0) {
                 updatedTests[testIndex] = {
                   ...updatedTests[testIndex],
-                  Status: status,
-                  UpdatedAt: new Date().toISOString(),
+                  status: status,
+                  updatedAt: new Date().toISOString(),
                 };
               }
             }
@@ -146,7 +147,7 @@ export function TestRunDetailPage({
             };
 
             updatedTests.forEach((test) => {
-              switch (test.Status) {
+              switch (test.status) {
                 case "PASSED":
                   newStats.passed++;
                   break;
@@ -173,6 +174,10 @@ export function TestRunDetailPage({
               }
             });
 
+            console.log("Updated run detail from WebSocket:", {
+              tests: updatedTests,
+              statistics: newStats,
+            });
             return {
               ...prevDetail,
               tests: updatedTests,
@@ -375,7 +380,7 @@ export function TestRunDetailPage({
           <div className="space-y-3">
             {runDetail.tests.map((test) => (
               <TestCaseRecord
-                key={test.ID}
+                key={test.id}
                 test={test}
                 runId={runDetail.runId}
               />
