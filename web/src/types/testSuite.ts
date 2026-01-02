@@ -1,4 +1,5 @@
 import type { TestStatus } from "./common";
+import type { Test } from "./testCase";
 
 export interface TestSuite {
   id: string;
@@ -20,6 +21,10 @@ export interface TestSuite {
   initiatedBy?: string;
   author?: string;
   owner?: string;
+  tests?: Test[];
+  suites?: TestSuite[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type SuiteType = "root" | "project" | "subsuite";

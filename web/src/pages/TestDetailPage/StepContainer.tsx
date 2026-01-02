@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronsDown, ChevronsRight } from "lucide-react";
-import type { Test, Step as StepType, TestStatus } from "@/types";
+import type { Test, Step as StepType } from "@/types";
+import type { TestStatus } from "@/types/common";
 import { Badge } from "@/components/Badge";
 import { Step } from "./Step";
 

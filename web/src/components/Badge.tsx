@@ -1,5 +1,5 @@
 import { cn } from "../lib/utils";
-import type { TestStatus } from "../types";
+import type { TestStatus } from "@/types/common";
 import {
   CheckCircle,
   XCircle,

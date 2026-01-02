@@ -7,7 +7,8 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
-import type { Step as StepType, TestStatus } from "@/types";
+import type { Step as StepType } from "@/types";
+import type { TestStatus } from "@/types/common";
 import { Badge } from "@/components/Badge";
 
 type StepProps = {
