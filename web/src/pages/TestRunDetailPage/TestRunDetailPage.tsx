@@ -4,13 +4,13 @@ import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import type { WebSocketEvent, WebSocketTestData } from "@/types";
 import { ArrowLeft, Play } from "lucide-react";
-import type { RunDetail } from "./types";
-import TestCaseRecord from "./TestCaseRecord";
+
 import { SuiteTitleCard } from "./SuiteTitleCard";
 import type { TestStatus } from "@/types/common";
 import { assembleSuiteHierarchy } from "../TestSuiteRunsPage/utils";
 import type { TestSuite } from "@/types/testSuite";
 import TestSuiteRecord from "./TestSuiteRecord";
+import type { TestRun } from "@/types/testRun";
 
 interface TestRunDetailPageProps {
   onWebSocketEvent?: WebSocketEvent | null;
@@ -20,7 +20,7 @@ export function TestRunDetailPage({
   onWebSocketEvent,
 }: TestRunDetailPageProps) {
   const { runId } = useParams<{ runId: string }>();
-  const [runDetail, setRunDetail] = useState<RunDetail | null>(null);
+  const [runDetail, setRunDetail] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -239,13 +239,13 @@ export function TestRunDetailPage({
   }
 
   const overallStatus: TestStatus =
-    runDetail.statistics.failed > 0
+    runDetail.statistics!.failed > 0
       ? "failed"
-      : runDetail.statistics.passed === runDetail.statistics.total &&
-        runDetail.statistics.total > 0
+      : runDetail.statistics!.passed === runDetail.statistics!.total &&
+        runDetail.statistics!.total > 0
       ? "passed"
-      : runDetail.statistics.skipped === runDetail.statistics.total &&
-        runDetail.statistics.total > 0
+      : runDetail.statistics!.skipped === runDetail.statistics!.total &&
+        runDetail.statistics!.total > 0
       ? "skipped"
       : "running";
 
@@ -258,7 +258,7 @@ export function TestRunDetailPage({
 
   const rootSuite = assembleSuiteHierarchy(
     runDetail.suites || [],
-    runDetail.tests
+    runDetail.tests!
   );
   console.log("Assembled suite hierarchy:", rootSuite);
 
@@ -295,11 +295,6 @@ export function TestRunDetailPage({
           </Card>
         ) : (
           <TestSuiteRecord suite={rootSuite} />
-          // <div className="space-y-3">
-          //   {runDetail.tests.map((test) => (
-          //     <TestCaseRecord key={test.id} test={test} runId={runDetail.id} />
-          //   ))}
-          // </div>
         )}
       </div>
     </div>

@@ -2,10 +2,11 @@ import { Badge } from "@/components/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/Card";
 import type { TestStatus } from "@/types/common";
 import { CheckCircle, CircleDashed, CircleOff, XCircle } from "lucide-react";
-import type { RunDetail } from "./types";
+
+import type { TestRun } from "@/types/testRun";
 
 export type ProgressBarProps = {
-  runDetail: RunDetail;
+  runDetail: TestRun;
   overallStatus?: TestStatus;
 };
 
@@ -13,56 +14,46 @@ export const SuiteTitleCard = ({
   runDetail,
   overallStatus,
 }: ProgressBarProps) => {
+  const stats = runDetail.statistics!;
   const runningPendingCount =
-    runDetail.statistics.total -
-    runDetail.statistics.passed -
-    runDetail.statistics.failed -
-    runDetail.statistics.skipped;
+    stats.total - stats.passed - stats.failed - stats.skipped;
+
   return (
     <Card>
       {/* Progress Bar */}
       <div className="h-8 bg-gray-200 rounded-t-lg overflow-hidden flex">
-        {runDetail.statistics.passed > 0 && (
+        {stats.passed > 0 && (
           <div
             className="bg-green-500 transition-all duration-300"
             style={{
-              width: `${
-                (runDetail.statistics.passed / runDetail.statistics.total) * 100
-              }%`,
+              width: `${(stats.passed / stats.total) * 100}%`,
             }}
-            title={`${runDetail.statistics.passed} passed`}
+            title={`${stats.passed} passed`}
           />
         )}
-        {runDetail.statistics.failed > 0 && (
+        {stats.failed > 0 && (
           <div
             className="bg-red-500 transition-all duration-300"
             style={{
-              width: `${
-                (runDetail.statistics.failed / runDetail.statistics.total) * 100
-              }%`,
+              width: `${(stats.failed / stats.total) * 100}%`,
             }}
-            title={`${runDetail.statistics.failed} failed`}
+            title={`${stats.failed} failed`}
           />
         )}
-        {runDetail.statistics.skipped > 0 && (
+        {stats.skipped > 0 && (
           <div
             className="bg-gray-400 transition-all duration-300"
             style={{
-              width: `${
-                (runDetail.statistics.skipped / runDetail.statistics.total) *
-                100
-              }%`,
+              width: `${(stats.skipped / stats.total) * 100}%`,
             }}
-            title={`${runDetail.statistics.skipped} skipped`}
+            title={`${stats.skipped} skipped`}
           />
         )}
-        {runDetail.statistics.total > 0 && runningPendingCount > 0 && (
+        {stats.total > 0 && runningPendingCount > 0 && (
           <div
             className="bg-blue-300 transition-all duration-300 animate-pulse"
             style={{
-              width: `${
-                (runningPendingCount / runDetail.statistics.total) * 100
-              }%`,
+              width: `${(runningPendingCount / stats.total) * 100}%`,
             }}
             title={`${runningPendingCount} running/pending`}
           />
@@ -75,7 +66,7 @@ export const SuiteTitleCard = ({
               {runDetail.name ?? runDetail.id}
             </CardTitle>
             <div className="text-sm text-gray-500">
-              Total Tests: {runDetail.tests.length}
+              Total Tests: {runDetail.tests!.length}
             </div>
           </div>
           <Badge status={overallStatus!} className="text-lg px-4 py-2" />
@@ -86,28 +77,28 @@ export const SuiteTitleCard = ({
           <div className="flex flex-col items-center p-4 bg-green-50 rounded-lg">
             <CheckCircle className="h-8 w-8 text-green-600 mb-2" />
             <div className="text-2xl font-bold text-green-600">
-              {runDetail.statistics.passed}
+              {runDetail.statistics!.passed}
             </div>
             <div className="text-sm text-gray-600">Passed</div>
           </div>
           <div className="flex flex-col items-center p-4 bg-red-50 rounded-lg">
             <XCircle className="h-8 w-8 text-red-600 mb-2" />
             <div className="text-2xl font-bold text-red-600">
-              {runDetail.statistics.failed}
+              {runDetail.statistics!.failed}
             </div>
             <div className="text-sm text-gray-600">Failed</div>
           </div>
           <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
             <CircleDashed className="h-8 w-8 text-gray-600 mb-2" />
             <div className="text-2xl font-bold text-gray-600">
-              {runDetail.statistics.skipped}
+              {runDetail.statistics!.skipped}
             </div>
             <div className="text-sm text-gray-600">Skipped</div>
           </div>
           <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
             <CircleOff className="h-8 w-8 text-gray-600 mb-2" />
             <div className="text-2xl font-bold text-gray-600">
-              {runDetail.statistics.unknown}
+              {runDetail.statistics!.unknown}
             </div>
             <div className="text-sm text-gray-600">Unknown</div>
           </div>

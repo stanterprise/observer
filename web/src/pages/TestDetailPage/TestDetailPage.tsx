@@ -415,6 +415,7 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
           steps: steps.map((step) => ({
             id: step.id,
             runId: step.runId,
+            testCaseRunId: step.testCaseRunId,
             parentStepId:
               step.parentStepId && step.parentStepId !== ""
                 ? step.parentStepId

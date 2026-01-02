@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronsDown, ChevronsRight } from "lucide-react";
-import type { Test, Step as StepType } from "@/types";
+import type { Test, Step as StepType } from "@/types/testCase";
 import type { TestStatus } from "@/types/common";
 import { Badge } from "@/components/Badge";
 import { Step } from "./Step";
@@ -30,28 +30,28 @@ export default ({ test }: StepContainerProps) => {
               <Badge status={test.status as TestStatus} />
             </div>
           </div>
-          {test.startedAt && (
+          {test.startTime && (
             <div>
               <span className="text-sm text-gray-500">Started</span>
               <p className="text-sm text-gray-900">
-                {new Date(test.startedAt).toLocaleString()}
+                {new Date(test.startTime).toLocaleString()}
               </p>
             </div>
           )}
-          {test.finishedAt && (
+          {test.endTime && (
             <div>
               <span className="text-sm text-gray-500">Finished</span>
               <p className="text-sm text-gray-900">
-                {new Date(test.finishedAt).toLocaleString()}
+                {new Date(test.endTime).toLocaleString()}
               </p>
             </div>
           )}
         </div>
-        {test.error && (
+        {test.errors && (
           <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded">
             <p className="text-sm font-medium text-red-800">Error</p>
             <p className="text-sm text-red-700 mt-1">
-              {test.error?.message || "Unknown error"}
+              {test.errors?.[0] || "Unknown error"}
             </p>
           </div>
         )}
@@ -97,8 +97,8 @@ function buildStepHierarchies(
       steps: buildStepHierarchies(steps, step.id),
     }))
     .sort((a, b) => {
-      const aTime = a.startedAt || "";
-      const bTime = b.startedAt || "";
+      const aTime = a.startTime || "";
+      const bTime = b.startTime || "";
       return aTime.localeCompare(bTime);
     });
 }
