@@ -3,11 +3,11 @@ import { Badge } from "../../components/Badge";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/Card";
 
-import type { TestCase } from "./types";
+import type { Test } from "@/types/testCase";
 import { getTestStatus, formatDuration } from "./utils";
 
 type TestRecordProps = {
-  test: TestCase;
+  test: Test;
   runId: string;
 };
 
@@ -36,12 +36,14 @@ export default ({ test, runId }: TestRecordProps) => {
                     <span className="ml-1">{test.retryCount}</span>
                   </div>
                 )}
-                <div className="flex items-center">
-                  <span className="font-medium">Started:</span>
-                  <span className="ml-1">
-                    {new Date(test.createdAt).toLocaleString()}
-                  </span>
-                </div>
+                {test.createdAt && (
+                  <div className="flex items-center">
+                    <span className="font-medium">Started:</span>
+                    <span className="ml-1">
+                      {new Date(test.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="shrink-0 ml-4">

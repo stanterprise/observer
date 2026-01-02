@@ -8,6 +8,8 @@ import type { RunDetail } from "./types";
 import TestCaseRecord from "./TestCaseRecord";
 import { SuiteTitleCard } from "./SuiteTitleCard";
 import type { TestStatus } from "@/types/common";
+import { assembleSuiteHierarchy } from "../TestSuiteRunsPage/utils";
+import type { TestSuite } from "@/types/testSuite";
 
 interface TestRunDetailPageProps {
   onWebSocketEvent?: WebSocketEvent | null;
@@ -21,10 +23,11 @@ export function TestRunDetailPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const countTests = (suite: RunDetail): number => {
-    let total = suite.tests?.length || 0; // API returns 'tests' (lowercase)
-    for (const childSuite of suite.suites ?? []) {
-      total += countTests(childSuite);
+  const countTests = (suites: TestSuite[]): number => {
+    let total = 0;
+    for (const suite of suites) {
+      total += suite.tests?.length || 0; // API returns 'tests' (lowercase)
+      total += countTests(suite.suites ?? []);
     }
 
     return total;
@@ -88,22 +91,22 @@ export function TestRunDetailPage({
             const testId = testData.testCase?.id || testData.id;
             // Safely extract status - handle both string and numeric values (protobuf enums)
             const rawStatus = testData.testCase?.status || testData.status;
-            let status = "RUNNING";
+            let status = "running";
             if (type === "test.end") {
               if (typeof rawStatus === "number") {
                 // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
                 const statusMap: Record<number, string> = {
-                  0: "UNKNOWN",
-                  1: "PASSED",
-                  2: "FAILED",
-                  3: "SKIPPED",
-                  4: "BROKEN",
-                  5: "TIMEDOUT",
-                  6: "INTERRUPTED",
+                  0: "unknown",
+                  1: "passed",
+                  2: "failed",
+                  3: "skipped",
+                  4: "broken",
+                  5: "timedout",
+                  6: "interrupted",
                 };
-                status = statusMap[rawStatus] || "UNKNOWN";
+                status = statusMap[rawStatus] || "unknown";
               } else if (typeof rawStatus === "string") {
-                status = rawStatus.toUpperCase();
+                status = rawStatus.toLowerCase();
               }
             }
 
@@ -118,7 +121,7 @@ export function TestRunDetailPage({
                   id: testId || "",
                   runId: testRunId || "",
                   title: testData.testCase?.title || "",
-                  status: "RUNNING",
+                  status: "running",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                 });
@@ -126,7 +129,7 @@ export function TestRunDetailPage({
                 // Update existing test
                 updatedTests[testIndex] = {
                   ...updatedTests[testIndex],
-                  status: "RUNNING",
+                  status: "running",
                   updatedAt: new Date().toISOString(),
                 };
               }
@@ -134,7 +137,7 @@ export function TestRunDetailPage({
               if (testIndex >= 0) {
                 updatedTests[testIndex] = {
                   ...updatedTests[testIndex],
-                  status: status,
+                  status: status as TestStatus,
                   updatedAt: new Date().toISOString(),
                 };
               }
@@ -157,29 +160,29 @@ export function TestRunDetailPage({
 
             updatedTests.forEach((test) => {
               switch (test.status) {
-                case "PASSED":
+                case "passed":
                   newStats.passed++;
                   break;
-                case "FAILED":
+                case "failed":
                   newStats.failed++;
                   break;
-                case "SKIPPED":
+                case "skipped":
                   newStats.skipped++;
                   break;
-                case "RUNNING":
+                case "running":
                   newStats.running
                     ? newStats.running++
                     : (newStats.running = 1);
                   break;
-                case "BROKEN":
+                case "broken":
                   newStats.broken ? newStats.broken++ : (newStats.broken = 1);
                   break;
-                case "TIMEDOUT":
+                case "timedout":
                   newStats.timedout
                     ? newStats.timedout++
                     : (newStats.timedout = 1);
                   break;
-                case "INTERRUPTED":
+                case "interrupted":
                   newStats.interrupted
                     ? newStats.interrupted++
                     : (newStats.interrupted = 1);
@@ -251,6 +254,12 @@ export function TestRunDetailPage({
     "Overall status:",
     overallStatus
   );
+
+  console.log(
+    "Assembled suite hierarchy:",
+    assembleSuiteHierarchy(runDetail.suites || [])
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -271,7 +280,7 @@ export function TestRunDetailPage({
       {/* Test Cases List */}
       <div>
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Test Cases ({countTests(runDetail)})
+          Test Cases ({countTests(runDetail.suites || [])})
         </h2>
         {!runDetail.tests || runDetail.tests.length === 0 ? (
           <Card>

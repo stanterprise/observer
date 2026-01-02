@@ -1,3 +1,6 @@
+import type { Test } from "@/types/testCase";
+import type { TestSuite } from "@/types/testSuite";
+
 export interface TestCase {
   id: string;
   runId: string;
@@ -24,8 +27,8 @@ export interface RunStatistics {
 export interface RunDetail {
   name: string;
   id: string;
-  tests: TestCase[]; // Note: lowercase 'tests' in response
-  suites?: RunDetail[];
+  tests: Test[]; // Note: lowercase 'tests' in response
+  suites?: TestSuite[];
   statistics: RunStatistics;
   totalSteps: number;
 }
