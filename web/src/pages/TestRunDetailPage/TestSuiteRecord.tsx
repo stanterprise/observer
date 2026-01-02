@@ -8,8 +8,8 @@ type TestSuiteRecordProps = {
 
 const TestSuiteRecord = ({ suite }: TestSuiteRecordProps) => {
   return (
-    <div>
-      <div>TestSuiteRecord: {suite.name}</div>
+    <div className="border border-gray-300 rounded-lg p-4 mb-4 pr-0">
+      <div>{suite.name}</div>
       <div className="space-y-3">
         {suite.tests?.map((test) => (
           <TestCaseRecord key={test.id} test={test} runId={suite.runId} />

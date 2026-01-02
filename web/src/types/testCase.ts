@@ -5,7 +5,7 @@ export interface Test {
   runId: string;
   title: string;
   status: TestStatus;
-  testSuiteRunId?: string;
+  suiteId?: string;
   description?: string;
   steps?: Step[];
   startTime?: string;

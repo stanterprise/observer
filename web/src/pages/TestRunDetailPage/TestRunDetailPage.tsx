@@ -10,6 +10,7 @@ import { SuiteTitleCard } from "./SuiteTitleCard";
 import type { TestStatus } from "@/types/common";
 import { assembleSuiteHierarchy } from "../TestSuiteRunsPage/utils";
 import type { TestSuite } from "@/types/testSuite";
+import TestSuiteRecord from "./TestSuiteRecord";
 
 interface TestRunDetailPageProps {
   onWebSocketEvent?: WebSocketEvent | null;
@@ -255,10 +256,11 @@ export function TestRunDetailPage({
     overallStatus
   );
 
-  console.log(
-    "Assembled suite hierarchy:",
-    assembleSuiteHierarchy(runDetail.suites || [])
+  const rootSuite = assembleSuiteHierarchy(
+    runDetail.suites || [],
+    runDetail.tests
   );
+  console.log("Assembled suite hierarchy:", rootSuite);
 
   return (
     <div className="space-y-6">
@@ -292,11 +294,12 @@ export function TestRunDetailPage({
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {runDetail.tests.map((test) => (
-              <TestCaseRecord key={test.id} test={test} runId={runDetail.id} />
-            ))}
-          </div>
+          <TestSuiteRecord suite={rootSuite} />
+          // <div className="space-y-3">
+          //   {runDetail.tests.map((test) => (
+          //     <TestCaseRecord key={test.id} test={test} runId={runDetail.id} />
+          //   ))}
+          // </div>
         )}
       </div>
     </div>
