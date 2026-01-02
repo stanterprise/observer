@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
-import type { WebSocketEvent, TestStatus, WebSocketTestData } from "@/types";
+import type { WebSocketEvent, WebSocketTestData } from "@/types";
 import {
   Play,
   CheckCircle,
@@ -12,6 +12,7 @@ import {
   Clock,
   ArrowUpDown,
 } from "lucide-react";
+import type { TestStatus } from "@/types/common";
 
 interface TestRunsPageProps {
   onWebSocketEvent?: WebSocketEvent | null;

@@ -1,4 +1,5 @@
-import type { TestStatus } from "../../types";
+import type { TestStatus } from "@/types/common";
+
 export const getTestStatus = (status: string): TestStatus => {
   const statusMap: Record<string, TestStatus> = {
     PASSED: "passed",

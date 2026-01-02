@@ -5,10 +5,10 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import type {
   WebSocketEvent,
-  TestStatus,
   WebSocketTestData,
   WebSocketStepData,
 } from "@/types";
+import type { TestStatus } from "@/types/common";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import StepContainer from "./StepContainer";
 

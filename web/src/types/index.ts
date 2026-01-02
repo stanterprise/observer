@@ -1,15 +1,4 @@
-// TypeScript types for Observer test data
-
-export type TestStatus =
-  | "passed"
-  | "failed"
-  | "skipped"
-  | "running"
-  | "pending"
-  | "unknown"
-  | "broken"
-  | "timedout"
-  | "interrupted";
+import type { TestStatus } from "./common";
 
 export interface TestCaseRun {
   id: string;
@@ -56,7 +45,15 @@ export interface TestRunStats {
 }
 
 // WebSocket event types
-export type EventType = "test.begin" | "test.end" | "step.begin" | "step.end";
+export type EventType =
+  | "test.begin"
+  | "test.end"
+  | "step.begin"
+  | "step.end"
+  | "suite.begin"
+  | "suite.end"
+  | "map.suites"
+  | "run.end";
 
 export interface WebSocketEvent {
   type: EventType;

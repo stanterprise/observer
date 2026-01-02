@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
-import type { WebSocketEvent, TestStatus, WebSocketTestData } from "@/types";
+import type { WebSocketEvent, WebSocketTestData } from "@/types";
 import { ArrowLeft, Play } from "lucide-react";
 import type { RunDetail } from "./types";
 import TestCaseRecord from "./TestCaseRecord";
 import { SuiteTitleCard } from "./SuiteTitleCard";
+import type { TestStatus } from "@/types/common";
 
 interface TestRunDetailPageProps {
   onWebSocketEvent?: WebSocketEvent | null;

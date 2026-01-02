@@ -1,6 +1,6 @@
 import { Badge } from "@/components/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/Card";
-import type { TestStatus } from "@/types";
+import type { TestStatus } from "@/types/common";
 import { CheckCircle, CircleDashed, CircleOff, XCircle } from "lucide-react";
 import type { RunDetail } from "./types";
 
@@ -9,7 +9,10 @@ export type ProgressBarProps = {
   overallStatus?: TestStatus;
 };
 
-export const SuiteTitleCard = ({ runDetail, overallStatus }: ProgressBarProps) => {
+export const SuiteTitleCard = ({
+  runDetail,
+  overallStatus,
+}: ProgressBarProps) => {
   const runningPendingCount =
     runDetail.statistics.total -
     runDetail.statistics.passed -
