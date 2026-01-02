@@ -9,7 +9,7 @@ export type ProgressBarProps = {
   overallStatus?: TestStatus;
 };
 
-export const ProgressBar = ({ runDetail, overallStatus }: ProgressBarProps) => {
+export const SuiteTitleCard = ({ runDetail, overallStatus }: ProgressBarProps) => {
   const runningPendingCount =
     runDetail.statistics.total -
     runDetail.statistics.passed -

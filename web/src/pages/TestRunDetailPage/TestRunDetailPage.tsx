@@ -6,7 +6,7 @@ import type { WebSocketEvent, TestStatus, WebSocketTestData } from "@/types";
 import { ArrowLeft, Play } from "lucide-react";
 import type { RunDetail } from "./types";
 import TestCaseRecord from "./TestCaseRecord";
-import { ProgressBar } from "./ProgressBar";
+import { SuiteTitleCard } from "./SuiteTitleCard";
 
 interface TestRunDetailPageProps {
   onWebSocketEvent?: WebSocketEvent | null;
@@ -140,17 +140,19 @@ export function TestRunDetailPage({
             }
 
             // Recalculate statistics
-            const newStats = {
-              total: updatedTests.length,
-              passed: 0,
-              failed: 0,
-              skipped: 0,
-              running: 0,
-              broken: 0,
-              timedout: 0,
-              interrupted: 0,
-              unknown: 0,
-            };
+            const newStats = runDetail.statistics
+              ? runDetail.statistics
+              : {
+                  total: updatedTests.length,
+                  passed: 0,
+                  failed: 0,
+                  skipped: 0,
+                  running: 0,
+                  broken: 0,
+                  timedout: 0,
+                  interrupted: 0,
+                  unknown: 0,
+                };
 
             updatedTests.forEach((test) => {
               switch (test.status) {
@@ -164,19 +166,27 @@ export function TestRunDetailPage({
                   newStats.skipped++;
                   break;
                 case "RUNNING":
-                  newStats.running++;
+                  newStats.running
+                    ? newStats.running++
+                    : (newStats.running = 1);
                   break;
                 case "BROKEN":
-                  newStats.broken++;
+                  newStats.broken ? newStats.broken++ : (newStats.broken = 1);
                   break;
                 case "TIMEDOUT":
-                  newStats.timedout++;
+                  newStats.timedout
+                    ? newStats.timedout++
+                    : (newStats.timedout = 1);
                   break;
                 case "INTERRUPTED":
-                  newStats.interrupted++;
+                  newStats.interrupted
+                    ? newStats.interrupted++
+                    : (newStats.interrupted = 1);
                   break;
                 default:
-                  newStats.unknown++;
+                  newStats.unknown
+                    ? newStats.unknown++
+                    : (newStats.unknown = 1);
               }
             });
 
@@ -255,7 +265,7 @@ export function TestRunDetailPage({
       </div>
 
       {/* Run Summary Card */}
-      <ProgressBar runDetail={runDetail} overallStatus={overallStatus} />
+      <SuiteTitleCard runDetail={runDetail} overallStatus={overallStatus} />
 
       {/* Test Cases List */}
       <div>
