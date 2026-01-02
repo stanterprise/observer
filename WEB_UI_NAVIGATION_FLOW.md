@@ -36,13 +36,14 @@ Root (/)
 │  └─ Test Suite Run Detail (/suite_runs/:runId)
 │     │  └─ Displays: Run statistics, progress bar, test cases list
 │     │
-│     └─ Test Case Detail (/tests/:testId)
+     └─ Test Detail (/suite_runs/:runId/tests/:testId)
 │        └─ Displays: Test info, metadata, execution steps
 ```
 
 ## User Flow Examples
 
 ### Flow 1: New User Landing
+
 ```
 1. User visits root (/) → Dashboard
    ├─ Sees empty state with welcome message
@@ -55,6 +56,7 @@ Root (/)
 ```
 
 ### Flow 2: Monitoring Active Tests
+
 ```
 1. User visits Dashboard (/)
    ├─ Sees 4 statistics cards
@@ -72,7 +74,7 @@ Root (/)
    ├─ Sees list of test cases
    └─ Clicks test case → Navigated to Test Case Detail
 
-3. User on Test Case Detail (/tests/test-xyz)
+3. User on Test Detail (/suite_runs/abc-123/tests/test-xyz)
    ├─ Sees test information (ID, Run ID, Duration, Retries)
    ├─ Sees execution timeline
    ├─ Sees metadata (if available)
@@ -81,6 +83,7 @@ Root (/)
 ```
 
 ### Flow 3: Investigating Failures
+
 ```
 1. User on Dashboard (/)
    ├─ Sees Pass Rate: 75% (yellow/warning)
@@ -95,7 +98,7 @@ Root (/)
    ├─ Identifies failed test (red badge)
    └─ Clicks failed test → Navigated to Test Case Detail
 
-3. User on Test Case Detail (/tests/failed-test)
+3. User on Test Detail (/suite_runs/failed-run/tests/failed-test)
    ├─ Badge shows "failed" status with red background
    ├─ Scrolls to execution steps
    ├─ Failed step highlighted with:
@@ -137,13 +140,13 @@ Root (/)
           │  ├─ Updates on WebSocket events
           │  └─ Supports sorting
           │
-          ├─ Run Detail
+          ├─ Test Run Detail
           │  ├─ Fetches specific run data
           │  ├─ Displays progress and tests
           │  ├─ Updates on WebSocket events
           │  └─ Links to test details
           │
-          └─ Test Case Detail
+          └─ Test Detail
              ├─ Fetches test and steps
              ├─ Displays hierarchical steps
              ├─ Updates on WebSocket events
@@ -166,22 +169,25 @@ Example: Test "login-test" fails
 7. Components update local state:
    ├─ Dashboard: Decrements pass rate
    ├─ Test Suite Runs: Updates run status to "failed"
-   ├─ Run Detail: Increments failed count
-   └─ Test Case Detail: Updates test status badge
+   ├─ Test Run Detail: Increments failed count
+   └─ Test Detail: Updates test status badge
 ```
 
 ## Navigation Patterns
 
 ### Primary Navigation
+
 - **Dashboard** → Overview of all test activity
 - **Test Runs** → List of all test suite runs
 
 ### Contextual Navigation
+
 - **Run Detail** → Click run ID from Dashboard or Test Runs
 - **Test Case Detail** → Click test case from Run Detail
 - **Back Navigation** → Arrow icons to return to previous page
 
 ### Quick Actions
+
 - **Refresh** buttons on Dashboard and Test Runs
 - **"View All →"** link from Dashboard to Test Runs
 - **Documentation** link in footer and Quick Actions
@@ -189,6 +195,7 @@ Example: Test "login-test" fails
 ## Responsive Behavior
 
 ### Desktop (≥1024px)
+
 ```
 ┌──────────────────────────────────────────────┐
 │  Header [Logo | Dashboard | Test Runs | ●]  │
@@ -205,6 +212,7 @@ Example: Test "login-test" fails
 ```
 
 ### Tablet (768px - 1023px)
+
 ```
 ┌────────────────────────────────────┐
 │  Header [Logo | Dash | Runs | ●]  │
@@ -224,6 +232,7 @@ Example: Test "login-test" fails
 ```
 
 ### Mobile (<768px)
+
 ```
 ┌────────────────────┐
 │ Header [☰ | Logo] │
@@ -253,6 +262,7 @@ Example: Test "login-test" fails
 ## Accessibility Navigation
 
 ### Keyboard Navigation
+
 ```
 Tab Order:
 1. Skip to main content (optional, could add)
@@ -275,6 +285,7 @@ Shortcuts:
 ```
 
 ### Screen Reader Navigation
+
 ```
 Landmarks:
 - <nav> → "Navigation"
@@ -296,6 +307,7 @@ ARIA:
 ## Error State Flows
 
 ### Network Error
+
 ```
 1. User on Dashboard
 2. API request fails (network error)
@@ -310,6 +322,7 @@ ARIA:
 ```
 
 ### Not Found Error
+
 ```
 1. User visits /suite_runs/invalid-id
 2. API returns 404
@@ -323,6 +336,7 @@ ARIA:
 ```
 
 ### Empty State
+
 ```
 1. User on Test Runs page
 2. API returns empty array
@@ -338,18 +352,21 @@ ARIA:
 ## Performance Considerations
 
 ### Data Fetching
+
 - Initial fetch on page load
 - Real-time updates via WebSocket (no polling)
 - Local state updates for immediate feedback
 - Optional manual refresh button
 
 ### Rendering
+
 - React functional components (fast re-renders)
 - Minimal prop drilling (local state where possible)
 - Conditional rendering for loading/error/success states
 - CSS transitions (GPU-accelerated)
 
 ### Bundle Size
+
 - Tailwind CSS (JIT, minimal bundle)
 - Lucide React icons (tree-shakeable)
 - React Router (code splitting ready)
@@ -358,6 +375,7 @@ ARIA:
 ## Summary
 
 The Observer web UI now provides:
+
 - Clear, intuitive navigation structure
 - Comprehensive dashboard for quick insights
 - Real-time updates without page refresh
