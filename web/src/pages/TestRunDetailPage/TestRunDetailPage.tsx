@@ -215,25 +215,83 @@ export function TestRunDetailPage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600">Loading run details...</div>
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="h-10 w-10 bg-gray-200 rounded-lg animate-pulse" />
+            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+          <div className="h-8 bg-gray-200 animate-pulse" />
+          <div className="p-6 space-y-4">
+            <div className="h-6 bg-gray-200 rounded w-3/4 animate-pulse" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="h-32 bg-gray-100 rounded-lg animate-pulse"
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-24 bg-gray-100 rounded-lg animate-pulse"
+            />
+          ))}
+        </div>
       </div>
     );
   }
 
   if (error || !runDetail) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6 animate-in fade-in duration-300">
         <Link
           to="/suite_runs"
-          className="inline-flex items-center text-blue-600 hover:text-blue-700"
+          className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors group"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Test Runs
+          <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+          <span className="font-medium">Back to Test Runs</span>
         </Link>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-red-600">Error: {error || "Run not found"}</div>
-        </div>
+        <Card className="border-red-200 bg-red-50/50">
+          <CardContent className="py-12">
+            <div className="text-center max-w-md mx-auto">
+              <div className="mx-auto h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <svg
+                  className="h-8 w-8 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                {error ? "Failed to Load Test Run" : "Test Run Not Found"}
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                {error ||
+                  "The test run you're looking for doesn't exist or has been deleted."}
+              </p>
+              <Link
+                to="/suite_runs"
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                View All Test Runs
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -263,38 +321,65 @@ export function TestRunDetailPage({
   console.log("Assembled suite hierarchy:", rootSuite);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8 animate-in fade-in duration-300">
+      {/* Header with improved visual design */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-4">
           <Link
             to="/suite_runs"
-            className="inline-flex items-center text-blue-600 hover:text-blue-700"
+            className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm hover:shadow group"
+            aria-label="Back to test runs"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5 group-hover:-translate-x-0.5 transition-transform" />
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Test Suite Run</h1>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
+              Test Suite Run
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {runDetail.name || runDetail.id}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Run Summary Card */}
-      <SuiteTitleCard runDetail={runDetail} overallStatus={overallStatus} />
+      {/* Run Summary Card with improved spacing */}
+      <div className="transition-all duration-300">
+        <SuiteTitleCard runDetail={runDetail} overallStatus={overallStatus} />
+      </div>
 
-      {/* Test Cases List */}
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Test Cases ({countTests(runDetail.suites || [])})
-        </h2>
+      {/* Test Cases List with enhanced design */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Test Cases
+            <span className="ml-2 text-base font-normal text-gray-500">
+              ({countTests(runDetail.suites || [])})
+            </span>
+          </h2>
+        </div>
+
         {!runDetail.tests || runDetail.tests.length === 0 ? (
-          <Card>
-            <CardContent>
-              <div className="text-center py-8 text-gray-500">
-                <Play className="mx-auto h-8 w-8 mb-2 text-gray-400" />
-                <p>No test cases found in this run.</p>
+          <Card className="border-dashed">
+            <CardContent className="py-16">
+              <div className="text-center max-w-sm mx-auto">
+                <div className="mx-auto h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                  <Play className="h-8 w-8 text-gray-400" />
+                </div>
+                <h3 className="text-base font-semibold text-gray-900 mb-2">
+                  No Test Cases Yet
+                </h3>
+                <p className="text-sm text-gray-500">
+                  This test run doesn't have any test cases yet. They will
+                  appear here as tests are executed.
+                </p>
               </div>
             </CardContent>
           </Card>
         ) : (
-          <TestSuiteRecord suite={rootSuite} />
+          <div className="transition-all duration-300">
+            <TestSuiteRecord suite={rootSuite} />
+          </div>
         )}
       </div>
     </div>
