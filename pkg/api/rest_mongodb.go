@@ -193,13 +193,31 @@ func (h *MongoHandler) handleRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract run IDs
-	runIDs := make([]string, 0, len(docs))
+	// Extract run Data
+	runData := make([]map[string]interface{}, 0, len(docs))
 	for _, doc := range docs {
-		runIDs = append(runIDs, doc.ID)
+		runData = append(runData, map[string]interface{}{
+			"id":         doc.ID,
+			"name":       doc.Name,
+			"updatedAt":  doc.UpdatedAt,
+			"totalTests": len(doc.Tests),
+			"status":     doc.Status,
+			"metadata":   doc.Metadata,
+			"statistics": map[string]interface{}{
+				"total":       len(doc.Tests),
+				"passed":      len(FilterTestsByStatus(doc.Tests, "PASSED")),
+				"failed":      len(FilterTestsByStatus(doc.Tests, "FAILED")),
+				"skipped":     len(FilterTestsByStatus(doc.Tests, "SKIPPED")),
+				"running":     len(FilterTestsByStatus(doc.Tests, "RUNNING")),
+				"broken":      len(FilterTestsByStatus(doc.Tests, "BROKEN")),
+				"timedout":    len(FilterTestsByStatus(doc.Tests, "TIMEDOUT")),
+				"interrupted": len(FilterTestsByStatus(doc.Tests, "INTERRUPTED")),
+				"unknown":     len(FilterTestsByStatus(doc.Tests, "UNKNOWN")),
+			},
+		})
 	}
 	response := map[string]interface{}{
-		"runs": runIDs,
+		"runs": runData,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

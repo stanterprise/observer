@@ -1,4 +1,6 @@
+import type { TestStatus } from "@/types/common";
 import type { Test } from "@/types/testCase";
+import type { TestRun } from "@/types/testRun";
 import type { TestSuite } from "@/types/testSuite";
 
 export function assembleSuiteHierarchy(
@@ -25,3 +27,33 @@ function buildSuiteTree(
     tests: tests,
   };
 }
+
+export const getRunStatus = (run: TestRun): TestStatus => {
+  // Prioritize error states
+  if (run.statistics!.failed > 0) return "FAILED";
+  if (run.statistics!.broken && run.statistics!.broken > 0) return "BROKEN";
+  if (run.statistics!.timedout && run.statistics!.timedout > 0)
+    return "TIMEDOUT";
+  if (run.statistics!.interrupted && run.statistics!.interrupted > 0)
+    return "INTERRUPTED";
+
+  // Then check for success or skip (all tests completed)
+  if (
+    run.statistics!.passed === run.statistics!.total &&
+    run.statistics!.total > 0
+  )
+    return "PASSED";
+  if (
+    run.statistics!.skipped === run.statistics!.total &&
+    run.statistics!.total > 0
+  )
+    return "SKIPPED";
+  // Check for active running tests (tests in progress)
+  if (run.statistics!.running && run.statistics!.running > 0) return "RUNNING";
+
+  // Check for unknown status (actual UNKNOWN status from backend)
+  if (run.statistics!.unknown && run.statistics!.unknown > 0) return "UNKNOWN";
+
+  // If no tests or all tests are in a mixed state, default to running
+  return "RUNNING";
+};

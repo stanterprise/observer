@@ -18,55 +18,63 @@ interface BadgeProps {
 }
 
 export function Badge({ status, className, showIcon = true }: BadgeProps) {
-  const statusConfig = {
-    passed: {
+  const statusConfig: Record<
+    TestStatus,
+    { color: string; icon: typeof CheckCircle; label: string }
+  > = {
+    PASSED: {
       color: "bg-green-100 text-green-800 border-green-200",
       icon: CheckCircle,
       label: "passed",
     },
-    failed: {
+    FAILED: {
       color: "bg-red-100 text-red-800 border-red-200",
       icon: XCircle,
       label: "failed",
     },
-    skipped: {
+    SKIPPED: {
       color: "bg-gray-100 text-gray-800 border-gray-200",
       icon: MinusCircle,
       label: "skipped",
     },
-    running: {
+    RUNNING: {
       color: "bg-blue-100 text-blue-800 border-blue-200",
       icon: Play,
       label: "running",
     },
-    pending: {
+    PENDING: {
       color: "bg-yellow-100 text-yellow-800 border-yellow-200",
       icon: Clock,
       label: "pending",
     },
-    unknown: {
+    UNKNOWN: {
       color: "bg-gray-100 text-gray-800 border-gray-200",
       icon: Circle,
       label: "unknown",
     },
-    broken: {
+    BROKEN: {
       color: "bg-orange-100 text-orange-800 border-orange-200",
       icon: AlertTriangle,
       label: "broken",
     },
-    timedout: {
+    TIMEDOUT: {
       color: "bg-purple-100 text-purple-800 border-purple-200",
       icon: Clock,
       label: "timed out",
     },
-    interrupted: {
+    INTERRUPTED: {
       color: "bg-pink-100 text-pink-800 border-pink-200",
       icon: Ban,
       label: "interrupted",
     },
+    NOT_RUN: {
+      color: "bg-gray-100 text-gray-800 border-gray-200",
+      icon: MinusCircle,
+      label: "not run",
+    },
   };
 
-  const config = statusConfig[status] || statusConfig.unknown;
+  const config = statusConfig[status] || statusConfig.UNKNOWN;
   const Icon = config.icon;
 
   return (

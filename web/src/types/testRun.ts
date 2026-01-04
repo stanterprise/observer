@@ -9,7 +9,6 @@ export interface TestRun {
   metadata?: Record<string, unknown>;
   duration?: number; // Duration in nanoseconds
   totalTests?: number;
-  testSuiteSpecId?: string;
   initiatedBy?: string;
   projectName?: string;
   startTime?: string;

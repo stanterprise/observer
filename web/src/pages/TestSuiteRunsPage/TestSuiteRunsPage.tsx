@@ -4,8 +4,12 @@ import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import type { WebSocketEvent, WebSocketTestData } from "@/types";
-import type { RunStatistics } from "@/types/testRun";
+import type {
+  WebSocketEvent,
+  WebSocketRunData,
+  WebSocketTestData,
+} from "@/types/webSocket";
+
 import {
   Play,
   CheckCircle,
@@ -14,20 +18,13 @@ import {
   Clock,
   ArrowUpDown,
 } from "lucide-react";
-import type { TestStatus } from "@/types/common";
 
-interface TestRunsPageProps {
-  // Props removed - component manages its own WebSocket
-}
+import type { TestRun } from "@/types/testRun";
+import { handleStartRun, handleUpdateRun } from "./suiteEventHandlers";
+import { getRunStatus } from "./utils";
 
-// Local interface combining run identification with statistics for list view
-interface TestRunListItem extends RunStatistics {
-  runId: string;
-  runName?: string;
-}
-
-export function TestSuiteRunsPage(_props: TestRunsPageProps) {
-  const [runs, setRuns] = useState<TestRunListItem[]>([]);
+export function TestSuiteRunsPage() {
+  const [runs, setRuns] = useState<TestRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -35,105 +32,14 @@ export function TestSuiteRunsPage(_props: TestRunsPageProps) {
   // Handle WebSocket events with filtered subscription
   const handleWebSocketMessage = useCallback((event: WebSocketEvent) => {
     const { type, data } = event;
+    if (type == "run.start") {
+      handleStartRun(data as WebSocketRunData, runs, setRuns);
+    }
+    if (type == "run.end") {
+    }
 
     if (type === "test.begin" || type === "test.end") {
-      const testData = data as WebSocketTestData;
-      const runId = testData.runId || testData.testCase?.runId;
-
-      // Safely extract status - handle both string and non-string values
-      let status = "RUNNING";
-      if (type === "test.end") {
-        const rawStatus = testData.testCase?.status || testData.status;
-        // Handle numeric status codes (protobuf enums) - need to map them
-        if (typeof rawStatus === "number") {
-          // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
-          const statusMap: Record<number, string> = {
-            0: "UNKNOWN",
-            1: "PASSED",
-            2: "FAILED",
-            3: "SKIPPED",
-            4: "BROKEN",
-            5: "TIMEDOUT",
-            6: "INTERRUPTED",
-          };
-          status = statusMap[rawStatus] || "UNKNOWN";
-        } else if (typeof rawStatus === "string") {
-          status = rawStatus.toUpperCase();
-        }
-      }
-
-      if (runId) {
-        setRuns((prevRuns) => {
-          try {
-            const existingIndex = prevRuns.findIndex((r) => r.runId === runId);
-
-            if (existingIndex >= 0) {
-              const updated = [...prevRuns];
-              const currentRun = { ...updated[existingIndex] };
-
-              // Update statistics based on event type
-              if (type === "test.begin") {
-                currentRun.running = (currentRun.running || 0) + 1;
-                currentRun.total = currentRun.total + 1;
-              } else if (type === "test.end") {
-                // Decrement running count
-                if (currentRun.running && currentRun.running > 0) {
-                  currentRun.running--;
-                }
-
-                // Increment appropriate status counter
-                switch (status) {
-                  case "PASSED":
-                    currentRun.passed++;
-                    break;
-                  case "FAILED":
-                    currentRun.failed++;
-                    break;
-                  case "SKIPPED":
-                    currentRun.skipped++;
-                    break;
-                  case "BROKEN":
-                    currentRun.broken = (currentRun.broken || 0) + 1;
-                    break;
-                  case "TIMEDOUT":
-                    currentRun.timedout = (currentRun.timedout || 0) + 1;
-                    break;
-                  case "INTERRUPTED":
-                    currentRun.interrupted = (currentRun.interrupted || 0) + 1;
-                    break;
-                  default:
-                    currentRun.unknown = (currentRun.unknown || 0) + 1;
-                }
-              }
-
-              currentRun.lastUpdated = new Date().toISOString();
-              updated[existingIndex] = currentRun;
-              return updated;
-            } else if (type === "test.begin") {
-              // New run started
-              const newRun: TestRunListItem = {
-                runId,
-                total: 1,
-                passed: 0,
-                failed: 0,
-                skipped: 0,
-                running: 1,
-                broken: 0,
-                timedout: 0,
-                interrupted: 0,
-                unknown: 0,
-                lastUpdated: new Date().toISOString(),
-              };
-              return [newRun, ...prevRuns];
-            }
-
-            return prevRuns;
-          } catch (error) {
-            console.error("Error updating runs from WebSocket:", error);
-            return prevRuns;
-          }
-        });
-      }
+      handleUpdateRun(data as WebSocketTestData, type, runs, setRuns);
     }
   }, []);
 
@@ -150,17 +56,17 @@ export function TestSuiteRunsPage(_props: TestRunsPageProps) {
     try {
       setLoading(true);
       // Fetch all run statistics in a single request
-      const response = await fetch(apiUrl("/runs/stats"));
+      const response = await fetch(apiUrl("/runs"));
       if (!response.ok) {
         throw new Error(`Failed to fetch runs: ${response.statusText}`);
       }
       const data = await response.json();
-      const stats = (data.runs || []) as TestRunListItem[];
+      const stats = (data.runs || []) as TestRun[];
 
       // Sort by lastUpdated (most recent first by default)
       stats.sort((a, b) => {
-        const aTime = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0;
-        const bTime = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
+        const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
         return bTime - aTime; // Descending order (newest first)
       });
 
@@ -190,35 +96,14 @@ export function TestSuiteRunsPage(_props: TestRunsPageProps) {
     );
   }
 
-  const getRunStatus = (run: TestRunListItem): TestStatus => {
-    // Prioritize error states
-    if (run.failed > 0) return "failed";
-    if (run.broken && run.broken > 0) return "broken";
-    if (run.timedout && run.timedout > 0) return "timedout";
-    if (run.interrupted && run.interrupted > 0) return "interrupted";
-
-    // Then check for success or skip (all tests completed)
-    if (run.passed === run.total && run.total > 0) return "passed";
-    if (run.skipped === run.total && run.total > 0) return "skipped";
-
-    // Check for active running tests (tests in progress)
-    if (run.running && run.running > 0) return "running";
-
-    // Check for unknown status (actual UNKNOWN status from backend)
-    if (run.unknown && run.unknown > 0) return "unknown";
-
-    // If no tests or all tests are in a mixed state, default to running
-    return "running";
-  };
-
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
   };
 
   // Sort runs based on current sort order
   const sortedRuns = [...runs].sort((a, b) => {
-    const aTime = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0;
-    const bTime = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
+    const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+    const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
     return sortOrder === "desc" ? bTime - aTime : aTime - bTime;
   });
 
@@ -324,15 +209,15 @@ export function TestSuiteRunsPage(_props: TestRunsPageProps) {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {sortedRuns.map((run) => (
                     <tr
-                      key={run.runId}
+                      key={run.id}
                       className="hover:bg-gray-50 transition-colors"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link
-                          to={`/suite_runs/${run.runId}`}
+                          to={`/suite_runs/${run.id}`}
                           className="text-blue-600 hover:text-blue-800 font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
                         >
-                          {run.runName || run.runId}
+                          {run.name || run.id}
                         </Link>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -340,32 +225,32 @@ export function TestSuiteRunsPage(_props: TestRunsPageProps) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <span className="text-green-600 font-semibold">
-                          {run.passed}
+                          {run.statistics!.passed}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <span className="text-red-600 font-semibold">
-                          {run.failed}
+                          {run.statistics!.failed}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <span className="text-gray-600 font-semibold">
-                          {run.skipped}
+                          {run.statistics!.skipped}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <span className="text-blue-600 font-semibold">
-                          {run.total}
+                          {run.statistics!.total}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {run.lastUpdated ? (
+                        {run.updatedAt ? (
                           <div className="flex flex-col">
                             <span>
-                              {new Date(run.lastUpdated).toLocaleDateString()}
+                              {new Date(run.updatedAt).toLocaleDateString()}
                             </span>
                             <span className="text-xs text-gray-400">
-                              {new Date(run.lastUpdated).toLocaleTimeString()}
+                              {new Date(run.updatedAt).toLocaleTimeString()}
                             </span>
                           </div>
                         ) : (

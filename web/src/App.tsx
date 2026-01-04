@@ -5,7 +5,7 @@ import { Layout } from "./components/Layout";
 import { TestRunDetailPage, TestDetailPage, TestSuiteRunsPage } from "./pages";
 
 import { useWebSocket } from "./hooks/useWebSocket";
-import type { WebSocketEvent } from "./types";
+import type { WebSocketEvent } from "@/types/webSocket";
 import DashboardPage from "./components/DashboardPage";
 
 function App() {

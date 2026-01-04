@@ -7,7 +7,7 @@ import type {
   WebSocketEvent,
   WebSocketTestData,
   WebSocketStepData,
-} from "@/types";
+} from "@/types/webSocket";
 import type { TestStatus } from "@/types/common";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import StepContainer from "./StepContainer";
@@ -266,16 +266,16 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
 
   const getTestStatus = (status: string): TestStatus => {
     const statusMap: Record<string, TestStatus> = {
-      PASSED: "passed",
-      FAILED: "failed",
-      SKIPPED: "skipped",
-      RUNNING: "running",
-      UNKNOWN: "unknown",
-      BROKEN: "broken",
-      TIMEDOUT: "timedout",
-      INTERRUPTED: "interrupted",
+      PASSED: "PASSED",
+      FAILED: "FAILED",
+      SKIPPED: "SKIPPED",
+      RUNNING: "RUNNING",
+      UNKNOWN: "UNKNOWN",
+      BROKEN: "BROKEN",
+      TIMEDOUT: "TIMEDOUT",
+      INTERRUPTED: "INTERRUPTED",
     };
-    return (statusMap[status] || "unknown") as TestStatus;
+    return (statusMap[status] || "UNKNOWN") as TestStatus;
   };
 
   const formatDuration = (nanoseconds?: number) => {

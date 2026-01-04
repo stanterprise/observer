@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
-import type { WebSocketEvent, WebSocketTestData } from "@/types";
+import type { WebSocketEvent, WebSocketTestData } from "@/types/webSocket";
 import { ArrowLeft, Play, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -126,7 +126,7 @@ export function TestRunDetailPage({
                   id: testId || "",
                   runId: testRunId || "",
                   title: testData.testCase?.title || "",
-                  status: "running",
+                  status: "RUNNING",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                 });
@@ -134,7 +134,7 @@ export function TestRunDetailPage({
                 // Update existing test
                 updatedTests[testIndex] = {
                   ...updatedTests[testIndex],
-                  status: "running",
+                  status: "RUNNING",
                   updatedAt: new Date().toISOString(),
                 };
               }
@@ -165,29 +165,29 @@ export function TestRunDetailPage({
 
             updatedTests.forEach((test) => {
               switch (test.status) {
-                case "passed":
+                case "PASSED":
                   newStats.passed++;
                   break;
-                case "failed":
+                case "FAILED":
                   newStats.failed++;
                   break;
-                case "skipped":
+                case "SKIPPED":
                   newStats.skipped++;
                   break;
-                case "running":
+                case "RUNNING":
                   newStats.running
                     ? newStats.running++
                     : (newStats.running = 1);
                   break;
-                case "broken":
+                case "BROKEN":
                   newStats.broken ? newStats.broken++ : (newStats.broken = 1);
                   break;
-                case "timedout":
+                case "TIMEDOUT":
                   newStats.timedout
                     ? newStats.timedout++
                     : (newStats.timedout = 1);
                   break;
-                case "interrupted":
+                case "INTERRUPTED":
                   newStats.interrupted
                     ? newStats.interrupted++
                     : (newStats.interrupted = 1);
@@ -301,16 +301,17 @@ export function TestRunDetailPage({
   }
 
   const overallStatus: TestStatus =
-    runDetail.statistics!.failed > 0
-      ? "failed"
+    runDetail.statistics!.running && runDetail.statistics!.running > 0
+      ? "RUNNING"
+      : runDetail.statistics!.failed > 0
+      ? "FAILED"
       : runDetail.statistics!.passed === runDetail.statistics!.total &&
         runDetail.statistics!.total > 0
-      ? "passed"
+      ? "PASSED"
       : runDetail.statistics!.skipped === runDetail.statistics!.total &&
         runDetail.statistics!.total > 0
-      ? "skipped"
-      : "running";
-
+      ? "SKIPPED"
+      : "NOT_RUN";
   console.log(
     "Rendering run detail:",
     runDetail,

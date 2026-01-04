@@ -47,12 +47,12 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
                     )}
                   </button>
                 )}
-                {step.status === "passed" ? (
+                {step.status === "PASSED" ? (
                   <>
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <Badge status={"success" as TestStatus} />
                   </>
-                ) : step.status === "failed" ? (
+                ) : step.status === "FAILED" ? (
                   <>
                     <AlertCircle className="w-5 h-5 text-red-600" />
                     <Badge status={"error" as TestStatus} />

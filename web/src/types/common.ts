@@ -1,10 +1,11 @@
 export type TestStatus =
-  | "passed"
-  | "failed"
-  | "skipped"
-  | "running"
-  | "pending"
-  | "unknown"
-  | "broken"
-  | "timedout"
-  | "interrupted";
+  | "PASSED"
+  | "FAILED"
+  | "SKIPPED"
+  | "RUNNING"
+  | "PENDING"
+  | "UNKNOWN"
+  | "BROKEN"
+  | "TIMEDOUT"
+  | "INTERRUPTED"
+  | "NOT_RUN";
