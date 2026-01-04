@@ -3,7 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import type { WebSocketEvent, WebSocketTestData } from "@/types";
-import { ArrowLeft, Play } from "lucide-react";
+import { ArrowLeft, Play, Eye, EyeOff } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import { SuiteTitleCard } from "./SuiteTitleCard";
 import type { TestStatus } from "@/types/common";
@@ -23,6 +24,9 @@ export function TestRunDetailPage({
   const [runDetail, setRunDetail] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hiddenSuiteTypes, setHiddenSuiteTypes] = useState<Set<string>>(
+    new Set(["ROOT", "PROJECT", "FILE"])
+  );
 
   const countTests = (suites: TestSuite[]): number => {
     let total = 0;
@@ -320,6 +324,30 @@ export function TestRunDetailPage({
   );
   console.log("Assembled suite hierarchy:", rootSuite);
 
+  // Get unique suite types from the hierarchy
+  const getSuiteTypes = (suite: TestSuite): Set<string> => {
+    const types = new Set<string>();
+    if (suite.type) types.add(suite.type.toUpperCase());
+    suite.suites?.forEach((s) => {
+      getSuiteTypes(s).forEach((t) => types.add(t));
+    });
+    return types;
+  };
+
+  const availableSuiteTypes = Array.from(getSuiteTypes(rootSuite)).sort();
+
+  const toggleSuiteType = (type: string) => {
+    setHiddenSuiteTypes((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(type)) {
+        newSet.delete(type);
+      } else {
+        newSet.add(type);
+      }
+      return newSet;
+    });
+  };
+
   return (
     <div className="space-y-6 pb-8 animate-in fade-in duration-300">
       {/* Header with improved visual design */}
@@ -351,12 +379,39 @@ export function TestRunDetailPage({
       {/* Test Cases List with enhanced design */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Test Cases
-            <span className="ml-2 text-base font-normal text-gray-500">
-              ({countTests(runDetail.suites || [])})
-            </span>
-          </h2>
+          <h2 className="text-xl font-semibold text-gray-900">Test Cases</h2>
+          {availableSuiteTypes.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 font-medium">Suites:</span>
+              <div className="flex gap-2">
+                {availableSuiteTypes.map((type) => {
+                  const isHidden = hiddenSuiteTypes.has(type);
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => toggleSuiteType(type)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all border",
+                        isHidden
+                          ? "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200"
+                          : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                      )}
+                      aria-label={`${
+                        isHidden ? "Show" : "Hide"
+                      } ${type} suites`}
+                    >
+                      {isHidden ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                      {type}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {!runDetail.tests || runDetail.tests.length === 0 ? (
@@ -378,7 +433,10 @@ export function TestRunDetailPage({
           </Card>
         ) : (
           <div className="transition-all duration-300">
-            <TestSuiteRecord suite={rootSuite} />
+            <TestSuiteRecord
+              suite={rootSuite}
+              hiddenSuiteTypes={hiddenSuiteTypes}
+            />
           </div>
         )}
       </div>
