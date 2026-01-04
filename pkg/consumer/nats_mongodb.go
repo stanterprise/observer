@@ -482,7 +482,8 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 
 	c.logger.Info("step start",
 		"id", req.Step.Id,
-		"test_case_run_id", req.Step.TestCaseId)
+		"test_case_run_id", req.Step.TestCaseId,
+		"retry_index", req.Step.RetryIndex)
 
 	// Convert metadata
 	md := make(map[string]interface{})
@@ -520,7 +521,7 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 	}
 
 	runID := req.Step.RunId
-	return c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseId)
+	return c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseId, req.Step.RetryIndex)
 }
 
 // handleStepEnd processes a step end event

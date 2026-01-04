@@ -16,9 +16,9 @@ interface TestDetailPageProps {
   onWebSocketEvent?: WebSocketEvent | null;
 }
 
-interface Step {
+interface StepDetail {
   id: string;
-  runId: string;
+  runId?: string;
   testCaseRunId: string;
   parentStepId?: string;
   status: string;
@@ -27,13 +27,13 @@ interface Step {
   startTime?: string;
   createdAt: string;
   updatedAt: string;
-  steps?: Step[]; // Nested steps for hierarchical structure
 }
 
 interface TestDetail {
   id: string;
   runId: string;
   title: string;
+  name?: string;
   status: string;
   metadata?: Record<string, unknown>;
   duration?: number;
@@ -42,11 +42,12 @@ interface TestDetail {
   timeout?: number;
   createdAt: string;
   updatedAt: string;
+  steps?: StepDetail[];
 }
 
 interface TestDetailResponse {
-  test: TestDetail;
-  steps: Step[];
+  runId: string;
+  tests: TestDetail[];
 }
 
 export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
@@ -95,7 +96,8 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
       const eventTestId = eventData.testCase?.id || eventData.id;
       if (eventTestId === testId) {
         setTestDetail((prevDetail) => {
-          if (!prevDetail || !prevDetail.test) return prevDetail;
+          if (!prevDetail || !prevDetail.tests || prevDetail.tests.length === 0)
+            return prevDetail;
 
           try {
             // Safely extract status - handle both string and numeric values (protobuf enums)
@@ -121,11 +123,15 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
 
             return {
               ...prevDetail,
-              test: {
-                ...prevDetail.test,
-                Status: status,
-                UpdatedAt: new Date().toISOString(),
-              },
+              tests: prevDetail.tests.map((t) =>
+                t.id === testId
+                  ? {
+                      ...t,
+                      status: status,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : t
+              ),
             };
           } catch (error) {
             console.error("Error updating test detail from WebSocket:", error);
@@ -136,12 +142,15 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
     } else if (type === "step.end" || type === "step.begin") {
       const eventData = data as WebSocketStepData;
       const eventTestCaseRunId = eventData.testCaseRunId;
-      if (eventTestCaseRunId === testId) {
+      if (eventTestCaseRunId === testId && testDetail.tests.length > 0) {
         setTestDetail((prevDetail) => {
-          if (!prevDetail || !prevDetail.steps) return prevDetail;
+          if (!prevDetail || !prevDetail.tests || prevDetail.tests.length === 0)
+            return prevDetail;
 
           try {
             const stepId = eventData.id;
+            if (!stepId) return prevDetail;
+
             // Safely extract status - handle both string and numeric values (protobuf enums)
             const rawStatus = eventData.status;
             let status = "RUNNING";
@@ -162,15 +171,17 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
                 status = rawStatus.toUpperCase();
               }
             }
-            const updatedSteps = [...prevDetail.steps];
+
+            const currentTest = prevDetail.tests[0];
+            const updatedSteps = [...(currentTest.steps || [])];
             const stepIndex = updatedSteps.findIndex((s) => s.id === stepId);
 
             if (type === "step.begin") {
               if (stepIndex === -1) {
                 // Add new step
                 updatedSteps.push({
-                  id: stepId || "",
-                  runId: prevDetail.test.runId,
+                  id: stepId,
+                  runId: currentTest.runId,
                   testCaseRunId: testId || "",
                   parentStepId: eventData.parentStepId,
                   status: "RUNNING",
@@ -198,7 +209,13 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
 
             return {
               ...prevDetail,
-              steps: updatedSteps,
+              tests: [
+                {
+                  ...currentTest,
+                  steps: updatedSteps,
+                  updatedAt: new Date().toISOString(),
+                },
+              ],
             };
           } catch (error) {
             console.error("Error updating steps from WebSocket:", error);
@@ -207,7 +224,7 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
         });
       }
     }
-  }, [onWebSocketEvent, testId, runId]);
+  }, [onWebSocketEvent, testId, testDetail]);
 
   if (loading) {
     return (
@@ -268,9 +285,37 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
     return `${(milliseconds / 1000).toFixed(2)}s`;
   };
 
-  const { test, steps } = testDetail;
+  // Extract test from the tests array (API returns array with single element)
+  const test = testDetail.tests[0];
+  if (!test) {
+    return (
+      <div className="space-y-4">
+        <Link
+          to="/suite_runs"
+          className="inline-flex items-center text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-2 py-1"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Test Runs
+        </Link>
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <AlertCircle className="h-16 w-16 text-red-500" />
+              <div className="text-red-600 text-center">
+                <p className="font-semibold">Test data not found</p>
+                <p className="text-sm mt-1">
+                  The test case data is missing or invalid.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const testStatus = getTestStatus(test.status);
-  const safeSteps = steps || [];
+  const safeSteps = test.steps || [];
   console.log(
     "Rendering TestDetailPage for test:",
     test.id,
@@ -410,11 +455,11 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
         test={{
           id: test.id,
           runId: test.runId,
-          title: test.title,
+          title: test.title || test.name || test.id,
           status: testStatus,
-          steps: steps.map((step) => ({
+          steps: safeSteps.map((step) => ({
             id: step.id,
-            runId: step.runId,
+            runId: step.runId || test.runId,
             testCaseRunId: step.testCaseRunId,
             parentStepId:
               step.parentStepId && step.parentStepId !== ""

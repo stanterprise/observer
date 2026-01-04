@@ -33,6 +33,12 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		test.Steps = []*m.StepDocument{}
 	}
 
+	// Initialize retry_index if nil
+	if test.RetryIndex == nil {
+		defaultRetryIndex := int32(0)
+		test.RetryIndex = &defaultRetryIndex
+	}
+
 	// Try to update existing test in root-level tests array
 	filter := bson.M{
 		"_id":               runID,

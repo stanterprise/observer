@@ -16,7 +16,7 @@ import (
 // - step: The step to create/update (step.ID identifies the step).
 // - testID: Required. ID of parent test containing this step.
 // Returns error if runID is empty or parent test not found.
-func (r *MongoRepository) UpsertStepBegin(ctx context.Context, runID string, step *m.StepDocument, testID string) error {
+func (r *MongoRepository) UpsertStepBegin(ctx context.Context, runID string, step *m.StepDocument, testID string, retry_index int32) error {
 	if err := validateRunID(runID); err != nil {
 		return err
 	}
@@ -34,16 +34,17 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, runID string, ste
 		step.Steps = []*m.StepDocument{}
 	}
 
-	return r.upsertStepInTest(ctx, runID, testID, step, now)
+	return r.upsertStepInTest(ctx, runID, testID, retry_index, step, now)
 }
 
 // upsertStepInTest handles steps as flat children of tests
-func (r *MongoRepository) upsertStepInTest(ctx context.Context, runID string, testID string, step *m.StepDocument, now time.Time) error {
+func (r *MongoRepository) upsertStepInTest(ctx context.Context, runID string, testID string, retry_index int32, step *m.StepDocument, now time.Time) error {
 	// Try to update existing step
 	filter := bson.M{
-		"_id":            runID,
-		"tests.id":       testID,
-		"tests.steps.id": step.ID,
+		"_id":               runID,
+		"tests.id":          testID,
+		"tests.retry_index": retry_index,
+		"tests.steps.id":    step.ID,
 	}
 	update := bson.M{
 		"$set": bson.M{

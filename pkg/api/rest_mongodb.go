@@ -129,37 +129,36 @@ func (h *MongoHandler) handleTestDetailByRunAndTest(w http.ResponseWriter, r *ht
 	}
 
 	// Search for the test in root tests and nested suites
-	var foundTest *m.TestDocument
+	var foundTests []*m.TestDocument = make([]*m.TestDocument, 0)
 	for _, test := range doc.Tests {
 		if test.ID == testID {
-			foundTest = test
+			foundTests = append(foundTests, test)
 			break
 		}
 	}
 
-	if foundTest == nil {
+	if len(foundTests) == 0 {
 		for _, suite := range doc.Suites {
 			for _, test := range suite.Tests {
 				if test.ID == testID {
-					foundTest = test
+					foundTests = append(foundTests, test)
 					break
 				}
 			}
-			if foundTest != nil {
+			if len(foundTests) > 0 {
 				break
 			}
 		}
 	}
 
-	if foundTest == nil {
+	if len(foundTests) == 0 {
 		http.Error(w, "Test not found", http.StatusNotFound)
 		return
 	}
 
 	response := map[string]interface{}{
 		"runId": runID,
-		"test":  foundTest,
-		"steps": foundTest.Steps,
+		"tests": foundTests,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

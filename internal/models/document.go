@@ -124,6 +124,7 @@ type StepDocument struct {
 	Status        string                 `bson:"status,omitempty" json:"status,omitempty"`
 	Category      string                 `bson:"category,omitempty" json:"category,omitempty"`
 	Location      string                 `bson:"location,omitempty" json:"location,omitempty"`
+	RetryIndex    int32                  `bson:"retry_index,omitempty" json:"retryIndex,omitempty"`
 
 	// Error fields
 	Error     string    `bson:"error,omitempty" json:"error,omitempty"`   // Single error message

@@ -41,4 +41,5 @@ export interface Step {
   errors?: string[];
   location?: string;
   category?: string;
+  retrtyIndex?: number;
 }
