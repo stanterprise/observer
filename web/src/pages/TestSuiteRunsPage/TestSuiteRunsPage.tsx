@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import type { WebSocketEvent, WebSocketTestData } from "@/types";
+import type { RunStatistics } from "@/types/testRun";
 import {
   Play,
   CheckCircle,
@@ -15,67 +17,24 @@ import {
 import type { TestStatus } from "@/types/common";
 
 interface TestRunsPageProps {
-  onWebSocketEvent?: WebSocketEvent | null;
+  // Props removed - component manages its own WebSocket
 }
 
-interface TestRunStats {
+// Local interface combining run identification with statistics for list view
+interface TestRunListItem extends RunStatistics {
   runId: string;
   runName?: string;
-  total: number;
-  passed: number;
-  failed: number;
-  skipped: number;
-  running?: number;
-  broken?: number;
-  timedout?: number;
-  interrupted?: number;
-  unknown?: number;
-  lastUpdated?: string;
 }
 
-export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
-  const [runs, setRuns] = useState<TestRunStats[]>([]);
+export function TestSuiteRunsPage(_props: TestRunsPageProps) {
+  const [runs, setRuns] = useState<TestRunListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  useEffect(() => {
-    fetchRuns();
-  }, []);
-
-  const fetchRuns = async () => {
-    try {
-      setLoading(true);
-      // Fetch all run statistics in a single request
-      const response = await fetch(apiUrl("/runs/stats"));
-      if (!response.ok) {
-        throw new Error(`Failed to fetch runs: ${response.statusText}`);
-      }
-      const data = await response.json();
-      const stats = (data.runs || []) as TestRunStats[];
-
-      // Sort by lastUpdated (most recent first by default)
-      stats.sort((a, b) => {
-        const aTime = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0;
-        const bTime = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
-        return bTime - aTime; // Descending order (newest first)
-      });
-
-      setRuns(stats);
-      setError(null);
-    } catch (err) {
-      console.error("Error fetching runs:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch runs");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle WebSocket events to update run statistics locally
-  useEffect(() => {
-    if (!onWebSocketEvent) return;
-
-    const { type, data } = onWebSocketEvent;
+  // Handle WebSocket events with filtered subscription
+  const handleWebSocketMessage = useCallback((event: WebSocketEvent) => {
+    const { type, data } = event;
 
     if (type === "test.begin" || type === "test.end") {
       const testData = data as WebSocketTestData;
@@ -152,7 +111,7 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
               return updated;
             } else if (type === "test.begin") {
               // New run started
-              const newRun: TestRunStats = {
+              const newRun: TestRunListItem = {
                 runId,
                 total: 1,
                 passed: 0,
@@ -176,7 +135,44 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
         });
       }
     }
-  }, [onWebSocketEvent]);
+  }, []);
+
+  // Subscribe to test.begin and test.end events only
+  useWebSocket({
+    onMessage: handleWebSocketMessage,
+  });
+
+  useEffect(() => {
+    fetchRuns();
+  }, []);
+
+  const fetchRuns = async () => {
+    try {
+      setLoading(true);
+      // Fetch all run statistics in a single request
+      const response = await fetch(apiUrl("/runs/stats"));
+      if (!response.ok) {
+        throw new Error(`Failed to fetch runs: ${response.statusText}`);
+      }
+      const data = await response.json();
+      const stats = (data.runs || []) as TestRunListItem[];
+
+      // Sort by lastUpdated (most recent first by default)
+      stats.sort((a, b) => {
+        const aTime = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0;
+        const bTime = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
+        return bTime - aTime; // Descending order (newest first)
+      });
+
+      setRuns(stats);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching runs:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch runs");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -194,7 +190,7 @@ export function TestSuiteRunsPage({ onWebSocketEvent }: TestRunsPageProps) {
     );
   }
 
-  const getRunStatus = (run: TestRunStats): TestStatus => {
+  const getRunStatus = (run: TestRunListItem): TestStatus => {
     // Prioritize error states
     if (run.failed > 0) return "failed";
     if (run.broken && run.broken > 0) return "broken";

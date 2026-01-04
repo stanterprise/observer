@@ -31,4 +31,5 @@ export interface RunStatistics {
   timedout?: number;
   interrupted?: number;
   unknown?: number;
+  lastUpdated?: string;
 }

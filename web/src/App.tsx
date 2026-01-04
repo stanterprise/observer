@@ -2,11 +2,7 @@ import { useState, useCallback } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 
-import {
-  TestRunDetailPage,
-  TestDetailPage,
-  TestSuiteRunsPage,
-} from "./pages";
+import { TestRunDetailPage, TestDetailPage, TestSuiteRunsPage } from "./pages";
 
 import { useWebSocket } from "./hooks/useWebSocket";
 import type { WebSocketEvent } from "./types";
@@ -29,10 +25,7 @@ function App() {
         <Route path="/" element={<Layout isConnected={isConnected} />}>
           <Route index element={<DashboardPage />} />
           <Route path="suite_runs">
-            <Route
-              index
-              element={<TestSuiteRunsPage onWebSocketEvent={lastEvent} />}
-            />
+            <Route index element={<TestSuiteRunsPage />} />
             <Route
               path=":runId"
               element={<TestRunDetailPage onWebSocketEvent={lastEvent} />}
