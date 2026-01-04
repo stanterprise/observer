@@ -141,7 +141,7 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 
 	// Publish test end event
 	testDuration := int64(1000000000)
-	err = repo.UpsertTestEnd(ctx, runID, testID, "PASSED", &testDuration)
+	err = repo.UpsertTestEnd(ctx, runID, testID, "PASSED", 0, &testDuration)
 	if err != nil {
 		t.Fatalf("Failed to upsert test end: %v", err)
 	}

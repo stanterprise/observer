@@ -24,9 +24,6 @@ func (n *noopWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 // ptrInt32 returns a pointer to the given int32 value
 func ptrInt32(v int32) *int32 {
-	if v == 0 {
-		return nil
-	}
 	return &v
 }
 
@@ -465,7 +462,7 @@ func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMess
 	}
 
 	runID := req.TestCase.RunId
-	return c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), duration)
+	return c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), req.TestCase.RetryIndex, duration)
 }
 
 // handleStepBegin processes a step begin event

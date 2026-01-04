@@ -54,6 +54,7 @@ type SuiteDocument struct {
 	Owner           string                 `bson:"owner,omitempty" json:"owner,omitempty"`
 	TestCaseIds     []string               `bson:"test_case_ids,omitempty" json:"testCaseIds,omitempty"`
 	SubSuiteIds     []string               `bson:"sub_suite_ids,omitempty" json:"subSuiteIds,omitempty"`
+	TestCases       []TestDocument         `bson:"test_cases,omitempty" json:"testCases,omitempty"`
 	StartTime       *time.Time             `bson:"start_time,omitempty" json:"startTime,omitempty"`
 	EndTime         *time.Time             `bson:"end_time,omitempty" json:"endTime,omitempty"`
 	CreatedAt       time.Time              `bson:"created_at" json:"createdAt"`

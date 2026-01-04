@@ -35,8 +35,9 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 
 	// Try to update existing test in root-level tests array
 	filter := bson.M{
-		"_id":      runID,
-		"tests.id": test.ID,
+		"_id":               runID,
+		"tests.id":          test.ID,
+		"tests.retry_index": test.RetryIndex,
 	}
 	update := bson.M{
 		"$set": bson.M{
@@ -104,8 +105,11 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 // UpsertTestEnd updates test end fields (status, duration).
 // - runID: Required. Identifies the document (_id).
 // - testID: Required. Identifies the test to update.
+// - retryIndex: Required. Identifies the test to update.
+// - status: New status to set (optional).
+// - duration: New duration to set (optional).
 // Returns error if runID is empty or test not found.
-func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testID string, status string, duration *int64) error {
+func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testID string, status string, retryIndex int32, duration *int64) error {
 	if err := validateRunID(runID); err != nil {
 		return err
 	}
@@ -124,8 +128,9 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 
 	// Update test in root-level tests array
 	filter := bson.M{
-		"_id":      runID,
-		"tests.id": testID,
+		"_id":               runID,
+		"tests.id":          testID,
+		"tests.retry_index": retryIndex,
 	}
 	setFields := bson.M{"updated_at": now}
 	for k, v := range updateFields {
@@ -144,7 +149,7 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 	}
 
 	if result.MatchedCount == 0 {
-		return fmt.Errorf("test not found: runID=%s, testID=%s", runID, testID)
+		return fmt.Errorf("test not found: runID=%s, testID=%s, retryIndex=%v", runID, testID, retryIndex)
 	}
 
 	r.logger.Info("test end", "runID", runID, "testID", testID, "status", status)
