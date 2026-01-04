@@ -99,7 +99,7 @@ func TestReportStep(t *testing.T) {
 		t.Fatalf("start failed: %v", err)
 	}
 
-	_, err = client.ReportStepBegin(ctx, &events.StepBeginEventRequest{Step: &entities.StepRun{Id: "step-id", RunId: "tid", TestCaseRunId: "test-id"}})
+	_, err = client.ReportStepBegin(ctx, &events.StepBeginEventRequest{Step: &entities.StepRun{Id: "step-id", RunId: "tid", TestCaseId: "test-id"}})
 	if err != nil {
 		t.Fatalf("step failed: %v", err)
 	}
@@ -142,8 +142,8 @@ func newTestGRPCServerWithNATS(logger *slog.Logger, pub *publisher.NATSPublisher
 	return grpcServer
 }
 
-// TestMapTestRun tests the MapTestRun endpoint
-func TestMapTestRun(t *testing.T) {
+// TestReportRunStart tests the ReportRunStart endpoint
+func TestReportRunStart(t *testing.T) {
 	conn := dialBufConn(t)
 	defer conn.Close()
 	client := observer.NewTestEventCollectorClient(conn)
@@ -151,7 +151,7 @@ func TestMapTestRun(t *testing.T) {
 	defer cancel()
 
 	// Valid request with run_id and test suites
-	_, err := client.MapTestRun(ctx, &events.MapTestRunEventRequest{
+	_, err := client.ReportRunStart(ctx, &events.ReportRunStartEventRequest{
 		RunId: "run-123",
 		TestSuites: []*entities.TestSuiteRun{
 			{
@@ -167,26 +167,26 @@ func TestMapTestRun(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Fatalf("MapTestRun failed: %v", err)
+		t.Fatalf("ReportRunStart failed: %v", err)
 	}
 }
 
-// TestMapTestRunInvalidInput tests validation of MapTestRun endpoint
-func TestMapTestRunInvalidInput(t *testing.T) {
+// TestReportRunStartInvalidInput tests validation of ReportRunStart endpoint
+func TestReportRunStartInvalidInput(t *testing.T) {
 	cases := []struct {
 		name string
-		req  *events.MapTestRunEventRequest
+		req  *events.ReportRunStartEventRequest
 	}{
 		{"nil-req", nil},
-		{"empty-run-id", &events.MapTestRunEventRequest{
+		{"empty-run-id", &events.ReportRunStartEventRequest{
 			RunId:      "",
 			TestSuites: []*entities.TestSuiteRun{{Id: "suite-1"}},
 		}},
-		{"empty-test-suites", &events.MapTestRunEventRequest{
+		{"empty-test-suites", &events.ReportRunStartEventRequest{
 			RunId:      "run-123",
 			TestSuites: []*entities.TestSuiteRun{},
 		}},
-		{"nil-test-suites", &events.MapTestRunEventRequest{
+		{"nil-test-suites", &events.ReportRunStartEventRequest{
 			RunId:      "run-123",
 			TestSuites: nil,
 		}},
@@ -199,7 +199,7 @@ func TestMapTestRunInvalidInput(t *testing.T) {
 			client := observer.NewTestEventCollectorClient(conn)
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
-			_, err := client.MapTestRun(ctx, c.req)
+			_, err := client.ReportRunStart(ctx, c.req)
 			if err == nil {
 				t.Fatalf("expected error for case %s", c.name)
 			}

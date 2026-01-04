@@ -251,7 +251,7 @@ func (c *Classifier) classifyStepBegin(ctx context.Context, event publisher.Even
 	}
 
 	// Extract parent test ID
-	testID := req.Step.TestCaseRunId
+	testID := req.Step.TestCaseId
 	if testID == "" {
 		c.logger.Debug("step begin - no parent test - buffer",
 			"step_id", req.Step.Id)

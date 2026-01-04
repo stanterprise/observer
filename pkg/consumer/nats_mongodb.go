@@ -433,7 +433,7 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 	// runID identifies the document
 	// TestSuiteRunId is the parent suite containing this test
 	runID := req.TestCase.RunId
-	suiteID := req.TestCase.TestSuiteRunId
+	suiteID := req.TestCase.TestSuiteId
 	if suiteID == "" {
 		// Fallback: if no TestSuiteRunId, use RunId as both
 		suiteID = runID
@@ -485,7 +485,7 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 
 	c.logger.Info("step start",
 		"id", req.Step.Id,
-		"test_case_run_id", req.Step.TestCaseRunId)
+		"test_case_run_id", req.Step.TestCaseId)
 
 	// Convert metadata
 	md := make(map[string]interface{})
@@ -502,7 +502,7 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 	step := &m.StepDocument{
 		ID:            req.Step.Id,
 		RunID:         req.Step.RunId,
-		TestCaseRunID: req.Step.TestCaseRunId,
+		TestCaseRunID: req.Step.TestCaseId,
 		ParentStepID:  req.Step.ParentStepId,
 		Title:         req.Step.Title,
 		Description:   req.Step.Description,
@@ -523,7 +523,7 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 	}
 
 	runID := req.Step.RunId
-	return c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseRunId)
+	return c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseId)
 }
 
 // handleStepEnd processes a step end event
@@ -542,7 +542,7 @@ func (c *MongoNATSConsumer) handleStepEnd(ctx context.Context, data json.RawMess
 		"status", req.Step.Status)
 
 	// Extract testID from TestCaseRunId (same as in handleStepBegin)
-	testID := extractTestID(req.Step.TestCaseRunId, req.Step.RunId)
+	testID := extractTestID(req.Step.TestCaseId, req.Step.RunId)
 	runID := req.Step.RunId
 
 	return c.repo.UpsertStepEnd(ctx, runID, req.Step.Id, testID, mongoStatusToString(req.Step.Status))
@@ -773,7 +773,7 @@ func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessa
 }
 
 func (c *MongoNATSConsumer) handleMapSuites(ctx context.Context, data json.RawMessage) error {
-	var req events.MapTestRunEventRequest
+	var req events.ReportRunStartEventRequest
 	if err := json.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal map suites event: %w", err)
 	}

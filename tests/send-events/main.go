@@ -53,10 +53,10 @@ func main() {
 
 	_, err = client.ReportTestBegin(ctx, &events.TestBeginEventRequest{
 		TestCase: &entities.TestCaseRun{
-			Id:            testID,
-			RunId:         runID,
-			TestSuiteRunId: suiteID,
-			Name:          "Demo Test for WebSocket",
+			Id:          testID,
+			RunId:       runID,
+			TestSuiteId: suiteID,
+			Name:        "Demo Test for WebSocket",
 			Metadata: map[string]string{
 				"browser": "chrome",
 				"env":     "staging",
@@ -75,11 +75,11 @@ func main() {
 	fmt.Println("Sending step begin event")
 	_, err = client.ReportStepBegin(ctx, &events.StepBeginEventRequest{
 		Step: &entities.StepRun{
-			Id:            stepID,
-			RunId:         runID,
-			TestCaseRunId: fmt.Sprintf("%s-%s", runID, testID), // This matches the Playwright reporter format
-			Title:         "Demo Step",
-			Category:      "test",
+			Id:         stepID,
+			RunId:      runID,
+			TestCaseId: fmt.Sprintf("%s-%s", runID, testID), // This matches the Playwright reporter format
+			Title:      "Demo Step",
+			Category:   "test",
 		},
 	})
 	if err != nil {
@@ -93,9 +93,9 @@ func main() {
 	fmt.Println("Sending step end event")
 	_, err = client.ReportStepEnd(ctx, &events.StepEndEventRequest{
 		Step: &entities.StepRun{
-			Id:            stepID,
-			TestCaseRunId: testID,
-			Status:        common.TestStatus_PASSED,
+			Id:         stepID,
+			TestCaseId: testID,
+			Status:     common.TestStatus_PASSED,
 		},
 	})
 	if err != nil {

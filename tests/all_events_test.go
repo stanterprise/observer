@@ -111,7 +111,7 @@ func TestAllEventTypes(t *testing.T) {
 	// 4. StepBegin
 	if err := pub.Publish(ctx, publisher.EventTypeStepBegin, &events.StepBeginEventRequest{
 		Step: &entities.StepRun{
-			TestCaseRunId: "test-1",
+			TestCaseId: "test-1",
 		},
 	}); err != nil {
 		t.Errorf("Failed to publish StepBegin: %v", err)
@@ -120,8 +120,8 @@ func TestAllEventTypes(t *testing.T) {
 	// 5. StepEnd
 	if err := pub.Publish(ctx, publisher.EventTypeStepEnd, &events.StepEndEventRequest{
 		Step: &entities.StepRun{
-			TestCaseRunId: "test-1",
-			Status:        common.TestStatus_PASSED,
+			TestCaseId: "test-1",
+			Status:     common.TestStatus_PASSED,
 		},
 	}); err != nil {
 		t.Errorf("Failed to publish StepEnd: %v", err)

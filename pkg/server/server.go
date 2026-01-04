@@ -312,7 +312,7 @@ func (s *EventServer) Heartbeat(ctx context.Context, in *events.HeartbeatEventRe
 	return &observer.AckResponse{Success: true, Message: "Heartbeat received"}, nil
 }
 
-func (s *EventServer) MapTestRun(ctx context.Context, in *events.MapTestRunEventRequest) (*observer.AckResponse, error) {
+func (s *EventServer) ReportRunStart(ctx context.Context, in *events.ReportRunStartEventRequest) (*observer.AckResponse, error) {
 	if in == nil {
 		return nil, status.Error(codes.InvalidArgument, "request required")
 	}

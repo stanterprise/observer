@@ -113,7 +113,7 @@ func TestNATSIntegration(t *testing.T) {
 			TestCase: &entities.TestCaseRun{
 				Id:       "test-nats-1",
 				RunId:    "run-nats-1",
-				Name:    "NATS Integration Test",
+				Name:     "NATS Integration Test",
 				Metadata: map[string]string{"env": "test"},
 			},
 		}
@@ -207,7 +207,7 @@ func TestNATSIntegration(t *testing.T) {
 	t.Run("ReportStepBegin publishes to NATS", func(t *testing.T) {
 		req := &events.StepBeginEventRequest{
 			Step: &entities.StepRun{
-				TestCaseRunId: "test-nats-3",
+				TestCaseId: "test-nats-3",
 			},
 		}
 
@@ -251,8 +251,8 @@ func TestNATSIntegration(t *testing.T) {
 	t.Run("ReportStepEnd publishes to NATS", func(t *testing.T) {
 		req := &events.StepEndEventRequest{
 			Step: &entities.StepRun{
-				TestCaseRunId: "test-nats-4",
-				Status:        common.TestStatus_PASSED,
+				TestCaseId: "test-nats-4",
+				Status:     common.TestStatus_PASSED,
 			},
 		}
 
