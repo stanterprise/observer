@@ -55,6 +55,10 @@ func (c *Classifier) Classify(ctx context.Context, event publisher.Event) (Event
 		return c.classifyStepBegin(ctx, event)
 	case publisher.EventTypeStepEnd:
 		return c.classifyStepEnd(ctx, event)
+	case publisher.EventTypeRunStart:
+		return c.classifyRunStart(ctx, event)
+	case publisher.EventTypeRunEnd:
+		return c.classifyRunEnd(ctx, event)
 	default:
 		// Unknown or heartbeat events can be processed immediately
 		return ClassifyImmediate, nil
@@ -311,5 +315,54 @@ func (c *Classifier) classifyStepEnd(ctx context.Context, event publisher.Event)
 
 	c.logger.Debug("step end - step missing - buffer",
 		"step_id", stepID)
+	return ClassifyBuffer, nil
+}
+
+// classifyRunStart checks if a run start event can be processed immediately
+func (c *Classifier) classifyRunStart(ctx context.Context, event publisher.Event) (EventClassification, error) {
+	var req events.ReportRunStartEventRequest
+	if err := json.Unmarshal(event.Data, &req); err != nil {
+		return ClassifyBuffer, fmt.Errorf("unmarshal run start: %w", err)
+	}
+
+	if req.RunId == "" {
+		return ClassifyBuffer, fmt.Errorf("run start missing run")
+	}
+
+	// Run start events are always immediate as they create new test runs
+	c.logger.Debug("run start - immediate",
+		"run_id", req.RunId)
+	return ClassifyImmediate, nil
+}
+
+// classifyRunEnd checks if a run end event can be processed immediately
+func (c *Classifier) classifyRunEnd(ctx context.Context, event publisher.Event) (EventClassification, error) {
+	var req events.TestRunEndEventRequest
+	if err := json.Unmarshal(event.Data, &req); err != nil {
+		return ClassifyBuffer, fmt.Errorf("unmarshal run end: %w", err)
+	}
+
+	if req.RunId == "" {
+		return ClassifyBuffer, fmt.Errorf("run end missing run")
+	}
+
+	runID := req.RunId
+	// Check if run exists
+	exists, err := c.repo.TestRunExists(ctx, runID)
+	if err != nil {
+		c.logger.Error("failed to check run existence",
+			"run_id", runID,
+			"error", err)
+		return ClassifyBuffer, fmt.Errorf("check run: %w", err)
+	}
+
+	if exists {
+		c.logger.Debug("run end - immediate",
+			"run_id", runID)
+		return ClassifyImmediate, nil
+	}
+
+	c.logger.Debug("run end - run missing - buffer",
+		"run_id", runID)
 	return ClassifyBuffer, nil
 }

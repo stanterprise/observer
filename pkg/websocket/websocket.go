@@ -42,11 +42,28 @@ type Hub struct {
 	stream   string
 }
 
+// EventFilters holds filters for selective event streaming
+type EventFilters struct {
+	// EventTypes filters events by type (e.g., test.begin, test.end)
+	// Empty slice means all event types
+	EventTypes []string
+
+	// RunID filters events by run ID
+	RunID string
+
+	// TestID filters events by test ID
+	TestID string
+
+	// SuiteID filters events by suite ID
+	SuiteID string
+}
+
 // Client represents a WebSocket client connection
 type Client struct {
-	hub  *Hub
-	conn *websocket.Conn
-	send chan []byte
+	hub     *Hub
+	conn    *websocket.Conn
+	send    chan []byte
+	filters EventFilters
 }
 
 var upgrader = websocket.Upgrader{
@@ -198,8 +215,20 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 			h.logger.Info("client disconnected", "total_clients", len(h.clients))
 
 		case message := <-h.broadcast:
+			// Parse the event to check filters
+			var event publisher.Event
+			if err := json.Unmarshal(message, &event); err != nil {
+				h.logger.Error("failed to parse event for filtering", "error", err)
+				continue
+			}
+
 			h.mu.RLock()
 			for client := range h.clients {
+				// Check if client's filters match this event
+				if !client.matchesFilters(&event) {
+					continue
+				}
+
 				select {
 				case client.send <- message:
 				default:
@@ -279,11 +308,21 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse filters from query parameters
+	filters := parseFilters(r)
+
 	client := &Client{
-		hub:  h,
-		conn: conn,
-		send: make(chan []byte, 256),
+		hub:     h,
+		conn:    conn,
+		send:    make(chan []byte, 256),
+		filters: filters,
 	}
+
+	h.logger.Info("client connecting with filters",
+		"eventTypes", filters.EventTypes,
+		"runID", filters.RunID,
+		"testID", filters.TestID,
+		"suiteID", filters.SuiteID)
 
 	client.hub.register <- client
 
@@ -353,6 +392,185 @@ func (c *Client) writePump() {
 			}
 		}
 	}
+}
+
+// parseFilters extracts event filters from URL query parameters
+func parseFilters(r *http.Request) EventFilters {
+	query := r.URL.Query()
+
+	filters := EventFilters{
+		RunID:   query.Get("runId"),
+		TestID:  query.Get("testId"),
+		SuiteID: query.Get("suiteId"),
+	}
+
+	// Parse event types (comma-separated)
+	if eventTypes := query.Get("eventTypes"); eventTypes != "" {
+		for _, et := range splitAndTrim(eventTypes, ",") {
+			if et != "" {
+				filters.EventTypes = append(filters.EventTypes, et)
+			}
+		}
+	}
+
+	return filters
+}
+
+// splitAndTrim splits a string by delimiter and trims whitespace from each part
+func splitAndTrim(s, delimiter string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := []string{}
+	for _, part := range splitString(s, delimiter) {
+		trimmed := trimSpace(part)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
+}
+
+// splitString splits string by delimiter (simple implementation)
+func splitString(s, delimiter string) []string {
+	if s == "" {
+		return nil
+	}
+	result := []string{}
+	current := ""
+	for i := 0; i < len(s); i++ {
+		if i+len(delimiter) <= len(s) && s[i:i+len(delimiter)] == delimiter {
+			result = append(result, current)
+			current = ""
+			i += len(delimiter) - 1
+		} else {
+			current += string(s[i])
+		}
+	}
+	if current != "" || len(result) > 0 {
+		result = append(result, current)
+	}
+	return result
+}
+
+// trimSpace removes leading and trailing whitespace
+func trimSpace(s string) string {
+	start := 0
+	end := len(s)
+	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
+		start++
+	}
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
+		end--
+	}
+	return s[start:end]
+}
+
+// matchesFilters checks if an event matches the client's filters
+func (c *Client) matchesFilters(event *publisher.Event) bool {
+	// If no filters are set, match all events
+	if len(c.filters.EventTypes) == 0 && c.filters.RunID == "" &&
+		c.filters.TestID == "" && c.filters.SuiteID == "" {
+		return true
+	}
+
+	// Parse event data to extract IDs
+	var eventData map[string]interface{}
+	if err := json.Unmarshal(event.Data, &eventData); err != nil {
+		// If we can't parse the data, allow the event (fail open)
+		return true
+	}
+
+	// Check event type filter
+	if len(c.filters.EventTypes) > 0 {
+		matched := false
+		for _, et := range c.filters.EventTypes {
+			if string(event.Type) == et {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	// Check runID filter
+	if c.filters.RunID != "" {
+		if runID, ok := extractID(eventData, "run_id", "runId"); ok {
+			if runID != c.filters.RunID {
+				return false
+			}
+		} else {
+			// If runID is required but not found in event, filter it out
+			return false
+		}
+	}
+
+	// Check testID filter
+	if c.filters.TestID != "" {
+		if testID, ok := extractID(eventData, "test_case.id", "testCase.id", "test_id", "testId", "id"); ok {
+			if testID != c.filters.TestID {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+
+	// Check suiteID filter
+	if c.filters.SuiteID != "" {
+		if suiteID, ok := extractID(eventData, "suite.id", "suiteId", "suite_id"); ok {
+			if suiteID != c.filters.SuiteID {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+
+	return true
+}
+
+// extractID attempts to extract an ID from event data using multiple possible field names
+func extractID(data map[string]interface{}, fieldNames ...string) (string, bool) {
+	for _, fieldName := range fieldNames {
+		// Handle nested fields (e.g., "test_case.id")
+		if value, ok := getNestedField(data, fieldName); ok {
+			if strValue, ok := value.(string); ok {
+				return strValue, true
+			}
+		}
+	}
+	return "", false
+}
+
+// getNestedField retrieves a nested field from a map using dot notation
+func getNestedField(data map[string]interface{}, fieldPath string) (interface{}, bool) {
+	fields := splitString(fieldPath, ".")
+	current := data
+
+	for i, field := range fields {
+		if i == len(fields)-1 {
+			// Last field - return its value
+			value, ok := current[field]
+			return value, ok
+		}
+
+		// Intermediate field - must be a map
+		value, ok := current[field]
+		if !ok {
+			return nil, false
+		}
+
+		nextMap, ok := value.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		current = nextMap
+	}
+
+	return nil, false
 }
 
 // noopWriter implements io.Writer but drops logs when no logger provided

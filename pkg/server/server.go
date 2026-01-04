@@ -326,7 +326,7 @@ func (s *EventServer) ReportRunStart(ctx context.Context, in *events.ReportRunSt
 
 	// Publish to NATS if publisher is configured
 	if s.publisher != nil {
-		if err := s.publisher.Publish(ctx, publisher.MapSuitesEvent, in); err != nil {
+		if err := s.publisher.Publish(ctx, publisher.EventTypeRunStart, in); err != nil {
 			s.logger.Error("publish to NATS failed", "run_id", in.RunId, "error", err)
 			return nil, status.Error(codes.Internal, "failed to publish event")
 		}

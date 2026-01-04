@@ -245,8 +245,8 @@ func (c *MongoNATSConsumer) processMessage(ctx context.Context, msg jetstream.Ms
 		return c.handleHeartbeat(ctx, event.Data)
 	case publisher.EventTypeRunEnd:
 		return c.handleRunEnd(ctx, event.Data)
-	case publisher.MapSuitesEvent:
-		return c.handleMapSuites(ctx, event.Data)
+	case publisher.EventTypeRunStart:
+		return c.handleRunStart(ctx, event.Data)
 	default:
 		c.logger.Warn("unknown event type", "type", event.Type)
 		return nil
@@ -772,13 +772,13 @@ func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessa
 	return nil
 }
 
-func (c *MongoNATSConsumer) handleMapSuites(ctx context.Context, data json.RawMessage) error {
+func (c *MongoNATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage) error {
 	var req events.ReportRunStartEventRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		return fmt.Errorf("unmarshal map suites event: %w", err)
+		return fmt.Errorf("unmarshal run start event: %w", err)
 	}
 
-	c.logger.Info("map suites",
+	c.logger.Info("run start",
 		"run_id", req.RunId,
 		"name", req.Name,
 		"total_tests", req.TotalTests,

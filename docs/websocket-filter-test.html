@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Filter Test Client</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      h1 {
+        color: #333;
+        margin-top: 0;
+      }
+      h2 {
+        color: #555;
+        border-bottom: 2px solid #e0e0e0;
+        padding-bottom: 10px;
+      }
+      .filter-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+      .filter-group {
+        display: flex;
+        flex-direction: column;
+      }
+      label {
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #666;
+      }
+      input[type="text"] {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .checkbox-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 5px;
+      }
+      .checkbox-group label {
+        display: flex;
+        align-items: center;
+        font-weight: normal;
+        margin: 0;
+      }
+      .checkbox-group input[type="checkbox"] {
+        margin-right: 5px;
+      }
+      .button-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+      button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.3s;
+      }
+      button.primary {
+        background: #4caf50;
+        color: white;
+      }
+      button.primary:hover {
+        background: #45a049;
+      }
+      button.secondary {
+        background: #f44336;
+        color: white;
+      }
+      button.secondary:hover {
+        background: #da190b;
+      }
+      button.tertiary {
+        background: #2196f3;
+        color: white;
+      }
+      button.tertiary:hover {
+        background: #0b7dda;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .status {
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        font-weight: 600;
+      }
+      .status.disconnected {
+        background: #ffebee;
+        color: #c62828;
+      }
+      .status.connected {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      .status.connecting {
+        background: #fff3e0;
+        color: #ef6c00;
+      }
+      .events {
+        max-height: 500px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 10px;
+        background: #fafafa;
+      }
+      .event {
+        padding: 10px;
+        margin-bottom: 10px;
+        border-left: 4px solid #2196f3;
+        background: white;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .event-header {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+      }
+      .event-type {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-right: 10px;
+      }
+      .event-type.test-begin {
+        background: #e3f2fd;
+        color: #1565c0;
+      }
+      .event-type.test-end {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      .event-type.step-begin {
+        background: #f3e5f5;
+        color: #6a1b9a;
+      }
+      .event-type.step-end {
+        background: #fff3e0;
+        color: #ef6c00;
+      }
+      .event-type.suite-begin {
+        background: #fce4ec;
+        color: #c2185b;
+      }
+      .event-type.suite-end {
+        background: #e0f2f1;
+        color: #00695c;
+      }
+      .event-type.test-failure {
+        background: #ffebee;
+        color: #c62828;
+      }
+      .event-type.test-error {
+        background: #ffebee;
+        color: #c62828;
+      }
+      .event-data {
+        color: #666;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 200px;
+        overflow-y: auto;
+        margin-top: 5px;
+      }
+      .stats {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+      .stat {
+        padding: 10px;
+        background: #f5f5f5;
+        border-radius: 4px;
+        flex: 1;
+      }
+      .stat-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: #333;
+      }
+      .stat-label {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
+      .url-display {
+        padding: 10px;
+        background: #f5f5f5;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        color: #333;
+        margin-bottom: 20px;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔌 Observer WebSocket Filter Test Client</h1>
+
+    <div class="container">
+      <h2>Connection Settings</h2>
+
+      <div class="filter-group" style="margin-bottom: 15px">
+        <label for="wsUrl">WebSocket URL:</label>
+        <input
+          type="text"
+          id="wsUrl"
+          value="ws://localhost:8080/ws"
+          placeholder="ws://localhost:8080/ws"
+        />
+      </div>
+
+      <h3>Event Type Filters</h3>
+      <div class="checkbox-group" id="eventTypeFilters">
+        <label><input type="checkbox" value="test.begin" /> test.begin</label>
+        <label><input type="checkbox" value="test.end" /> test.end</label>
+        <label><input type="checkbox" value="step.begin" /> step.begin</label>
+        <label><input type="checkbox" value="step.end" /> step.end</label>
+        <label><input type="checkbox" value="suite.begin" /> suite.begin</label>
+        <label><input type="checkbox" value="suite.end" /> suite.end</label>
+        <label
+          ><input type="checkbox" value="test.failure" /> test.failure</label
+        >
+        <label><input type="checkbox" value="test.error" /> test.error</label>
+        <label><input type="checkbox" value="stdout" /> stdout</label>
+        <label><input type="checkbox" value="stderr" /> stderr</label>
+      </div>
+
+      <h3>ID Filters</h3>
+      <div class="filter-section">
+        <div class="filter-group">
+          <label for="runId">Run ID:</label>
+          <input type="text" id="runId" placeholder="e.g., run-123" />
+        </div>
+        <div class="filter-group">
+          <label for="testId">Test ID:</label>
+          <input type="text" id="testId" placeholder="e.g., test-456" />
+        </div>
+        <div class="filter-group">
+          <label for="suiteId">Suite ID:</label>
+          <input type="text" id="suiteId" placeholder="e.g., suite-789" />
+        </div>
+      </div>
+
+      <div class="url-display" id="finalUrl"></div>
+
+      <div class="button-group">
+        <button id="connectBtn" class="primary">Connect</button>
+        <button id="disconnectBtn" class="secondary" disabled>
+          Disconnect
+        </button>
+        <button id="clearBtn" class="tertiary">Clear Events</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="status disconnected" id="status">Disconnected</div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="eventCount">0</div>
+          <div class="stat-label">Events Received</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="connectionTime">--</div>
+          <div class="stat-label">Connection Time</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <h2>
+        Events
+        <span style="font-size: 14px; font-weight: normal"
+          >(most recent first)</span
+        >
+      </h2>
+      <div class="events" id="events">
+        <p style="color: #999; text-align: center; padding: 20px">
+          No events yet. Connect to start receiving events.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      let ws = null;
+      let eventCount = 0;
+      let connectionStartTime = null;
+
+      const statusEl = document.getElementById("status");
+      const eventsEl = document.getElementById("events");
+      const eventCountEl = document.getElementById("eventCount");
+      const connectionTimeEl = document.getElementById("connectionTime");
+      const connectBtn = document.getElementById("connectBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const finalUrlEl = document.getElementById("finalUrl");
+
+      function updateFinalUrl() {
+        const baseUrl = document.getElementById("wsUrl").value;
+        const params = new URLSearchParams();
+
+        // Add event type filters
+        const eventTypes = Array.from(
+          document.querySelectorAll("#eventTypeFilters input:checked")
+        ).map((cb) => cb.value);
+        if (eventTypes.length > 0) {
+          params.append("eventTypes", eventTypes.join(","));
+        }
+
+        // Add ID filters
+        const runId = document.getElementById("runId").value.trim();
+        if (runId) params.append("runId", runId);
+
+        const testId = document.getElementById("testId").value.trim();
+        if (testId) params.append("testId", testId);
+
+        const suiteId = document.getElementById("suiteId").value.trim();
+        if (suiteId) params.append("suiteId", suiteId);
+
+        const queryString = params.toString();
+        const finalUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+        finalUrlEl.textContent = `Connection URL: ${finalUrl}`;
+
+        return finalUrl;
+      }
+
+      function updateStatus(status, message) {
+        statusEl.className = `status ${status}`;
+        statusEl.textContent = message;
+      }
+
+      function formatEventType(type) {
+        const className = type.replace(".", "-");
+        return `<span class="event-type ${className}">${type}</span>`;
+      }
+
+      function addEvent(event) {
+        eventCount++;
+        eventCountEl.textContent = eventCount;
+
+        const eventDiv = document.createElement("div");
+        eventDiv.className = "event";
+
+        const timestamp = new Date(event.timestamp).toLocaleTimeString(
+          "en-US",
+          {
+            hour12: false,
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            fractionalSecondDigits: 3,
+          }
+        );
+
+        eventDiv.innerHTML = `
+                <div class="event-header">
+                    ${formatEventType(event.type)}
+                    <span style="color: #999;">${timestamp}</span>
+                </div>
+                <div class="event-data">${JSON.stringify(
+                  JSON.parse(event.data),
+                  null,
+                  2
+                )}</div>
+            `;
+
+        if (eventsEl.firstChild && eventsEl.firstChild.tagName !== "P") {
+          eventsEl.insertBefore(eventDiv, eventsEl.firstChild);
+        } else {
+          eventsEl.innerHTML = "";
+          eventsEl.appendChild(eventDiv);
+        }
+      }
+
+      function updateConnectionTime() {
+        if (!connectionStartTime) return;
+        const elapsed = Math.floor((Date.now() - connectionStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        connectionTimeEl.textContent = `${minutes}:${seconds
+          .toString()
+          .padStart(2, "0")}`;
+      }
+
+      function connect() {
+        const url = updateFinalUrl();
+
+        updateStatus("connecting", "Connecting...");
+        connectBtn.disabled = true;
+
+        ws = new WebSocket(url);
+
+        ws.onopen = () => {
+          updateStatus("connected", "Connected");
+          disconnectBtn.disabled = false;
+          connectionStartTime = Date.now();
+          setInterval(updateConnectionTime, 1000);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            addEvent(data);
+          } catch (err) {
+            console.error("Failed to parse event:", err);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error("WebSocket error:", error);
+          updateStatus("disconnected", "Connection error");
+        };
+
+        ws.onclose = () => {
+          updateStatus("disconnected", "Disconnected");
+          connectBtn.disabled = false;
+          disconnectBtn.disabled = true;
+          connectionStartTime = null;
+          connectionTimeEl.textContent = "--";
+        };
+      }
+
+      function disconnect() {
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
+      }
+
+      function clearEvents() {
+        eventsEl.innerHTML =
+          '<p style="color: #999; text-align: center; padding: 20px;">No events yet.</p>';
+        eventCount = 0;
+        eventCountEl.textContent = "0";
+      }
+
+      // Event listeners
+      connectBtn.addEventListener("click", connect);
+      disconnectBtn.addEventListener("click", disconnect);
+      clearBtn.addEventListener("click", clearEvents);
+
+      // Update URL preview when filters change
+      document
+        .getElementById("wsUrl")
+        .addEventListener("input", updateFinalUrl);
+      document
+        .getElementById("runId")
+        .addEventListener("input", updateFinalUrl);
+      document
+        .getElementById("testId")
+        .addEventListener("input", updateFinalUrl);
+      document
+        .getElementById("suiteId")
+        .addEventListener("input", updateFinalUrl);
+      document.querySelectorAll("#eventTypeFilters input").forEach((cb) => {
+        cb.addEventListener("change", updateFinalUrl);
+      });
+
+      // Initial URL display
+      updateFinalUrl();
+    </script>
+  </body>
+</html>
