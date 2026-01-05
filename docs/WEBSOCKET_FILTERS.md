@@ -38,6 +38,8 @@ Filter events by their type using the `eventTypes` query parameter. Multiple eve
 - `suite.end` - Test suite completed
 - `test.failure` - Test case failed
 - `test.error` - Test case encountered an error
+- `run.start` - Test run is started
+- `run.end` - Test run is completed
 - `stdout` - Standard output from test
 - `stderr` - Standard error from test
 
