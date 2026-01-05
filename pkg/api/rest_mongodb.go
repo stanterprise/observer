@@ -129,37 +129,36 @@ func (h *MongoHandler) handleTestDetailByRunAndTest(w http.ResponseWriter, r *ht
 	}
 
 	// Search for the test in root tests and nested suites
-	var foundTest *m.TestDocument
+	var foundTests []*m.TestDocument = make([]*m.TestDocument, 0)
 	for _, test := range doc.Tests {
 		if test.ID == testID {
-			foundTest = test
+			foundTests = append(foundTests, test)
 			break
 		}
 	}
 
-	if foundTest == nil {
+	if len(foundTests) == 0 {
 		for _, suite := range doc.Suites {
 			for _, test := range suite.Tests {
 				if test.ID == testID {
-					foundTest = test
+					foundTests = append(foundTests, test)
 					break
 				}
 			}
-			if foundTest != nil {
+			if len(foundTests) > 0 {
 				break
 			}
 		}
 	}
 
-	if foundTest == nil {
+	if len(foundTests) == 0 {
 		http.Error(w, "Test not found", http.StatusNotFound)
 		return
 	}
 
 	response := map[string]interface{}{
 		"runId": runID,
-		"test":  foundTest,
-		"steps": foundTest.Steps,
+		"tests": foundTests,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -194,13 +193,31 @@ func (h *MongoHandler) handleRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract run IDs
-	runIDs := make([]string, 0, len(docs))
+	// Extract run Data
+	runData := make([]map[string]interface{}, 0, len(docs))
 	for _, doc := range docs {
-		runIDs = append(runIDs, doc.ID)
+		runData = append(runData, map[string]interface{}{
+			"id":         doc.ID,
+			"name":       doc.Name,
+			"updatedAt":  doc.UpdatedAt,
+			"totalTests": len(doc.Tests),
+			"status":     doc.Status,
+			"metadata":   doc.Metadata,
+			"statistics": map[string]interface{}{
+				"total":       len(doc.Tests),
+				"passed":      len(FilterTestsByStatus(doc.Tests, "PASSED")),
+				"failed":      len(FilterTestsByStatus(doc.Tests, "FAILED")),
+				"skipped":     len(FilterTestsByStatus(doc.Tests, "SKIPPED")),
+				"running":     len(FilterTestsByStatus(doc.Tests, "RUNNING")),
+				"broken":      len(FilterTestsByStatus(doc.Tests, "BROKEN")),
+				"timedout":    len(FilterTestsByStatus(doc.Tests, "TIMEDOUT")),
+				"interrupted": len(FilterTestsByStatus(doc.Tests, "INTERRUPTED")),
+				"unknown":     len(FilterTestsByStatus(doc.Tests, "UNKNOWN")),
+			},
+		})
 	}
 	response := map[string]interface{}{
-		"runs": runIDs,
+		"runs": runData,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -290,6 +307,7 @@ func (h *MongoHandler) handleRunsStats(w http.ResponseWriter, r *http.Request) {
 		}
 
 		runStat := map[string]interface{}{
+			"runName":     doc.Name,
 			"runId":       doc.ID,
 			"total":       stats["total"],
 			"passed":      stats["passed"],
@@ -417,14 +435,14 @@ func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 		totalSteps += len(test.Steps)
 	}
 
-	response := map[string]interface{}{
-		"runId":      runID,
-		"tests":      allTests,
-		"statistics": stats,
-		"totalSteps": totalSteps,
-		"document":   doc, // Include full document for advanced clients
-	}
+	// response := map[string]interface{}{
+	// 	"runId":      runID,
+	// 	"tests":      allTests,
+	// 	"statistics": stats,
+	// 	"totalSteps": totalSteps,
+	// 	"document":   doc, // Include full document for advanced clients
+	// }
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(doc)
 }

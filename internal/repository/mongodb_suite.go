@@ -51,18 +51,29 @@ func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, runID string, su
 func (r *MongoRepository) upsertRootSuite(ctx context.Context, runID string, suite *m.SuiteDocument, now time.Time) error {
 	// Try to update existing suite
 	filter := bson.M{
-		"_id": runID,
+		"_id":       runID,
+		"suites.id": suite.ID,
 	}
 	update := bson.M{
 		"$set": bson.M{
+			"suites.$.run_id":             suite.RunID,
+			"suites.$.parent_suite_id":    suite.ParentSuiteID,
 			"suites.$.name":               suite.Name,
 			"suites.$.description":        suite.Description,
 			"suites.$.status":             suite.Status,
 			"suites.$.metadata":           suite.Metadata,
+			"suites.$.duration":           suite.Duration,
+			"suites.$.location":           suite.Location,
+			"suites.$.type":               suite.Type,
 			"suites.$.test_suite_spec_id": suite.TestSuiteSpecID,
 			"suites.$.initiated_by":       suite.InitiatedBy,
 			"suites.$.project_name":       suite.ProjectName,
+			"suites.$.author":             suite.Author,
+			"suites.$.owner":              suite.Owner,
+			"suites.$.test_case_ids":      suite.TestCaseIds,
+			"suites.$.sub_suite_ids":      suite.SubSuiteIds,
 			"suites.$.start_time":         suite.StartTime,
+			"suites.$.end_time":           suite.EndTime,
 			"suites.$.updated_at":         now,
 			"updated_at":                  now,
 		},
@@ -104,14 +115,24 @@ func (r *MongoRepository) upsertNestedSuite(ctx context.Context, runID string, s
 	}
 	update := bson.M{
 		"$set": bson.M{
+			"suites.$[parent].suites.$[suite].run_id":             suite.RunID,
+			"suites.$[parent].suites.$[suite].parent_suite_id":    suite.ParentSuiteID,
 			"suites.$[parent].suites.$[suite].name":               suite.Name,
 			"suites.$[parent].suites.$[suite].description":        suite.Description,
 			"suites.$[parent].suites.$[suite].status":             suite.Status,
 			"suites.$[parent].suites.$[suite].metadata":           suite.Metadata,
+			"suites.$[parent].suites.$[suite].duration":           suite.Duration,
+			"suites.$[parent].suites.$[suite].location":           suite.Location,
+			"suites.$[parent].suites.$[suite].type":               suite.Type,
 			"suites.$[parent].suites.$[suite].test_suite_spec_id": suite.TestSuiteSpecID,
 			"suites.$[parent].suites.$[suite].initiated_by":       suite.InitiatedBy,
 			"suites.$[parent].suites.$[suite].project_name":       suite.ProjectName,
+			"suites.$[parent].suites.$[suite].author":             suite.Author,
+			"suites.$[parent].suites.$[suite].owner":              suite.Owner,
+			"suites.$[parent].suites.$[suite].test_case_ids":      suite.TestCaseIds,
+			"suites.$[parent].suites.$[suite].sub_suite_ids":      suite.SubSuiteIds,
 			"suites.$[parent].suites.$[suite].start_time":         suite.StartTime,
+			"suites.$[parent].suites.$[suite].end_time":           suite.EndTime,
 			"suites.$[parent].suites.$[suite].updated_at":         now,
 			"updated_at": now,
 		},

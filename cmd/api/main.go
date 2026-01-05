@@ -18,9 +18,7 @@ import (
 )
 
 func main() {
-	var (
-		port = flag.String("port", envOr("PORT", "8080"), "HTTP port to listen on")
-	)
+	port := flag.String("port", envOr("PORT", "8080"), "HTTP port to listen on")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -35,16 +33,16 @@ func main() {
 		logger.Error("MONGODB_URI or MONGO_URI not set; API requires MongoDB")
 		os.Exit(1)
 	}
-	
+
 	logger.Info("using MongoDB backend for API")
-	
+
 	// Ensure MongoDB connection cleanup
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		mongoDB.Close(ctx)
 	}()
-	
+
 	// Create MongoDB repository and handler
 	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
 	mongoHandler := api.NewMongoHandler(repo, logger)
@@ -99,6 +97,15 @@ func main() {
 		fmt.Fprintf(w, "Available endpoints:\n")
 		fmt.Fprintf(w, "  GET /health - Health check\n")
 		fmt.Fprintf(w, "  GET /ws - WebSocket endpoint for real-time events\n")
+		fmt.Fprintf(w, "\nWebSocket Filters (Query Parameters):\n")
+		fmt.Fprintf(w, "  ?eventTypes=test.begin,test.end    - Filter by event types (comma-separated)\n")
+		fmt.Fprintf(w, "                                       Available: test.begin, test.end, step.begin, step.end,\n")
+		fmt.Fprintf(w, "                                                  suite.begin, suite.end, test.failure, test.error,\n")
+		fmt.Fprintf(w, "                                                  stdout, stderr\n")
+		fmt.Fprintf(w, "  ?runId=<run_id>                    - Filter by run ID\n")
+		fmt.Fprintf(w, "  ?testId=<test_id>                  - Filter by test ID\n")
+		fmt.Fprintf(w, "  ?suiteId=<suite_id>                - Filter by suite ID\n")
+		fmt.Fprintf(w, "\nExample: ws://localhost:8080/ws?eventTypes=test.begin,test.end&runId=my-run-123\n")
 		fmt.Fprintf(w, "\nREST API:\n")
 		fmt.Fprintf(w, "  GET  /api/tests           - List test cases (supports ?runId, ?status, ?search, ?limit, ?offset)\n")
 		fmt.Fprintf(w, "  GET  /api/tests/{id}      - Get specific test case with steps\n")

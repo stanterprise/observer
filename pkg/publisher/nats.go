@@ -128,7 +128,8 @@ const (
 	EventTypeStdOutput   EventType = "stdout"
 	EventTypeStdError    EventType = "stderr"
 	EventTypeHeartbeat   EventType = "heartbeat"
-	MapSuitesEvent       EventType = "map.suites"
+	EventTypeRunEnd      EventType = "run.end"
+	EventTypeRunStart    EventType = "run.start"
 )
 
 // Event represents a generic event wrapper for publishing

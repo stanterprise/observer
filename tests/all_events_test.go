@@ -72,6 +72,7 @@ func TestAllEventTypes(t *testing.T) {
 		publisher.EventTypeStdOutput:   false,
 		publisher.EventTypeStdError:    false,
 		publisher.EventTypeHeartbeat:   false,
+		publisher.EventTypeRunEnd:      false,
 	}
 
 	// Publish all event types
@@ -92,7 +93,7 @@ func TestAllEventTypes(t *testing.T) {
 		TestCase: &entities.TestCaseRun{
 			Id:    "test-1",
 			RunId: "run-1",
-			Name: "Test Case 1",
+			Name:  "Test Case 1",
 		},
 	}); err != nil {
 		t.Errorf("Failed to publish TestBegin: %v", err)
@@ -110,7 +111,7 @@ func TestAllEventTypes(t *testing.T) {
 	// 4. StepBegin
 	if err := pub.Publish(ctx, publisher.EventTypeStepBegin, &events.StepBeginEventRequest{
 		Step: &entities.StepRun{
-			TestCaseRunId: "test-1",
+			TestCaseId: "test-1",
 		},
 	}); err != nil {
 		t.Errorf("Failed to publish StepBegin: %v", err)
@@ -119,8 +120,8 @@ func TestAllEventTypes(t *testing.T) {
 	// 5. StepEnd
 	if err := pub.Publish(ctx, publisher.EventTypeStepEnd, &events.StepEndEventRequest{
 		Step: &entities.StepRun{
-			TestCaseRunId: "test-1",
-			Status:        common.TestStatus_PASSED,
+			TestCaseId: "test-1",
+			Status:     common.TestStatus_PASSED,
 		},
 	}); err != nil {
 		t.Errorf("Failed to publish StepEnd: %v", err)
@@ -182,6 +183,14 @@ func TestAllEventTypes(t *testing.T) {
 		Timestamp: timestamppb.Now(),
 	}); err != nil {
 		t.Errorf("Failed to publish Heartbeat: %v", err)
+	}
+
+	// 12. RunEnd
+	if err := pub.Publish(ctx, publisher.EventTypeRunEnd, &events.TestRunEndEventRequest{
+		RunId:       "run-1",
+		FinalStatus: common.TestStatus_PASSED,
+	}); err != nil {
+		t.Errorf("Failed to publish RunEnd: %v", err)
 	}
 
 	t.Log("All events published, fetching from NATS...")

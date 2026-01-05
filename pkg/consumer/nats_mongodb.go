@@ -24,9 +24,6 @@ func (n *noopWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 // ptrInt32 returns a pointer to the given int32 value
 func ptrInt32(v int32) *int32 {
-	if v == 0 {
-		return nil
-	}
 	return &v
 }
 
@@ -243,8 +240,10 @@ func (c *MongoNATSConsumer) processMessage(ctx context.Context, msg jetstream.Ms
 		return c.handleStdError(ctx, event.Data)
 	case publisher.EventTypeHeartbeat:
 		return c.handleHeartbeat(ctx, event.Data)
-	case publisher.MapSuitesEvent:
-		return c.handleMapSuites(ctx, event.Data)
+	case publisher.EventTypeRunEnd:
+		return c.handleRunEnd(ctx, event.Data)
+	case publisher.EventTypeRunStart:
+		return c.handleRunStart(ctx, event.Data)
 	default:
 		c.logger.Warn("unknown event type", "type", event.Type)
 		return nil
@@ -279,28 +278,46 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 		startTime = &t
 	}
 
+	var endTime *time.Time
+	if req.Suite.EndTime != nil {
+		t := req.Suite.EndTime.AsTime()
+		endTime = &t
+	}
+
+	var duration *int64
+	if req.Suite.Duration != nil {
+		d := req.Suite.Duration.AsDuration().Nanoseconds()
+		duration = &d
+	}
+
 	suite := &m.SuiteDocument{
 		ID:              req.Suite.Id,
+		RunID:           req.Suite.RunId,
+		ParentSuiteID:   req.Suite.ParentSuiteId,
 		Name:            req.Suite.Name,
 		Description:     req.Suite.Description,
+		Status:          req.Suite.Status.String(),
 		Metadata:        md,
+		Duration:        duration,
+		Location:        req.Suite.Location,
+		Type:            req.Suite.Type.String(),
 		TestSuiteSpecID: "",
 		InitiatedBy:     req.Suite.InitiatedBy,
 		ProjectName:     req.Suite.Project,
+		Author:          req.Suite.Author,
+		Owner:           req.Suite.Owner,
+		TestCaseIds:     req.Suite.TestCaseIds,
+		SubSuiteIds:     req.Suite.SubSuiteIds,
 		StartTime:       startTime,
+		EndTime:         endTime,
 	}
 
-	// Extract parent suite ID and runID from metadata
-	// For root suites: runID = suite.Id, parentSuiteID = ""
-	// For nested suites: runID from metadata, parentSuiteID from metadata
-	parentSuiteID := ""
-	if parentID, ok := req.Suite.Metadata["parent_suite_id"]; ok && parentID != "" {
-		parentSuiteID = parentID
-	}
-
+	// Use ParentSuiteId directly from protobuf (already set in suite object)
+	// For root suites: ParentSuiteId will be empty string
+	// For nested suites: ParentSuiteId will be set to parent's ID
 	runID := req.Suite.RunId
 
-	return c.repo.UpsertSuiteBegin(ctx, runID, suite, parentSuiteID)
+	return c.repo.UpsertSuiteBegin(ctx, runID, suite, suite.ParentSuiteID)
 }
 
 // handleSuiteEnd processes a suite end event
@@ -330,11 +347,8 @@ func (c *MongoNATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMes
 		duration = &d
 	}
 
-	// Extract runID from metadata, or use suite.Id if it's the root
-	runID := req.Suite.Id
-	if runIDMeta, ok := req.Suite.Metadata["run_id"]; ok && runIDMeta != "" {
-		runID = runIDMeta
-	}
+	// Use RunId directly from protobuf
+	runID := req.Suite.RunId
 
 	return c.repo.UpsertSuiteEnd(ctx, runID, req.Suite.Id, req.Suite.Status.String(), endTime, duration)
 }
@@ -361,14 +375,51 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 		md[k] = v
 	}
 
+	var startTime *time.Time
+	if req.TestCase.StartTime != nil {
+		t := req.TestCase.StartTime.AsTime()
+		startTime = &t
+	}
+
+	var endTime *time.Time
+	if req.TestCase.EndTime != nil {
+		t := req.TestCase.EndTime.AsTime()
+		endTime = &t
+	}
+
+	// Convert attachments
+	var attachments []map[string]interface{}
+	for _, att := range req.TestCase.Attachments {
+		attMap := make(map[string]interface{})
+		attMap["name"] = att.Name
+		attMap["mime_type"] = att.MimeType
+		if content := att.GetContent(); len(content) > 0 {
+			attMap["content"] = string(content)
+		} else if att.GetUri() != "" {
+			attMap["uri"] = att.GetUri()
+		}
+		attachments = append(attachments, attMap)
+	}
+
 	test := &m.TestDocument{
-		ID:         req.TestCase.Id,
-		RunID:      req.TestCase.RunId,
-		Title:      req.TestCase.Name,
-		Metadata:   md,
-		RetryCount: ptrInt32(req.TestCase.RetryCount),
-		RetryIndex: ptrInt32(req.TestCase.RetryIndex),
-		Timeout:    ptrInt32(req.TestCase.Timeout),
+		ID:           req.TestCase.Id,
+		Name:         req.TestCase.Name,
+		Title:        req.TestCase.Name,
+		Description:  req.TestCase.Description,
+		RunID:        req.TestCase.RunId,
+		Status:       req.TestCase.Status.String(),
+		StartTime:    startTime,
+		EndTime:      endTime,
+		Metadata:     md,
+		Tags:         req.TestCase.Tags,
+		Location:     req.TestCase.Location,
+		RetryCount:   ptrInt32(req.TestCase.RetryCount),
+		RetryIndex:   ptrInt32(req.TestCase.RetryIndex),
+		Timeout:      ptrInt32(req.TestCase.Timeout),
+		Attachments:  attachments,
+		ErrorMessage: req.TestCase.ErrorMessage,
+		StackTrace:   req.TestCase.StackTrace,
+		ErrorList:    req.TestCase.Errors,
 	}
 
 	if req.TestCase.Duration != nil {
@@ -379,7 +430,7 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 	// runID identifies the document
 	// TestSuiteRunId is the parent suite containing this test
 	runID := req.TestCase.RunId
-	suiteID := req.TestCase.TestSuiteRunId
+	suiteID := req.TestCase.TestSuiteId
 	if suiteID == "" {
 		// Fallback: if no TestSuiteRunId, use RunId as both
 		suiteID = runID
@@ -411,7 +462,7 @@ func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMess
 	}
 
 	runID := req.TestCase.RunId
-	return c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), duration)
+	return c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), req.TestCase.RetryIndex, duration)
 }
 
 // handleStepBegin processes a step begin event
@@ -431,20 +482,46 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 
 	c.logger.Info("step start",
 		"id", req.Step.Id,
-		"test_case_run_id", req.Step.TestCaseRunId)
+		"test_case_run_id", req.Step.TestCaseId,
+		"retry_index", req.Step.RetryIndex)
+
+	// Convert metadata
+	md := make(map[string]interface{})
+	for k, v := range req.Step.Metadata {
+		md[k] = v
+	}
+
+	var startTime *time.Time
+	if req.Step.StartTime != nil {
+		t := req.Step.StartTime.AsTime()
+		startTime = &t
+	}
 
 	step := &m.StepDocument{
 		ID:            req.Step.Id,
 		RunID:         req.Step.RunId,
-		TestCaseRunID: req.Step.TestCaseRunId,
+		TestCaseRunID: req.Step.TestCaseId,
 		ParentStepID:  req.Step.ParentStepId,
-		Status:        "RUNNING",
-		Category:      req.Step.Category,
 		Title:         req.Step.Title,
+		Description:   req.Step.Description,
+		StartTime:     startTime,
+		Type:          req.Step.Type,
+		Metadata:      md,
+		WorkerIndex:   req.Step.WorkerIndex,
+		Status:        req.Step.Status.String(),
+		Category:      req.Step.Category,
+		Location:      req.Step.Location,
+		Error:         req.Step.Error,
+		Errors:        req.Step.Errors,
+	}
+
+	if req.Step.Duration != nil {
+		nanos := req.Step.Duration.AsDuration().Nanoseconds()
+		step.Duration = &nanos
 	}
 
 	runID := req.Step.RunId
-	return c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseRunId)
+	return c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseId, req.Step.RetryIndex)
 }
 
 // handleStepEnd processes a step end event
@@ -463,7 +540,7 @@ func (c *MongoNATSConsumer) handleStepEnd(ctx context.Context, data json.RawMess
 		"status", req.Step.Status)
 
 	// Extract testID from TestCaseRunId (same as in handleStepBegin)
-	testID := extractTestID(req.Step.TestCaseRunId, req.Step.RunId)
+	testID := extractTestID(req.Step.TestCaseId, req.Step.RunId)
 	runID := req.Step.RunId
 
 	return c.repo.UpsertStepEnd(ctx, runID, req.Step.Id, testID, mongoStatusToString(req.Step.Status))
@@ -477,13 +554,50 @@ func (c *MongoNATSConsumer) handleTestFailure(ctx context.Context, data json.Raw
 	}
 
 	c.logger.Info("test failure",
+		"run_id", req.RunId,
 		"test_id", req.TestId,
 		"message_len", len(req.FailureMessage))
 
-	// These events don't have RunId in protobuf schema
-	// We need to extract it from TestId or make UpdateTestStatus work without runID
-	// For now, log a warning and skip
-	c.logger.Warn("test failure event without runID support", "test_id", req.TestId)
+	if req.RunId == "" {
+		c.logger.Warn("test failure event missing run_id", "test_id", req.TestId)
+		return nil
+	}
+
+	// Convert protobuf Timestamp to *time.Time
+	var timestamp *time.Time
+	if req.Timestamp != nil {
+		t := req.Timestamp.AsTime()
+		timestamp = &t
+	}
+
+	// Convert attachments to map slice
+	attachments := make([]map[string]interface{}, 0, len(req.Attachments))
+	for _, att := range req.Attachments {
+		attMap := map[string]interface{}{
+			"name":      att.Name,
+			"mime_type": att.MimeType,
+		}
+		// Handle oneof payload
+		if content := att.GetContent(); content != nil {
+			attMap["content"] = content
+		}
+		if uri := att.GetUri(); uri != "" {
+			attMap["uri"] = uri
+		}
+		attachments = append(attachments, attMap)
+	}
+
+	failure := m.TestFailureDocument{
+		FailureMessage: req.FailureMessage,
+		StackTrace:     req.StackTrace,
+		Timestamp:      timestamp,
+		Attachments:    attachments,
+	}
+
+	if err := c.repo.AppendTestFailure(ctx, req.RunId, req.TestId, failure); err != nil {
+		return fmt.Errorf("append test failure: %w", err)
+	}
+
 	return nil
 }
 
@@ -495,13 +609,50 @@ func (c *MongoNATSConsumer) handleTestError(ctx context.Context, data json.RawMe
 	}
 
 	c.logger.Info("test error",
+		"run_id", req.RunId,
 		"test_id", req.TestId,
 		"message_len", len(req.ErrorMessage))
 
-	// These events don't have RunId in protobuf schema
-	// We need to extract it from TestId or make UpdateTestStatus work without runID
-	// For now, log a warning and skip
-	c.logger.Warn("test error event without runID support", "test_id", req.TestId)
+	if req.RunId == "" {
+		c.logger.Warn("test error event missing run_id", "test_id", req.TestId)
+		return nil
+	}
+
+	// Convert protobuf Timestamp to *time.Time
+	var timestamp *time.Time
+	if req.Timestamp != nil {
+		t := req.Timestamp.AsTime()
+		timestamp = &t
+	}
+
+	// Convert attachments to map slice
+	attachments := make([]map[string]interface{}, 0, len(req.Attachments))
+	for _, att := range req.Attachments {
+		attMap := map[string]interface{}{
+			"name":      att.Name,
+			"mime_type": att.MimeType,
+		}
+		// Handle oneof payload
+		if content := att.GetContent(); content != nil {
+			attMap["content"] = content
+		}
+		if uri := att.GetUri(); uri != "" {
+			attMap["uri"] = uri
+		}
+		attachments = append(attachments, attMap)
+	}
+
+	errorDoc := m.TestErrorDocument{
+		ErrorMessage: req.ErrorMessage,
+		StackTrace:   req.StackTrace,
+		Timestamp:    timestamp,
+		Attachments:  attachments,
+	}
+
+	if err := c.repo.AppendTestError(ctx, req.RunId, req.TestId, errorDoc); err != nil {
+		return fmt.Errorf("append test error: %w", err)
+	}
+
 	return nil
 }
 
@@ -513,8 +664,30 @@ func (c *MongoNATSConsumer) handleStdOutput(ctx context.Context, data json.RawMe
 	}
 
 	c.logger.Debug("stdout",
+		"run_id", req.RunId,
 		"test_id", req.TestId,
 		"message_len", len(req.Message))
+
+	if req.RunId == "" {
+		c.logger.Warn("stdout event missing run_id", "test_id", req.TestId)
+		return nil
+	}
+
+	// Convert protobuf Timestamp to *time.Time
+	var timestamp *time.Time
+	if req.Timestamp != nil {
+		t := req.Timestamp.AsTime()
+		timestamp = &t
+	}
+
+	output := m.OutputDocument{
+		Message:   req.Message,
+		Timestamp: timestamp,
+	}
+
+	if err := c.repo.AppendStdOutput(ctx, req.RunId, req.TestId, output); err != nil {
+		return fmt.Errorf("append stdout: %w", err)
+	}
 
 	return nil
 }
@@ -527,8 +700,30 @@ func (c *MongoNATSConsumer) handleStdError(ctx context.Context, data json.RawMes
 	}
 
 	c.logger.Debug("stderr",
+		"run_id", req.RunId,
 		"test_id", req.TestId,
 		"message_len", len(req.Message))
+
+	if req.RunId == "" {
+		c.logger.Warn("stderr event missing run_id", "test_id", req.TestId)
+		return nil
+	}
+
+	// Convert protobuf Timestamp to *time.Time
+	var timestamp *time.Time
+	if req.Timestamp != nil {
+		t := req.Timestamp.AsTime()
+		timestamp = &t
+	}
+
+	output := m.OutputDocument{
+		Message:   req.Message,
+		Timestamp: timestamp,
+	}
+
+	if err := c.repo.AppendStdError(ctx, req.RunId, req.TestId, output); err != nil {
+		return fmt.Errorf("append stderr: %w", err)
+	}
 
 	return nil
 }
@@ -544,15 +739,58 @@ func (c *MongoNATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMe
 	return nil
 }
 
-func (c *MongoNATSConsumer) handleMapSuites(ctx context.Context, data json.RawMessage) error {
-	var req events.MapTestRunEventRequest
+// handleRunEnd processes a test run end event
+func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) error {
+	var req events.TestRunEndEventRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		return fmt.Errorf("unmarshal map suites event: %w", err)
+		return fmt.Errorf("unmarshal run end event: %w", err)
 	}
 
-	c.logger.Info("map suites",
+	c.logger.Info("run end", "run_id", req.RunId, "status", req.FinalStatus)
+
+	// Convert protobuf Timestamp to *time.Time
+	var startTime *time.Time
+	if req.StartTime != nil {
+		t := req.StartTime.AsTime()
+		startTime = &t
+	}
+
+	// Convert protobuf Duration to *int64 (nanoseconds)
+	var duration *int64
+	if req.Duration != nil {
+		d := req.Duration.AsDuration().Nanoseconds()
+		duration = &d
+	}
+
+	// Update the test run document with final status, times, and duration
+	if err := c.repo.UpdateTestRunEnd(ctx, req.RunId, req.FinalStatus.String(), startTime, duration); err != nil {
+		return fmt.Errorf("update run end: %w", err)
+	}
+
+	if err := c.repo.MarkRunningTestsAsTimedOut(ctx, req.RunId); err != nil {
+		return fmt.Errorf("mark running tests as timed out: %w", err)
+	}
+
+	return nil
+}
+
+func (c *MongoNATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage) error {
+	var req events.ReportRunStartEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal run start event: %w", err)
+	}
+
+	c.logger.Info("run start",
 		"run_id", req.RunId,
-		"suite_mappings", req.GetTestSuites())
+		"name", req.Name,
+		"total_tests", req.TotalTests,
+		"suite_count", len(req.TestSuites))
+
+	// Convert run-level metadata
+	runMetadata := make(map[string]interface{})
+	for k, v := range req.Metadata {
+		runMetadata[k] = v
+	}
 
 	// Convert protobuf entities to SuiteDocument models
 	suites := make([]m.SuiteDocument, 0, len(req.TestSuites))
@@ -586,23 +824,30 @@ func (c *MongoNATSConsumer) handleMapSuites(ctx context.Context, data json.RawMe
 		}
 
 		suite := m.SuiteDocument{
-			ID:          protoSuite.Id,
-			Name:        protoSuite.Name,
-			Description: protoSuite.Description,
-			Metadata:    md,
-
-			InitiatedBy: protoSuite.InitiatedBy,
-			ProjectName: protoSuite.Project,
-			StartTime:   startTime,
-			EndTime:     endTime,
-			Duration:    duration,
-			Status:      protoSuite.Status.String(),
+			ID:            protoSuite.Id,
+			RunID:         protoSuite.RunId,
+			ParentSuiteID: protoSuite.ParentSuiteId,
+			Name:          protoSuite.Name,
+			Description:   protoSuite.Description,
+			Metadata:      md,
+			Location:      protoSuite.Location,
+			Type:          protoSuite.Type.String(),
+			InitiatedBy:   protoSuite.InitiatedBy,
+			ProjectName:   protoSuite.Project,
+			Author:        protoSuite.Author,
+			Owner:         protoSuite.Owner,
+			TestCaseIds:   protoSuite.TestCaseIds,
+			SubSuiteIds:   protoSuite.SubSuiteIds,
+			StartTime:     startTime,
+			EndTime:       endTime,
+			Duration:      duration,
+			Status:        protoSuite.Status.String(),
 		}
 
 		suites = append(suites, suite)
 	}
 
-	return c.repo.MapSuites(ctx, req.RunId, suites)
+	return c.repo.MapSuites(ctx, req.RunId, req.Name, runMetadata, req.TotalTests, suites)
 }
 
 // mongoStatusToString converts protobuf status to string

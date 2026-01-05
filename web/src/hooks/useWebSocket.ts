@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { wsUrl } from "../lib/config";
-import type { WebSocketEvent } from "../types";
+import type { WebSocketEvent } from "@/types/webSocket";
 
 interface UseWebSocketOptions {
   onMessage?: (event: WebSocketEvent) => void;

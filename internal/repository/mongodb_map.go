@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func (r *MongoRepository) MapSuites(ctx context.Context, runID string, suites []m.SuiteDocument) error {
+func (r *MongoRepository) MapSuites(ctx context.Context, runID string, name string, metadata map[string]interface{}, totalTests int32, suites []m.SuiteDocument) error {
 	if err := validateRunID(runID); err != nil {
 		return err
 	}
@@ -24,6 +24,27 @@ func (r *MongoRepository) MapSuites(ctx context.Context, runID string, suites []
 	// Ensure document exists
 	if err := r.ensureDocumentExists(ctx, runID); err != nil {
 		errs = append(errs, fmt.Errorf("ensure document exists: %w", err))
+	}
+
+	// Update run-level fields (name, metadata, total_tests)
+	runUpdate := bson.M{
+		"$set": bson.M{
+			"updated_at": now,
+		},
+	}
+	if name != "" {
+		runUpdate["$set"].(bson.M)["name"] = name
+	}
+	if len(metadata) > 0 {
+		runUpdate["$set"].(bson.M)["metadata"] = metadata
+	}
+	if totalTests > 0 {
+		runUpdate["$set"].(bson.M)["total_tests"] = totalTests
+	}
+
+	_, err := r.collection.UpdateOne(ctx, filter, runUpdate)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("update run metadata: %w", err))
 	}
 
 	for _, suite := range suites {
@@ -52,7 +73,7 @@ func (r *MongoRepository) MapSuites(ctx context.Context, runID string, suites []
 		"$set":  bson.M{"updated_at": now},
 	}
 
-	_, err := r.collection.UpdateOne(ctx, filter, update)
+	_, err = r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("append root suite: %w", err))
 	}

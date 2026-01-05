@@ -168,6 +168,15 @@ func (r *MongoRepository) UpdateTestStatus(ctx context.Context, runID string, te
 	return nil
 }
 
+// TestRunExists checks if a test run document exists by ID
+func (r *MongoRepository) TestRunExists(ctx context.Context, runID string) (bool, error) {
+	count, err := r.collection.CountDocuments(ctx, bson.M{"_id": runID})
+	if err != nil {
+		return false, fmt.Errorf("count test run: %w", err)
+	}
+	return count > 0, nil
+}
+
 // SuiteExists checks if a suite exists in the repository
 // For nested suites, it extracts the root document ID and checks if the suite exists in the document hierarchy
 func (r *MongoRepository) SuiteExists(ctx context.Context, suiteID string) (bool, error) {

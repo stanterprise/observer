@@ -13,6 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stanterprise/observer/pkg/publisher"
+	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 )
 
 // Hub manages WebSocket connections and broadcasts events to connected clients
@@ -42,11 +43,28 @@ type Hub struct {
 	stream   string
 }
 
+// EventFilters holds filters for selective event streaming
+type EventFilters struct {
+	// EventTypes filters events by type (e.g., test.begin, test.end)
+	// Empty slice means all event types
+	EventTypes []string
+
+	// RunID filters events by run ID
+	RunID string
+
+	// TestID filters events by test ID
+	TestID string
+
+	// SuiteID filters events by suite ID
+	SuiteID string
+}
+
 // Client represents a WebSocket client connection
 type Client struct {
-	hub  *Hub
-	conn *websocket.Conn
-	send chan []byte
+	hub     *Hub
+	conn    *websocket.Conn
+	send    chan []byte
+	filters EventFilters
 }
 
 var upgrader = websocket.Upgrader{
@@ -198,8 +216,20 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 			h.logger.Info("client disconnected", "total_clients", len(h.clients))
 
 		case message := <-h.broadcast:
+			// Parse the event to check filters
+			var event publisher.Event
+			if err := json.Unmarshal(message, &event); err != nil {
+				h.logger.Error("failed to parse event for filtering", "error", err)
+				continue
+			}
+
 			h.mu.RLock()
 			for client := range h.clients {
+				// Check if client's filters match this event
+				if !client.matchesFilters(&event) {
+					continue
+				}
+
 				select {
 				case client.send <- message:
 				default:
@@ -249,7 +279,7 @@ func (h *Hub) consumeNATSEvents(ctx context.Context, cfg NATSConfig) {
 
 			// Process each message
 			for msg := range msgs.Messages() {
-				// Parse the event
+				// Parse the event envelope
 				var event publisher.Event
 				if err := json.Unmarshal(msg.Data(), &event); err != nil {
 					h.logger.Error("unmarshal event failed", "error", err)
@@ -261,8 +291,15 @@ func (h *Hub) consumeNATSEvents(ctx context.Context, cfg NATSConfig) {
 					"type", event.Type,
 					"timestamp", event.Timestamp)
 
-				// Broadcast to all connected WebSocket clients
-				h.broadcast <- msg.Data()
+				// Normalize protobuf data to camelCase before broadcasting
+				normalizedData, err := h.normalizeEventData(&event)
+				if err != nil {
+					h.logger.Error("normalize event data failed", "error", err, "type", event.Type)
+					// Fall back to raw data if normalization fails
+					h.broadcast <- msg.Data()
+				} else {
+					h.broadcast <- normalizedData
+				}
 
 				// Acknowledge message
 				msg.Ack()
@@ -279,11 +316,21 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse filters from query parameters
+	filters := parseFilters(r)
+
 	client := &Client{
-		hub:  h,
-		conn: conn,
-		send: make(chan []byte, 256),
+		hub:     h,
+		conn:    conn,
+		send:    make(chan []byte, 256),
+		filters: filters,
 	}
+
+	h.logger.Info("client connecting with filters",
+		"eventTypes", filters.EventTypes,
+		"runID", filters.RunID,
+		"testID", filters.TestID,
+		"suiteID", filters.SuiteID)
 
 	client.hub.register <- client
 
@@ -353,6 +400,247 @@ func (c *Client) writePump() {
 			}
 		}
 	}
+}
+
+// parseFilters extracts event filters from URL query parameters
+func parseFilters(r *http.Request) EventFilters {
+	query := r.URL.Query()
+
+	filters := EventFilters{
+		RunID:   query.Get("runId"),
+		TestID:  query.Get("testId"),
+		SuiteID: query.Get("suiteId"),
+	}
+
+	// Parse event types (comma-separated)
+	if eventTypes := query.Get("eventTypes"); eventTypes != "" {
+		for _, et := range splitAndTrim(eventTypes, ",") {
+			if et != "" {
+				filters.EventTypes = append(filters.EventTypes, et)
+			}
+		}
+	}
+
+	return filters
+}
+
+// splitAndTrim splits a string by delimiter and trims whitespace from each part
+func splitAndTrim(s, delimiter string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := []string{}
+	for _, part := range splitString(s, delimiter) {
+		trimmed := trimSpace(part)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
+}
+
+// splitString splits string by delimiter (simple implementation)
+func splitString(s, delimiter string) []string {
+	if s == "" {
+		return nil
+	}
+	result := []string{}
+	current := ""
+	for i := 0; i < len(s); i++ {
+		if i+len(delimiter) <= len(s) && s[i:i+len(delimiter)] == delimiter {
+			result = append(result, current)
+			current = ""
+			i += len(delimiter) - 1
+		} else {
+			current += string(s[i])
+		}
+	}
+	if current != "" || len(result) > 0 {
+		result = append(result, current)
+	}
+	return result
+}
+
+// trimSpace removes leading and trailing whitespace
+func trimSpace(s string) string {
+	start := 0
+	end := len(s)
+	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
+		start++
+	}
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
+		end--
+	}
+	return s[start:end]
+}
+
+// matchesFilters checks if an event matches the client's filters
+func (c *Client) matchesFilters(event *publisher.Event) bool {
+	// If no filters are set, match all events
+	if len(c.filters.EventTypes) == 0 && c.filters.RunID == "" &&
+		c.filters.TestID == "" && c.filters.SuiteID == "" {
+		return true
+	}
+
+	// Parse event data to extract IDs
+	var eventData map[string]interface{}
+	if err := json.Unmarshal(event.Data, &eventData); err != nil {
+		// If we can't parse the data, allow the event (fail open)
+		return true
+	}
+
+	// Check event type filter
+	if len(c.filters.EventTypes) > 0 {
+		matched := false
+		for _, et := range c.filters.EventTypes {
+			if string(event.Type) == et {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	// Check runID filter
+	if c.filters.RunID != "" {
+		if runID, ok := extractID(eventData, "run_id", "runId"); ok {
+			if runID != c.filters.RunID {
+				return false
+			}
+		} else {
+			// If runID is required but not found in event, filter it out
+			return false
+		}
+	}
+
+	// Check testID filter
+	if c.filters.TestID != "" {
+		if testID, ok := extractID(eventData, "test_case.id", "testCase.id", "test_id", "testId", "id"); ok {
+			if testID != c.filters.TestID {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+
+	// Check suiteID filter
+	if c.filters.SuiteID != "" {
+		if suiteID, ok := extractID(eventData, "suite.id", "suiteId", "suite_id"); ok {
+			if suiteID != c.filters.SuiteID {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+
+	return true
+}
+
+// extractID attempts to extract an ID from event data using multiple possible field names
+func extractID(data map[string]interface{}, fieldNames ...string) (string, bool) {
+	for _, fieldName := range fieldNames {
+		// Handle nested fields (e.g., "test_case.id")
+		if value, ok := getNestedField(data, fieldName); ok {
+			if strValue, ok := value.(string); ok {
+				return strValue, true
+			}
+		}
+	}
+	return "", false
+}
+
+// getNestedField retrieves a nested field from a map using dot notation
+func getNestedField(data map[string]interface{}, fieldPath string) (interface{}, bool) {
+	fields := splitString(fieldPath, ".")
+	current := data
+
+	for i, field := range fields {
+		if i == len(fields)-1 {
+			// Last field - return its value
+			value, ok := current[field]
+			return value, ok
+		}
+
+		// Intermediate field - must be a map
+		value, ok := current[field]
+		if !ok {
+			return nil, false
+		}
+
+		nextMap, ok := value.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		current = nextMap
+	}
+
+	return nil, false
+}
+
+// normalizeEventData converts protobuf events to model-based JSON for consistency with REST API
+// This ensures WebSocket events match the MongoDB document structure used by the REST API
+func (h *Hub) normalizeEventData(event *publisher.Event) ([]byte, error) {
+	// Convert protobuf to model-based structure
+	var modelData interface{}
+
+	switch event.Type {
+	case publisher.EventTypeRunStart:
+		var req events.ReportRunStartEventRequest
+		if err := json.Unmarshal(event.Data, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal run start: %w", err)
+		}
+		modelData = protoToTestRunDocument(&req)
+
+	case publisher.EventTypeTestBegin:
+		var req events.TestBeginEventRequest
+		if err := json.Unmarshal(event.Data, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal test begin: %w", err)
+		}
+		modelData = protoToTestDocument(req.TestCase)
+
+	case publisher.EventTypeTestEnd:
+		var req events.TestEndEventRequest
+		if err := json.Unmarshal(event.Data, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal test end: %w", err)
+		}
+		modelData = protoToTestDocument(req.TestCase)
+
+	case publisher.EventTypeStepBegin, publisher.EventTypeStepEnd,
+		publisher.EventTypeSuiteBegin, publisher.EventTypeSuiteEnd,
+		publisher.EventTypeRunEnd:
+		// For events not yet converted to models, pass through raw data
+		// TODO: Add model converters for these event types
+		if err := json.Unmarshal(event.Data, &modelData); err != nil {
+			return nil, fmt.Errorf("parse event data: %w", err)
+		}
+
+	default:
+		// For unknown event types, pass through the raw data
+		if err := json.Unmarshal(event.Data, &modelData); err != nil {
+			return nil, fmt.Errorf("parse unknown event type: %w", err)
+		}
+	}
+
+	// Re-wrap in event envelope with model-based data
+	normalizedEvent := publisher.Event{
+		Type:      event.Type,
+		Timestamp: event.Timestamp,
+		Data:      nil, // Will be filled during marshal
+	}
+
+	// Marshal model data
+	dataBytes, err := json.Marshal(modelData)
+	if err != nil {
+		return nil, fmt.Errorf("marshal model data: %w", err)
+	}
+	normalizedEvent.Data = json.RawMessage(dataBytes)
+
+	// Marshal complete event
+	return json.Marshal(normalizedEvent)
 }
 
 // noopWriter implements io.Writer but drops logs when no logger provided

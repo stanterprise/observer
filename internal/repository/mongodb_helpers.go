@@ -44,3 +44,141 @@ func buildStepEndUpdate(status string, now time.Time) bson.M {
 	}
 	return update
 }
+
+
+
+// AppendTestFailure adds a failure to a test document
+func (r *MongoRepository) AppendTestFailure(ctx context.Context, runID, testID string, failure interface{}) error {
+	if err := validateRunID(runID); err != nil {
+		return err
+	}
+
+	now := time.Now()
+	filter := bson.M{
+		"_id":             runID,
+		"suites.tests.id": testID,
+	}
+
+	update := bson.M{
+		"$push": bson.M{
+			"suites.$[].tests.$[test].failures": failure,
+		},
+		"$set": bson.M{
+			"updated_at": now,
+		},
+	}
+
+	arrayFilters := []interface{}{
+		bson.M{"test.id": testID},
+	}
+
+	opts := options.Update().SetArrayFilters(options.ArrayFilters{Filters: arrayFilters})
+	_, err := r.collection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		return fmt.Errorf("append test failure: %w", err)
+	}
+
+	return nil
+}
+
+// AppendTestError adds an error to a test document
+func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID string, errorDoc interface{}) error {
+	if err := validateRunID(runID); err != nil {
+		return err
+	}
+
+	now := time.Now()
+	filter := bson.M{
+		"_id":             runID,
+		"suites.tests.id": testID,
+	}
+
+	update := bson.M{
+		"$push": bson.M{
+			"suites.$[].tests.$[test].errors": errorDoc,
+		},
+		"$set": bson.M{
+			"updated_at": now,
+		},
+	}
+
+	arrayFilters := []interface{}{
+		bson.M{"test.id": testID},
+	}
+
+	opts := options.Update().SetArrayFilters(options.ArrayFilters{Filters: arrayFilters})
+	_, err := r.collection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		return fmt.Errorf("append test error: %w", err)
+	}
+
+	return nil
+}
+
+// AppendStdOutput adds stdout output to a test document
+func (r *MongoRepository) AppendStdOutput(ctx context.Context, runID, testID string, output interface{}) error {
+	if err := validateRunID(runID); err != nil {
+		return err
+	}
+
+	now := time.Now()
+	filter := bson.M{
+		"_id":             runID,
+		"suites.tests.id": testID,
+	}
+
+	update := bson.M{
+		"$push": bson.M{
+			"suites.$[].tests.$[test].stdout": output,
+		},
+		"$set": bson.M{
+			"updated_at": now,
+		},
+	}
+
+	arrayFilters := []interface{}{
+		bson.M{"test.id": testID},
+	}
+
+	opts := options.Update().SetArrayFilters(options.ArrayFilters{Filters: arrayFilters})
+	_, err := r.collection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		return fmt.Errorf("append stdout: %w", err)
+	}
+
+	return nil
+}
+
+// AppendStdError adds stderr output to a test document
+func (r *MongoRepository) AppendStdError(ctx context.Context, runID, testID string, output interface{}) error {
+	if err := validateRunID(runID); err != nil {
+		return err
+	}
+
+	now := time.Now()
+	filter := bson.M{
+		"_id":             runID,
+		"suites.tests.id": testID,
+	}
+
+	update := bson.M{
+		"$push": bson.M{
+			"suites.$[].tests.$[test].stderr": output,
+		},
+		"$set": bson.M{
+			"updated_at": now,
+		},
+	}
+
+	arrayFilters := []interface{}{
+		bson.M{"test.id": testID},
+	}
+
+	opts := options.Update().SetArrayFilters(options.ArrayFilters{Filters: arrayFilters})
+	_, err := r.collection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		return fmt.Errorf("append stderr: %w", err)
+	}
+
+	return nil
+}

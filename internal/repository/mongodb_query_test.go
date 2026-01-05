@@ -6,27 +6,33 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/mongodb"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// setupTestRepo creates a test repository with an in-memory MongoDB client
-// Note: These tests require a running MongoDB instance
+// setupTestRepo creates a test repository with a MongoDB testcontainer
 func setupTestRepo(t *testing.T) (*MongoRepository, func()) {
 	ctx := context.Background()
 
-	// Use MongoDB test instance
-	mongoURI := "mongodb://localhost:27017"
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	// Start MongoDB container
+	mongoContainer, err := mongodb.RunContainer(ctx, testcontainers.WithImage("mongo:7.0"))
 	if err != nil {
-		t.Skipf("MongoDB not available: %v", err)
-		return nil, func() {}
+		t.Fatalf("Failed to start MongoDB container: %v", err)
 	}
 
-	// Test connection
-	if err := client.Ping(ctx, nil); err != nil {
-		t.Skipf("MongoDB not available: %v", err)
-		return nil, func() {}
+	mongoURI, err := mongoContainer.ConnectionString(ctx)
+	if err != nil {
+		mongoContainer.Terminate(ctx)
+		t.Fatalf("Failed to get MongoDB connection string: %v", err)
+	}
+
+	// Connect to MongoDB
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		mongoContainer.Terminate(ctx)
+		t.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
 
 	dbName := "observer_test_" + time.Now().Format("20060102150405")
@@ -36,6 +42,7 @@ func setupTestRepo(t *testing.T) (*MongoRepository, func()) {
 	cleanup := func() {
 		client.Database(dbName).Drop(context.Background())
 		client.Disconnect(context.Background())
+		mongoContainer.Terminate(context.Background())
 	}
 
 	return repo, cleanup
@@ -43,9 +50,6 @@ func setupTestRepo(t *testing.T) (*MongoRepository, func()) {
 
 func TestMongoRepository_SuiteExists_RootLevel(t *testing.T) {
 	repo, cleanup := setupTestRepo(t)
-	if repo == nil {
-		return // MongoDB not available
-	}
 	defer cleanup()
 
 	ctx := context.Background()
@@ -88,9 +92,6 @@ func TestMongoRepository_SuiteExists_RootLevel(t *testing.T) {
 
 func TestMongoRepository_SuiteExists_Nested(t *testing.T) {
 	repo, cleanup := setupTestRepo(t)
-	if repo == nil {
-		return
-	}
 	defer cleanup()
 
 	ctx := context.Background()
@@ -134,9 +135,6 @@ func TestMongoRepository_SuiteExists_Nested(t *testing.T) {
 
 func TestMongoRepository_TestExists_RootLevel(t *testing.T) {
 	repo, cleanup := setupTestRepo(t)
-	if repo == nil {
-		return
-	}
 	defer cleanup()
 
 	ctx := context.Background()
@@ -153,7 +151,7 @@ func TestMongoRepository_TestExists_RootLevel(t *testing.T) {
 		Tests: []*m.TestDocument{
 			{
 				ID:        testID,
-				Title:      "Test 1",
+				Title:     "Test 1",
 				Status:    "running",
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
@@ -189,9 +187,6 @@ func TestMongoRepository_TestExists_RootLevel(t *testing.T) {
 
 func TestMongoRepository_TestExists_InSuite(t *testing.T) {
 	repo, cleanup := setupTestRepo(t)
-	if repo == nil {
-		return
-	}
 	defer cleanup()
 
 	ctx := context.Background()
@@ -216,7 +211,7 @@ func TestMongoRepository_TestExists_InSuite(t *testing.T) {
 				Tests: []*m.TestDocument{
 					{
 						ID:        testID,
-						Title:      "Nested Test",
+						Title:     "Nested Test",
 						Status:    "running",
 						CreatedAt: time.Now(),
 						UpdatedAt: time.Now(),
@@ -244,9 +239,6 @@ func TestMongoRepository_TestExists_InSuite(t *testing.T) {
 
 func TestMongoRepository_StepExists(t *testing.T) {
 	repo, cleanup := setupTestRepo(t)
-	if repo == nil {
-		return
-	}
 	defer cleanup()
 
 	ctx := context.Background()
@@ -264,14 +256,14 @@ func TestMongoRepository_StepExists(t *testing.T) {
 		Tests: []*m.TestDocument{
 			{
 				ID:        testID,
-				Title:      "Test 1",
+				Title:     "Test 1",
 				Status:    "running",
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
 				Steps: []*m.StepDocument{
 					{
 						ID:        stepID,
-						Title:      "Step 1",
+						Title:     "Step 1",
 						Status:    "running",
 						CreatedAt: time.Now(),
 						UpdatedAt: time.Now(),
@@ -308,9 +300,6 @@ func TestMongoRepository_StepExists(t *testing.T) {
 
 func TestMongoRepository_StepExists_InNestedSuite(t *testing.T) {
 	repo, cleanup := setupTestRepo(t)
-	if repo == nil {
-		return
-	}
 	defer cleanup()
 
 	ctx := context.Background()
@@ -324,7 +313,7 @@ func TestMongoRepository_StepExists_InNestedSuite(t *testing.T) {
 		Status:    "running",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		Tests: []*m.TestDocument{},
+		Tests:     []*m.TestDocument{},
 		Suites: []*m.SuiteDocument{
 			{
 				ID:        "run-ghi-suite-/nested",
@@ -335,14 +324,14 @@ func TestMongoRepository_StepExists_InNestedSuite(t *testing.T) {
 				Tests: []*m.TestDocument{
 					{
 						ID:        "run-ghi-test-nested",
-						Title:      "Nested Test",
+						Title:     "Nested Test",
 						Status:    "running",
 						CreatedAt: time.Now(),
 						UpdatedAt: time.Now(),
 						Steps: []*m.StepDocument{
 							{
 								ID:        stepID,
-								Title:      "Nested Step",
+								Title:     "Nested Step",
 								Status:    "running",
 								CreatedAt: time.Now(),
 								UpdatedAt: time.Now(),

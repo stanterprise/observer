@@ -122,13 +122,14 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 	// Publish step begin event
 	stepID := "step-integration-1"
 	stepBeginEvent := &m.StepDocument{
-		ID:       stepID,
-		Status:   "RUNNING",
-		Category: "action",
-		Title:    "Perform action",
+		ID:         stepID,
+		Status:     "RUNNING",
+		Category:   "action",
+		Title:      "Perform action",
+		RetryIndex: 0,
 	}
 
-	err = repo.UpsertStepBegin(ctx, runID, stepBeginEvent, testID)
+	err = repo.UpsertStepBegin(ctx, runID, stepBeginEvent, testID, 0)
 	if err != nil {
 		t.Fatalf("Failed to upsert step begin: %v", err)
 	}
@@ -141,7 +142,7 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 
 	// Publish test end event
 	testDuration := int64(1000000000)
-	err = repo.UpsertTestEnd(ctx, runID, testID, "PASSED", &testDuration)
+	err = repo.UpsertTestEnd(ctx, runID, testID, "PASSED", 0, &testDuration)
 	if err != nil {
 		t.Fatalf("Failed to upsert test end: %v", err)
 	}
@@ -185,29 +186,29 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 		t.Errorf("Suite duration = %v, want %v", suite.Duration, suiteDuration)
 	}
 
-	// Test should be in suite's tests array
-	if len(suite.Tests) != 1 {
-		t.Fatalf("Tests count = %v, want 1", len(suite.Tests))
+	// Test should be in root-level tests array (not in suite's tests array)
+	if len(finalDoc.Tests) != 1 {
+		t.Fatalf("Tests count = %v, want 1", len(finalDoc.Tests))
 	}
-	if suite.Tests[0].ID != testID {
-		t.Errorf("Test ID = %v, want %v", suite.Tests[0].ID, testID)
+	if finalDoc.Tests[0].ID != testID {
+		t.Errorf("Test ID = %v, want %v", finalDoc.Tests[0].ID, testID)
 	}
-	if suite.Tests[0].Status != "PASSED" {
-		t.Errorf("Test status = %v, want PASSED", suite.Tests[0].Status)
+	if finalDoc.Tests[0].Status != "PASSED" {
+		t.Errorf("Test status = %v, want PASSED", finalDoc.Tests[0].Status)
 	}
-	if suite.Tests[0].Duration == nil || *suite.Tests[0].Duration != testDuration {
-		t.Errorf("Test duration = %v, want %v", suite.Tests[0].Duration, testDuration)
+	if finalDoc.Tests[0].Duration == nil || *finalDoc.Tests[0].Duration != testDuration {
+		t.Errorf("Test duration = %v, want %v", finalDoc.Tests[0].Duration, testDuration)
 	}
 
 	// Step should be in test's steps array
-	if len(suite.Tests[0].Steps) != 1 {
-		t.Fatalf("Steps count = %v, want 1", len(suite.Tests[0].Steps))
+	if len(finalDoc.Tests[0].Steps) != 1 {
+		t.Fatalf("Steps count = %v, want 1", len(finalDoc.Tests[0].Steps))
 	}
-	if suite.Tests[0].Steps[0].ID != stepID {
-		t.Errorf("Step ID = %v, want %v", suite.Tests[0].Steps[0].ID, stepID)
+	if finalDoc.Tests[0].Steps[0].ID != stepID {
+		t.Errorf("Step ID = %v, want %v", finalDoc.Tests[0].Steps[0].ID, stepID)
 	}
-	if suite.Tests[0].Steps[0].Status != "PASSED" {
-		t.Errorf("Step status = %v, want PASSED", suite.Tests[0].Steps[0].Status)
+	if finalDoc.Tests[0].Steps[0].Status != "PASSED" {
+		t.Errorf("Step status = %v, want PASSED", finalDoc.Tests[0].Steps[0].Status)
 	}
 
 	// Cleanup stream
@@ -266,9 +267,10 @@ func TestNATSToMongoDB_NestedSuites(t *testing.T) {
 	// Create nested suite level 1
 	nestedSuite1ID := "suite-level1"
 	nestedSuite1 := &m.SuiteDocument{
-		ID:     nestedSuite1ID,
-		Name:   "Nested Suite Level 1",
-		Status: "RUNNING",
+		ID:            nestedSuite1ID,
+		Name:          "Nested Suite Level 1",
+		Status:        "RUNNING",
+		ParentSuiteID: "suite-root",
 	}
 	err = repo.UpsertSuiteBegin(ctx, runID, nestedSuite1, rootSuiteID)
 	if err != nil {
@@ -313,11 +315,12 @@ func TestNATSToMongoDB_NestedSuites(t *testing.T) {
 		t.Errorf("Expected nested suite ID %s, got %s", nestedSuite1ID, nestedSuite.ID)
 	}
 
-	if len(nestedSuite.Tests) == 0 {
-		t.Fatal("No tests found in nested suite")
+	// Tests should be in root-level tests array (not in suite's tests array)
+	if len(finalDoc.Tests) == 0 {
+		t.Fatal("No tests found in root-level tests array")
 	}
 
-	foundTest := nestedSuite.Tests[0]
+	foundTest := finalDoc.Tests[0]
 	if foundTest.ID != testID {
 		t.Errorf("Expected test ID %s, got %s", testID, foundTest.ID)
 	}
