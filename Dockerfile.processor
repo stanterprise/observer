@@ -6,8 +6,8 @@
 # ============================================================================
 FROM golang:1.24-alpine AS builder
 
-# Install ca-certificates for HTTPS connections and build dependencies for CGO (required for SQLite support)
-RUN apk add --no-cache ca-certificates gcc musl-dev sqlite-dev
+# Install ca-certificates for HTTPS connections
+RUN apk add --no-cache ca-certificates
 
 WORKDIR /build
 
@@ -20,10 +20,10 @@ COPY cmd/processor/ ./cmd/processor/
 COPY pkg/ ./pkg/
 COPY internal/ ./internal/
 
-# Build processor binary with CGO for SQLite
+# Build processor binary
 # TARGETARCH is automatically set by BuildKit for multi-platform builds
 ARG TARGETARCH
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build -ldflags='-w -s' \
     -o /bin/processor ./cmd/processor
 
@@ -32,8 +32,8 @@ RUN CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} \
 # ============================================================================
 FROM alpine:3.20
 
-# Install runtime dependencies (SQLite libs for CGO binary)
-RUN apk add --no-cache ca-certificates tzdata libstdc++ sqlite-libs
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata
 
 # Copy processor binary from builder
 COPY --from=builder /bin/processor /usr/local/bin/processor

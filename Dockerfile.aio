@@ -29,14 +29,6 @@ RUN npm run build
 # ============================================================================
 FROM golang:1.24-bookworm AS go-builder
 
-# Install build dependencies for CGO (required for SQLite)
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libc6-dev \
-    libsqlite3-dev
-
 WORKDIR /build
 
 # Copy go mod files and download dependencies (cached layer)
@@ -52,21 +44,21 @@ COPY cmd/ ./cmd/
 COPY pkg/ ./pkg/
 COPY internal/ ./internal/
 
-# Build all service binaries for Linux with CGO enabled (required for SQLite)
+# Build all service binaries for Linux
 # TARGETARCH is automatically set by BuildKit for multi-platform builds
 ARG TARGETARCH
 
 # Use cache mounts for faster builds across architectures
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo sqlite_omit_load_extension' \
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
+    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo' \
     -o /bin/ingestion ./cmd/ingestion && \
-    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo sqlite_omit_load_extension' \
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
+    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo' \
     -o /bin/processor ./cmd/processor && \
-    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo sqlite_omit_load_extension' \
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
+    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo' \
     -o /bin/api ./cmd/api
 
 # ============================================================================
