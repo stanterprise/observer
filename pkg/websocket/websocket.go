@@ -13,6 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stanterprise/observer/pkg/publisher"
+	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 )
 
 // Hub manages WebSocket connections and broadcasts events to connected clients
@@ -278,7 +279,7 @@ func (h *Hub) consumeNATSEvents(ctx context.Context, cfg NATSConfig) {
 
 			// Process each message
 			for msg := range msgs.Messages() {
-				// Parse the event
+				// Parse the event envelope
 				var event publisher.Event
 				if err := json.Unmarshal(msg.Data(), &event); err != nil {
 					h.logger.Error("unmarshal event failed", "error", err)
@@ -290,8 +291,15 @@ func (h *Hub) consumeNATSEvents(ctx context.Context, cfg NATSConfig) {
 					"type", event.Type,
 					"timestamp", event.Timestamp)
 
-				// Broadcast to all connected WebSocket clients
-				h.broadcast <- msg.Data()
+				// Normalize protobuf data to camelCase before broadcasting
+				normalizedData, err := h.normalizeEventData(&event)
+				if err != nil {
+					h.logger.Error("normalize event data failed", "error", err, "type", event.Type)
+					// Fall back to raw data if normalization fails
+					h.broadcast <- msg.Data()
+				} else {
+					h.broadcast <- normalizedData
+				}
 
 				// Acknowledge message
 				msg.Ack()
@@ -571,6 +579,68 @@ func getNestedField(data map[string]interface{}, fieldPath string) (interface{},
 	}
 
 	return nil, false
+}
+
+// normalizeEventData converts protobuf events to model-based JSON for consistency with REST API
+// This ensures WebSocket events match the MongoDB document structure used by the REST API
+func (h *Hub) normalizeEventData(event *publisher.Event) ([]byte, error) {
+	// Convert protobuf to model-based structure
+	var modelData interface{}
+
+	switch event.Type {
+	case publisher.EventTypeRunStart:
+		var req events.ReportRunStartEventRequest
+		if err := json.Unmarshal(event.Data, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal run start: %w", err)
+		}
+		modelData = protoToTestRunDocument(&req)
+
+	case publisher.EventTypeTestBegin:
+		var req events.TestBeginEventRequest
+		if err := json.Unmarshal(event.Data, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal test begin: %w", err)
+		}
+		modelData = protoToTestDocument(req.TestCase)
+
+	case publisher.EventTypeTestEnd:
+		var req events.TestEndEventRequest
+		if err := json.Unmarshal(event.Data, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal test end: %w", err)
+		}
+		modelData = protoToTestDocument(req.TestCase)
+
+	case publisher.EventTypeStepBegin, publisher.EventTypeStepEnd,
+		publisher.EventTypeSuiteBegin, publisher.EventTypeSuiteEnd,
+		publisher.EventTypeRunEnd:
+		// For events not yet converted to models, pass through raw data
+		// TODO: Add model converters for these event types
+		if err := json.Unmarshal(event.Data, &modelData); err != nil {
+			return nil, fmt.Errorf("parse event data: %w", err)
+		}
+
+	default:
+		// For unknown event types, pass through the raw data
+		if err := json.Unmarshal(event.Data, &modelData); err != nil {
+			return nil, fmt.Errorf("parse unknown event type: %w", err)
+		}
+	}
+
+	// Re-wrap in event envelope with model-based data
+	normalizedEvent := publisher.Event{
+		Type:      event.Type,
+		Timestamp: event.Timestamp,
+		Data:      nil, // Will be filled during marshal
+	}
+
+	// Marshal model data
+	dataBytes, err := json.Marshal(modelData)
+	if err != nil {
+		return nil, fmt.Errorf("marshal model data: %w", err)
+	}
+	normalizedEvent.Data = json.RawMessage(dataBytes)
+
+	// Marshal complete event
+	return json.Marshal(normalizedEvent)
 }
 
 // noopWriter implements io.Writer but drops logs when no logger provided
