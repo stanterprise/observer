@@ -1,9 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
-import { useWebSocket } from "@/hooks/useWebSocket";
 import type {
   WebSocketEvent,
   WebSocketRunData,
@@ -23,38 +22,34 @@ import type { TestRun } from "@/types/testRun";
 import { handleStartRun, handleUpdateRun } from "./suiteEventHandlers";
 import { getRunStatus } from "./utils";
 
-export function TestSuiteRunsPage() {
+interface TestSuiteRunsPageProps {
+  onWebSocketEvent: WebSocketEvent | null;
+}
+
+export function TestSuiteRunsPage({
+  onWebSocketEvent,
+}: TestSuiteRunsPageProps) {
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  // Handle WebSocket events with filtered subscription
-  const handleWebSocketMessage = useCallback(
-    (event: WebSocketEvent) => {
-      const { type, data } = event;
-      // console.log("[TestSuiteRunsPage] Received WebSocket event:", type, data);
+  // Handle WebSocket events from App.tsx
+  useEffect(() => {
+    if (!onWebSocketEvent) return;
 
-      if (type === "run.start") {
-        console.log("[TestSuiteRunsPage] Handling run.start event");
-        handleStartRun(data as WebSocketRunData, setRuns);
-      }
-      if (type === "run.end") {
-        // Handle run.end if needed
-      }
+    const { type, data } = onWebSocketEvent;
 
-      if (type === "test.begin" || type === "test.end") {
-        console.log("[TestSuiteRunsPage] Handling test event:", type);
-        handleUpdateRun(data as WebSocketTestData, type, setRuns);
-      }
-    },
-    [] // Remove runs from dependencies to avoid stale closure
-  );
+    if (type === "run.start") {
+      console.log("[TestSuiteRunsPage] Handling run.start event");
+      handleStartRun(data as WebSocketRunData, setRuns);
+    }
 
-  // Subscribe to test.begin and test.end events only
-  useWebSocket({
-    onMessage: handleWebSocketMessage,
-  });
+    if (type === "test.begin" || type === "test.end") {
+      console.log("[TestSuiteRunsPage] Handling test event:", type);
+      handleUpdateRun(data as WebSocketTestData, type, setRuns);
+    }
+  }, [onWebSocketEvent]);
 
   useEffect(() => {
     fetchRuns();
