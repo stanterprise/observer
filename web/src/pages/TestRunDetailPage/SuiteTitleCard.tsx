@@ -16,7 +16,16 @@ export const SuiteTitleCard = ({
 }: ProgressBarProps) => {
   const stats = runDetail.statistics!;
   const runningPendingCount =
-    stats.total - stats.passed - stats.failed - stats.skipped;
+    stats.total -
+    stats.passed -
+    stats.failed -
+    stats.skipped -
+    stats.broken! -
+    stats.timedout! -
+    stats.interrupted!;
+
+  const totalFailedTestsCounts =
+    stats.failed + stats.broken! + stats.timedout! + stats.interrupted!;
 
   return (
     <Card className="overflow-hidden shadow-lg border-gray-200">
@@ -35,14 +44,14 @@ export const SuiteTitleCard = ({
             <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
           </div>
         )}
-        {stats.failed > 0 && (
+        {totalFailedTestsCounts > 0 && (
           <div
             className="bg-linear-to-r from-red-500 to-red-600 transition-all duration-500 ease-out"
             style={{
-              width: `${(stats.failed / stats.total) * 100}%`,
+              width: `${(totalFailedTestsCounts / stats.total) * 100}%`,
             }}
-            title={`${stats.failed} failed (${Math.round(
-              (stats.failed / stats.total) * 100
+            title={`${totalFailedTestsCounts} failed (${Math.round(
+              (totalFailedTestsCounts / stats.total) * 100
             )}%)`}
           />
         )}
@@ -124,14 +133,14 @@ export const SuiteTitleCard = ({
           <div className="group flex flex-col items-center p-4 md:p-6 bg-linear-to-br from-red-50 to-red-100/50 rounded-xl border border-red-200 transition-all duration-200 hover:shadow-md hover:scale-105 cursor-default">
             <XCircle className="h-8 w-8 md:h-10 md:w-10 text-red-600 mb-3 group-hover:scale-110 transition-transform" />
             <div className="text-3xl md:text-4xl font-bold text-red-700 mb-1">
-              {runDetail.statistics!.failed}
+              {totalFailedTestsCounts}
             </div>
             <div className="text-xs md:text-sm text-gray-700 font-medium uppercase tracking-wide">
               Failed
             </div>
             {stats.total > 0 && (
               <div className="text-xs text-red-600 font-semibold mt-1">
-                {Math.round((stats.failed / stats.total) * 100)}%
+                {Math.round((totalFailedTestsCounts / stats.total) * 100)}%
               </div>
             )}
           </div>

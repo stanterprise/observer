@@ -233,7 +233,10 @@ export function TestSuiteRunsPage({
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <span className="text-red-600 font-semibold">
-                          {run.statistics!.failed}
+                          {run.statistics!.failed +
+                            (run.statistics!.broken || 0) +
+                            (run.statistics!.timedout || 0) +
+                            (run.statistics!.interrupted || 0)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">

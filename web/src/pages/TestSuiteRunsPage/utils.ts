@@ -32,7 +32,7 @@ export const getRunStatus = (run: TestRun): TestStatus => {
   // Prioritize error states
   if (run.statistics) {
     const notRunTests =
-      run.statistics.total -
+      run.totalTests! -
       (run.statistics.passed +
         run.statistics.failed +
         (run.statistics.broken || 0) +
@@ -41,14 +41,6 @@ export const getRunStatus = (run: TestRun): TestStatus => {
         (run.statistics.skipped || 0) +
         (run.statistics.unknown || 0));
 
-    console.log(
-      "[getRunStatus] Evaluating run status for run ID:",
-      run.id,
-      "with statistics:",
-      run.statistics,
-      "Not run tests count:",
-      notRunTests
-    );
     if (notRunTests > 0) {
       return "RUNNING";
     } else {
@@ -60,15 +52,9 @@ export const getRunStatus = (run: TestRun): TestStatus => {
         return "INTERRUPTED";
 
       // Then check for success or skip (all tests completed)
-      if (
-        run.statistics.passed === run.statistics.total &&
-        run.statistics.total > 0
-      )
+      if (run.statistics.passed === run.totalTests && run.totalTests! > 0)
         return "PASSED";
-      if (
-        run.statistics.skipped === run.statistics.total &&
-        run.statistics.total > 0
-      )
+      if (run.statistics.skipped === run.totalTests && run.totalTests! > 0)
         return "SKIPPED";
       // Check for active running tests (tests in progress)
       if (run.statistics.running && run.statistics.running > 0)

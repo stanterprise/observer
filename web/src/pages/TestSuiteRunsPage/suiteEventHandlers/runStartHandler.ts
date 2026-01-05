@@ -37,9 +37,9 @@ export const handleStartRun = (
         startTime: data.startTime || new Date().toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: data.updatedAt || new Date().toISOString(),
-        totalTests: data.totalTests || 0,
+        totalTests: data.totalTests!,
         statistics: {
-          total: data.totalTests || 0,
+          total: data.totalTests!,
           passed: 0,
           failed: 0,
           skipped: 0,
