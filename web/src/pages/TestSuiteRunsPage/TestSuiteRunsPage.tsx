@@ -30,18 +30,26 @@ export function TestSuiteRunsPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Handle WebSocket events with filtered subscription
-  const handleWebSocketMessage = useCallback((event: WebSocketEvent) => {
-    const { type, data } = event;
-    if (type == "run.start") {
-      handleStartRun(data as WebSocketRunData, runs, setRuns);
-    }
-    if (type == "run.end") {
-    }
+  const handleWebSocketMessage = useCallback(
+    (event: WebSocketEvent) => {
+      const { type, data } = event;
+      // console.log("[TestSuiteRunsPage] Received WebSocket event:", type, data);
 
-    if (type === "test.begin" || type === "test.end") {
-      handleUpdateRun(data as WebSocketTestData, type, runs, setRuns);
-    }
-  }, []);
+      if (type === "run.start") {
+        console.log("[TestSuiteRunsPage] Handling run.start event");
+        handleStartRun(data as WebSocketRunData, setRuns);
+      }
+      if (type === "run.end") {
+        // Handle run.end if needed
+      }
+
+      if (type === "test.begin" || type === "test.end") {
+        console.log("[TestSuiteRunsPage] Handling test event:", type);
+        handleUpdateRun(data as WebSocketTestData, type, setRuns);
+      }
+    },
+    [] // Remove runs from dependencies to avoid stale closure
+  );
 
   // Subscribe to test.begin and test.end events only
   useWebSocket({

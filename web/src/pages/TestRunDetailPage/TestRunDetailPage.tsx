@@ -125,7 +125,10 @@ export function TestRunDetailPage({
                 updatedTests.push({
                   id: testId || "",
                   runId: testRunId || "",
-                  title: testData.testCase?.title || "",
+                  title:
+                    testData.testCase?.name ||
+                    testData.testCase?.description ||
+                    "",
                   status: "RUNNING",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),

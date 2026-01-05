@@ -15,14 +15,14 @@ export interface WebSocketTestData {
   runId?: string;
   testCase?: {
     id?: string;
-    title?: string;
     name?: string;
+    description?: string;
     runId?: string;
-    status?: string; // Status is in test_case for test.end events
-    location?: {
-      file?: string;
-    };
-    project?: string;
+    testSuiteId?: string; // Changed from suiteId to match protobuf
+    status?: number; // Numeric status code (0=UNKNOWN, 1=PASSED, 2=FAILED, etc.)
+    metadata?: Record<string, any>;
+    startTime?: string;
+    endTime?: string;
   };
   status?: string;
   startedAt?: string;
@@ -43,15 +43,17 @@ export interface WebSocketStepData {
 }
 
 export interface WebSocketRunData {
-  id?: string;
+  runId?: string; // Primary field from model
+  id?: string; // Fallback for compatibility
   name?: string;
+  totalTests?: number;
+  metadata?: Record<string, any>;
   startTime?: string;
   finishedAt?: string;
   updatedAt?: string;
   status?: string;
-  totalTests?: number;
-  metadata?: Record<string, unknown>;
   statistics?: RunStatistics;
+  testSuites?: unknown[]; // From protobuf
 }
 
 export interface WebSocketEvent {

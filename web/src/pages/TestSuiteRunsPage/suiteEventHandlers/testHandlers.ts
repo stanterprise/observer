@@ -5,20 +5,40 @@ import type { TestRun } from "@/types/testRun";
 export const handleUpdateRun = (
   data: WebSocketTestData,
   type: EventType,
-  runs: TestRun[],
   setRuns: React.Dispatch<React.SetStateAction<TestRun[]>>
 ) => {
   const testData = data as WebSocketTestData;
-  const runId = testData.runId || testData.testCase?.runId;
+  console.log(
+    "[handleUpdateRun] Raw data structure:",
+    JSON.stringify(data, null, 2)
+  );
 
-  console.log("Getting NPM run build off my back", setRuns, runs);
+  const runId =
+    testData.testCase?.runId || testData.runId || testData.testRunId;
+
+  console.log(
+    "[handleUpdateRun] Processing event:",
+    type,
+    "runId:",
+    runId,
+    "data:",
+    data
+  );
+
   // Safely extract status - handle both string and non-string values
-  let status: TestStatus;
+  let status: TestStatus | undefined;
   if (type === "test.end") {
-    const rawStatus = testData.testCase?.status || testData.status;
-    // Handle numeric status codes (protobuf enums) - need to map them
+    // Now receiving camelCase: testCase.status (numeric)
+    const rawStatus = testData.testCase?.status;
+    console.log(
+      "[handleUpdateRun] Raw status value:",
+      rawStatus,
+      "type:",
+      typeof rawStatus
+    );
+
+    // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
     if (typeof rawStatus === "number") {
-      // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
       const statusMap: Record<number, string> = {
         0: "UNKNOWN",
         1: "PASSED",
@@ -29,25 +49,36 @@ export const handleUpdateRun = (
         6: "INTERRUPTED",
       };
       status = (statusMap[rawStatus] as unknown as TestStatus) || "UNKNOWN";
-    } else if (typeof rawStatus === "string") {
-      status = rawStatus.toUpperCase() as unknown as TestStatus;
+    } else {
+      status = "UNKNOWN";
     }
+    console.log("[handleUpdateRun] Extracted status:", status);
   }
 
   if (runId) {
     setRuns((prevRuns) => {
       try {
+        console.log(
+          "[handleUpdateRun] Looking for run in",
+          prevRuns.length,
+          "runs"
+        );
         const existingIndex = prevRuns.findIndex((r) => r.id === runId);
+        console.log("[handleUpdateRun] Found run at index:", existingIndex);
         if (existingIndex >= 0) {
           const updated = [...prevRuns];
           const currentRun = { ...updated[existingIndex] };
-          currentRun.statistics!.total =
-            runs.find((r) => r.id === runId)?.statistics!.total || 0;
+          // Keep existing total from the current run state
           // Update statistics based on event type
           if (type === "test.begin") {
+            console.log("[handleUpdateRun] Incrementing running count");
             currentRun.statistics!.running =
               (currentRun.statistics!.running || 0) + 1;
           } else if (type === "test.end") {
+            console.log(
+              "[handleUpdateRun] Processing test.end with status:",
+              status
+            );
             // Decrement running count
             if (
               currentRun.statistics!.running &&
@@ -56,6 +87,12 @@ export const handleUpdateRun = (
               currentRun.statistics!.running--;
             }
             // Increment appropriate status counter
+            if (status) {
+              console.log(
+                "[handleUpdateRun] Updating counter for status:",
+                status
+              );
+            }
             switch (status) {
               case "PASSED":
                 currentRun.statistics!.passed =
@@ -88,13 +125,20 @@ export const handleUpdateRun = (
           }
           currentRun.updatedAt = new Date().toISOString();
           updated[existingIndex] = currentRun;
+          console.log(
+            "[handleUpdateRun] Updated run statistics:",
+            currentRun.statistics
+          );
           return updated;
         }
+        console.warn("[handleUpdateRun] Run not found with id:", runId);
         return prevRuns;
       } catch (error) {
         console.error("Error updating runs from WebSocket:", error);
         return prevRuns;
       }
     });
+  } else {
+    console.warn("[handleUpdateRun] No runId found in event data");
   }
 };
