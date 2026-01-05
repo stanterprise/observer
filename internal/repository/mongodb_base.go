@@ -1,9 +1,9 @@
 package repository
 
 import (
-"log/slog"
+	"log/slog"
 
-"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // MongoRepository handles MongoDB operations for test runs

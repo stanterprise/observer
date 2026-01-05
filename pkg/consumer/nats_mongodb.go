@@ -767,6 +767,10 @@ func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessa
 		return fmt.Errorf("update run end: %w", err)
 	}
 
+	if err := c.repo.MarkRunningTestsAsTimedOut(ctx, req.RunId); err != nil {
+		return fmt.Errorf("mark running tests as timed out: %w", err)
+	}
+
 	return nil
 }
 
