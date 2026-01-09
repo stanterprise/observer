@@ -64,3 +64,35 @@ func protoToTestDocument(tc *entities.TestCaseRun) *models.TestDocument {
 		EndTime:     endTime,
 	}
 }
+
+func protoToStepDocument(step *entities.StepRun) *models.StepDocument {
+	if step == nil {
+		return nil
+	}
+
+	var startTime *time.Time
+	var durationNanos *int64
+	if step.StartTime != nil {
+		t := step.StartTime.AsTime()
+		startTime = &t
+	}
+	if step.Duration != nil {
+		nanos := step.Duration.AsDuration().Nanoseconds()
+		durationNanos = &nanos
+	}
+
+	return &models.StepDocument{
+		ID:            step.Id,
+		TestCaseRunID: step.TestCaseId,
+		Title:         step.Title,
+		Description:   step.Description,
+		Status:        step.Status.String(),
+		Metadata:      convertMetadata(step.Metadata),
+		StartTime:     startTime,
+		Duration:      durationNanos,
+		ParentStepID:  step.ParentStepId,
+		RunID:         step.RunId,
+		Type:          step.Type,
+		Category:      step.Category,
+	}
+}
