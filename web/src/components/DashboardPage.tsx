@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiUrl } from "../lib/config";
+import { useWebSocket } from "../hooks/useWebSocket";
+import type { WebSocketEvent, WebSocketRunData } from "../types/webSocket";
 import { Card, CardHeader, CardTitle, CardContent } from "./Card";
 import {
   Activity,
@@ -41,6 +43,33 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Dashboard-specific WebSocket - only subscribes to run-level events
+  // This connection is independent from global and run-specific connections
+  // It's created when DashboardPage mounts, destroyed when it unmounts
+  useWebSocket({
+    filters: {
+      eventTypes: ["run.start", "run.end"], // Only high-level summary events
+    },
+    onMessage: handleWebSocketEvent,
+  });
+
+  function handleWebSocketEvent(event: WebSocketEvent) {
+    if (event.type === "run.start") {
+      const runData = event.data as WebSocketRunData;
+      console.log("[Dashboard] New run started:", runData.runId || runData.id);
+      // Update stats to show new run
+      setStats((prev) => ({
+        ...prev,
+        totalRuns: prev.totalRuns + 1,
+      }));
+    } else if (event.type === "run.end") {
+      const runData = event.data as WebSocketRunData;
+      console.log("[Dashboard] Run completed:", runData.runId || runData.id);
+      // Refresh dashboard stats when run completes
+      fetchDashboardStats();
+    }
+  }
 
   useEffect(() => {
     fetchDashboardStats();
@@ -323,10 +352,14 @@ export default function DashboardPage() {
                             {run.lastUpdated ? (
                               <div className="flex flex-col">
                                 <span>
-                                  {new Date(run.lastUpdated).toLocaleDateString()}
+                                  {new Date(
+                                    run.lastUpdated
+                                  ).toLocaleDateString()}
                                 </span>
                                 <span className="text-xs text-gray-400">
-                                  {new Date(run.lastUpdated).toLocaleTimeString()}
+                                  {new Date(
+                                    run.lastUpdated
+                                  ).toLocaleTimeString()}
                                 </span>
                               </div>
                             ) : (
