@@ -654,12 +654,17 @@ func (h *Hub) normalizeEventData(event *publisher.Event) ([]byte, error) {
 		}
 		modelData = protoToTestDocument(req.TestCase)
 
-	case publisher.EventTypeStepBegin, publisher.EventTypeStepEnd:
+	case publisher.EventTypeStepBegin:
+		var req events.StepBeginEventRequest
+		if err := json.Unmarshal(event.Data, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal step begin: %w", err)
+		}
+		modelData = protoToStepDocument(req.Step)
+
+	case publisher.EventTypeStepEnd:
 		var req events.StepEndEventRequest
-		// For events not yet converted to models, pass through raw data
-		// TODO: Add model converters for these event types
-		if err := json.Unmarshal(event.Data, &modelData); err != nil {
-			return nil, fmt.Errorf("parse event data: %w", err)
+		if err := json.Unmarshal(event.Data, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal step end: %w", err)
 		}
 		modelData = protoToStepDocument(req.Step)
 
