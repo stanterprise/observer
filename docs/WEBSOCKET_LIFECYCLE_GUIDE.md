@@ -1,6 +1,6 @@
 # WebSocket Connection Lifecycle Management Guide
 
-**Date:** January 10, 2026
+**Date:** January 10, 2025
 
 ## Overview
 
