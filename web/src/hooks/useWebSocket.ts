@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { wsUrl } from "../lib/config";
+import { wsUrl, type WebSocketFilters } from "../lib/config";
 import type { WebSocketEvent } from "@/types/webSocket";
 
 interface UseWebSocketOptions {
+  filters?: WebSocketFilters; // Optional filters for this connection
   onMessage?: (event: WebSocketEvent) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
@@ -13,6 +14,7 @@ interface UseWebSocketOptions {
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const {
+    filters,
     onMessage,
     onConnect,
     onDisconnect,
@@ -28,6 +30,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const isIntentionalCloseRef = useRef(false);
 
   // Use refs for callbacks to avoid recreating connect function
+  const filtersRef = useRef(filters);
   const onMessageRef = useRef(onMessage);
   const onConnectRef = useRef(onConnect);
   const onDisconnectRef = useRef(onDisconnect);
@@ -37,6 +40,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
   // Update refs when callbacks change
   useEffect(() => {
+    filtersRef.current = filters;
     onMessageRef.current = onMessage;
     onConnectRef.current = onConnect;
     onDisconnectRef.current = onDisconnect;
@@ -44,6 +48,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     autoReconnectRef.current = autoReconnect;
     reconnectIntervalRef.current = reconnectInterval;
   }, [
+    filters,
     onMessage,
     onConnect,
     onDisconnect,
@@ -64,7 +69,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         return;
       }
 
-      const url = wsUrl();
+      const url = wsUrl(filtersRef.current);
 
       try {
         const ws = new WebSocket(url);
@@ -177,6 +182,17 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       setIsConnected(false);
     };
   }, []);
+
+  // Reconnect when filters change
+  useEffect(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      // Filters changed - reconnect with new filters
+      disconnect();
+      setTimeout(() => {
+        connect.current();
+      }, 100);
+    }
+  }, [filters]);
 
   return {
     isConnected,

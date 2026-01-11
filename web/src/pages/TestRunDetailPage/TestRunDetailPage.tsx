@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/Card";
 import type { WebSocketEvent, WebSocketTestData } from "@/types/webSocket";
 import { ArrowLeft, Play, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 import { SuiteTitleCard } from "./SuiteTitleCard";
 import type { TestStatus } from "@/types/common";
@@ -13,13 +14,7 @@ import type { TestSuite } from "@/types/testSuite";
 import TestSuiteRecord from "./TestSuiteRecord";
 import type { TestRun } from "@/types/testRun";
 
-interface TestRunDetailPageProps {
-  onWebSocketEvent?: WebSocketEvent | null;
-}
-
-export function TestRunDetailPage({
-  onWebSocketEvent,
-}: TestRunDetailPageProps) {
+export function TestRunDetailPage() {
   const { runId } = useParams<{ runId: string }>();
   const [runDetail, setRunDetail] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,6 +22,25 @@ export function TestRunDetailPage({
   const [hiddenSuiteTypes, setHiddenSuiteTypes] = useState<Set<string>>(
     new Set(["ROOT", "PROJECT", "FILE"])
   );
+
+  // Run-specific WebSocket - receives ALL events for this run (including steps)
+  useWebSocket({
+    filters: runId ? { runId } : undefined,
+    onMessage: handleWebSocketEvent,
+  });
+
+  function handleWebSocketEvent(event: WebSocketEvent) {
+    const { type, data } = event;
+    if (type === "test.end" || type === "test.begin") {
+      const testData = data as WebSocketTestData;
+      const testRunId = testData.runId || testData.testCase?.runId;
+
+      if (testRunId === runId) {
+        console.log("WebSocket event received for run:", testData);
+        updateTestFromEvent(event);
+      }
+    }
+  }
 
   const countTests = (suites: TestSuite[]): number => {
     let total = 0;
@@ -79,146 +93,132 @@ export function TestRunDetailPage({
   };
 
   // Handle WebSocket events to update test statuses locally
-  useEffect(() => {
-    if (!onWebSocketEvent || !runDetail) return;
+  function updateTestFromEvent(event: WebSocketEvent) {
+    if (!runDetail) return;
 
-    const { type, data } = onWebSocketEvent;
-    if (type === "test.end" || type === "test.begin") {
-      const testData = data as WebSocketTestData;
-      const testRunId = testData.runId || testData.testCase?.runId;
+    const { type, data } = event;
+    const testData = data as WebSocketTestData;
 
-      if (testRunId === runId) {
-        console.log("WebSocket event received for run:", testData);
-        setRunDetail((prevDetail) => {
-          if (!prevDetail || !prevDetail.tests) return prevDetail;
+    setRunDetail((prevDetail) => {
+      if (!prevDetail || !prevDetail.tests) return prevDetail;
 
-          try {
-            const testId = testData.testCase?.id || testData.id;
-            // Safely extract status - handle both string and numeric values (protobuf enums)
-            const rawStatus = testData.testCase?.status || testData.status;
-            let status = "running";
-            if (type === "test.end") {
-              if (typeof rawStatus === "number") {
-                // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
-                const statusMap: Record<number, string> = {
-                  0: "unknown",
-                  1: "passed",
-                  2: "failed",
-                  3: "skipped",
-                  4: "broken",
-                  5: "timedout",
-                  6: "interrupted",
-                };
-                status = statusMap[rawStatus] || "unknown";
-              } else if (typeof rawStatus === "string") {
-                status = rawStatus.toLowerCase();
-              }
-            }
-
-            // Update or add test in the tests array
-            const updatedTests = [...prevDetail.tests];
-            const testIndex = updatedTests.findIndex((t) => t.id === testId);
-
-            if (type === "test.begin") {
-              if (testIndex === -1) {
-                // Add new test
-                updatedTests.push({
-                  id: testId || "",
-                  runId: testRunId || "",
-                  title:
-                    testData.testCase?.name ||
-                    testData.testCase?.description ||
-                    "",
-                  status: "RUNNING",
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                });
-              } else {
-                // Update existing test
-                updatedTests[testIndex] = {
-                  ...updatedTests[testIndex],
-                  status: "RUNNING",
-                  updatedAt: new Date().toISOString(),
-                };
-              }
-            } else if (type === "test.end") {
-              if (testIndex >= 0) {
-                updatedTests[testIndex] = {
-                  ...updatedTests[testIndex],
-                  status: status as TestStatus,
-                  updatedAt: new Date().toISOString(),
-                };
-              }
-            }
-
-            // Recalculate statistics
-            const newStats = runDetail.statistics
-              ? runDetail.statistics
-              : {
-                  total: updatedTests.length,
-                  passed: 0,
-                  failed: 0,
-                  skipped: 0,
-                  running: 0,
-                  broken: 0,
-                  timedout: 0,
-                  interrupted: 0,
-                  unknown: 0,
-                };
-
-            updatedTests.forEach((test) => {
-              switch (test.status) {
-                case "PASSED":
-                  newStats.passed++;
-                  break;
-                case "FAILED":
-                  newStats.failed++;
-                  break;
-                case "SKIPPED":
-                  newStats.skipped++;
-                  break;
-                case "RUNNING":
-                  newStats.running
-                    ? newStats.running++
-                    : (newStats.running = 1);
-                  break;
-                case "BROKEN":
-                  newStats.broken ? newStats.broken++ : (newStats.broken = 1);
-                  break;
-                case "TIMEDOUT":
-                  newStats.timedout
-                    ? newStats.timedout++
-                    : (newStats.timedout = 1);
-                  break;
-                case "INTERRUPTED":
-                  newStats.interrupted
-                    ? newStats.interrupted++
-                    : (newStats.interrupted = 1);
-                  break;
-                default:
-                  newStats.unknown
-                    ? newStats.unknown++
-                    : (newStats.unknown = 1);
-              }
-            });
-
-            console.log("Updated run detail from WebSocket:", {
-              tests: updatedTests,
-              statistics: newStats,
-            });
-            return {
-              ...prevDetail,
-              tests: updatedTests,
-              statistics: newStats,
+      try {
+        const testId = testData.testCase?.id || testData.id;
+        // Safely extract status - handle both string and numeric values (protobuf enums)
+        const rawStatus = testData.testCase?.status || testData.status;
+        let status = "running";
+        if (type === "test.end") {
+          if (typeof rawStatus === "number") {
+            // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
+            const statusMap: Record<number, string> = {
+              0: "unknown",
+              1: "passed",
+              2: "failed",
+              3: "skipped",
+              4: "broken",
+              5: "timedout",
+              6: "interrupted",
             };
-          } catch (error) {
-            console.error("Error updating run detail from WebSocket:", error);
-            return prevDetail;
+            status = statusMap[rawStatus] || "unknown";
+          } else if (typeof rawStatus === "string") {
+            status = rawStatus.toLowerCase();
+          }
+        }
+
+        // Update or add test in the tests array
+        const updatedTests = [...prevDetail.tests];
+        const testIndex = updatedTests.findIndex((t) => t.id === testId);
+
+        if (type === "test.begin") {
+          if (testIndex === -1) {
+            // Add new test
+            updatedTests.push({
+              id: testId || "",
+              runId: testData.runId || testData.testCase?.runId || "",
+              title:
+                testData.testCase?.name || testData.testCase?.description || "",
+              status: "RUNNING",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
+          } else {
+            // Update existing test
+            updatedTests[testIndex] = {
+              ...updatedTests[testIndex],
+              status: "RUNNING",
+              updatedAt: new Date().toISOString(),
+            };
+          }
+        } else if (type === "test.end") {
+          if (testIndex >= 0) {
+            updatedTests[testIndex] = {
+              ...updatedTests[testIndex],
+              status: status as TestStatus,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+        }
+
+        // Recalculate statistics
+        const newStats = runDetail.statistics
+          ? runDetail.statistics
+          : {
+              total: updatedTests.length,
+              passed: 0,
+              failed: 0,
+              skipped: 0,
+              running: 0,
+              broken: 0,
+              timedout: 0,
+              interrupted: 0,
+              unknown: 0,
+            };
+
+        updatedTests.forEach((test) => {
+          switch (test.status) {
+            case "PASSED":
+              newStats.passed++;
+              break;
+            case "FAILED":
+              newStats.failed++;
+              break;
+            case "SKIPPED":
+              newStats.skipped++;
+              break;
+            case "RUNNING":
+              newStats.running ? newStats.running++ : (newStats.running = 1);
+              break;
+            case "BROKEN":
+              newStats.broken ? newStats.broken++ : (newStats.broken = 1);
+              break;
+            case "TIMEDOUT":
+              newStats.timedout ? newStats.timedout++ : (newStats.timedout = 1);
+              break;
+            case "INTERRUPTED":
+              newStats.interrupted
+                ? newStats.interrupted++
+                : (newStats.interrupted = 1);
+              break;
+            default:
+              newStats.unknown ? newStats.unknown++ : (newStats.unknown = 1);
           }
         });
+
+        console.log("Updated run detail from WebSocket:", {
+          tests: updatedTests,
+          statistics: newStats,
+        });
+        return {
+          ...prevDetail,
+          tests: updatedTests,
+          statistics: newStats,
+        };
+      } catch (error) {
+        console.error("Error updating run detail from WebSocket:", error);
+        return prevDetail;
       }
-    }
-  }, [onWebSocketEvent, runId]);
+    });
+  }
 
   if (loading) {
     return (

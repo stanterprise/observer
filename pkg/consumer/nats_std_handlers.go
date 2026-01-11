@@ -1,0 +1,83 @@
+package consumer
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	m "github.com/stanterprise/observer/internal/models"
+	events "github.com/stanterprise/proto-go/testsystem/v1/events"
+)
+
+// handleStdOutput processes a stdout event
+func (c *MongoNATSConsumer) handleStdOutput(ctx context.Context, data json.RawMessage) error {
+	var req events.StdOutputEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal stdout event: %w", err)
+	}
+
+	c.logger.Debug("stdout",
+		"run_id", req.RunId,
+		"test_id", req.TestId,
+		"message_len", len(req.Message))
+
+	if req.RunId == "" {
+		c.logger.Warn("stdout event missing run_id", "test_id", req.TestId)
+		return nil
+	}
+
+	// Convert protobuf Timestamp to *time.Time
+	var timestamp *time.Time
+	if req.Timestamp != nil {
+		t := req.Timestamp.AsTime()
+		timestamp = &t
+	}
+
+	output := m.OutputDocument{
+		Message:   req.Message,
+		Timestamp: timestamp,
+	}
+
+	if err := c.repo.AppendStdOutput(ctx, req.RunId, req.TestId, output); err != nil {
+		return fmt.Errorf("append stdout: %w", err)
+	}
+
+	return nil
+}
+
+// handleStdError processes a stderr event
+func (c *MongoNATSConsumer) handleStdError(ctx context.Context, data json.RawMessage) error {
+	var req events.StdErrorEventRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal stderr event: %w", err)
+	}
+
+	c.logger.Debug("stderr",
+		"run_id", req.RunId,
+		"test_id", req.TestId,
+		"message_len", len(req.Message))
+
+	if req.RunId == "" {
+		c.logger.Warn("stderr event missing run_id", "test_id", req.TestId)
+		return nil
+	}
+
+	// Convert protobuf Timestamp to *time.Time
+	var timestamp *time.Time
+	if req.Timestamp != nil {
+		t := req.Timestamp.AsTime()
+		timestamp = &t
+	}
+
+	output := m.OutputDocument{
+		Message:   req.Message,
+		Timestamp: timestamp,
+	}
+
+	if err := c.repo.AppendStdError(ctx, req.RunId, req.TestId, output); err != nil {
+		return fmt.Errorf("append stderr: %w", err)
+	}
+
+	return nil
+}

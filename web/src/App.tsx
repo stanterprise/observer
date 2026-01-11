@@ -9,16 +9,25 @@ import type { WebSocketEvent } from "@/types/webSocket";
 import DashboardPage from "./components/DashboardPage";
 
 function App() {
-  const [lastEvent, setLastEvent] = useState<WebSocketEvent | null>(null);
   const [globalWebSocketEvent, setGlobalWebSocketEvent] =
     useState<WebSocketEvent | null>(null);
 
   const handleWebSocketMessage = useCallback((event: WebSocketEvent) => {
-    setLastEvent(event);
     setGlobalWebSocketEvent(event);
   }, []);
 
+  // Global WebSocket - filters out step events, only run/test level events
   const { isConnected } = useWebSocket({
+    filters: {
+      eventTypes: [
+        "run.start",
+        "run.end",
+        "test.begin",
+        "test.end",
+        "test.failure",
+        "test.error",
+      ],
+    },
     onMessage: handleWebSocketMessage,
   });
 
@@ -34,14 +43,8 @@ function App() {
                 <TestSuiteRunsPage onWebSocketEvent={globalWebSocketEvent} />
               }
             />
-            <Route
-              path=":runId"
-              element={<TestRunDetailPage onWebSocketEvent={lastEvent} />}
-            />
-            <Route
-              path=":runId/tests/:testId"
-              element={<TestDetailPage onWebSocketEvent={lastEvent} />}
-            />
+            <Route path=":runId" element={<TestRunDetailPage />} />
+            <Route path=":runId/tests/:testId" element={<TestDetailPage />} />
           </Route>
         </Route>
       </Routes>

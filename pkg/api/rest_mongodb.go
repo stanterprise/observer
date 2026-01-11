@@ -196,15 +196,19 @@ func (h *MongoHandler) handleRuns(w http.ResponseWriter, r *http.Request) {
 	// Extract run Data
 	runData := make([]map[string]interface{}, 0, len(docs))
 	for _, doc := range docs {
+		var totalTests int = 0
+		for _, suite := range doc.Suites {
+			totalTests += len(suite.TestCaseIds)
+		}
 		runData = append(runData, map[string]interface{}{
 			"id":         doc.ID,
 			"name":       doc.Name,
 			"updatedAt":  doc.UpdatedAt,
-			"totalTests": len(doc.Tests),
+			"totalTests": totalTests,
 			"status":     doc.Status,
 			"metadata":   doc.Metadata,
 			"statistics": map[string]interface{}{
-				"total":       len(doc.Tests),
+				"total":       totalTests,
 				"passed":      len(FilterTestsByStatus(doc.Tests, "PASSED")),
 				"failed":      len(FilterTestsByStatus(doc.Tests, "FAILED")),
 				"skipped":     len(FilterTestsByStatus(doc.Tests, "SKIPPED")),

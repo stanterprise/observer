@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -41,6 +42,10 @@ type Hub struct {
 	js       jetstream.JetStream
 	consumer jetstream.Consumer
 	stream   string
+
+	// Metrics for monitoring (atomic operations)
+	droppedMessages   int64 // Messages dropped due to full client buffers
+	droppedBroadcasts int64 // Broadcasts dropped due to full hub channel
 }
 
 // EventFilters holds filters for selective event streaming
@@ -92,7 +97,7 @@ func NewHub(logger *slog.Logger) *Hub {
 	}
 
 	return &Hub{
-		broadcast:  make(chan []byte, 256),
+		broadcast:  make(chan []byte, 1024), // Increased from 256 for better load handling
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
@@ -232,10 +237,30 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 
 				select {
 				case client.send <- message:
+					// Successfully queued
 				default:
-					// Client's send channel is full, close and remove
-					close(client.send)
-					delete(h.clients, client)
+					// Client's send channel is full - drop oldest message to make room
+					// This keeps the client connected and ensures they see latest events
+					select {
+					case <-client.send: // Remove oldest message
+						atomic.AddInt64(&h.droppedMessages, 1)
+					default:
+						// Channel already drained by another goroutine
+					}
+					// Try to add new message
+					select {
+					case client.send <- message:
+						// Successfully queued after making room
+					default:
+						// Still couldn't send - client is extremely slow
+						// Log but keep connection alive
+						droppedCount := atomic.LoadInt64(&h.droppedMessages)
+						if droppedCount%100 == 0 { // Log every 100th drop to avoid spam
+							h.logger.Warn("client buffer overflow, dropping messages",
+								"total_dropped", droppedCount,
+								"event_type", event.Type)
+						}
+					}
 				}
 			}
 			h.mu.RUnlock()
@@ -296,9 +321,29 @@ func (h *Hub) consumeNATSEvents(ctx context.Context, cfg NATSConfig) {
 				if err != nil {
 					h.logger.Error("normalize event data failed", "error", err, "type", event.Type)
 					// Fall back to raw data if normalization fails
-					h.broadcast <- msg.Data()
+					select {
+					case h.broadcast <- msg.Data():
+					default:
+						atomic.AddInt64(&h.droppedBroadcasts, 1)
+						droppedCount := atomic.LoadInt64(&h.droppedBroadcasts)
+						if droppedCount%50 == 0 { // Log every 50th drop
+							h.logger.Warn("broadcast channel full, dropping event",
+								"type", event.Type,
+								"total_dropped_broadcasts", droppedCount)
+						}
+					}
 				} else {
-					h.broadcast <- normalizedData
+					select {
+					case h.broadcast <- normalizedData:
+					default:
+						atomic.AddInt64(&h.droppedBroadcasts, 1)
+						droppedCount := atomic.LoadInt64(&h.droppedBroadcasts)
+						if droppedCount%50 == 0 {
+							h.logger.Warn("broadcast channel full, dropping event",
+								"type", event.Type,
+								"total_dropped_broadcasts", droppedCount)
+						}
+					}
 				}
 
 				// Acknowledge message
@@ -322,7 +367,7 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	client := &Client{
 		hub:     h,
 		conn:    conn,
-		send:    make(chan []byte, 256),
+		send:    make(chan []byte, 1024), // Increased from 256 for better load handling
 		filters: filters,
 	}
 
@@ -609,8 +654,21 @@ func (h *Hub) normalizeEventData(event *publisher.Event) ([]byte, error) {
 		}
 		modelData = protoToTestDocument(req.TestCase)
 
-	case publisher.EventTypeStepBegin, publisher.EventTypeStepEnd,
-		publisher.EventTypeSuiteBegin, publisher.EventTypeSuiteEnd,
+	case publisher.EventTypeStepBegin:
+		var req events.StepBeginEventRequest
+		if err := json.Unmarshal(event.Data, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal step begin: %w", err)
+		}
+		modelData = protoToStepDocument(req.Step)
+
+	case publisher.EventTypeStepEnd:
+		var req events.StepEndEventRequest
+		if err := json.Unmarshal(event.Data, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal step end: %w", err)
+		}
+		modelData = protoToStepDocument(req.Step)
+
+	case publisher.EventTypeSuiteBegin, publisher.EventTypeSuiteEnd,
 		publisher.EventTypeRunEnd:
 		// For events not yet converted to models, pass through raw data
 		// TODO: Add model converters for these event types
@@ -641,6 +699,42 @@ func (h *Hub) normalizeEventData(event *publisher.Event) ([]byte, error) {
 
 	// Marshal complete event
 	return json.Marshal(normalizedEvent)
+}
+
+// Metrics returns current hub metrics for monitoring
+type HubMetrics struct {
+	ConnectedClients   int
+	DroppedMessages    int64
+	DroppedBroadcasts  int64
+	BroadcastQueueSize int
+	BroadcastCapacity  int
+}
+
+// GetMetrics returns current hub metrics (safe for concurrent access)
+func (h *Hub) GetMetrics() HubMetrics {
+	h.mu.RLock()
+	clients := len(h.clients)
+	h.mu.RUnlock()
+
+	return HubMetrics{
+		ConnectedClients:   clients,
+		DroppedMessages:    atomic.LoadInt64(&h.droppedMessages),
+		DroppedBroadcasts:  atomic.LoadInt64(&h.droppedBroadcasts),
+		BroadcastQueueSize: len(h.broadcast),
+		BroadcastCapacity:  cap(h.broadcast),
+	}
+}
+
+// LogMetrics logs current metrics (useful for periodic health checks)
+func (h *Hub) LogMetrics() {
+	m := h.GetMetrics()
+	h.logger.Info("websocket hub metrics",
+		"connected_clients", m.ConnectedClients,
+		"dropped_messages", m.DroppedMessages,
+		"dropped_broadcasts", m.DroppedBroadcasts,
+		"broadcast_queue_size", m.BroadcastQueueSize,
+		"broadcast_capacity", m.BroadcastCapacity,
+		"queue_utilization_pct", float64(m.BroadcastQueueSize)/float64(m.BroadcastCapacity)*100)
 }
 
 // noopWriter implements io.Writer but drops logs when no logger provided

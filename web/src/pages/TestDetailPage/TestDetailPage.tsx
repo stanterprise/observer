@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import type {
   WebSocketEvent,
   WebSocketTestData,
@@ -11,10 +12,6 @@ import type {
 import type { TestStatus } from "@/types/common";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import StepContainer from "./StepContainer";
-
-interface TestDetailPageProps {
-  onWebSocketEvent?: WebSocketEvent | null;
-}
 
 interface StepDetail {
   id: string;
@@ -50,11 +47,31 @@ interface TestDetailResponse {
   tests: TestDetail[];
 }
 
-export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
+export function TestDetailPage() {
   const { runId, testId } = useParams<{ runId: string; testId: string }>();
   const [testDetail, setTestDetail] = useState<TestDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Run-specific WebSocket - receives ALL events for this run (including steps)
+  useWebSocket({
+    filters: runId ? { runId } : undefined,
+    onMessage: handleWebSocketEvent,
+  });
+
+  function handleWebSocketEvent(event: WebSocketEvent) {
+    const { type, data } = event;
+
+    if (type === "test.end" || type === "test.begin") {
+      const eventData = data as WebSocketTestData;
+      const eventTestId = eventData.testCase?.id || eventData.id;
+      if (eventTestId === testId) {
+        updateTestFromEvent(event);
+      }
+    } else if (type === "step.end" || type === "step.begin") {
+      updateStepFromEvent(event);
+    }
+  }
 
   useEffect(() => {
     if (testId) {
@@ -86,145 +103,146 @@ export function TestDetailPage({ onWebSocketEvent }: TestDetailPageProps) {
   };
 
   // Handle WebSocket events to update test and step statuses locally
-  useEffect(() => {
-    if (!onWebSocketEvent || !testDetail) return;
+  function updateTestFromEvent(event: WebSocketEvent) {
+    if (!testDetail) return;
 
-    const { type, data } = onWebSocketEvent;
+    const { type, data } = event;
+    const eventData = data as WebSocketTestData;
 
-    if (type === "test.end" || type === "test.begin") {
-      const eventData = data as WebSocketTestData;
-      const eventTestId = eventData.testCase?.id || eventData.id;
-      if (eventTestId === testId) {
-        setTestDetail((prevDetail) => {
-          if (!prevDetail || !prevDetail.tests || prevDetail.tests.length === 0)
-            return prevDetail;
+    setTestDetail((prevDetail) => {
+      if (!prevDetail || !prevDetail.tests || prevDetail.tests.length === 0)
+        return prevDetail;
 
-          try {
-            // Safely extract status - handle both string and numeric values (protobuf enums)
-            const rawStatus = eventData.testCase?.status || eventData.status;
-            let status = "RUNNING";
-            if (type === "test.end") {
-              if (typeof rawStatus === "number") {
-                // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
-                const statusMap: Record<number, string> = {
-                  0: "UNKNOWN",
-                  1: "PASSED",
-                  2: "FAILED",
-                  3: "SKIPPED",
-                  4: "BROKEN",
-                  5: "TIMEDOUT",
-                  6: "INTERRUPTED",
-                };
-                status = statusMap[rawStatus] || "UNKNOWN";
-              } else if (typeof rawStatus === "string") {
-                status = rawStatus.toUpperCase();
-              }
-            }
-
-            return {
-              ...prevDetail,
-              tests: prevDetail.tests.map((t) =>
-                t.id === testId
-                  ? {
-                      ...t,
-                      status: status,
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : t
-              ),
+      try {
+        // Safely extract status - handle both string and numeric values (protobuf enums)
+        const rawStatus = eventData.testCase?.status || eventData.status;
+        let status = "RUNNING";
+        if (type === "test.end") {
+          if (typeof rawStatus === "number") {
+            // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
+            const statusMap: Record<number, string> = {
+              0: "UNKNOWN",
+              1: "PASSED",
+              2: "FAILED",
+              3: "SKIPPED",
+              4: "BROKEN",
+              5: "TIMEDOUT",
+              6: "INTERRUPTED",
             };
-          } catch (error) {
-            console.error("Error updating test detail from WebSocket:", error);
-            return prevDetail;
+            status = statusMap[rawStatus] || "UNKNOWN";
+          } else if (typeof rawStatus === "string") {
+            status = rawStatus.toUpperCase();
           }
-        });
-      }
-    } else if (type === "step.end" || type === "step.begin") {
-      const eventData = data as WebSocketStepData;
-      const eventTestCaseRunId = eventData.testCaseRunId;
-      if (eventTestCaseRunId === testId && testDetail.tests.length > 0) {
-        setTestDetail((prevDetail) => {
-          if (!prevDetail || !prevDetail.tests || prevDetail.tests.length === 0)
-            return prevDetail;
+        }
 
-          try {
-            const stepId = eventData.id;
-            if (!stepId) return prevDetail;
-
-            // Safely extract status - handle both string and numeric values (protobuf enums)
-            const rawStatus = eventData.status;
-            let status = "RUNNING";
-            if (type === "step.end") {
-              if (typeof rawStatus === "number") {
-                // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
-                const statusMap: Record<number, string> = {
-                  0: "UNKNOWN",
-                  1: "PASSED",
-                  2: "FAILED",
-                  3: "SKIPPED",
-                  4: "BROKEN",
-                  5: "TIMEDOUT",
-                  6: "INTERRUPTED",
-                };
-                status = statusMap[rawStatus] || "UNKNOWN";
-              } else if (typeof rawStatus === "string") {
-                status = rawStatus.toUpperCase();
-              }
-            }
-
-            const currentTest = prevDetail.tests[0];
-            const updatedSteps = [...(currentTest.steps || [])];
-            const stepIndex = updatedSteps.findIndex((s) => s.id === stepId);
-
-            if (type === "step.begin") {
-              if (stepIndex === -1) {
-                // Add new step
-                updatedSteps.push({
-                  id: stepId,
-                  runId: currentTest.runId,
-                  testCaseRunId: testId || "",
-                  parentStepId: eventData.parentStepId,
-                  status: "RUNNING",
-                  category: eventData.category || "",
-                  title: eventData.title || "",
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                });
-              } else {
-                updatedSteps[stepIndex] = {
-                  ...updatedSteps[stepIndex],
-                  status: "RUNNING",
-                  updatedAt: new Date().toISOString(),
-                };
-              }
-            } else if (type === "step.end") {
-              if (stepIndex >= 0) {
-                updatedSteps[stepIndex] = {
-                  ...updatedSteps[stepIndex],
+        return {
+          ...prevDetail,
+          tests: prevDetail.tests.map((t) =>
+            t.id === testId
+              ? {
+                  ...t,
                   status: status,
                   updatedAt: new Date().toISOString(),
-                };
-              }
-            }
-
-            return {
-              ...prevDetail,
-              tests: [
-                {
-                  ...currentTest,
-                  steps: updatedSteps,
-                  updatedAt: new Date().toISOString(),
-                },
-              ],
-            };
-          } catch (error) {
-            console.error("Error updating steps from WebSocket:", error);
-            return prevDetail;
-          }
-        });
+                }
+              : t
+          ),
+        };
+      } catch (error) {
+        console.error("Error updating test detail from WebSocket:", error);
+        return prevDetail;
       }
+    });
+  }
+
+  function updateStepFromEvent(event: WebSocketEvent) {
+    if (!testDetail || testDetail.tests.length === 0) return;
+
+    const { type, data } = event;
+    const eventData = data as WebSocketStepData;
+    const eventTestCaseRunId = eventData.testCaseRunId;
+
+    if (eventTestCaseRunId === testId) {
+      setTestDetail((prevDetail) => {
+        if (!prevDetail || !prevDetail.tests || prevDetail.tests.length === 0)
+          return prevDetail;
+
+        try {
+          const stepId = eventData.id;
+          if (!stepId) return prevDetail;
+
+          // Safely extract status - handle both string and numeric values (protobuf enums)
+          const rawStatus = eventData.status;
+          let status = "RUNNING";
+          if (type === "step.end") {
+            if (typeof rawStatus === "number") {
+              // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
+              const statusMap: Record<number, string> = {
+                0: "UNKNOWN",
+                1: "PASSED",
+                2: "FAILED",
+                3: "SKIPPED",
+                4: "BROKEN",
+                5: "TIMEDOUT",
+                6: "INTERRUPTED",
+              };
+              status = statusMap[rawStatus] || "UNKNOWN";
+            } else if (typeof rawStatus === "string") {
+              status = rawStatus.toUpperCase();
+            }
+          }
+
+          const currentTest = prevDetail.tests[0];
+          const updatedSteps = [...(currentTest.steps || [])];
+          const stepIndex = updatedSteps.findIndex((s) => s.id === stepId);
+
+          if (type === "step.begin") {
+            if (stepIndex === -1) {
+              // Add new step
+              updatedSteps.push({
+                id: stepId,
+                runId: currentTest.runId,
+                testCaseRunId: testId || "",
+                parentStepId: eventData.parentStepId,
+                status: "RUNNING",
+                category: eventData.category || "",
+                title: eventData.title || "",
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              });
+            } else {
+              updatedSteps[stepIndex] = {
+                ...updatedSteps[stepIndex],
+                status: "RUNNING",
+                updatedAt: new Date().toISOString(),
+              };
+            }
+          } else if (type === "step.end") {
+            if (stepIndex >= 0) {
+              updatedSteps[stepIndex] = {
+                ...updatedSteps[stepIndex],
+                status: status,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+          }
+
+          return {
+            ...prevDetail,
+            tests: [
+              {
+                ...currentTest,
+                steps: updatedSteps,
+                updatedAt: new Date().toISOString(),
+              },
+            ],
+          };
+        } catch (error) {
+          console.error("Error updating steps from WebSocket:", error);
+          return prevDetail;
+        }
+      });
     }
-  }, [onWebSocketEvent, testId, testDetail]);
+  }
 
   if (loading) {
     return (
