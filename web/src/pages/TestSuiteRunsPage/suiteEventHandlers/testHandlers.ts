@@ -10,6 +10,14 @@ interface TestState {
   status: TestStatus;
 }
 
+// Extended type for WebSocket test data with additional fields
+interface ExtendedTestData extends WebSocketTestData {
+  id?: string;
+  runId?: string;
+  status?: string;
+  retryIndex?: number;
+}
+
 // Helper to generate unique key for test (id + retryIndex)
 // This matches MongoDB's approach where tests are identified by (id, retry_index) pair
 const getTestKey = (testId: string, retryIndex: number): string => {
@@ -75,22 +83,21 @@ export const handleUpdateRun = (
   type: EventType,
   setRuns: React.Dispatch<React.SetStateAction<TestRun[]>>
 ) => {
-  const testData = data as WebSocketTestData;
+  const extendedData = data as ExtendedTestData;
 
   // WebSocket sends TestDocument directly (not wrapped in testCase)
   // TestDocument has: id, runId, suiteId, status, retryIndex, etc.
   const runId =
-    (data as any).runId ||
-    testData.testCase?.runId ||
-    testData.runId ||
-    testData.testRunId;
+    extendedData.runId ||
+    extendedData.testCase?.runId ||
+    extendedData.testRunId;
 
-  const testId = (data as any).id || testData.testCase?.id;
-  const retryIndex = (data as any).retryIndex ?? 0; // Default to 0 if not provided
+  const testId = extendedData.id || extendedData.testCase?.id;
+  const retryIndex = extendedData.retryIndex ?? extendedData.testCase?.retryIndex ?? 0;
 
   // Safely extract status - TestDocument.status is already a string
   let status: TestStatus;
-  const rawStatus = (data as any).status;
+  const rawStatus = extendedData.status;
 
   if (typeof rawStatus === "string") {
     status = rawStatus.toUpperCase() as TestStatus;
@@ -118,10 +125,10 @@ export const handleUpdateRun = (
           // This map represents the current state of all tests in this run
           const testStates = new Map<string, TestState>();
           for (const test of currentRun.tests) {
-            const key = getTestKey(test.id, (test as any).retryIndex ?? 0);
+            const key = getTestKey(test.id, test.retryIndex ?? 0);
             testStates.set(key, {
               id: test.id,
-              retryIndex: (test as any).retryIndex ?? 0,
+              retryIndex: test.retryIndex ?? 0,
               status: test.status,
             });
           }
@@ -141,7 +148,7 @@ export const handleUpdateRun = (
             title: "", // Not needed for statistics
             status: state.status,
             retryIndex: state.retryIndex,
-          })) as any;
+          }));
 
           // Recalculate statistics from test states (absolute counting, not incremental)
           // This mirrors the MongoDB processor's approach
