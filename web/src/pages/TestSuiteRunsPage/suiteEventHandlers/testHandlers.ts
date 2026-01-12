@@ -124,6 +124,11 @@ export const handleUpdateRun = (
           // Build test state map from current run's tests
           // This map represents the current state of all tests in this run
           const testStates = new Map<string, TestState>();
+          
+          // If tests array is empty but we have existing statistics from MongoDB,
+          // we need to preserve those statistics rather than resetting to 0.
+          // We can't reconstruct the full test state from aggregate statistics alone,
+          // but we can track tests as they arrive via WebSocket events.
           for (const test of currentRun.tests) {
             const key = getTestKey(test.id, test.retryIndex ?? 0);
             testStates.set(key, {
@@ -152,7 +157,24 @@ export const handleUpdateRun = (
 
           // Recalculate statistics from test states (absolute counting, not incremental)
           // This mirrors the MongoDB processor's approach
-          currentRun.statistics = calculateStatistics(testStates);
+          const newStatistics = calculateStatistics(testStates);
+          
+          // If we had existing statistics from MongoDB (e.g., after page refresh)
+          // and our test states map is smaller, it means we don't have all the test
+          // state yet. In this case, preserve the total from MongoDB and only update
+          // the counts we can calculate from WebSocket events.
+          if (currentRun.statistics && currentRun.statistics.total > newStatistics.total) {
+            // Keep the MongoDB total but merge in the WebSocket-derived statistics
+            currentRun.statistics = {
+              ...currentRun.statistics,
+              ...newStatistics,
+              total: currentRun.statistics.total, // Preserve MongoDB total
+            };
+          } else {
+            // We have complete state from WebSocket, use calculated statistics
+            currentRun.statistics = newStatistics;
+          }
+          
           currentRun.updatedAt = new Date().toISOString();
           updated[existingIndex] = currentRun;
 
