@@ -12,6 +12,13 @@ interface UseWebSocketOptions {
   reconnectInterval?: number;
 }
 
+// Helper to generate event hash for deduplication
+function getEventHash(event: WebSocketEvent): string {
+  const data = event.data as any;
+  const id = data.id || data.testCase?.id || data.test?.id || data.runId || data.run?.id || '';
+  return `${event.type}-${id}-${event.timestamp}`;
+}
+
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const {
     filters,
@@ -28,6 +35,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const reconnectTimeoutRef = useRef<number | null>(null);
   const shouldReconnectRef = useRef(true);
   const isIntentionalCloseRef = useRef(false);
+  
+  // Event deduplication: track processed events by hash
+  const processedEventsRef = useRef<Set<string>>(new Set());
 
   // Use refs for callbacks to avoid recreating connect function
   const filtersRef = useRef(filters);
@@ -37,6 +47,19 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const onErrorRef = useRef(onError);
   const autoReconnectRef = useRef(autoReconnect);
   const reconnectIntervalRef = useRef(reconnectInterval);
+
+  // Clear old processed events every 60 seconds to prevent memory leak
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Keep only last 1000 events to prevent unbounded growth
+      const processed = Array.from(processedEventsRef.current);
+      if (processed.length > 1000) {
+        processedEventsRef.current = new Set(processed.slice(-1000));
+      }
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Update refs when callbacks change
   useEffect(() => {
@@ -86,11 +109,29 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
               for (const evt of events) {
                 if (evt.trim()) {
                   const parsedEvent = JSON.parse(evt) as WebSocketEvent;
+                  
+                  // Check for duplicates
+                  const hash = getEventHash(parsedEvent);
+                  if (processedEventsRef.current.has(hash)) {
+                    console.debug('[WebSocket] Skipping duplicate event:', hash);
+                    continue;
+                  }
+                  processedEventsRef.current.add(hash);
+                  
                   onMessageRef.current?.(parsedEvent);
                 }
               }
             } else {
               const data = JSON.parse(event.data) as WebSocketEvent;
+              
+              // Check for duplicates
+              const hash = getEventHash(data);
+              if (processedEventsRef.current.has(hash)) {
+                console.debug('[WebSocket] Skipping duplicate event:', hash);
+                return;
+              }
+              processedEventsRef.current.add(hash);
+              
               onMessageRef.current?.(data);
             }
           } catch (error) {

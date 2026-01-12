@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
@@ -23,42 +23,7 @@ export function TestRunDetailPage() {
     new Set(["ROOT", "PROJECT", "FILE"])
   );
 
-  // Run-specific WebSocket - receives ALL events for this run (including steps)
-  useWebSocket({
-    filters: runId ? { runId } : undefined,
-    onMessage: handleWebSocketEvent,
-  });
-
-  function handleWebSocketEvent(event: WebSocketEvent) {
-    const { type, data } = event;
-    if (type === "test.end" || type === "test.begin") {
-      const testData = data as WebSocketTestData;
-      const testRunId = testData.runId || testData.testCase?.runId;
-
-      if (testRunId === runId) {
-        console.log("WebSocket event received for run:", testData);
-        updateTestFromEvent(event);
-      }
-    }
-  }
-
-  const countTests = (suites: TestSuite[]): number => {
-    let total = 0;
-    for (const suite of suites) {
-      total += suite.tests?.length || 0; // API returns 'tests' (lowercase)
-      total += countTests(suite.suites ?? []);
-    }
-
-    return total;
-  };
-
-  useEffect(() => {
-    if (runId) {
-      fetchRunDetail(runId);
-    }
-  }, [runId]);
-
-  const fetchRunDetail = async (id: string) => {
+  const fetchRunDetail = useCallback(async (id: string) => {
     try {
       setLoading(true);
       const response = await fetch(apiUrl(`/runs/${id}`));
@@ -90,7 +55,54 @@ export function TestRunDetailPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Callback for WebSocket reconnection - refresh data from API
+  const handleReconnect = useCallback(() => {
+    if (runId) {
+      console.log('[TestRunDetailPage] WebSocket reconnected, refreshing run data');
+      fetchRunDetail(runId);
+    }
+  }, [runId, fetchRunDetail]);
+
+  // Run-specific WebSocket - receives test events for this run (excluding steps for performance)
+  useWebSocket({
+    filters: runId ? { 
+      runId,
+      eventTypes: ['test.begin', 'test.end', 'run.end'] // Exclude step events for performance
+    } : undefined,
+    onMessage: handleWebSocketEvent,
+    onConnect: handleReconnect,
+  });
+
+  function handleWebSocketEvent(event: WebSocketEvent) {
+    const { type, data } = event;
+    if (type === "test.end" || type === "test.begin") {
+      const testData = data as WebSocketTestData;
+      const testRunId = testData.runId || testData.testCase?.runId;
+
+      if (testRunId === runId) {
+        console.log("WebSocket event received for run:", testData);
+        updateTestFromEvent(event);
+      }
+    }
+  }
+
+  const countTests = (suites: TestSuite[]): number => {
+    let total = 0;
+    for (const suite of suites) {
+      total += suite.tests?.length || 0; // API returns 'tests' (lowercase)
+      total += countTests(suite.suites ?? []);
+    }
+
+    return total;
   };
+
+  useEffect(() => {
+    if (runId) {
+      fetchRunDetail(runId);
+    }
+  }, [runId, fetchRunDetail]);
 
   // Handle WebSocket events to update test statuses locally
   function updateTestFromEvent(event: WebSocketEvent) {

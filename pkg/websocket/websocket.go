@@ -81,6 +81,27 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// isLowPriorityEvent returns true if the event type is low priority (e.g., steps)
+// Low priority events are only sent to clients that explicitly filter for them (have runId/testId set).
+// This prevents step events from flooding all clients when they don't need them.
+// Design decision: Clients with NO filters will NOT receive step events to reduce traffic.
+func isLowPriorityEvent(eventType publisher.EventType) bool {
+	return eventType == publisher.EventTypeStepBegin ||
+		eventType == publisher.EventTypeStepEnd
+}
+
+// isHighPriorityEvent returns true if the event type is high priority (e.g., tests, runs)
+// High priority events are broadcast to all clients matching their general filters.
+// These events are critical for test observability and should always be delivered.
+func isHighPriorityEvent(eventType publisher.EventType) bool {
+	return eventType == publisher.EventTypeRunStart ||
+		eventType == publisher.EventTypeRunEnd ||
+		eventType == publisher.EventTypeTestBegin ||
+		eventType == publisher.EventTypeTestEnd ||
+		eventType == publisher.EventTypeTestFailure ||
+		eventType == publisher.EventTypeTestError
+}
+
 // NATSConfig holds configuration for NATS WebSocket integration
 type NATSConfig struct {
 	URL          string
@@ -97,7 +118,7 @@ func NewHub(logger *slog.Logger) *Hub {
 	}
 
 	return &Hub{
-		broadcast:  make(chan []byte, 1024), // Increased from 256 for better load handling
+		broadcast:  make(chan []byte, 4096), // Increased from 1024 to handle high load (4x capacity)
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
@@ -202,6 +223,10 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 		go h.consumeNATSEvents(ctx, cfg)
 	}
 
+	// Periodic metrics logging ticker
+	metricsTicker := time.NewTicker(60 * time.Second)
+	defer metricsTicker.Stop()
+
 	// Main hub loop
 	for {
 		select {
@@ -229,15 +254,27 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 			}
 
 			h.mu.RLock()
+			sentCount := 0
+			filteredCount := 0
+
 			for client := range h.clients {
-				// Check if client's filters match this event
+				// SMART FILTERING: Skip low-priority (step) events if client doesn't have matching filter
+				// This implements traffic reduction by preventing step events from being sent to clients
+				// that don't explicitly need them (via runId/testId filter).
+				// Note: Clients with NO filters will not receive step events (by design, to reduce traffic).
+				if isLowPriorityEvent(event.Type) && !client.matchesFilters(&event) {
+					filteredCount++
+					continue
+				}
+
+				// High-priority events OR matching low-priority events - check general filter
 				if !client.matchesFilters(&event) {
 					continue
 				}
 
 				select {
 				case client.send <- message:
-					// Successfully queued
+					sentCount++
 				default:
 					// Client's send channel is full - drop oldest message to make room
 					// This keeps the client connected and ensures they see latest events
@@ -250,7 +287,7 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 					// Try to add new message
 					select {
 					case client.send <- message:
-						// Successfully queued after making room
+						sentCount++
 					default:
 						// Still couldn't send - client is extremely slow
 						// Log but keep connection alive
@@ -264,6 +301,18 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 				}
 			}
 			h.mu.RUnlock()
+
+			// Log filtering effectiveness for low-priority events
+			if filteredCount > 0 {
+				h.logger.Debug("filtered low-priority event",
+					"type", event.Type,
+					"filtered_clients", filteredCount,
+					"sent_to_clients", sentCount)
+			}
+
+		case <-metricsTicker.C:
+			// Log metrics every 60 seconds
+			h.LogMetrics()
 
 		case <-ctx.Done():
 			h.logger.Info("hub stopping")
@@ -367,7 +416,7 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	client := &Client{
 		hub:     h,
 		conn:    conn,
-		send:    make(chan []byte, 1024), // Increased from 256 for better load handling
+		send:    make(chan []byte, 2048), // Increased from 1024 to handle high load (2x capacity)
 		filters: filters,
 	}
 
