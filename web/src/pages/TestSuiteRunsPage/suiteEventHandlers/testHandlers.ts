@@ -126,20 +126,80 @@ export const handleUpdateRun = (
           const testStates = new Map<string, TestState>();
           
           // If tests array is empty but we have existing statistics from MongoDB,
-          // we need to preserve those statistics rather than resetting to 0.
-          // We can't reconstruct the full test state from aggregate statistics alone,
-          // but we can track tests as they arrive via WebSocket events.
-          for (const test of currentRun.tests) {
-            const key = getTestKey(test.id, test.retryIndex ?? 0);
-            testStates.set(key, {
-              id: test.id,
-              retryIndex: test.retryIndex ?? 0,
-              status: test.status,
-            });
+          // initialize the map with placeholder tests based on MongoDB statistics.
+          // This allows WebSocket events to update existing counts incrementally.
+          if (currentRun.tests.length === 0 && currentRun.statistics) {
+            // Create placeholder tests for each status category from MongoDB stats
+            let placeholderId = 0;
+            const stats = currentRun.statistics;
+            
+            // Helper to add placeholder tests for a given status
+            const addPlaceholders = (status: TestStatus, count: number) => {
+              for (let i = 0; i < count; i++) {
+                const key = getTestKey(`__placeholder_${status}_${placeholderId}`, 0);
+                testStates.set(key, {
+                  id: `__placeholder_${status}_${placeholderId}`,
+                  retryIndex: 0,
+                  status: status,
+                });
+                placeholderId++;
+              }
+            };
+            
+            // Add placeholders for each status
+            if (stats.passed) addPlaceholders("PASSED", stats.passed);
+            if (stats.failed) addPlaceholders("FAILED", stats.failed);
+            if (stats.skipped) addPlaceholders("SKIPPED", stats.skipped);
+            if (stats.running) addPlaceholders("RUNNING", stats.running);
+            if (stats.broken) addPlaceholders("BROKEN", stats.broken);
+            if (stats.timedout) addPlaceholders("TIMEDOUT", stats.timedout);
+            if (stats.interrupted) addPlaceholders("INTERRUPTED", stats.interrupted);
+            if (stats.unknown) addPlaceholders("UNKNOWN", stats.unknown);
+          } else {
+            // Load existing test states from tests array
+            for (const test of currentRun.tests) {
+              const key = getTestKey(test.id, test.retryIndex ?? 0);
+              testStates.set(key, {
+                id: test.id,
+                retryIndex: test.retryIndex ?? 0,
+                status: test.status,
+              });
+            }
           }
 
           // Update or add the test state based on the event
           const testKey = getTestKey(testId, retryIndex);
+          
+          // If this is a real test (not a placeholder), check if we need to remove a placeholder
+          // This happens when WebSocket events arrive after page refresh with MongoDB placeholders
+          const oldTestState = testStates.get(testKey);
+          if (!oldTestState) {
+            // New test - check if we should replace a placeholder of the old status
+            // Find and remove one placeholder of the previous status (if transitioning states)
+            if (type === "test.end") {
+              // Test is ending - it was previously RUNNING, find and remove a RUNNING placeholder
+              for (const [key] of testStates.entries()) {
+                if (key.startsWith("__placeholder_RUNNING_")) {
+                  testStates.delete(key);
+                  break;
+                }
+              }
+            }
+          } else if (oldTestState && type === "test.end") {
+            // Test is transitioning from oldStatus to newStatus
+            // Remove a placeholder of the old status if it exists
+            const oldStatus = oldTestState.status;
+            if (oldStatus !== status) {
+              for (const [key] of testStates.entries()) {
+                if (key.startsWith(`__placeholder_${oldStatus}_`)) {
+                  testStates.delete(key);
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Add or update the real test
           testStates.set(testKey, {
             id: testId,
             retryIndex,
@@ -157,21 +217,8 @@ export const handleUpdateRun = (
 
           // Recalculate statistics from test states (absolute counting, not incremental)
           // This mirrors the MongoDB processor's approach
-          const newStatistics = calculateStatistics(testStates);
-          
-          // If we had existing statistics from MongoDB (e.g., after page refresh)
-          // and our test states map is smaller, it means we don't have all the test
-          // state yet. In this case, preserve MongoDB statistics entirely.
-          // We can't mix MongoDB and WebSocket statistics because we don't know which
-          // tests are duplicates vs new ones.
-          if (currentRun.statistics && currentRun.statistics.total > newStatistics.total) {
-            // Keep MongoDB statistics unchanged - WebSocket state is incomplete
-            // Don't overwrite with partial WebSocket data
-            // Statistics will update once WebSocket accumulates all tests
-          } else {
-            // We have complete state from WebSocket, use calculated statistics
-            currentRun.statistics = newStatistics;
-          }
+          // With placeholder initialization, we always have complete state
+          currentRun.statistics = calculateStatistics(testStates);
           
           currentRun.updatedAt = new Date().toISOString();
           updated[existingIndex] = currentRun;
