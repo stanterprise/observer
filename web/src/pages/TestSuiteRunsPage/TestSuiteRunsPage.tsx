@@ -24,10 +24,12 @@ import { getRunStatus } from "./utils";
 
 interface TestSuiteRunsPageProps {
   onWebSocketEvent: WebSocketEvent | null;
+  refreshTrigger?: number; // Trigger refresh on WebSocket reconnection
 }
 
 export function TestSuiteRunsPage({
   onWebSocketEvent,
+  refreshTrigger = 0,
 }: TestSuiteRunsPageProps) {
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,14 @@ export function TestSuiteRunsPage({
       handleUpdateRun(data as WebSocketTestData, type, setRuns);
     }
   }, [onWebSocketEvent]);
+
+  // Refresh data when WebSocket reconnects
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      console.log('[TestSuiteRunsPage] WebSocket reconnected, refreshing data from API');
+      fetchRuns();
+    }
+  }, [refreshTrigger]);
 
   useEffect(() => {
     fetchRuns();

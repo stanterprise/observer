@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 
@@ -11,9 +11,16 @@ import DashboardPage from "./components/DashboardPage";
 function App() {
   const [globalWebSocketEvent, setGlobalWebSocketEvent] =
     useState<WebSocketEvent | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const handleWebSocketMessage = useCallback((event: WebSocketEvent) => {
     setGlobalWebSocketEvent(event);
+  }, []);
+
+  const handleWebSocketReconnect = useCallback(() => {
+    console.log('[App] WebSocket reconnected, triggering data refresh');
+    // Trigger refresh in child components
+    setRefreshTrigger(prev => prev + 1);
   }, []);
 
   // Global WebSocket - filters out step events, only run/test level events
@@ -29,6 +36,7 @@ function App() {
       ],
     },
     onMessage: handleWebSocketMessage,
+    onConnect: handleWebSocketReconnect,
   });
 
   return (
@@ -40,7 +48,10 @@ function App() {
             <Route
               index
               element={
-                <TestSuiteRunsPage onWebSocketEvent={globalWebSocketEvent} />
+                <TestSuiteRunsPage 
+                  onWebSocketEvent={globalWebSocketEvent}
+                  refreshTrigger={refreshTrigger}
+                />
               }
             />
             <Route path=":runId" element={<TestRunDetailPage />} />

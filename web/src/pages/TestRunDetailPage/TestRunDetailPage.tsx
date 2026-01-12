@@ -23,10 +23,22 @@ export function TestRunDetailPage() {
     new Set(["ROOT", "PROJECT", "FILE"])
   );
 
-  // Run-specific WebSocket - receives ALL events for this run (including steps)
+  // Callback for WebSocket reconnection - refresh data from API
+  const handleReconnect = () => {
+    if (runId) {
+      console.log('[TestRunDetailPage] WebSocket reconnected, refreshing run data');
+      fetchRunDetail(runId);
+    }
+  };
+
+  // Run-specific WebSocket - receives test events for this run (excluding steps for performance)
   useWebSocket({
-    filters: runId ? { runId } : undefined,
+    filters: runId ? { 
+      runId,
+      eventTypes: ['test.begin', 'test.end', 'run.end'] // Exclude step events for performance
+    } : undefined,
     onMessage: handleWebSocketEvent,
+    onConnect: handleReconnect,
   });
 
   function handleWebSocketEvent(event: WebSocketEvent) {
