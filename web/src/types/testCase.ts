@@ -19,6 +19,7 @@ export interface Test {
   timeout?: number;
   duration?: number;
   retryCount?: number;
+  retryIndex?: number;
   createdAt?: string;
   updatedAt?: string;
 }

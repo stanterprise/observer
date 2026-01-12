@@ -23,6 +23,7 @@ export interface WebSocketTestData {
     metadata?: Record<string, any>;
     startTime?: string;
     endTime?: string;
+    retryIndex?: number;
   };
   status?: string;
   startedAt?: string;
@@ -31,6 +32,7 @@ export interface WebSocketTestData {
     message?: string;
   };
   testRunId?: string;
+  retryIndex?: number;
 }
 
 export interface WebSocketStepData {
