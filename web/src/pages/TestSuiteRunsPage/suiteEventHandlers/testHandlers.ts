@@ -161,15 +161,13 @@ export const handleUpdateRun = (
           
           // If we had existing statistics from MongoDB (e.g., after page refresh)
           // and our test states map is smaller, it means we don't have all the test
-          // state yet. In this case, preserve the total from MongoDB and only update
-          // the counts we can calculate from WebSocket events.
+          // state yet. In this case, preserve MongoDB statistics entirely.
+          // We can't mix MongoDB and WebSocket statistics because we don't know which
+          // tests are duplicates vs new ones.
           if (currentRun.statistics && currentRun.statistics.total > newStatistics.total) {
-            // Keep the MongoDB total but merge in the WebSocket-derived statistics
-            currentRun.statistics = {
-              ...currentRun.statistics,
-              ...newStatistics,
-              total: currentRun.statistics.total, // Preserve MongoDB total
-            };
+            // Keep MongoDB statistics unchanged - WebSocket state is incomplete
+            // Don't overwrite with partial WebSocket data
+            // Statistics will update once WebSocket accumulates all tests
           } else {
             // We have complete state from WebSocket, use calculated statistics
             currentRun.statistics = newStatistics;
