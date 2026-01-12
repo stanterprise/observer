@@ -82,14 +82,17 @@ var upgrader = websocket.Upgrader{
 }
 
 // isLowPriorityEvent returns true if the event type is low priority (e.g., steps)
-// Low priority events are only sent to clients that explicitly filter for them
+// Low priority events are only sent to clients that explicitly filter for them (have runId/testId set).
+// This prevents step events from flooding all clients when they don't need them.
+// Design decision: Clients with NO filters will NOT receive step events to reduce traffic.
 func isLowPriorityEvent(eventType publisher.EventType) bool {
 	return eventType == publisher.EventTypeStepBegin ||
 		eventType == publisher.EventTypeStepEnd
 }
 
 // isHighPriorityEvent returns true if the event type is high priority (e.g., tests, runs)
-// High priority events are broadcast to all clients matching filters
+// High priority events are broadcast to all clients matching their general filters.
+// These events are critical for test observability and should always be delivered.
 func isHighPriorityEvent(eventType publisher.EventType) bool {
 	return eventType == publisher.EventTypeRunStart ||
 		eventType == publisher.EventTypeRunEnd ||
@@ -255,7 +258,10 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 			filteredCount := 0
 
 			for client := range h.clients {
-				// SMART FILTERING: Skip low-priority events if client doesn't have matching filter
+				// SMART FILTERING: Skip low-priority (step) events if client doesn't have matching filter
+				// This implements traffic reduction by preventing step events from being sent to clients
+				// that don't explicitly need them (via runId/testId filter).
+				// Note: Clients with NO filters will not receive step events (by design, to reduce traffic).
 				if isLowPriorityEvent(event.Type) && !client.matchesFilters(&event) {
 					filteredCount++
 					continue

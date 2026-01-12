@@ -137,7 +137,7 @@ func TestSmartFiltering_StepEventsFilteredByRunID(t *testing.T) {
 
 	hub.register <- clientA
 	hub.register <- clientB
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond) // Increased to ensure hub processes registrations
 
 	// Send step event for run-a
 	stepEvent := publisher.Event{
@@ -185,7 +185,7 @@ func TestSmartFiltering_HighPriorityBroadcastToAll(t *testing.T) {
 
 	hub.register <- clientA
 	hub.register <- clientB
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond) // Increased to ensure hub processes registrations
 
 	// Send high-priority test.begin event for run-a
 	testEvent := publisher.Event{
@@ -224,7 +224,7 @@ func TestSmartFiltering_NoFilterReceivesHighPriority(t *testing.T) {
 	}
 
 	hub.register <- clientNoFilter
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond) // Increased to ensure hub processes registration
 
 	// Send high-priority test event
 	testEvent := publisher.Event{
@@ -257,7 +257,7 @@ func TestSmartFiltering_NoFilterDoesNotReceiveSteps(t *testing.T) {
 	}
 
 	hub.register <- clientNoFilter
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond) // Increased to ensure hub processes registration
 
 	// Send low-priority step event
 	stepEvent := publisher.Event{

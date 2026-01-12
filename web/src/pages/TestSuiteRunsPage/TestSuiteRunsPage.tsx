@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
@@ -36,36 +36,7 @@ export function TestSuiteRunsPage({
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  // Handle WebSocket events from App.tsx
-  useEffect(() => {
-    if (!onWebSocketEvent) return;
-
-    const { type, data } = onWebSocketEvent;
-
-    if (type === "run.start") {
-      console.log("[TestSuiteRunsPage] Handling run.start event");
-      handleStartRun(data as WebSocketRunData, setRuns);
-    }
-
-    if (type === "test.begin" || type === "test.end") {
-      console.log("[TestSuiteRunsPage] Handling test event:", type);
-      handleUpdateRun(data as WebSocketTestData, type, setRuns);
-    }
-  }, [onWebSocketEvent]);
-
-  // Refresh data when WebSocket reconnects
-  useEffect(() => {
-    if (refreshTrigger > 0) {
-      console.log('[TestSuiteRunsPage] WebSocket reconnected, refreshing data from API');
-      fetchRuns();
-    }
-  }, [refreshTrigger]);
-
-  useEffect(() => {
-    fetchRuns();
-  }, []);
-
-  const fetchRuns = async () => {
+  const fetchRuns = useCallback(async () => {
     try {
       setLoading(true);
       // Fetch all run statistics in a single request
@@ -91,7 +62,36 @@ export function TestSuiteRunsPage({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Handle WebSocket events from App.tsx
+  useEffect(() => {
+    if (!onWebSocketEvent) return;
+
+    const { type, data } = onWebSocketEvent;
+
+    if (type === "run.start") {
+      console.log("[TestSuiteRunsPage] Handling run.start event");
+      handleStartRun(data as WebSocketRunData, setRuns);
+    }
+
+    if (type === "test.begin" || type === "test.end") {
+      console.log("[TestSuiteRunsPage] Handling test event:", type);
+      handleUpdateRun(data as WebSocketTestData, type, setRuns);
+    }
+  }, [onWebSocketEvent]);
+
+  // Refresh data when WebSocket reconnects
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      console.log('[TestSuiteRunsPage] WebSocket reconnected, refreshing data from API');
+      fetchRuns();
+    }
+  }, [refreshTrigger, fetchRuns]);
+
+  useEffect(() => {
+    fetchRuns();
+  }, [fetchRuns]);
 
   if (loading) {
     return (
