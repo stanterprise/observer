@@ -15,7 +15,13 @@ interface UseWebSocketOptions {
 // Helper to generate event hash for deduplication
 function getEventHash(event: WebSocketEvent): string {
   const data = event.data as any;
-  const id = data.id || data.testCase?.id || data.test?.id || data.runId || data.run?.id || '';
+  const id =
+    data.id ||
+    data.testCase?.id ||
+    data.test?.id ||
+    data.runId ||
+    data.run?.id ||
+    "";
   return `${event.type}-${id}-${event.timestamp}`;
 }
 
@@ -35,7 +41,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const reconnectTimeoutRef = useRef<number | null>(null);
   const shouldReconnectRef = useRef(true);
   const isIntentionalCloseRef = useRef(false);
-  
+
   // Event deduplication: track processed events by hash
   const processedEventsRef = useRef<Set<string>>(new Set());
 
@@ -109,29 +115,32 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
               for (const evt of events) {
                 if (evt.trim()) {
                   const parsedEvent = JSON.parse(evt) as WebSocketEvent;
-                  
+
                   // Check for duplicates
                   const hash = getEventHash(parsedEvent);
                   if (processedEventsRef.current.has(hash)) {
-                    console.debug('[WebSocket] Skipping duplicate event:', hash);
+                    console.debug(
+                      "[WebSocket] Skipping duplicate event:",
+                      hash
+                    );
                     continue;
                   }
                   processedEventsRef.current.add(hash);
-                  
+
                   onMessageRef.current?.(parsedEvent);
                 }
               }
             } else {
               const data = JSON.parse(event.data) as WebSocketEvent;
-              
+
               // Check for duplicates
               const hash = getEventHash(data);
               if (processedEventsRef.current.has(hash)) {
-                console.debug('[WebSocket] Skipping duplicate event:', hash);
+                console.debug("[WebSocket] Skipping duplicate event:", hash);
                 return;
               }
               processedEventsRef.current.add(hash);
-              
+
               onMessageRef.current?.(data);
             }
           } catch (error) {
