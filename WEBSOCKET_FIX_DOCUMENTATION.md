@@ -34,12 +34,13 @@ The issue was caused by **fundamentally different approaches** to calculating st
 
 ## Solution
 
-### Core Concept: State-Based Statistics
+### Core Concept: State-Based Statistics with MongoDB Baseline
 
 Instead of incrementing/decrementing counters, we now:
-1. **Store test states** in a Map keyed by `{testId}-{retryIndex}`
+1. **Store test states** in a Map keyed by `{testId}-{retryIndex}` for tests seen via WebSocket
 2. **Update test state** on each event (upsert operation)
 3. **Recalculate statistics** from the Map on every update (absolute counting)
+4. **Preserve MongoDB baseline** when WebSocket state is incomplete after page refresh
 
 ### Implementation Details
 
@@ -63,9 +64,9 @@ if (type === "test.begin") {
 - No retry_index tracking
 - Accumulates errors over time
 
-#### After (State-Based):
+#### After (State-Based with MongoDB Baseline):
 ```typescript
-// Build test state map from current run's tests
+// Build test state map from current run's tests (WebSocket-tracked tests only)
 const testStates = new Map<string, TestState>();
 for (const test of currentRun.tests) {
   const key = getTestKey(test.id, test.retryIndex ?? 0);
@@ -84,14 +85,25 @@ testStates.set(testKey, {
   status,
 });
 
-// Recalculate statistics from test states (absolute counting)
-currentRun.statistics = calculateStatistics(testStates);
+// Recalculate statistics from test states
+const newStatistics = calculateStatistics(testStates);
+
+// Preserve MongoDB baseline when WebSocket state is incomplete
+if (currentRun.statistics && currentRun.statistics.total > newStatistics.total) {
+  // Keep MongoDB statistics - WebSocket state is incomplete
+  // Accept temporary inconsistency after page refresh
+} else {
+  // Use WebSocket statistics - we have sufficient state
+  currentRun.statistics = newStatistics;
+}
 ```
 
 **Benefits:**
 - Tracks unique test instances: `{id}-{retryIndex}`
 - Idempotent: repeated events produce same result
 - Matches MongoDB logic exactly
+- Preserves MongoDB baseline after page refresh
+- No complex placeholder logic
 
 ### Statistics Calculation
 
@@ -163,16 +175,20 @@ for _, test := range allTests {
 
 **After:** State persists across events
 - Each event updates test state map
-- Running count reflects actual state of tests
+- Running count reflects actual state of WebSocket-tracked tests
+- MongoDB statistics provide baseline for tests not yet tracked
 
-### Scenario 3: Page Refresh
-**Before:** Statistics decrease after refresh
-- Real-time (WebSocket): Total: 15, Passed: 12
-- After refresh (MongoDB): Total: 10, Passed: 8
+### Scenario 3: Page Refresh During Test Run
+**Before:** Statistics reset after first WebSocket event
+- Real-time (WebSocket): Total: 15, Passed: 11, Failed: 3, Skipped: 1
+- After refresh (MongoDB): Total: 15, Passed: 11, Failed: 3, Skipped: 1
+- First WebSocket event: **Total: 1** (reset to 0, then +1)
 
-**After:** Statistics match at all times
-- Real-time (WebSocket): Total: 10, Passed: 8
-- After refresh (MongoDB): Total: 10, Passed: 8
+**After:** MongoDB statistics preserved until sufficient WebSocket state
+- Real-time (WebSocket): Total: 15, Passed: 11, Failed: 3, Skipped: 1
+- After refresh (MongoDB): Total: 15, Passed: 11, Failed: 3, Skipped: 1
+- First WebSocket event: **Total: 15** (MongoDB baseline preserved)
+- After many WebSocket events: Total updates based on WebSocket state once sufficient tests tracked
 
 ## Architecture Alignment
 
