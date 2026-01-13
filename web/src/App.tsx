@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 
-import { TestRunDetailPage, TestDetailPage, TestSuiteRunsPage } from "./pages";
+import { TestRunDetailPage, TestDetailPage, TestSuiteRunsPage, TestTrendsPage } from "./pages";
 
 import { useWebSocket } from "./hooks/useWebSocket";
 import type { WebSocketEvent } from "@/types/webSocket";
@@ -57,6 +57,7 @@ function App() {
             <Route path=":runId" element={<TestRunDetailPage />} />
             <Route path=":runId/tests/:testId" element={<TestDetailPage />} />
           </Route>
+          <Route path="tests/:testId/trends" element={<TestTrendsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
