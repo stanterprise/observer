@@ -376,6 +376,65 @@ export function MarkerStatsPage() {
         </Card>
       )}
 
+      {/* Passes and Failures Timeline */}
+      {runs.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <TrendingUp className="h-5 w-5 text-purple-600" />
+              <span>Passes and Failures Over Time</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="w-full h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={prepareTimelineData(runs)}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 12 }}
+                    className="text-gray-600"
+                  />
+                  <YAxis
+                    label={{
+                      value: "Number of Tests",
+                      angle: -90,
+                      position: "insideLeft",
+                      style: { fontSize: 12 },
+                    }}
+                    tick={{ fontSize: 12 }}
+                    className="text-gray-600"
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="passed"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={{ fill: "#10b981", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Passed"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="failed"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    dot={{ fill: "#ef4444", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Failed"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Test Status Distribution */}
       {runs.length > 0 && (
         <Card>
