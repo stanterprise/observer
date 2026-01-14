@@ -5,6 +5,16 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { ArrowLeft, TrendingUp, Clock, AlertCircle } from "lucide-react";
 import type { TestStatus } from "@/types/common";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
 interface TestTrendItem {
   testId: string;
@@ -140,6 +150,39 @@ export function TestTrendsPage() {
     return sum / validDurations.length;
   };
 
+  const prepareChartData = (trends: TestTrendItem[]) => {
+    // Reverse to show chronological order (oldest to newest)
+    return [...trends]
+      .reverse()
+      .map((trend, index) => {
+        const durationMs = trend.duration ? trend.duration / 1000000 : 0;
+        const date = new Date(trend.createdAt);
+        return {
+          name: `Run ${index + 1}`,
+          duration: parseFloat(durationMs.toFixed(2)),
+          fullDate: date.toLocaleString(),
+          runId: trend.runId,
+          status: trend.status,
+        };
+      })
+      .filter((item) => item.duration > 0); // Only include items with valid duration
+  };
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+          <p className="font-semibold text-gray-900">{data.name}</p>
+          <p className="text-sm text-gray-600">Duration: {data.duration}ms</p>
+          <p className="text-sm text-gray-600">Status: {data.status}</p>
+          <p className="text-xs text-gray-500 mt-1">{data.fullDate}</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -266,6 +309,53 @@ export function TestTrendsPage() {
                   {formatDuration(avgDuration)}
                 </p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Execution Time Graph */}
+      {trends.length > 0 && prepareChartData(trends).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Execution Time Trend</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="w-full h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={prepareChartData(trends)}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 12 }}
+                    className="text-gray-600"
+                  />
+                  <YAxis
+                    label={{
+                      value: "Duration (ms)",
+                      angle: -90,
+                      position: "insideLeft",
+                      style: { fontSize: 12 },
+                    }}
+                    tick={{ fontSize: 12 }}
+                    className="text-gray-600"
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="duration"
+                    stroke="#2563eb"
+                    strokeWidth={2}
+                    dot={{ fill: "#2563eb", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Duration (ms)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
