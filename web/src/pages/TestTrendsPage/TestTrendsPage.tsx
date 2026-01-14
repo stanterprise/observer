@@ -395,7 +395,7 @@ export function TestTrendsPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {trends.map((trend, index) => (
-                    <tr key={`${trend.runId}-${index}`} className="hover:bg-gray-50">
+                    <tr key={`${trend.runId}-${trend.testId}-${index}`} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link
                           to={`/suite_runs/${trend.runId}`}

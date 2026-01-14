@@ -32,11 +32,35 @@ func NewMongoHandler(repo *repository.MongoRepository, logger *slog.Logger) *Mon
 
 // RegisterRoutes registers all REST API routes on the provided mux
 func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/tests", h.handleTests)
-	mux.HandleFunc("/api/tests/", h.handleTestTrends)
+	mux.HandleFunc("/api/tests/", h.handleTestsWithTrends) // Handles both /api/tests and /api/tests/{testId}/trends
 	mux.HandleFunc("/api/runs", h.handleRuns)
 	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
+}
+
+// handleTestsWithTrends handles both /api/tests and /api/tests/{testId}/trends
+func (h *MongoHandler) handleTestsWithTrends(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/tests")
+	
+	// Route to trends endpoint if path matches /{testId}/trends
+	if path != "" && path != "/" && strings.HasSuffix(path, "/trends") {
+		h.handleTestTrends(w, r)
+		return
+	}
+	
+	// Route to list tests endpoint for /api/tests or /api/tests/
+	if path == "" || path == "/" {
+		h.handleTests(w, r)
+		return
+	}
+	
+	// Unknown path pattern
+	http.Error(w, "Not found", http.StatusNotFound)
 }
 
 // handleTests handles GET /api/tests - list all test cases with optional filtering
