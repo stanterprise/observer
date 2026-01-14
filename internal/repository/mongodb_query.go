@@ -239,3 +239,89 @@ func (r *MongoRepository) StepExists(ctx context.Context, stepID string) (bool, 
 
 	return count > 0, nil
 }
+
+// TestTrendItem represents a single test execution in the history
+type TestTrendItem struct {
+	TestID    string     `json:"testId"`
+	RunID     string     `json:"runId"`
+	Status    string     `json:"status"`
+	Duration  *int64     `json:"duration,omitempty"`
+	StartTime *time.Time `json:"startTime,omitempty"`
+	EndTime   *time.Time `json:"endTime,omitempty"`
+	CreatedAt time.Time  `json:"createdAt"`
+}
+
+// GetTestTrends retrieves historical test execution data for a specific test ID across multiple runs
+// Returns test executions sorted by created_at in descending order (most recent first)
+func (r *MongoRepository) GetTestTrends(ctx context.Context, testID string, limit int64) ([]*TestTrendItem, error) {
+	if testID == "" {
+		return nil, fmt.Errorf("testID is required")
+	}
+
+	if limit <= 0 {
+		limit = 50 // Default limit
+	}
+
+	// Aggregate pipeline to find all tests with the given testID across all runs
+	// This searches both root-level tests and nested suite tests
+	pipeline := mongo.Pipeline{
+		// Stage 1: Match documents that contain the test ID in either root or nested tests
+		{{Key: "$match", Value: bson.M{
+			"$or": []bson.M{
+				{"tests.id": testID},
+				{"suites.tests.id": testID},
+			},
+		}}},
+		// Stage 2: Add a field with all matching tests
+		{{Key: "$addFields", Value: bson.M{
+			"allTests": bson.M{
+				"$concatArrays": []interface{}{
+					bson.M{"$ifNull": []interface{}{"$tests", []interface{}{}}},
+					bson.M{
+						"$reduce": bson.M{
+							"input":        "$suites",
+							"initialValue": []interface{}{},
+							"in": bson.M{
+								"$concatArrays": []interface{}{
+									"$$value",
+									bson.M{"$ifNull": []interface{}{"$$this.tests", []interface{}{}}},
+								},
+							},
+						},
+					},
+				},
+			},
+		}}},
+		// Stage 3: Unwind the allTests array
+		{{Key: "$unwind", Value: "$allTests"}},
+		// Stage 4: Match only the specific test ID
+		{{Key: "$match", Value: bson.M{"allTests.id": testID}}},
+		// Stage 5: Project the required fields
+		{{Key: "$project", Value: bson.M{
+			"testId":    "$allTests.id",
+			"runId":     "$_id",
+			"status":    "$allTests.status",
+			"duration":  "$allTests.duration",
+			"startTime": "$allTests.start_time",
+			"endTime":   "$allTests.end_time",
+			"createdAt": "$allTests.created_at",
+		}}},
+		// Stage 6: Sort by created_at descending (most recent first)
+		{{Key: "$sort", Value: bson.M{"createdAt": -1}}},
+		// Stage 7: Limit results
+		{{Key: "$limit", Value: limit}},
+	}
+
+	cursor, err := r.collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, fmt.Errorf("aggregate test trends: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var trends []*TestTrendItem
+	if err := cursor.All(ctx, &trends); err != nil {
+		return nil, fmt.Errorf("decode test trends: %w", err)
+	}
+
+	return trends, nil
+}

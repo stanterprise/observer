@@ -32,10 +32,35 @@ func NewMongoHandler(repo *repository.MongoRepository, logger *slog.Logger) *Mon
 
 // RegisterRoutes registers all REST API routes on the provided mux
 func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/tests", h.handleTests)
+	mux.HandleFunc("/api/tests/", h.handleTestsWithTrends) // Handles both /api/tests and /api/tests/{testId}/trends
 	mux.HandleFunc("/api/runs", h.handleRuns)
 	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
+}
+
+// handleTestsWithTrends handles both /api/tests and /api/tests/{testId}/trends
+func (h *MongoHandler) handleTestsWithTrends(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/tests")
+	
+	// Route to trends endpoint if path matches /{testId}/trends
+	if path != "" && path != "/" && strings.HasSuffix(path, "/trends") {
+		h.handleTestTrends(w, r)
+		return
+	}
+	
+	// Route to list tests endpoint for /api/tests or /api/tests/
+	if path == "" || path == "/" {
+		h.handleTests(w, r)
+		return
+	}
+	
+	// Unknown path pattern
+	http.Error(w, "Not found", http.StatusNotFound)
 }
 
 // handleTests handles GET /api/tests - list all test cases with optional filtering
@@ -449,4 +474,56 @@ func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(doc)
+}
+
+// handleTestTrends handles GET /api/tests/{testId}/trends - get historical test execution data
+func (h *MongoHandler) handleTestTrends(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract test ID from URL path: /api/tests/{testId}/trends
+	path := strings.TrimPrefix(r.URL.Path, "/api/tests/")
+	
+	// Check if this is a trends request
+	if !strings.HasSuffix(path, "/trends") {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	testID := strings.TrimSuffix(path, "/trends")
+	if testID == "" {
+		http.Error(w, "Test ID required", http.StatusBadRequest)
+		return
+	}
+
+	// Get limit from query parameters
+	limit := int64(50)
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsedLimit, err := strconv.ParseInt(l, 10, 64); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	// Fetch test trends from repository
+	trends, err := h.repo.GetTestTrends(r.Context(), testID, limit)
+	if err != nil {
+		h.logger.Error("failed to fetch test trends", "test_id", testID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if trends == nil {
+		trends = []*repository.TestTrendItem{}
+	}
+
+	response := map[string]interface{}{
+		"testId": testID,
+		"trends": trends,
+		"count":  len(trends),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }

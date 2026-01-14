@@ -10,7 +10,7 @@ import type {
   WebSocketStepData,
 } from "@/types/webSocket";
 import type { TestStatus } from "@/types/common";
-import { ArrowLeft, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertCircle, TrendingUp } from "lucide-react";
 import StepContainer from "./StepContainer";
 
 interface StepDetail {
@@ -358,6 +358,13 @@ export function TestDetailPage() {
             </p>
           </div>
         </div>
+        <Link
+          to={`/tests/${test.id}/trends`}
+          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+        >
+          <TrendingUp className="h-4 w-4 mr-2" />
+          View Trends
+        </Link>
       </div>
 
       {/* Test Case Summary Card */}
