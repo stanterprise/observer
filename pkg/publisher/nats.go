@@ -9,6 +9,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -141,8 +143,21 @@ type Event struct {
 
 // Publish publishes an event to NATS JetStream
 func (p *NATSPublisher) Publish(ctx context.Context, eventType EventType, data interface{}) error {
-	// Marshal the data
-	dataBytes, err := json.Marshal(data)
+	// Marshal the data using protobuf JSON marshaler for proto messages
+	var dataBytes []byte
+	var err error
+
+	if protoMsg, ok := data.(proto.Message); ok {
+		// Use protojson for protobuf messages to handle oneof fields correctly
+		dataBytes, err = protojson.MarshalOptions{
+			UseProtoNames:   true,
+			EmitUnpopulated: false,
+		}.Marshal(protoMsg)
+	} else {
+		// Fall back to standard JSON for non-protobuf messages
+		dataBytes, err = json.Marshal(data)
+	}
+
 	if err != nil {
 		return fmt.Errorf("marshal event data: %w", err)
 	}

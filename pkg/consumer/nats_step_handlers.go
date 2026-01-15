@@ -9,12 +9,16 @@ import (
 
 	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/proto-go/testsystem/v1/events"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // handleStepBegin processes a step begin event
 func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMessage) error {
 	var req events.StepBeginEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal step begin event: %w", err)
 	}
 
@@ -73,7 +77,10 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 // handleStepEnd processes a step end event
 func (c *MongoNATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) error {
 	var req events.StepEndEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal step end event: %w", err)
 	}
 

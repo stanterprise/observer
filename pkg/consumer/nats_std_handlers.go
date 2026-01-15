@@ -8,12 +8,16 @@ import (
 
 	m "github.com/stanterprise/observer/internal/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // handleStdOutput processes a stdout event
 func (c *MongoNATSConsumer) handleStdOutput(ctx context.Context, data json.RawMessage) error {
 	var req events.StdOutputEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal stdout event: %w", err)
 	}
 
@@ -49,7 +53,10 @@ func (c *MongoNATSConsumer) handleStdOutput(ctx context.Context, data json.RawMe
 // handleStdError processes a stderr event
 func (c *MongoNATSConsumer) handleStdError(ctx context.Context, data json.RawMessage) error {
 	var req events.StdErrorEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal stderr event: %w", err)
 	}
 

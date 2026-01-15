@@ -8,12 +8,16 @@ import (
 
 	m "github.com/stanterprise/observer/internal/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // handleRunEnd processes a test run end event
 func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) error {
 	var req events.TestRunEndEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal run end event: %w", err)
 	}
 
@@ -47,7 +51,10 @@ func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessa
 
 func (c *MongoNATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage) error {
 	var req events.ReportRunStartEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal run start event: %w", err)
 	}
 

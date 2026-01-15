@@ -14,6 +14,7 @@ import (
 	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/stanterprise/proto-go/testsystem/v1/common"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // noopWriter implements io.Writer but drops logs when no logger provided.
@@ -252,7 +253,10 @@ func (c *MongoNATSConsumer) processMessage(ctx context.Context, msg jetstream.Ms
 // handleHeartbeat processes a heartbeat event
 func (c *MongoNATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMessage) error {
 	var req events.HeartbeatEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal heartbeat event: %w", err)
 	}
 
