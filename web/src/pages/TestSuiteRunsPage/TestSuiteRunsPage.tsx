@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
@@ -35,6 +35,8 @@ export function TestSuiteRunsPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [searchParams] = useSearchParams();
+  const markerFilter = searchParams.get("marker");
 
   const fetchRuns = useCallback(async () => {
     try {
@@ -45,7 +47,18 @@ export function TestSuiteRunsPage({
         throw new Error(`Failed to fetch runs: ${response.statusText}`);
       }
       const data = await response.json();
-      const stats = (data.runs || []) as TestRun[];
+      let stats = (data.runs || []) as TestRun[];
+
+      // Filter by marker if specified in query params
+      if (markerFilter) {
+        stats = stats.filter(
+          (run) =>
+            run.metadata &&
+            typeof run.metadata === "object" &&
+            "MARKER" in run.metadata &&
+            run.metadata.MARKER === markerFilter
+        );
+      }
 
       // Sort by lastUpdated (most recent first by default)
       stats.sort((a, b) => {
@@ -62,7 +75,7 @@ export function TestSuiteRunsPage({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [markerFilter]);
 
   // Handle WebSocket events from App.tsx
   useEffect(() => {
@@ -123,7 +136,18 @@ export function TestSuiteRunsPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Test Suite Runs</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Test Suite Runs</h1>
+          {markerFilter && (
+            <p className="text-sm text-gray-600 mt-1">
+              Filtered by marker: <span className="font-semibold text-blue-600">{markerFilter}</span>
+              {" "}
+              <Link to="/suite_runs" className="text-blue-600 hover:underline">
+                (Clear filter)
+              </Link>
+            </p>
+          )}
+        </div>
         <button
           onClick={fetchRuns}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
