@@ -36,6 +36,7 @@ func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/runs", h.handleRuns)
 	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
+	mux.HandleFunc("/api/markers", h.handleMarkers)        // Handles GET /api/markers - list all unique markers
 	mux.HandleFunc("/api/marker/", h.handleMarkerStats) // Handles /api/marker/{markerValue}/stats
 }
 
@@ -523,6 +524,30 @@ func (h *MongoHandler) handleTestTrends(w http.ResponseWriter, r *http.Request) 
 		"testId": testID,
 		"trends": trends,
 		"count":  len(trends),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleMarkers handles GET /api/markers - list all unique MARKER metadata values with counts
+func (h *MongoHandler) handleMarkers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Fetch unique markers from repository
+	markers, err := h.repo.GetUniqueMarkers(r.Context())
+	if err != nil {
+		h.logger.Error("failed to fetch unique markers", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"markers": markers,
+		"count":   len(markers),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
