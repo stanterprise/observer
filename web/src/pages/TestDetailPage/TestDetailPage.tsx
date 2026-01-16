@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { TagList } from "@/components/TagList";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type {
   WebSocketEvent,
@@ -33,6 +34,7 @@ interface TestDetail {
   name?: string;
   status: string;
   metadata?: Record<string, unknown>;
+  tags?: string[];
   duration?: number;
   retryCount?: number;
   retryIndex?: number;
@@ -471,6 +473,16 @@ export function TestDetailPage() {
                   {JSON.stringify(test.metadata, null, 2)}
                 </pre>
               </div>
+            </div>
+          )}
+
+          {/* Tags Section */}
+          {test.tags && test.tags.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
+                Tags
+              </h3>
+              <TagList tags={test.tags} />
             </div>
           )}
         </CardContent>

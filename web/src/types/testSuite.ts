@@ -12,6 +12,7 @@ export interface TestSuite {
   duration?: number; // in milliseconds
   status?: TestStatus;
   metadata?: Record<string, string>;
+  tags?: string[];
   projectName?: string;
   location?: string;
   type?: string;

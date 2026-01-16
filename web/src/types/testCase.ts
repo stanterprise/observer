@@ -35,6 +35,7 @@ export interface Step {
   type?: string;
   steps?: Step[];
   metadata?: Record<string, string>;
+  tags?: string[];
   parentStepId?: string;
   workerIndex?: string;
   status?: TestStatus;
