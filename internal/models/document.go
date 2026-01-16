@@ -55,6 +55,7 @@ type SuiteDocument struct {
 	TestCaseIds     []string               `bson:"test_case_ids,omitempty" json:"testCaseIds,omitempty"`
 	SubSuiteIds     []string               `bson:"sub_suite_ids,omitempty" json:"subSuiteIds,omitempty"`
 	TestCases       []TestDocument         `bson:"test_cases,omitempty" json:"testCases,omitempty"`
+	Tags            []string               `bson:"tags,omitempty" json:"tags,omitempty"`
 	StartTime       *time.Time             `bson:"start_time,omitempty" json:"startTime,omitempty"`
 	EndTime         *time.Time             `bson:"end_time,omitempty" json:"endTime,omitempty"`
 	CreatedAt       time.Time              `bson:"created_at" json:"createdAt"`
@@ -120,6 +121,7 @@ type StepDocument struct {
 	Duration      *int64                 `bson:"duration,omitempty" json:"duration,omitempty"`
 	Type          string                 `bson:"type,omitempty" json:"type,omitempty"`
 	Metadata      map[string]interface{} `bson:"metadata,omitempty" json:"metadata,omitempty"`
+	Tags          []string               `bson:"tags,omitempty" json:"tags,omitempty"`
 	WorkerIndex   string                 `bson:"worker_index,omitempty" json:"workerIndex,omitempty"`
 	Status        string                 `bson:"status,omitempty" json:"status,omitempty"`
 	Category      string                 `bson:"category,omitempty" json:"category,omitempty"`

@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/Card";
+import { TagList } from "@/components/TagList";
 import { useState, useEffect } from "react";
 import {
   CheckCircle2,
@@ -67,6 +68,11 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
                   {step.title || step.id}
                 </h3>
               </div>
+              {step.tags && step.tags.length > 0 && (
+                <div className="mt-2 ml-8">
+                  <TagList tags={step.tags} />
+                </div>
+              )}
             </div>
           </div>
         </CardContent>

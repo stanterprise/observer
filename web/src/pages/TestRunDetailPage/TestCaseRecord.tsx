@@ -1,5 +1,6 @@
 import { Clock } from "lucide-react";
 import { Badge } from "../../components/Badge";
+import { TagList } from "../../components/TagList";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/Card";
 
@@ -49,6 +50,11 @@ export default ({ test, runId }: TestRecordProps) => {
                   </div>
                 )}
               </div>
+              {test.tags && test.tags.length > 0 && (
+                <div className="mt-2">
+                  <TagList tags={test.tags} />
+                </div>
+              )}
             </div>
             <div className="shrink-0 ml-4">
               <svg
