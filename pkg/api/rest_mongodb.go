@@ -36,6 +36,7 @@ func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/runs", h.handleRuns)
 	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
+	mux.HandleFunc("/api/marker/", h.handleMarkerStats) // Handles /api/marker/{markerValue}/stats
 }
 
 // handleTestsWithTrends handles both /api/tests and /api/tests/{testId}/trends
@@ -522,6 +523,132 @@ func (h *MongoHandler) handleTestTrends(w http.ResponseWriter, r *http.Request) 
 		"testId": testID,
 		"trends": trends,
 		"count":  len(trends),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleMarkerStats handles GET /api/marker/{markerValue}/stats - get historical statistics for runs with matching MARKER metadata
+func (h *MongoHandler) handleMarkerStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract marker value and check for /stats suffix
+	path := strings.TrimPrefix(r.URL.Path, "/api/marker/")
+	
+	// Check if this is a stats request
+	if !strings.HasSuffix(path, "/stats") {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	markerValue := strings.TrimSuffix(path, "/stats")
+	if markerValue == "" {
+		http.Error(w, "Marker value required", http.StatusBadRequest)
+		return
+	}
+
+	// Get limit from query parameters
+	limit := int64(100)
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsedLimit, err := strconv.ParseInt(l, 10, 64); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	// Build filter for runs with matching MARKER metadata
+	filter := bson.M{
+		"metadata.MARKER": markerValue,
+	}
+
+	// Fetch runs from repository
+	docs, total, err := h.repo.ListTestRuns(r.Context(), filter, limit, 0)
+	if err != nil {
+		h.logger.Error("failed to fetch runs by marker", "marker", markerValue, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Build statistics for each run
+	runStats := make([]map[string]interface{}, 0, len(docs))
+	for _, doc := range docs {
+		// Collect all tests (from root and nested suites)
+		var allTests []*m.TestDocument
+		allTests = append(allTests, doc.Tests...)
+		for _, suite := range doc.Suites {
+			allTests = append(allTests, suite.Tests...)
+		}
+
+		// Calculate statistics
+		stats := map[string]int{
+			"total":       len(allTests),
+			"passed":      0,
+			"failed":      0,
+			"skipped":     0,
+			"running":     0,
+			"broken":      0,
+			"timedout":    0,
+			"interrupted": 0,
+			"unknown":     0,
+		}
+
+		for _, test := range allTests {
+			switch test.Status {
+			case "PASSED":
+				stats["passed"]++
+			case "FAILED":
+				stats["failed"]++
+			case "SKIPPED":
+				stats["skipped"]++
+			case "RUNNING":
+				stats["running"]++
+			case "BROKEN":
+				stats["broken"]++
+			case "TIMEDOUT":
+				stats["timedout"]++
+			case "INTERRUPTED":
+				stats["interrupted"]++
+			case "UNKNOWN":
+				stats["unknown"]++
+			case "":
+				stats["running"]++
+			default:
+				stats["unknown"]++
+			}
+		}
+
+		runStat := map[string]interface{}{
+			"runId":       doc.ID,
+			"runName":     doc.Name,
+			"status":      doc.Status,
+			"metadata":    doc.Metadata,
+			"startTime":   doc.StartTime,
+			"endTime":     doc.EndTime,
+			"duration":    doc.Duration,
+			"createdAt":   doc.CreatedAt,
+			"updatedAt":   doc.UpdatedAt,
+			"total":       stats["total"],
+			"passed":      stats["passed"],
+			"failed":      stats["failed"],
+			"skipped":     stats["skipped"],
+			"running":     stats["running"],
+			"broken":      stats["broken"],
+			"timedout":    stats["timedout"],
+			"interrupted": stats["interrupted"],
+			"unknown":     stats["unknown"],
+		}
+
+		runStats = append(runStats, runStat)
+	}
+
+	response := map[string]interface{}{
+		"marker": markerValue,
+		"runs":   runStats,
+		"total":  total,
+		"count":  len(runStats),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -9,12 +9,16 @@ import (
 
 	m "github.com/stanterprise/observer/internal/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // handleSuiteBegin processes a suite begin event
 func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessage) error {
 	var req events.SuiteBeginEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal suite begin event: %w", err)
 	}
 
@@ -84,7 +88,10 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 // handleSuiteEnd processes a suite end event
 func (c *MongoNATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage) error {
 	var req events.SuiteEndEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal suite end event: %w", err)
 	}
 

@@ -8,13 +8,17 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
-	"github.com/stanterprise/proto-go/testsystem/v1/events"
+	events "github.com/stanterprise/proto-go/testsystem/v1/events"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // handleTestBegin processes a test begin event
 func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage) error {
 	var req events.TestBeginEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal test begin event: %w", err)
 	}
 
@@ -100,7 +104,10 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 // handleTestEnd processes a test end event
 func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) error {
 	var req events.TestEndEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal test end event: %w", err)
 	}
 
@@ -126,7 +133,10 @@ func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMess
 // handleTestFailure processes a test failure event
 func (c *MongoNATSConsumer) handleTestFailure(ctx context.Context, data json.RawMessage) error {
 	var req events.TestFailureEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal test failure event: %w", err)
 	}
 
@@ -181,7 +191,10 @@ func (c *MongoNATSConsumer) handleTestFailure(ctx context.Context, data json.Raw
 // handleTestError processes a test error event
 func (c *MongoNATSConsumer) handleTestError(ctx context.Context, data json.RawMessage) error {
 	var req events.TestErrorEventRequest
-	if err := json.Unmarshal(data, &req); err != nil {
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
 		return fmt.Errorf("unmarshal test error event: %w", err)
 	}
 
