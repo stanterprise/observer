@@ -11,6 +11,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	// MetadataMarkerField is the MongoDB field path for the MARKER metadata key
+	MetadataMarkerField = "metadata.MARKER"
+)
+
 // GetTestRun retrieves a complete test run document by ID
 func (r *MongoRepository) GetTestRun(ctx context.Context, id string) (*m.TestRunDocument, error) {
 	var doc m.TestRunDocument
@@ -339,11 +344,11 @@ func (r *MongoRepository) GetUniqueMarkers(ctx context.Context) ([]*MarkerInfo, 
 	pipeline := mongo.Pipeline{
 		// Stage 1: Match documents that have metadata.MARKER field
 		{{Key: "$match", Value: bson.M{
-			"metadata.MARKER": bson.M{"$exists": true, "$ne": nil},
+			MetadataMarkerField: bson.M{"$exists": true, "$ne": nil},
 		}}},
 		// Stage 2: Group by MARKER value and count occurrences
 		{{Key: "$group", Value: bson.M{
-			"_id":   "$metadata.MARKER",
+			"_id":   "$" + MetadataMarkerField,
 			"count": bson.M{"$sum": 1},
 		}}},
 		// Stage 3: Sort by marker value alphabetically
