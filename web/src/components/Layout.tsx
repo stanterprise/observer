@@ -57,6 +57,17 @@ export function Layout({ isConnected }: LayoutProps) {
               >
                 Test Runs
               </Link>
+              <Link
+                to="/markers"
+                className={cn(
+                  "px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  isActive("/markers")
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                )}
+              >
+                Markers
+              </Link>
               <div
                 className="flex items-center ml-2 md:ml-4 px-3 py-1.5 rounded-md bg-gray-50"
                 role="status"
