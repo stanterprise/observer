@@ -546,3 +546,163 @@ return &v
 func timePtr(t time.Time) *time.Time {
 return &t
 }
+
+func TestMongoRepository_GetUniqueMarkers(t *testing.T) {
+repo, cleanup := setupTestRepo(t)
+defer cleanup()
+
+ctx := context.Background()
+
+// Test 1: Empty database returns empty list
+markers, err := repo.GetUniqueMarkers(ctx)
+if err != nil {
+t.Fatalf("GetUniqueMarkers failed on empty database: %v", err)
+}
+if len(markers) != 0 {
+t.Errorf("Expected 0 markers in empty database, got %d", len(markers))
+}
+
+// Create test runs with various marker scenarios
+now := time.Now()
+
+// Run 1: Has MARKER "release-1.0"
+doc1 := &m.TestRunDocument{
+ID:        "run-001",
+Name:      "Release Test 1",
+Status:    "completed",
+CreatedAt: now,
+UpdatedAt: now,
+Metadata: map[string]interface{}{
+"MARKER":      "release-1.0",
+"environment": "production",
+},
+Tests:  []*m.TestDocument{},
+Suites: []*m.SuiteDocument{},
+}
+
+// Run 2: Has MARKER "release-1.0" (duplicate marker)
+doc2 := &m.TestRunDocument{
+ID:        "run-002",
+Name:      "Release Test 2",
+Status:    "completed",
+CreatedAt: now.Add(1 * time.Hour),
+UpdatedAt: now.Add(1 * time.Hour),
+Metadata: map[string]interface{}{
+"MARKER": "release-1.0",
+},
+Tests:  []*m.TestDocument{},
+Suites: []*m.SuiteDocument{},
+}
+
+// Run 3: Has MARKER "nightly"
+doc3 := &m.TestRunDocument{
+ID:        "run-003",
+Name:      "Nightly Test",
+Status:    "completed",
+CreatedAt: now.Add(2 * time.Hour),
+UpdatedAt: now.Add(2 * time.Hour),
+Metadata: map[string]interface{}{
+"MARKER": "nightly",
+},
+Tests:  []*m.TestDocument{},
+Suites: []*m.SuiteDocument{},
+}
+
+// Run 4: No MARKER field
+doc4 := &m.TestRunDocument{
+ID:        "run-004",
+Name:      "No Marker Test",
+Status:    "completed",
+CreatedAt: now.Add(3 * time.Hour),
+UpdatedAt: now.Add(3 * time.Hour),
+Metadata: map[string]interface{}{
+"environment": "staging",
+},
+Tests:  []*m.TestDocument{},
+Suites: []*m.SuiteDocument{},
+}
+
+// Run 5: Empty string MARKER (should be excluded)
+doc5 := &m.TestRunDocument{
+ID:        "run-005",
+Name:      "Empty Marker Test",
+Status:    "completed",
+CreatedAt: now.Add(4 * time.Hour),
+UpdatedAt: now.Add(4 * time.Hour),
+Metadata: map[string]interface{}{
+"MARKER": "",
+},
+Tests:  []*m.TestDocument{},
+Suites: []*m.SuiteDocument{},
+}
+
+// Run 6: Has MARKER "release-1.0" (third occurrence)
+doc6 := &m.TestRunDocument{
+ID:        "run-006",
+Name:      "Release Test 3",
+Status:    "completed",
+CreatedAt: now.Add(5 * time.Hour),
+UpdatedAt: now.Add(5 * time.Hour),
+Metadata: map[string]interface{}{
+"MARKER": "release-1.0",
+},
+Tests:  []*m.TestDocument{},
+Suites: []*m.SuiteDocument{},
+}
+
+// Insert all documents
+_, err = repo.collection.InsertOne(ctx, doc1)
+if err != nil {
+t.Fatalf("Failed to insert doc1: %v", err)
+}
+_, err = repo.collection.InsertOne(ctx, doc2)
+if err != nil {
+t.Fatalf("Failed to insert doc2: %v", err)
+}
+_, err = repo.collection.InsertOne(ctx, doc3)
+if err != nil {
+t.Fatalf("Failed to insert doc3: %v", err)
+}
+_, err = repo.collection.InsertOne(ctx, doc4)
+if err != nil {
+t.Fatalf("Failed to insert doc4: %v", err)
+}
+_, err = repo.collection.InsertOne(ctx, doc5)
+if err != nil {
+t.Fatalf("Failed to insert doc5: %v", err)
+}
+_, err = repo.collection.InsertOne(ctx, doc6)
+if err != nil {
+t.Fatalf("Failed to insert doc6: %v", err)
+}
+
+// Test 2: Get unique markers
+markers, err = repo.GetUniqueMarkers(ctx)
+if err != nil {
+t.Fatalf("GetUniqueMarkers failed: %v", err)
+}
+
+// Should have 2 unique markers (release-1.0 and nightly)
+// Empty string and missing MARKER should be excluded
+if len(markers) != 2 {
+t.Errorf("Expected 2 unique markers, got %d", len(markers))
+}
+
+// Verify markers are sorted by count descending
+// release-1.0 should be first (3 occurrences), nightly second (1 occurrence)
+if len(markers) >= 2 {
+if markers[0].Marker != "release-1.0" {
+t.Errorf("Expected first marker to be 'release-1.0', got '%s'", markers[0].Marker)
+}
+if markers[0].Count != 3 {
+t.Errorf("Expected 'release-1.0' count to be 3, got %d", markers[0].Count)
+}
+
+if markers[1].Marker != "nightly" {
+t.Errorf("Expected second marker to be 'nightly', got '%s'", markers[1].Marker)
+}
+if markers[1].Count != 1 {
+t.Errorf("Expected 'nightly' count to be 1, got %d", markers[1].Count)
+}
+}
+}

@@ -336,9 +336,9 @@ type MarkerInfo struct {
 func (r *MongoRepository) GetUniqueMarkers(ctx context.Context) ([]*MarkerInfo, error) {
 	// Aggregate pipeline to find all unique MARKER values and count runs for each
 	pipeline := mongo.Pipeline{
-		// Stage 1: Match documents that have a MARKER in metadata
+		// Stage 1: Match documents that have a MARKER in metadata and exclude null/empty values
 		{{Key: "$match", Value: bson.M{
-			"metadata.MARKER": bson.M{"$exists": true, "$ne": nil},
+			"metadata.MARKER": bson.M{"$exists": true, "$nin": []interface{}{nil, ""}},
 		}}},
 		// Stage 2: Group by MARKER value and count
 		{{Key: "$group", Value: bson.M{
