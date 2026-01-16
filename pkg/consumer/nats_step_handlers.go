@@ -57,6 +57,7 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 		StartTime:     startTime,
 		Type:          req.Step.Type,
 		Metadata:      md,
+		// Tags:          req.Step.Tags, // TODO: Add when available in protobuf
 		WorkerIndex:   req.Step.WorkerIndex,
 		Status:        req.Step.Status.String(),
 		Category:      req.Step.Category,
