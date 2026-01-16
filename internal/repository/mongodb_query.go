@@ -325,3 +325,40 @@ func (r *MongoRepository) GetTestTrends(ctx context.Context, testID string, limi
 
 	return trends, nil
 }
+
+// MarkerInfo represents a unique marker value with its run count
+type MarkerInfo struct {
+	Marker string `json:"marker" bson:"_id"`
+	Count  int64  `json:"count" bson:"count"`
+}
+
+// GetUniqueMarkers retrieves all unique MARKER metadata values and their run counts
+func (r *MongoRepository) GetUniqueMarkers(ctx context.Context) ([]*MarkerInfo, error) {
+	// Aggregate pipeline to find all unique MARKER values and count runs for each
+	pipeline := mongo.Pipeline{
+		// Stage 1: Match documents that have a MARKER in metadata and exclude null/empty values
+		{{Key: "$match", Value: bson.M{
+			"metadata.MARKER": bson.M{"$exists": true, "$nin": []interface{}{nil, ""}},
+		}}},
+		// Stage 2: Group by MARKER value and count
+		{{Key: "$group", Value: bson.M{
+			"_id":   "$metadata.MARKER",
+			"count": bson.M{"$sum": 1},
+		}}},
+		// Stage 3: Sort by count descending (most runs first)
+		{{Key: "$sort", Value: bson.M{"count": -1}}},
+	}
+
+	cursor, err := r.collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, fmt.Errorf("aggregate unique markers: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var markers []*MarkerInfo
+	if err := cursor.All(ctx, &markers); err != nil {
+		return nil, fmt.Errorf("decode unique markers: %w", err)
+	}
+
+	return markers, nil
+}
