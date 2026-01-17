@@ -58,12 +58,12 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 		Type:          req.Step.Type,
 		Metadata:      md,
 		// Tags:          req.Step.Tags, // TODO: Add when available in protobuf
-		WorkerIndex:   req.Step.WorkerIndex,
-		Status:        req.Step.Status.String(),
-		Category:      req.Step.Category,
-		Location:      req.Step.Location,
-		Error:         req.Step.Error,
-		Errors:        req.Step.Errors,
+		WorkerIndex: req.Step.WorkerIndex,
+		Status:      req.Step.Status.String(),
+		Category:    req.Step.Category,
+		Location:    req.Step.Location,
+		Error:       req.Step.Error,
+		Errors:      req.Step.Errors,
 	}
 
 	if req.Step.Duration != nil {
@@ -91,11 +91,15 @@ func (c *MongoNATSConsumer) handleStepEnd(ctx context.Context, data json.RawMess
 
 	c.logger.Info("step end",
 		"id", req.Step.Id,
-		"status", req.Step.Status)
+		"status", req.Step.Status,
+		"retry_index", req.Step.RetryIndex)
 
 	// Extract testID from TestCaseRunId (same as in handleStepBegin)
 	testID := extractTestID(req.Step.TestCaseId, req.Step.RunId)
 	runID := req.Step.RunId
 
-	return c.repo.UpsertStepEnd(ctx, runID, req.Step.Id, testID, mongoStatusToString(req.Step.Status))
+	// Extract retry_index from Step (defaults to 0 if not set)
+	retryIndex := req.Step.RetryIndex
+
+	return c.repo.UpsertStepEnd(ctx, runID, req.Step.Id, testID, retryIndex, mongoStatusToString(req.Step.Status))
 }

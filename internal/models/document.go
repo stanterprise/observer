@@ -67,45 +67,92 @@ type SuiteDocument struct {
 	Tests []*TestDocument `bson:"tests,omitempty" json:"tests,omitempty"`
 }
 
-// TestDocument represents a test case embedded within a suite or run document.
-type TestDocument struct {
-	ID          string                 `bson:"id" json:"id"`
-	Name        string                 `bson:"name,omitempty" json:"name,omitempty"` // Same as Title, for protobuf compatibility
-	Title       string                 `bson:"title,omitempty" json:"title,omitempty"`
-	Description string                 `bson:"description,omitempty" json:"description,omitempty"`
-	RunID       string                 `bson:"run_id,omitempty" json:"runId,omitempty"`
-	SuiteID     string                 `bson:"suite_id,omitempty" json:"suiteId,omitempty"`
-	Status      string                 `bson:"status,omitempty" json:"status,omitempty"`
-	StartTime   *time.Time             `bson:"start_time,omitempty" json:"startTime,omitempty"`
-	EndTime     *time.Time             `bson:"end_time,omitempty" json:"endTime,omitempty"`
-	Duration    *int64                 `bson:"duration,omitempty" json:"duration,omitempty"`
-	Metadata    map[string]interface{} `bson:"metadata,omitempty" json:"metadata,omitempty"`
-	Tags        []string               `bson:"tags,omitempty" json:"tags,omitempty"`
-	Location    string                 `bson:"location,omitempty" json:"location,omitempty"`
-	RetryCount  *int32                 `bson:"retry_count,omitempty" json:"retryCount,omitempty"`
-	RetryIndex  *int32                 `bson:"retry_index,omitempty" json:"retryIndex,omitempty"`
-	Timeout     *int32                 `bson:"timeout,omitempty" json:"timeout,omitempty"`
+// AttemptDocument represents a single test attempt/retry.
+// Each test can have multiple attempts based on retry_count.
+type AttemptDocument struct {
+	RetryIndex   int32                    `bson:"retry_index" json:"retryIndex"`
+	Steps        []*StepDocument          `bson:"steps,omitempty" json:"steps,omitempty"`
+	Status       string                   `bson:"status,omitempty" json:"status,omitempty"`
+	StartTime    *time.Time               `bson:"start_time,omitempty" json:"startTime,omitempty"`
+	EndTime      *time.Time               `bson:"end_time,omitempty" json:"endTime,omitempty"`
+	Duration     *int64                   `bson:"duration,omitempty" json:"duration,omitempty"`
+	Attachments  []map[string]interface{} `bson:"attachments,omitempty" json:"attachments,omitempty"`
+	ErrorMessage string                   `bson:"error_message,omitempty" json:"errorMessage,omitempty"`
+	StackTrace   string                   `bson:"stack_trace,omitempty" json:"stackTrace,omitempty"`
+	ErrorList    []string                 `bson:"error_list,omitempty" json:"errorList,omitempty"`
+	Failures     []*TestFailureDocument   `bson:"failures,omitempty" json:"failures,omitempty"`
+	Errors       []*TestErrorDocument     `bson:"errors,omitempty" json:"errors,omitempty"`
+	StdOut       []*OutputDocument        `bson:"stdout,omitempty" json:"stdout,omitempty"`
+	StdErr       []*OutputDocument        `bson:"stderr,omitempty" json:"stderr,omitempty"`
+	CreatedAt    time.Time                `bson:"created_at" json:"createdAt"`
+	UpdatedAt    time.Time                `bson:"updated_at" json:"updatedAt"`
+}
 
-	// Legacy single error fields (for backward compatibility with older events)
+// TestDocument represents a test case embedded within a suite or run document.
+// With attempt-based retries: each test has an Attempts array containing per-attempt data.
+// Test-level Status/StartTime/EndTime/Duration represent aggregated values across attempts.
+type TestDocument struct {
+	ID          string `bson:"id" json:"id"`
+	Name        string `bson:"name,omitempty" json:"name,omitempty"` // Same as Title, for protobuf compatibility
+	Title       string `bson:"title,omitempty" json:"title,omitempty"`
+	Description string `bson:"description,omitempty" json:"description,omitempty"`
+	RunID       string `bson:"run_id,omitempty" json:"runId,omitempty"`
+	SuiteID     string `bson:"suite_id,omitempty" json:"suiteId,omitempty"`
+
+	// Status mirrors the status of attempts[retry_index]
+	Status string `bson:"status,omitempty" json:"status,omitempty"`
+
+	// StartTime is the earliest (attempt[0].start_time)
+	StartTime *time.Time `bson:"start_time,omitempty" json:"startTime,omitempty"`
+
+	// EndTime is the latest (current attempt's end_time)
+	EndTime *time.Time `bson:"end_time,omitempty" json:"endTime,omitempty"`
+
+	// Duration is from the current attempt
+	Duration *int64 `bson:"duration,omitempty" json:"duration,omitempty"`
+
+	Metadata   map[string]interface{} `bson:"metadata,omitempty" json:"metadata,omitempty"`
+	Tags       []string               `bson:"tags,omitempty" json:"tags,omitempty"`
+	Location   string                 `bson:"location,omitempty" json:"location,omitempty"`
+	RetryCount *int32                 `bson:"retry_count,omitempty" json:"retryCount,omitempty"`
+
+	// RetryIndex indicates which attempt is currently active
+	RetryIndex *int32 `bson:"retry_index,omitempty" json:"retryIndex,omitempty"`
+
+	Timeout *int32 `bson:"timeout,omitempty" json:"timeout,omitempty"`
+
+	// Attempts array: sized to retry_count+1, indexed by retry_index
+	Attempts []*AttemptDocument `bson:"attempts,omitempty" json:"attempts,omitempty"`
+
+	// DEPRECATED: Legacy single error fields (for backward compatibility with older events)
+	// New code should use attempts[retry_index].error_message instead
 	ErrorMessage string `bson:"error_message,omitempty" json:"errorMessage,omitempty"`
-	StackTrace   string `bson:"stack_trace,omitempty" json:"stackTrace,omitempty"`
-	// Attachments directly on the test (separate from failure/error attachments)
+
+	// DEPRECATED: Use attempts[retry_index].stack_trace instead
+	StackTrace string `bson:"stack_trace,omitempty" json:"stackTrace,omitempty"`
+
+	// DEPRECATED: Use attempts[retry_index].attachments instead
 	Attachments []map[string]interface{} `bson:"attachments,omitempty" json:"attachments,omitempty"`
 
-	// Test failures and errors (structured documents from new events)
+	// DEPRECATED: Use attempts[retry_index].failures instead
 	Failures []*TestFailureDocument `bson:"failures,omitempty" json:"failures,omitempty"`
-	Errors   []*TestErrorDocument   `bson:"errors,omitempty" json:"errors,omitempty"`
 
-	// Error list (simple string array, different from Errors documents)
+	// DEPRECATED: Use attempts[retry_index].errors instead
+	Errors []*TestErrorDocument `bson:"errors,omitempty" json:"errors,omitempty"`
+
+	// DEPRECATED: Use attempts[retry_index].error_list instead
 	ErrorList []string `bson:"error_list,omitempty" json:"errorList,omitempty"`
-	// Standard output and error streams
+
+	// DEPRECATED: Use attempts[retry_index].stdout instead
 	StdOut []*OutputDocument `bson:"stdout,omitempty" json:"stdout,omitempty"`
+
+	// DEPRECATED: Use attempts[retry_index].stderr instead
 	StdErr []*OutputDocument `bson:"stderr,omitempty" json:"stderr,omitempty"`
 
 	CreatedAt time.Time `bson:"created_at" json:"createdAt"`
 	UpdatedAt time.Time `bson:"updated_at" json:"updatedAt"`
 
-	// Embedded steps for this test
+	// DEPRECATED: Use attempts[retry_index].steps instead
 	Steps []*StepDocument `bson:"steps,omitempty" json:"steps,omitempty"`
 }
 

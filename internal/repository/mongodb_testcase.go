@@ -39,6 +39,33 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		test.RetryIndex = &defaultRetryIndex
 	}
 
+	// Initialize retry_count if nil (default to 0 for no retries)
+	if test.RetryCount == nil {
+		defaultRetryCount := int32(0)
+		test.RetryCount = &defaultRetryCount
+	}
+
+	// Initialize attempts array sized to retry_count+1
+	// Each attempt contains empty steps array and retry_index
+	if test.Attempts == nil || len(test.Attempts) == 0 {
+		attemptsSize := int(*test.RetryCount + 1)
+		test.Attempts = make([]*m.AttemptDocument, attemptsSize)
+		for i := 0; i < attemptsSize; i++ {
+			test.Attempts[i] = &m.AttemptDocument{
+				RetryIndex: int32(i),
+				Steps:      []*m.StepDocument{},
+				CreatedAt:  now,
+				UpdatedAt:  now,
+			}
+		}
+	}
+
+	// Set start_time for the current attempt (attempts[retry_index])
+	if test.StartTime != nil && int(*test.RetryIndex) < len(test.Attempts) {
+		test.Attempts[*test.RetryIndex].StartTime = test.StartTime
+		test.Attempts[*test.RetryIndex].Status = test.Status // Initialize attempt status
+	}
+
 	// Try to update existing test in root-level tests array
 	filter := bson.M{
 		"_id":               runID,
@@ -60,6 +87,7 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 			"tests.$[test].retry_count":   test.RetryCount,
 			"tests.$[test].retry_index":   test.RetryIndex,
 			"tests.$[test].timeout":       test.Timeout,
+			"tests.$[test].attempts":      test.Attempts, // Add attempts array
 			"tests.$[test].attachments":   test.Attachments,
 			"tests.$[test].error_message": test.ErrorMessage,
 			"tests.$[test].stack_trace":   test.StackTrace,
@@ -108,14 +136,16 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 	return nil
 }
 
-// UpsertTestEnd updates test end fields (status, duration).
+// UpsertTestEnd updates test end fields (status, duration) and corresponding attempt fields.
+// With attempt-based retries: updates both test-level status and attempts[retry_index] status/end_time/duration.
 // - runID: Required. Identifies the document (_id).
 // - testID: Required. Identifies the test to update.
-// - retryIndex: Required. Identifies the test to update.
+// - retryIndex: Required. Identifies the test attempt to update.
 // - status: New status to set (optional).
+// - endTime: End time for the attempt (optional).
 // - duration: New duration to set (optional).
 // Returns error if runID is empty or test not found.
-func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testID string, status string, retryIndex int32, duration *int64) error {
+func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testID string, status string, retryIndex int32, endTime *time.Time, duration *int64) error {
 	if err := validateRunID(runID); err != nil {
 		return err
 	}
@@ -124,23 +154,39 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 	}
 
 	now := time.Now()
-	updateFields := bson.M{"updated_at": now}
+
+	// Build update fields for both test-level and attempt-level
+	setFields := bson.M{
+		"updated_at": now,
+	}
+
+	// Update test-level status (mirrors current attempt status)
 	if status != "" {
-		updateFields["status"] = status
+		setFields["tests.$[test].status"] = status
+		// Also update the attempt status using literal index
+		setFields[fmt.Sprintf("tests.$[test].attempts.%d.status", retryIndex)] = status
 	}
+
+	// Update test-level end_time (latest attempt end_time)
+	if endTime != nil {
+		setFields["tests.$[test].end_time"] = endTime
+		setFields[fmt.Sprintf("tests.$[test].attempts.%d.end_time", retryIndex)] = endTime
+	}
+
+	// Update test-level duration (current attempt duration)
 	if duration != nil {
-		updateFields["duration"] = duration
+		setFields["tests.$[test].duration"] = duration
+		setFields[fmt.Sprintf("tests.$[test].attempts.%d.duration", retryIndex)] = duration
 	}
+
+	// Update attempt updated_at
+	setFields[fmt.Sprintf("tests.$[test].attempts.%d.updated_at", retryIndex)] = now
 
 	// Update test in root-level tests array
 	filter := bson.M{
 		"_id":               runID,
 		"tests.id":          testID,
 		"tests.retry_index": retryIndex,
-	}
-	setFields := bson.M{"updated_at": now}
-	for k, v := range updateFields {
-		setFields["tests.$[test]."+k] = v
 	}
 
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
@@ -158,6 +204,6 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 		return fmt.Errorf("test not found: runID=%s, testID=%s, retryIndex=%v", runID, testID, retryIndex)
 	}
 
-	r.logger.Info("test end", "runID", runID, "testID", testID, "status", status)
+	r.logger.Info("test end", "runID", runID, "testID", testID, "status", status, "retryIndex", retryIndex)
 	return nil
 }
