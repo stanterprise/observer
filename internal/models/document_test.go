@@ -62,16 +62,22 @@ func TestSuiteDocument_Fields(t *testing.T) {
 
 func TestTestDocument_Fields(t *testing.T) {
 	now := time.Now()
+	retryIndex := int32(0)
+	retryCount := int32(2)
+
 	test := &TestDocument{
-		ID:        "test-123",
-		RunID:     "run-456",
-		SuiteID:   "suite-789",
-		Title:     "Test Case",
-		Status:    "PASSED",
-		Metadata:  map[string]interface{}{"browser": "chrome"},
-		CreatedAt: now,
-		UpdatedAt: now,
-		Steps:     []*StepDocument{},
+		ID:         "test-123",
+		RunID:      "run-456",
+		SuiteID:    "suite-789",
+		Title:      "Test Case",
+		Status:     "PASSED",
+		Metadata:   map[string]interface{}{"browser": "chrome"},
+		RetryIndex: &retryIndex,
+		RetryCount: &retryCount,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+		Steps:      []*StepDocument{}, // DEPRECATED field
+		Attempts:   []*AttemptDocument{},
 	}
 
 	if test.ID != "test-123" {
@@ -82,6 +88,47 @@ func TestTestDocument_Fields(t *testing.T) {
 	}
 	if test.RunID != "run-456" {
 		t.Errorf("RunID = %v, want run-456", test.RunID)
+	}
+	if test.RetryIndex == nil || *test.RetryIndex != retryIndex {
+		t.Errorf("RetryIndex = %v, want %v", test.RetryIndex, retryIndex)
+	}
+	if test.RetryCount == nil || *test.RetryCount != retryCount {
+		t.Errorf("RetryCount = %v, want %v", test.RetryCount, retryCount)
+	}
+	// Verify Attempts array can be initialized
+	if test.Attempts == nil {
+		t.Error("Attempts should not be nil")
+	}
+}
+
+func TestAttemptDocument_Fields(t *testing.T) {
+	now := time.Now()
+	duration := int64(5000000000) // 5 seconds in nanoseconds
+
+	attempt := &AttemptDocument{
+		RetryIndex:   0,
+		Steps:        []*StepDocument{},
+		Status:       "PASSED",
+		StartTime:    &now,
+		EndTime:      &now,
+		Duration:     &duration,
+		ErrorMessage: "",
+		StackTrace:   "",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if attempt.RetryIndex != 0 {
+		t.Errorf("RetryIndex = %v, want 0", attempt.RetryIndex)
+	}
+	if attempt.Status != "PASSED" {
+		t.Errorf("Status = %v, want PASSED", attempt.Status)
+	}
+	if attempt.Duration == nil || *attempt.Duration != duration {
+		t.Errorf("Duration = %v, want %v", attempt.Duration, duration)
+	}
+	if len(attempt.Steps) != 0 {
+		t.Errorf("Steps length = %v, want 0", len(attempt.Steps))
 	}
 }
 

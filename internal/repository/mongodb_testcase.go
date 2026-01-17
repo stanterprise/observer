@@ -47,7 +47,7 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 
 	// Initialize attempts array sized to retry_count+1
 	// Each attempt contains empty steps array and retry_index
-	if test.Attempts == nil || len(test.Attempts) == 0 {
+	if len(test.Attempts) == 0 {
 		attemptsSize := int(*test.RetryCount + 1)
 		test.Attempts = make([]*m.AttemptDocument, attemptsSize)
 		for i := 0; i < attemptsSize; i++ {
