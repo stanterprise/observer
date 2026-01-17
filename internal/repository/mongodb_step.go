@@ -41,40 +41,37 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, runID string, ste
 // upsertStepInTestAttempt handles steps as children of attempts[retry_index] array.
 // With attempt-based retries: steps are stored in attempts[retry_index].steps instead of tests.steps.
 func (r *MongoRepository) upsertStepInTestAttempt(ctx context.Context, runID string, testID string, retry_index int32, step *m.StepDocument, now time.Time) error {
-	// Use literal index in MongoDB path since retry_index is known
-	stepsPath := fmt.Sprintf("tests.$[test].attempts.%d.steps", retry_index)
-	stepPath := fmt.Sprintf("tests.$[test].attempts.%d.steps.$[step]", retry_index)
-
-	// Try to update existing step in attempts[retry_index].steps
+	// Use arrayFilters for ALL levels: test, attempt, step
+	// This avoids MongoDB error "The path 'tests.X.attempts.0.steps' must exist"
 	filter := bson.M{
-		"_id":               runID,
-		"tests.id":          testID,
-		"tests.retry_index": retry_index,
+		"_id":      runID,
+		"tests.id": testID,
 	}
 
 	update := bson.M{
 		"$set": bson.M{
-			stepPath + ".parent_step_id": step.ParentStepID,
-			stepPath + ".title":          step.Title,
-			stepPath + ".description":    step.Description,
-			stepPath + ".start_time":     step.StartTime,
-			stepPath + ".duration":       step.Duration,
-			stepPath + ".type":           step.Type,
-			stepPath + ".tags":           step.Tags,
-			stepPath + ".metadata":       step.Metadata,
-			stepPath + ".worker_index":   step.WorkerIndex,
-			stepPath + ".status":         step.Status,
-			stepPath + ".category":       step.Category,
-			stepPath + ".location":       step.Location,
-			stepPath + ".error":          step.Error,
-			stepPath + ".errors":         step.Errors,
-			stepPath + ".updated_at":     now,
-			"updated_at":                 now,
+			"tests.$[test].attempts.$[attempt].steps.$[step].parent_step_id": step.ParentStepID,
+			"tests.$[test].attempts.$[attempt].steps.$[step].title":          step.Title,
+			"tests.$[test].attempts.$[attempt].steps.$[step].description":    step.Description,
+			"tests.$[test].attempts.$[attempt].steps.$[step].start_time":     step.StartTime,
+			"tests.$[test].attempts.$[attempt].steps.$[step].duration":       step.Duration,
+			"tests.$[test].attempts.$[attempt].steps.$[step].type":           step.Type,
+			"tests.$[test].attempts.$[attempt].steps.$[step].tags":           step.Tags,
+			"tests.$[test].attempts.$[attempt].steps.$[step].metadata":       step.Metadata,
+			"tests.$[test].attempts.$[attempt].steps.$[step].worker_index":   step.WorkerIndex,
+			"tests.$[test].attempts.$[attempt].steps.$[step].status":         step.Status,
+			"tests.$[test].attempts.$[attempt].steps.$[step].category":       step.Category,
+			"tests.$[test].attempts.$[attempt].steps.$[step].location":       step.Location,
+			"tests.$[test].attempts.$[attempt].steps.$[step].error":          step.Error,
+			"tests.$[test].attempts.$[attempt].steps.$[step].errors":         step.Errors,
+			"tests.$[test].attempts.$[attempt].steps.$[step].updated_at":     now,
+			"updated_at": now,
 		},
 	}
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
 			bson.M{"test.id": testID},
+			bson.M{"attempt.retry_index": retry_index},
 			bson.M{"step.id": step.ID},
 		},
 	})
@@ -90,17 +87,19 @@ func (r *MongoRepository) upsertStepInTestAttempt(ctx context.Context, runID str
 	}
 
 	// Step doesn't exist, append it to attempts[retry_index].steps array
+	// Use arrayFilter for attempt to avoid MongoDB path existence error
 	filter = bson.M{
 		"_id":      runID,
 		"tests.id": testID,
 	}
 	update = bson.M{
-		"$push": bson.M{stepsPath: step},
+		"$push": bson.M{"tests.$[test].attempts.$[attempt].steps": step},
 		"$set":  bson.M{"updated_at": now},
 	}
 	arrayFilters = options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
 			bson.M{"test.id": testID},
+			bson.M{"attempt.retry_index": retry_index},
 		},
 	})
 
@@ -113,7 +112,13 @@ func (r *MongoRepository) upsertStepInTestAttempt(ctx context.Context, runID str
 		return fmt.Errorf("parent test not found: runID=%s, testID=%s, retryIndex=%d", runID, testID, retry_index)
 	}
 
-	r.logger.Info("step begin (inserted)", "runID", runID, "stepID", step.ID, "testID", testID, "retryIndex", retry_index)
+	r.logger.Info("step begin (inserted)",
+		"runID", runID,
+		"stepID", step.ID,
+		"testID", testID,
+		"retryIndex", retry_index,
+		"matchedCount", result.MatchedCount,
+		"modifiedCount", result.ModifiedCount)
 	return nil
 }
 
@@ -137,16 +142,14 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepI
 
 	now := time.Now()
 
-	// Use literal index in MongoDB path since retry_index is known
-	stepPath := fmt.Sprintf("tests.$[test].attempts.%d.steps.$[step]", retry_index)
-
+	// Use arrayFilters for ALL levels for consistency with UpsertStepBegin
 	setFields := bson.M{
-		"updated_at":             now,
-		stepPath + ".updated_at": now,
+		"updated_at": now,
+		"tests.$[test].attempts.$[attempt].steps.$[step].updated_at": now,
 	}
 
 	if status != "" {
-		setFields[stepPath+".status"] = status
+		setFields["tests.$[test].attempts.$[attempt].steps.$[step].status"] = status
 	}
 
 	// Update step in attempts[retry_index].steps array
@@ -157,6 +160,7 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepI
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
 			bson.M{"test.id": testID},
+			bson.M{"attempt.retry_index": retry_index},
 			bson.M{"step.id": stepID},
 		},
 	})
