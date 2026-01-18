@@ -149,29 +149,25 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		return nil
 	}
 
-	r.logger.Debug("Test not found, creating new test with full attempts array",
+	r.logger.Debug("Test not found, creating new test with current attempt only",
 		"runID", runID,
 		"testID", test.ID,
 		"retryIndex", *test.RetryIndex,
 		"retryCount", *test.RetryCount)
 
-	// Test doesn't exist, create it with full attempts array pre-allocated
+	// Test doesn't exist, create it with only the current attempt
 	test.CreatedAt = now
-	attemptsSize := int(*test.RetryCount + 1)
-	test.Attempts = make([]*m.AttemptDocument, attemptsSize)
-	for i := 0; i < attemptsSize; i++ {
-		test.Attempts[i] = &m.AttemptDocument{
-			RetryIndex: int32(i),
-			Steps:      []*m.StepDocument{},
-			CreatedAt:  now,
-			UpdatedAt:  now,
-		}
+	currentAttempt = &m.AttemptDocument{
+		RetryIndex: *test.RetryIndex,
+		Steps:      []*m.StepDocument{},
+		StartTime:  test.StartTime,
+		Status:     test.Status,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
-	test.Attempts[*test.RetryIndex].StartTime = test.StartTime
-	test.Attempts[*test.RetryIndex].Status = test.Status
+	test.Attempts = []*m.AttemptDocument{currentAttempt}
 
-	r.logger.Debug("Pre-allocated attempts array",
-		"attemptsSize", attemptsSize,
+	r.logger.Debug("Created test with single attempt",
 		"currentRetryIndex", *test.RetryIndex)
 
 	filter = bson.M{
