@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
@@ -34,6 +35,13 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, runID string, ste
 	if step.Steps == nil {
 		step.Steps = []*m.StepDocument{}
 	}
+
+	r.logger.Debug("UpsertStepBegin starting",
+		"runID", runID,
+		"stepID", step.ID,
+		"testID", testID,
+		"retryIndex", retry_index,
+		"stepTitle", step.Title)
 
 	return r.upsertStepInTestAttempt(ctx, runID, testID, retry_index, step, now)
 }
@@ -76,14 +84,46 @@ func (r *MongoRepository) upsertStepInTestAttempt(ctx context.Context, runID str
 		},
 	})
 
+	r.logger.Debug("Attempting to update existing step in attempt",
+		"runID", runID,
+		"stepID", step.ID,
+		"testID", testID,
+		"retryIndex", retry_index)
+
 	result, err := r.collection.UpdateOne(ctx, filter, update, arrayFilters)
-	if err != nil {
+
+	// MongoDB throws an error when the steps array is empty and we try to use array filters with step.id
+	// Treat this as "step not found" and continue to append logic
+	pathDoesNotExist := err != nil && (strings.Contains(err.Error(), "must exist in the document") ||
+		strings.Contains(err.Error(), "path") && strings.Contains(err.Error(), "steps"))
+
+	if err != nil && !pathDoesNotExist {
 		return fmt.Errorf("update step in test attempt: %w", err)
 	}
 
-	if result.MatchedCount > 0 {
-		r.logger.Info("step begin (updated)", "runID", runID, "stepID", step.ID, "testID", testID, "retryIndex", retry_index)
+	if err == nil && result.MatchedCount > 0 {
+		r.logger.Info("step begin (updated)",
+			"runID", runID,
+			"stepID", step.ID,
+			"testID", testID,
+			"retryIndex", retry_index,
+			"matchedCount", result.MatchedCount,
+			"modifiedCount", result.ModifiedCount)
 		return nil
+	}
+
+	if pathDoesNotExist {
+		r.logger.Debug("Steps array empty or path doesn't exist, will append",
+			"runID", runID,
+			"stepID", step.ID,
+			"testID", testID,
+			"retryIndex", retry_index)
+	} else {
+		r.logger.Debug("Step not found in attempt, appending to steps array",
+			"runID", runID,
+			"stepID", step.ID,
+			"testID", testID,
+			"retryIndex", retry_index)
 	}
 
 	// Step doesn't exist, append it to attempts[retry_index].steps array
@@ -103,12 +143,22 @@ func (r *MongoRepository) upsertStepInTestAttempt(ctx context.Context, runID str
 		},
 	})
 
+	r.logger.Debug("Appending step to attempt array",
+		"filter", filter,
+		"retryIndex", retry_index)
+
 	result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 	if err != nil {
 		return fmt.Errorf("append step to test attempt: %w", err)
 	}
 
 	if result.MatchedCount == 0 {
+		r.logger.Error("parent test or attempt not found for step",
+			"runID", runID,
+			"testID", testID,
+			"retryIndex", retry_index,
+			"stepID", step.ID,
+			"filter", filter)
 		return fmt.Errorf("parent test not found: runID=%s, testID=%s, retryIndex=%d", runID, testID, retry_index)
 	}
 
@@ -142,6 +192,13 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepI
 
 	now := time.Now()
 
+	r.logger.Debug("UpsertStepEnd starting",
+		"runID", runID,
+		"stepID", stepID,
+		"testID", testID,
+		"retryIndex", retry_index,
+		"status", status)
+
 	// Use arrayFilters for ALL levels for consistency with UpsertStepBegin
 	setFields := bson.M{
 		"updated_at": now,
@@ -171,9 +228,22 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepI
 	}
 
 	if result.MatchedCount == 0 {
+		r.logger.Error("step not found for UpsertStepEnd",
+			"runID", runID,
+			"stepID", stepID,
+			"testID", testID,
+			"retryIndex", retry_index,
+			"filter", filter)
 		return fmt.Errorf("step not found: runID=%s, stepID=%s, testID=%s, retryIndex=%d", runID, stepID, testID, retry_index)
 	}
 
-	r.logger.Info("step end", "runID", runID, "stepID", stepID, "testID", testID, "retryIndex", retry_index, "status", status)
+	r.logger.Info("step end",
+		"runID", runID,
+		"stepID", stepID,
+		"testID", testID,
+		"retryIndex", retry_index,
+		"status", status,
+		"matchedCount", result.MatchedCount,
+		"modifiedCount", result.ModifiedCount)
 	return nil
 }
