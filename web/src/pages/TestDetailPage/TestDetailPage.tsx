@@ -11,7 +11,13 @@ import type {
   WebSocketStepData,
 } from "@/types/webSocket";
 import type { TestStatus } from "@/types/common";
-import { ArrowLeft, AlertCircle, TrendingUp } from "lucide-react";
+import {
+  ArrowLeft,
+  AlertCircle,
+  TrendingUp,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import StepContainer from "./StepContainer";
 
 interface StepDetail {
@@ -25,6 +31,20 @@ interface StepDetail {
   startTime?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+interface AttemptDetail {
+  retryIndex: number;
+  steps?: StepDetail[];
+  status?: string;
+  startTime?: string;
+  endTime?: string;
+  duration?: number;
+  errorMessage?: string;
+  stackTrace?: string;
+  errors?: any[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface TestDetail {
@@ -41,12 +61,247 @@ interface TestDetail {
   timeout?: number;
   createdAt: string;
   updatedAt: string;
-  steps?: StepDetail[];
+  steps?: StepDetail[]; // Legacy field
+  attempts?: AttemptDetail[];
 }
 
 interface TestDetailResponse {
   runId: string;
   tests: TestDetail[];
+}
+
+// Utility function to format duration
+function formatDuration(ms?: number): string {
+  if (!ms) return "N/A";
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(2)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = (seconds % 60).toFixed(0);
+  return `${minutes}m ${remainingSeconds}s`;
+}
+
+// Utility function to convert status to TestStatus
+function getTestStatus(status: string | number | undefined): TestStatus {
+  if (!status) return "PENDING";
+  if (typeof status === "number") {
+    const statusMap: Record<number, TestStatus> = {
+      0: "UNKNOWN",
+      1: "PASSED",
+      2: "FAILED",
+      3: "SKIPPED",
+      4: "BROKEN",
+      5: "TIMEDOUT",
+      6: "INTERRUPTED",
+    };
+    return statusMap[status] || "UNKNOWN";
+  }
+  const upperStatus = status.toUpperCase();
+  if (upperStatus === "PASSED") return "PASSED";
+  if (upperStatus === "FAILED") return "FAILED";
+  if (upperStatus === "RUNNING") return "RUNNING";
+  if (upperStatus === "SKIPPED") return "SKIPPED";
+  if (upperStatus === "BROKEN") return "BROKEN";
+  if (upperStatus === "TIMEDOUT") return "TIMEDOUT";
+  if (upperStatus === "INTERRUPTED") return "INTERRUPTED";
+  if (upperStatus === "PENDING") return "PENDING";
+  return upperStatus as TestStatus;
+}
+
+// Helper component for rendering attempts in an accordion
+function AttemptsAccordion({
+  test,
+  attempts,
+}: {
+  test: TestDetail;
+  attempts: AttemptDetail[];
+}) {
+  const [openAttempt, setOpenAttempt] = useState<number>(
+    test.retryIndex ?? attempts.length - 1
+  );
+
+  const getAttemptStatus = (attempt: AttemptDetail): TestStatus => {
+    if (!attempt.status) return "PENDING";
+    return getTestStatus(attempt.status);
+  };
+
+  const toggleAttempt = (retryIndex: number) => {
+    setOpenAttempt(openAttempt === retryIndex ? -1 : retryIndex);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Test Execution Attempts</CardTitle>
+        <p className="text-sm text-gray-600 mt-1">
+          {attempts.length} attempt{attempts.length > 1 ? "s" : ""} recorded
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {attempts.map((attempt) => {
+            const isOpen = openAttempt === attempt.retryIndex;
+            const attemptStatus = getAttemptStatus(attempt);
+            const attemptSteps = attempt.steps || [];
+
+            return (
+              <div
+                key={attempt.retryIndex}
+                className="border border-gray-200 rounded-lg overflow-hidden"
+              >
+                {/* Accordion Header */}
+                <button
+                  onClick={() => toggleAttempt(attempt.retryIndex)}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {isOpen ? (
+                      <ChevronDown className="h-5 w-5 text-gray-600" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 text-gray-600" />
+                    )}
+                    <div className="text-left">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900">
+                          Attempt {attempt.retryIndex + 1}
+                        </span>
+                        {attempt.retryIndex === test.retryIndex && (
+                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        {attemptSteps.length} step
+                        {attemptSteps.length !== 1 ? "s" : ""}
+                        {attempt.startTime && (
+                          <span className="ml-2">
+                            • Started{" "}
+                            {new Date(attempt.startTime).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Badge status={attemptStatus} />
+                </button>
+
+                {/* Accordion Body */}
+                {isOpen && (
+                  <div className="p-4 bg-white border-t border-gray-200">
+                    {/* Attempt Info */}
+                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                      <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <dt className="text-gray-600 font-medium">Status</dt>
+                          <dd className="mt-1">
+                            <Badge status={attemptStatus} />
+                          </dd>
+                        </div>
+                        {attempt.startTime && (
+                          <div>
+                            <dt className="text-gray-600 font-medium">
+                              Started
+                            </dt>
+                            <dd className="text-gray-900 mt-1">
+                              {new Date(attempt.startTime).toLocaleString()}
+                            </dd>
+                          </div>
+                        )}
+                        {attempt.endTime && (
+                          <div>
+                            <dt className="text-gray-600 font-medium">
+                              Finished
+                            </dt>
+                            <dd className="text-gray-900 mt-1">
+                              {new Date(attempt.endTime).toLocaleString()}
+                            </dd>
+                          </div>
+                        )}
+                        {attempt.duration !== undefined && (
+                          <div>
+                            <dt className="text-gray-600 font-medium">
+                              Duration
+                            </dt>
+                            <dd className="text-gray-900 mt-1 font-semibold">
+                              {formatDuration(attempt.duration)}
+                            </dd>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
+
+                    {/* Error Display */}
+                    {(attempt.errorMessage ||
+                      (attempt.errors && attempt.errors.length > 0)) && (
+                      <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <h4 className="text-sm font-semibold text-red-800 mb-2">
+                          Error Details
+                        </h4>
+                        {attempt.errorMessage && (
+                          <p className="text-sm text-red-700 mb-2">
+                            {attempt.errorMessage}
+                          </p>
+                        )}
+                        {attempt.stackTrace && (
+                          <pre className="text-xs text-red-600 bg-red-100 p-2 rounded overflow-x-auto whitespace-pre-wrap">
+                            {attempt.stackTrace}
+                          </pre>
+                        )}
+                        {attempt.errors && attempt.errors.length > 0 && (
+                          <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
+                            {attempt.errors.map((err, idx) => (
+                              <li key={idx}>
+                                {typeof err === "string"
+                                  ? err
+                                  : JSON.stringify(err)}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Steps */}
+                    {attemptSteps.length > 0 ? (
+                      <StepContainer
+                        test={{
+                          id: test.id,
+                          runId: test.runId,
+                          title: `Attempt ${attempt.retryIndex + 1}`,
+                          status: attemptStatus,
+                          steps: attemptSteps.map((step) => ({
+                            id: step.id,
+                            runId: step.runId || test.runId,
+                            testCaseRunId: step.testCaseRunId,
+                            parentStepId:
+                              step.parentStepId && step.parentStepId !== ""
+                                ? step.parentStepId
+                                : undefined,
+                            status: getTestStatus(step.status),
+                            category: step.category,
+                            title: step.title,
+                            startedAt: step.startTime || step.createdAt,
+                            finishedAt: step.updatedAt,
+                          })),
+                        }}
+                      />
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <p className="text-sm">
+                          No steps recorded for this attempt
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function TestDetailPage() {
@@ -194,6 +449,78 @@ export function TestDetailPage() {
           }
 
           const currentTest = prevDetail.tests[0];
+          const retryIndex =
+            (eventData as any).retryIndex ?? currentTest.retryIndex ?? 0;
+
+          // Update attempt-based steps if attempts exist
+          if (currentTest.attempts && currentTest.attempts.length > 0) {
+            const updatedAttempts = [...currentTest.attempts];
+            const attemptIndex = updatedAttempts.findIndex(
+              (a) => a.retryIndex === retryIndex
+            );
+
+            if (attemptIndex !== -1) {
+              const attempt = updatedAttempts[attemptIndex];
+              const attemptSteps = [...(attempt.steps || [])];
+              const stepIndex = attemptSteps.findIndex((s) => s.id === stepId);
+
+              if (type === "step.begin") {
+                if (stepIndex === -1) {
+                  // New step, add it
+                  attemptSteps.push({
+                    id: stepId,
+                    runId: (eventData as any).runId || currentTest.runId,
+                    testCaseRunId: eventData.testCaseRunId || "",
+                    title: eventData.title || stepId,
+                    category: eventData.category || "test",
+                    status: "RUNNING",
+                    startTime:
+                      (eventData as any).startTime || new Date().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    parentStepId: eventData.parentStepId,
+                  });
+                } else {
+                  // Update existing step
+                  attemptSteps[stepIndex] = {
+                    ...attemptSteps[stepIndex],
+                    status: "RUNNING",
+                    startTime:
+                      (eventData as any).startTime ||
+                      attemptSteps[stepIndex].startTime,
+                    updatedAt: new Date().toISOString(),
+                  };
+                }
+              } else if (type === "step.end") {
+                if (stepIndex !== -1) {
+                  attemptSteps[stepIndex] = {
+                    ...attemptSteps[stepIndex],
+                    status: status,
+                    updatedAt: new Date().toISOString(),
+                  };
+                }
+              }
+
+              updatedAttempts[attemptIndex] = {
+                ...attempt,
+                steps: attemptSteps,
+                updatedAt: new Date().toISOString(),
+              };
+
+              return {
+                ...prevDetail,
+                tests: [
+                  {
+                    ...currentTest,
+                    attempts: updatedAttempts,
+                    updatedAt: new Date().toISOString(),
+                  },
+                ],
+              };
+            }
+          }
+
+          // Fallback to legacy steps array
           const updatedSteps = [...(currentTest.steps || [])];
           const stepIndex = updatedSteps.findIndex((s) => s.id === stepId);
 
@@ -335,12 +662,21 @@ export function TestDetailPage() {
   }
 
   const testStatus = getTestStatus(test.status);
-  const safeSteps = test.steps || [];
+
+  // Use attempts if available, fallback to legacy steps
+  const hasAttempts = test.attempts && test.attempts.length > 0;
+  const attempts = test.attempts || [];
+  const legacySteps = test.steps || [];
+
   console.log(
     "Rendering TestDetailPage for test:",
     test.id,
-    "with steps:",
-    safeSteps
+    "hasAttempts:",
+    hasAttempts,
+    "attempts:",
+    attempts,
+    "legacySteps:",
+    legacySteps
   );
   return (
     <div className="space-y-6">
@@ -455,9 +791,24 @@ export function TestDetailPage() {
                 <div className="flex justify-between items-start">
                   <dt className="text-gray-600 font-medium">Total Steps:</dt>
                   <dd className="text-gray-900 font-semibold text-right ml-4">
-                    {safeSteps.length}
+                    {hasAttempts
+                      ? attempts.reduce(
+                          (sum, attempt) => sum + (attempt.steps?.length || 0),
+                          0
+                        )
+                      : legacySteps.length}
                   </dd>
                 </div>
+                {hasAttempts && attempts.length > 1 && (
+                  <div className="flex justify-between items-start">
+                    <dt className="text-gray-600 font-medium">
+                      Total Attempts:
+                    </dt>
+                    <dd className="text-gray-900 font-semibold text-right ml-4">
+                      {attempts.length}
+                    </dd>
+                  </div>
+                )}
               </dl>
             </div>
           </div>
@@ -488,28 +839,33 @@ export function TestDetailPage() {
         </CardContent>
       </Card>
 
-      <StepContainer
-        test={{
-          id: test.id,
-          runId: test.runId,
-          title: test.title || test.name || test.id,
-          status: testStatus,
-          steps: safeSteps.map((step) => ({
-            id: step.id,
-            runId: step.runId || test.runId,
-            testCaseRunId: step.testCaseRunId,
-            parentStepId:
-              step.parentStepId && step.parentStepId !== ""
-                ? step.parentStepId
-                : undefined,
-            status: getTestStatus(step.status),
-            category: step.category,
-            title: step.title,
-            startedAt: step.startTime || step.createdAt,
-            finishedAt: step.updatedAt,
-          })),
-        }}
-      />
+      {/* Test Execution Steps - Attempts Accordion */}
+      {hasAttempts ? (
+        <AttemptsAccordion test={test} attempts={attempts} />
+      ) : (
+        <StepContainer
+          test={{
+            id: test.id,
+            runId: test.runId,
+            title: test.title || test.name || test.id,
+            status: testStatus,
+            steps: legacySteps.map((step) => ({
+              id: step.id,
+              runId: step.runId || test.runId,
+              testCaseRunId: step.testCaseRunId,
+              parentStepId:
+                step.parentStepId && step.parentStepId !== ""
+                  ? step.parentStepId
+                  : undefined,
+              status: getTestStatus(step.status),
+              category: step.category,
+              title: step.title,
+              startedAt: step.startTime || step.createdAt,
+              finishedAt: step.updatedAt,
+            })),
+          }}
+        />
+      )}
     </div>
   );
 }
