@@ -72,7 +72,7 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 			"tests.$[test].name":        test.Name,
 			"tests.$[test].title":       test.Title,
 			"tests.$[test].description": test.Description,
-			"tests.$[test].status":      test.Status,
+			// DO NOT set test-level status on TestBegin - it will be set correctly on TestEnd
 			"tests.$[test].start_time":  test.StartTime,
 			"tests.$[test].retry_index": test.RetryIndex,
 			"tests.$[test].updated_at":  now,
@@ -122,10 +122,10 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		"$set": bson.M{
 			"tests.$[test].retry_index": test.RetryIndex,
 			"tests.$[test].retry_count": test.RetryCount,
-			"tests.$[test].status":      test.Status,
-			"tests.$[test].start_time":  test.StartTime,
-			"tests.$[test].updated_at":  now,
-			"updated_at":                now,
+			// DO NOT set test-level status on TestBegin - it will be set correctly on TestEnd
+			"tests.$[test].start_time": test.StartTime,
+			"tests.$[test].updated_at": now,
+			"updated_at":               now,
 		},
 	}
 
@@ -157,11 +157,14 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 
 	// Test doesn't exist, create it with only the current attempt
 	test.CreatedAt = now
+	// Save the incoming status for the attempt, but don't set test-level status yet
+	attemptStatus := test.Status
+	test.Status = "" // Clear test-level status - will be set correctly on TestEnd
 	currentAttempt = &m.AttemptDocument{
 		RetryIndex: *test.RetryIndex,
 		Steps:      []*m.StepDocument{},
 		StartTime:  test.StartTime,
-		Status:     test.Status,
+		Status:     attemptStatus, // Use saved status for attempt
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -222,34 +225,18 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 		"retryIndex", retryIndex,
 		"status", status)
 
-	// Build update fields for both test-level and attempt-level
-	setFields := bson.M{
-		"updated_at": now,
+	// Step 1: Update the current attempt's status, end_time, and duration
+	attemptSetFields := bson.M{
+		fmt.Sprintf("tests.$[test].attempts.%d.status", retryIndex):     status,
+		fmt.Sprintf("tests.$[test].attempts.%d.updated_at", retryIndex): now,
 	}
-
-	// Update test-level status (mirrors current attempt status)
-	if status != "" {
-		setFields["tests.$[test].status"] = status
-		// Also update the attempt status using literal index
-		setFields[fmt.Sprintf("tests.$[test].attempts.%d.status", retryIndex)] = status
-	}
-
-	// Update test-level end_time (latest attempt end_time)
 	if endTime != nil {
-		setFields["tests.$[test].end_time"] = endTime
-		setFields[fmt.Sprintf("tests.$[test].attempts.%d.end_time", retryIndex)] = endTime
+		attemptSetFields[fmt.Sprintf("tests.$[test].attempts.%d.end_time", retryIndex)] = endTime
 	}
-
-	// Update test-level duration (current attempt duration)
 	if duration != nil {
-		setFields["tests.$[test].duration"] = duration
-		setFields[fmt.Sprintf("tests.$[test].attempts.%d.duration", retryIndex)] = duration
+		attemptSetFields[fmt.Sprintf("tests.$[test].attempts.%d.duration", retryIndex)] = duration
 	}
 
-	// Update attempt updated_at
-	setFields[fmt.Sprintf("tests.$[test].attempts.%d.updated_at", retryIndex)] = now
-
-	// Update test in root-level tests array
 	filter := bson.M{
 		"_id":               runID,
 		"tests.id":          testID,
@@ -262,6 +249,71 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 		},
 	})
 
+	// Update attempt fields first
+	_, err := r.collection.UpdateOne(ctx, filter, bson.M{"$set": attemptSetFields}, arrayFilters)
+	if err != nil {
+		return fmt.Errorf("update test attempt: %w", err)
+	}
+
+	// Step 2: Fetch the test to determine the overall status based on all attempts
+	// This is necessary because test-level status should represent the BEST outcome across all attempts
+	// Following Playwright/Jest convention: if ANY attempt passed, the test is PASSED overall
+	testDoc, err := r.GetTestFromRun(ctx, testID)
+	if err != nil {
+		return fmt.Errorf("fetch test for status aggregation: %w", err)
+	}
+	if testDoc == nil {
+		return fmt.Errorf("test not found after attempt update: %s", testID)
+	}
+
+	// Determine overall test status based on all attempts
+	// Rule: If ANY attempt has status PASSED, the test is PASSED (retry success scenario)
+	//       Otherwise, use the current attempt's status
+	overallStatus := status
+	if len(testDoc.Attempts) > 0 {
+		hasPassedAttempt := false
+		for _, attempt := range testDoc.Attempts {
+			if attempt.Status == "PASSED" {
+				hasPassedAttempt = true
+				break
+			}
+		}
+		if hasPassedAttempt {
+			overallStatus = "PASSED"
+		}
+	}
+
+	r.logger.Debug("Computed overall test status",
+		"runID", runID,
+		"testID", testID,
+		"currentAttemptStatus", status,
+		"overallStatus", overallStatus,
+		"totalAttempts", len(testDoc.Attempts))
+
+	// Step 3: Update test-level fields with aggregated status and timing
+	setFields := bson.M{
+		"updated_at": now,
+	}
+
+	// Update test-level status with aggregated status (may differ from current attempt)
+	if overallStatus != "" {
+		setFields["tests.$[test].status"] = overallStatus
+	}
+
+	// Update test-level end_time (latest attempt end_time)
+	if endTime != nil {
+		setFields["tests.$[test].end_time"] = endTime
+	}
+
+	// Update test-level duration (current attempt duration)
+	if duration != nil {
+		setFields["tests.$[test].duration"] = duration
+	}
+
+	// Update test-level updated_at
+	setFields["tests.$[test].updated_at"] = now
+
+	// Update test in root-level tests array with aggregated status
 	result, err := r.collection.UpdateOne(ctx, filter, bson.M{"$set": setFields}, arrayFilters)
 	if err != nil {
 		return fmt.Errorf("update test end: %w", err)
@@ -279,7 +331,8 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 	r.logger.Info("test end",
 		"runID", runID,
 		"testID", testID,
-		"status", status,
+		"currentAttemptStatus", status,
+		"overallStatus", overallStatus,
 		"retryIndex", retryIndex,
 		"matchedCount", result.MatchedCount,
 		"modifiedCount", result.ModifiedCount)
