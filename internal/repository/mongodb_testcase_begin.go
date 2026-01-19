@@ -32,12 +32,6 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		test.RetryIndex = &defaultRetryIndex
 	}
 
-	// Initialize retry_count if nil (default to 0 for no retries)
-	if test.RetryCount == nil {
-		defaultRetryCount := int32(0)
-		test.RetryCount = &defaultRetryCount
-	}
-
 	r.logger.Debug("UpsertTestBegin starting",
 		"runID", runID,
 		"testID", test.ID,
@@ -45,12 +39,7 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		"retryCount", *test.RetryCount,
 		"status", test.Status)
 
-	result, err := upsertTest(r, ctx, runID, test, suiteID, now)
-	if err != nil {
-		return err
-	}
-
-	err = appendTestAttempt(r, ctx, runID, test, suiteID, now, result)
+	err := upsertTest(r, ctx, runID, test, suiteID, now)
 	if err != nil {
 		return err
 	}
@@ -58,12 +47,12 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 	return nil
 }
 
-func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.TestDocument, suiteID string, now time.Time) (*mongo.UpdateResult, error) {
+func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.TestDocument, suiteID string, now time.Time) error {
 	if err := ValidateRunID(runID); err != nil {
-		return nil, err
+		return err
 	}
 	if suiteID == "" {
-		return nil, fmt.Errorf("suiteID is required")
+		return fmt.Errorf("suiteID is required")
 	}
 
 	test.UpdatedAt = now
@@ -87,20 +76,31 @@ func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.T
 		"tests.id":                   test.ID,
 		"tests.attempts.retry_index": test.RetryIndex,
 	}
+
+	currentAttempt := &m.AttemptDocument{
+		RetryIndex: *test.RetryIndex,
+		Steps:      []*m.StepDocument{},
+		StartTime:  test.StartTime,
+		Status:     test.Status,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
 	update := bson.M{
 		"$set": bson.M{
 			"tests.$[test].name":        test.Name,
 			"tests.$[test].title":       test.Title,
 			"tests.$[test].description": test.Description,
-			// DO NOT set test-level status on TestBegin - it will be set correctly on TestEnd
 			"tests.$[test].start_time":  test.StartTime,
 			"tests.$[test].retry_index": test.RetryIndex,
 			"tests.$[test].updated_at":  now,
-			fmt.Sprintf("tests.$[test].attempts.%d.start_time", *test.RetryIndex): test.StartTime,
-			fmt.Sprintf("tests.$[test].attempts.%d.updated_at", *test.RetryIndex): now,
-			"updated_at": now,
+			"updated_at":                now,
 		},
 	}
+
+	if *test.RetryIndex == 0 {
+		update["$set"].(bson.M)["tests.$[test].attempts"] = []*m.AttemptDocument{currentAttempt}
+	}
+
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
 			bson.M{"test.id": test.ID},
@@ -113,7 +113,7 @@ func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.T
 
 	result, err := r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 	if err != nil {
-		return nil, fmt.Errorf("update test attempt: %w", err)
+		return fmt.Errorf("update test attempt: %w", err)
 	}
 
 	if result.MatchedCount > 0 {
@@ -123,10 +123,10 @@ func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.T
 			"retryIndex", *test.RetryIndex,
 			"matchedCount", result.MatchedCount,
 			"modifiedCount", result.ModifiedCount)
-		return result, nil
+		return nil
 	}
 
-	return result, nil
+	return nil
 }
 
 func appendTestAttempt(r *MongoRepository, ctx context.Context, runID string, test *m.TestDocument, suiteID string, now time.Time, testUpdateResult *mongo.UpdateResult) error {
@@ -187,55 +187,6 @@ func appendTestAttempt(r *MongoRepository, ctx context.Context, runID string, te
 			"attemptsArrayLength", "will be one more")
 		return nil
 	}
-
-	r.logger.Debug("Test not found, creating new test with current attempt only",
-		"runID", runID,
-		"testID", test.ID,
-		"retryIndex", *test.RetryIndex,
-		"retryCount", *test.RetryCount)
-
-	// Test doesn't exist, create it with only the current attempt
-	test.CreatedAt = now
-	// Save the incoming status for the attempt, but don't set test-level status yet
-	attemptStatus := test.Status
-	test.Status = "" // Clear test-level status - will be set correctly on TestEnd
-	currentAttempt = &m.AttemptDocument{
-		RetryIndex: *test.RetryIndex,
-		Steps:      []*m.StepDocument{},
-		StartTime:  test.StartTime,
-		Status:     attemptStatus, // Use saved status for attempt
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	}
-	test.Attempts = []*m.AttemptDocument{currentAttempt}
-
-	r.logger.Debug("Created test with single attempt",
-		"currentRetryIndex", *test.RetryIndex)
-
-	filter = bson.M{
-		"_id": runID,
-	}
-	update = bson.M{
-		"$push": bson.M{"tests": test},
-		"$set":  bson.M{"updated_at": now},
-	}
-
-	result, err = r.collection.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return fmt.Errorf("append test: %w", err)
-	}
-
-	if result.MatchedCount == 0 {
-		return fmt.Errorf("test run document not found: runID=%s", runID)
-	}
-
-	r.logger.Info("test begin (test created)",
-		"runID", runID,
-		"testID", test.ID,
-		"retryIndex", *test.RetryIndex,
-		"attemptsArraySize", len(test.Attempts),
-		"matchedCount", result.MatchedCount,
-		"modifiedCount", result.ModifiedCount)
 
 	return nil
 }
