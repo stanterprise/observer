@@ -10,7 +10,7 @@ import (
 )
 
 // validateRunID checks if runID is provided and returns an error if not
-func validateRunID(runID string) error {
+func ValidateRunID(runID string) error {
 	if runID == "" {
 		return fmt.Errorf("runID is required")
 	}
@@ -47,7 +47,7 @@ func buildStepEndUpdate(status string, now time.Time) bson.M {
 
 // AppendTestFailure adds a failure to a test document's attempt array
 func (r *MongoRepository) AppendTestFailure(ctx context.Context, runID, testID string, retryIndex int32, failure interface{}) error {
-	if err := validateRunID(runID); err != nil {
+	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
 
@@ -84,7 +84,7 @@ func (r *MongoRepository) AppendTestFailure(ctx context.Context, runID, testID s
 
 // AppendTestError adds an error to a test document's attempt array
 func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID string, retryIndex int32, errorDoc interface{}) error {
-	if err := validateRunID(runID); err != nil {
+	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
 
@@ -121,7 +121,7 @@ func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID str
 
 // AppendStdOutput adds stdout output to a test document
 func (r *MongoRepository) AppendStdOutput(ctx context.Context, runID, testID string, output interface{}) error {
-	if err := validateRunID(runID); err != nil {
+	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
 
@@ -155,7 +155,7 @@ func (r *MongoRepository) AppendStdOutput(ctx context.Context, runID, testID str
 
 // AppendStdError adds stderr output to a test document
 func (r *MongoRepository) AppendStdError(ctx context.Context, runID, testID string, output interface{}) error {
-	if err := validateRunID(runID); err != nil {
+	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
 

@@ -7,6 +7,7 @@ import (
 
 	m "github.com/stanterprise/observer/internal/models"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -16,13 +17,6 @@ import (
 // - suiteID: Required. ID of parent suite containing this test.
 // Returns error if runID is empty.
 func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, test *m.TestDocument, suiteID string) error {
-	if err := validateRunID(runID); err != nil {
-		return err
-	}
-	if suiteID == "" {
-		return fmt.Errorf("suiteID is required")
-	}
-
 	now := time.Now()
 	test.UpdatedAt = now
 	test.SuiteID = suiteID
@@ -51,15 +45,41 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		"retryCount", *test.RetryCount,
 		"status", test.Status)
 
-	// Create attempt object for current retry_index
-	currentAttempt := &m.AttemptDocument{
-		RetryIndex: *test.RetryIndex,
-		Steps:      []*m.StepDocument{},
-		StartTime:  test.StartTime,
-		Status:     test.Status,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+	result, err := upsertTest(r, ctx, runID, test, suiteID, now)
+	if err != nil {
+		return err
 	}
+
+	err = appendTestAttempt(r, ctx, runID, test, suiteID, now, result)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.TestDocument, suiteID string, now time.Time) (*mongo.UpdateResult, error) {
+	if err := ValidateRunID(runID); err != nil {
+		return nil, err
+	}
+	if suiteID == "" {
+		return nil, fmt.Errorf("suiteID is required")
+	}
+
+	test.UpdatedAt = now
+	test.SuiteID = suiteID
+	test.RunID = runID
+
+	if test.Steps == nil {
+		test.Steps = []*m.StepDocument{}
+	}
+
+	r.logger.Debug("UpsertTestBegin starting",
+		"runID", runID,
+		"testID", test.ID,
+		"retryIndex", *test.RetryIndex,
+		"retryCount", *test.RetryCount,
+		"status", test.Status)
 
 	// Try to update existing attempt in test's attempts array
 	filter := bson.M{
@@ -77,7 +97,6 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 			"tests.$[test].retry_index": test.RetryIndex,
 			"tests.$[test].updated_at":  now,
 			fmt.Sprintf("tests.$[test].attempts.%d.start_time", *test.RetryIndex): test.StartTime,
-			fmt.Sprintf("tests.$[test].attempts.%d.status", *test.RetryIndex):     test.Status,
 			fmt.Sprintf("tests.$[test].attempts.%d.updated_at", *test.RetryIndex): now,
 			"updated_at": now,
 		},
@@ -94,7 +113,7 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 
 	result, err := r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 	if err != nil {
-		return fmt.Errorf("update test attempt: %w", err)
+		return nil, fmt.Errorf("update test attempt: %w", err)
 	}
 
 	if result.MatchedCount > 0 {
@@ -104,7 +123,21 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 			"retryIndex", *test.RetryIndex,
 			"matchedCount", result.MatchedCount,
 			"modifiedCount", result.ModifiedCount)
-		return nil
+		return result, nil
+	}
+
+	return result, nil
+}
+
+func appendTestAttempt(r *MongoRepository, ctx context.Context, runID string, test *m.TestDocument, suiteID string, now time.Time, testUpdateResult *mongo.UpdateResult) error {
+	// Create attempt object for current retry_index
+	currentAttempt := &m.AttemptDocument{
+		RetryIndex: *test.RetryIndex,
+		Steps:      []*m.StepDocument{},
+		StartTime:  test.StartTime,
+		Status:     test.Status,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
 	r.logger.Debug("Attempt not found, trying to append",
@@ -113,11 +146,11 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		"retryIndex", *test.RetryIndex)
 
 	// Attempt doesn't exist, check if test exists to append attempt
-	filter = bson.M{
+	filter := bson.M{
 		"_id":      runID,
 		"tests.id": test.ID,
 	}
-	update = bson.M{
+	update := bson.M{
 		"$push": bson.M{"tests.$[test].attempts": currentAttempt},
 		"$set": bson.M{
 			"tests.$[test].retry_index": test.RetryIndex,
@@ -129,11 +162,17 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		},
 	}
 
+	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"test.id": test.ID},
+		},
+	})
+
 	r.logger.Debug("Appending new attempt to existing test",
 		"filter", filter,
 		"currentAttempt.RetryIndex", currentAttempt.RetryIndex)
 
-	result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
+	result, err := r.collection.UpdateOne(ctx, filter, update, arrayFilters)
 	if err != nil {
 		return fmt.Errorf("append attempt to test: %w", err)
 	}
@@ -197,144 +236,6 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		"attemptsArraySize", len(test.Attempts),
 		"matchedCount", result.MatchedCount,
 		"modifiedCount", result.ModifiedCount)
-	return nil
-}
 
-// UpsertTestEnd updates test end fields (status, duration) and corresponding attempt fields.
-// With attempt-based retries: updates both test-level status and attempts[retry_index] status/end_time/duration.
-// - runID: Required. Identifies the document (_id).
-// - testID: Required. Identifies the test to update.
-// - retryIndex: Required. Identifies the test attempt to update.
-// - status: New status to set (optional).
-// - endTime: End time for the attempt (optional).
-// - duration: New duration to set (optional).
-// Returns error if runID is empty or test not found.
-func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testID string, status string, retryIndex int32, endTime *time.Time, duration *int64) error {
-	if err := validateRunID(runID); err != nil {
-		return err
-	}
-	if testID == "" {
-		return fmt.Errorf("testID is required")
-	}
-
-	now := time.Now()
-
-	r.logger.Debug("UpsertTestEnd starting",
-		"runID", runID,
-		"testID", testID,
-		"retryIndex", retryIndex,
-		"status", status)
-
-	// Step 1: Update the current attempt's status, end_time, and duration
-	attemptSetFields := bson.M{
-		fmt.Sprintf("tests.$[test].attempts.%d.status", retryIndex):     status,
-		fmt.Sprintf("tests.$[test].attempts.%d.updated_at", retryIndex): now,
-	}
-	if endTime != nil {
-		attemptSetFields[fmt.Sprintf("tests.$[test].attempts.%d.end_time", retryIndex)] = endTime
-	}
-	if duration != nil {
-		attemptSetFields[fmt.Sprintf("tests.$[test].attempts.%d.duration", retryIndex)] = duration
-	}
-
-	filter := bson.M{
-		"_id":               runID,
-		"tests.id":          testID,
-		"tests.retry_index": retryIndex,
-	}
-
-	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
-		Filters: []interface{}{
-			bson.M{"test.id": testID},
-		},
-	})
-
-	// Update attempt fields first
-	_, err := r.collection.UpdateOne(ctx, filter, bson.M{"$set": attemptSetFields}, arrayFilters)
-	if err != nil {
-		return fmt.Errorf("update test attempt: %w", err)
-	}
-
-	// Step 2: Fetch the test to determine the overall status based on all attempts
-	// This is necessary because test-level status should represent the BEST outcome across all attempts
-	// Following Playwright/Jest convention: if ANY attempt passed, the test is PASSED overall
-	testDoc, err := r.GetTestFromRun(ctx, testID)
-	if err != nil {
-		return fmt.Errorf("fetch test for status aggregation: %w", err)
-	}
-	if testDoc == nil {
-		return fmt.Errorf("test not found after attempt update: %s", testID)
-	}
-
-	// Determine overall test status based on all attempts
-	// Rule: If ANY attempt has status PASSED, the test is PASSED (retry success scenario)
-	//       Otherwise, use the current attempt's status
-	overallStatus := status
-	if len(testDoc.Attempts) > 0 {
-		hasPassedAttempt := false
-		for _, attempt := range testDoc.Attempts {
-			if attempt.Status == "PASSED" {
-				hasPassedAttempt = true
-				break
-			}
-		}
-		if hasPassedAttempt {
-			overallStatus = "PASSED"
-		}
-	}
-
-	r.logger.Debug("Computed overall test status",
-		"runID", runID,
-		"testID", testID,
-		"currentAttemptStatus", status,
-		"overallStatus", overallStatus,
-		"totalAttempts", len(testDoc.Attempts))
-
-	// Step 3: Update test-level fields with aggregated status and timing
-	setFields := bson.M{
-		"updated_at": now,
-	}
-
-	// Update test-level status with aggregated status (may differ from current attempt)
-	if overallStatus != "" {
-		setFields["tests.$[test].status"] = overallStatus
-	}
-
-	// Update test-level end_time (latest attempt end_time)
-	if endTime != nil {
-		setFields["tests.$[test].end_time"] = endTime
-	}
-
-	// Update test-level duration (current attempt duration)
-	if duration != nil {
-		setFields["tests.$[test].duration"] = duration
-	}
-
-	// Update test-level updated_at
-	setFields["tests.$[test].updated_at"] = now
-
-	// Update test in root-level tests array with aggregated status
-	result, err := r.collection.UpdateOne(ctx, filter, bson.M{"$set": setFields}, arrayFilters)
-	if err != nil {
-		return fmt.Errorf("update test end: %w", err)
-	}
-
-	if result.MatchedCount == 0 {
-		r.logger.Error("test not found for UpsertTestEnd",
-			"runID", runID,
-			"testID", testID,
-			"retryIndex", retryIndex,
-			"filter", filter)
-		return fmt.Errorf("test not found: runID=%s, testID=%s, retryIndex=%v", runID, testID, retryIndex)
-	}
-
-	r.logger.Info("test end",
-		"runID", runID,
-		"testID", testID,
-		"currentAttemptStatus", status,
-		"overallStatus", overallStatus,
-		"retryIndex", retryIndex,
-		"matchedCount", result.MatchedCount,
-		"modifiedCount", result.ModifiedCount)
 	return nil
 }

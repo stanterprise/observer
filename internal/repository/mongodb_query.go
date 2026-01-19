@@ -105,7 +105,7 @@ func (r *MongoRepository) GetTestFromRun(ctx context.Context, testID string) (*m
 
 // UpdateTestStatus updates the status of a test case run
 func (r *MongoRepository) UpdateTestStatus(ctx context.Context, runID string, testID string, status string) error {
-	if err := validateRunID(runID); err != nil {
+	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
 	if testID == "" {
