@@ -32,6 +32,12 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		test.RetryIndex = &defaultRetryIndex
 	}
 
+	// Initialize retry_count if nil (default to 0 for no retries)
+	if test.RetryCount == nil {
+		defaultRetryCount := int32(0)
+		test.RetryCount = &defaultRetryCount
+	}
+
 	r.logger.Debug("UpsertTestBegin starting",
 		"runID", runID,
 		"testID", test.ID,
@@ -63,13 +69,6 @@ func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.T
 		test.Steps = []*m.StepDocument{}
 	}
 
-	r.logger.Debug("UpsertTestBegin starting",
-		"runID", runID,
-		"testID", test.ID,
-		"retryIndex", *test.RetryIndex,
-		"retryCount", *test.RetryCount,
-		"status", test.Status)
-
 	// Try to update existing attempt in test's attempts array
 	filter := bson.M{
 		"_id":                        runID,
@@ -77,33 +76,25 @@ func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.T
 		"tests.attempts.retry_index": test.RetryIndex,
 	}
 
-	currentAttempt := &m.AttemptDocument{
-		RetryIndex: *test.RetryIndex,
-		Steps:      []*m.StepDocument{},
-		StartTime:  test.StartTime,
-		Status:     test.Status,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	}
 	update := bson.M{
 		"$set": bson.M{
-			"tests.$[test].name":        test.Name,
-			"tests.$[test].title":       test.Title,
-			"tests.$[test].description": test.Description,
-			"tests.$[test].start_time":  test.StartTime,
-			"tests.$[test].retry_index": test.RetryIndex,
-			"tests.$[test].updated_at":  now,
-			"updated_at":                now,
+			"tests.$[test].name":                                test.Name,
+			"tests.$[test].title":                               test.Title,
+			"tests.$[test].description":                         test.Description,
+			"tests.$[test].start_time":                          test.StartTime,
+			"tests.$[test].retry_index":                         test.RetryIndex,
+			"tests.$[test].updated_at":                          now,
+			"tests.$[test].attempts.$[attempt].start_time":  test.StartTime,
+			"tests.$[test].attempts.$[attempt].status":      test.Status,
+			"tests.$[test].attempts.$[attempt].updated_at": now,
+			"updated_at": now,
 		},
-	}
-
-	if *test.RetryIndex == 0 {
-		update["$set"].(bson.M)["tests.$[test].attempts"] = []*m.AttemptDocument{currentAttempt}
 	}
 
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
 			bson.M{"test.id": test.ID},
+			bson.M{"attempt.retry_index": test.RetryIndex},
 		},
 	})
 
@@ -126,7 +117,8 @@ func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.T
 		return nil
 	}
 
-	return nil
+	// Attempt not found, try to append it or create the test
+	return appendTestAttempt(r, ctx, runID, test, suiteID, now, result)
 }
 
 func appendTestAttempt(r *MongoRepository, ctx context.Context, runID string, test *m.TestDocument, suiteID string, now time.Time, testUpdateResult *mongo.UpdateResult) error {
@@ -187,6 +179,55 @@ func appendTestAttempt(r *MongoRepository, ctx context.Context, runID string, te
 			"attemptsArrayLength", "will be one more")
 		return nil
 	}
+
+	// Test doesn't exist, create it with the current attempt
+	r.logger.Debug("Test not found, creating new test with current attempt",
+		"runID", runID,
+		"testID", test.ID,
+		"retryIndex", *test.RetryIndex,
+		"retryCount", *test.RetryCount)
+
+	test.CreatedAt = now
+	// Save the incoming status for the attempt, but don't set test-level status yet
+	attemptStatus := test.Status
+	test.Status = "" // Clear test-level status - will be set correctly on TestEnd
+	currentAttempt = &m.AttemptDocument{
+		RetryIndex: *test.RetryIndex,
+		Steps:      []*m.StepDocument{},
+		StartTime:  test.StartTime,
+		Status:     attemptStatus, // Use saved status for attempt
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	test.Attempts = []*m.AttemptDocument{currentAttempt}
+
+	r.logger.Debug("Created test document with single attempt",
+		"currentRetryIndex", *test.RetryIndex)
+
+	filter = bson.M{
+		"_id": runID,
+	}
+	update = bson.M{
+		"$push": bson.M{"tests": test},
+		"$set":  bson.M{"updated_at": now},
+	}
+
+	result, err = r.collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("append test: %w", err)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("test run document not found: runID=%s", runID)
+	}
+
+	r.logger.Info("test begin (test created)",
+		"runID", runID,
+		"testID", test.ID,
+		"retryIndex", *test.RetryIndex,
+		"attemptsArraySize", len(test.Attempts),
+		"matchedCount", result.MatchedCount,
+		"modifiedCount", result.ModifiedCount)
 
 	return nil
 }
