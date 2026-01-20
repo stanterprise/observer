@@ -329,7 +329,8 @@ func (c *Classifier) classifyRunStart(ctx context.Context, event publisher.Event
 		return ClassifyBuffer, fmt.Errorf("run start missing run")
 	}
 
-	// Run start events are always immediate as they create new test runs
+	// Run start events are always immediate - idempotent for sharded execution
+	// where multiple workers may send run start with same run_id
 	c.logger.Debug("run start - immediate",
 		"run_id", req.RunId)
 	return ClassifyImmediate, nil

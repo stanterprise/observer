@@ -20,6 +20,7 @@ type TestRunDocument struct {
 	Metadata        map[string]interface{} `bson:"metadata,omitempty" json:"metadata,omitempty"`
 	Duration        *int64                 `bson:"duration,omitempty" json:"duration,omitempty"` // Duration in nanoseconds
 	TotalTests      int32                  `bson:"total_tests,omitempty" json:"totalTests,omitempty"`
+	ShardCount      int32                  `bson:"shard_count,omitempty" json:"shardCount,omitempty"`         // Number of shards that reported (for sharded test execution)
 	TestSuiteSpecID string                 `bson:"test_suite_spec_id,omitempty" json:"testSuiteSpecId,omitempty"`
 	InitiatedBy     string                 `bson:"initiated_by,omitempty" json:"initiatedBy,omitempty"`
 	ProjectName     string                 `bson:"project_name,omitempty" json:"projectName,omitempty"`

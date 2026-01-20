@@ -27,19 +27,37 @@ func (r *MongoRepository) MapSuites(ctx context.Context, runID string, name stri
 	}
 
 	// Update run-level fields (name, metadata, total_tests)
+	// For sharded test execution: accumulate total_tests, merge metadata at key level
 	runUpdate := bson.M{
 		"$set": bson.M{
 			"updated_at": now,
 		},
+		"$inc": bson.M{},
 	}
+	
+	// Name: use first-write wins via $setOnInsert (handled in ensureDocumentExists)
+	// For subsequent calls, only update if name is different
 	if name != "" {
 		runUpdate["$set"].(bson.M)["name"] = name
 	}
+	
+	// Metadata: merge at key level to preserve metadata from all shards
 	if len(metadata) > 0 {
-		runUpdate["$set"].(bson.M)["metadata"] = metadata
+		for k, v := range metadata {
+			runUpdate["$set"].(bson.M)[fmt.Sprintf("metadata.%s", k)] = v
+		}
 	}
+	
+	// Total tests: accumulate across shards using $inc
 	if totalTests > 0 {
-		runUpdate["$set"].(bson.M)["total_tests"] = totalTests
+		runUpdate["$inc"].(bson.M)["total_tests"] = totalTests
+		// Track number of shards that reported
+		runUpdate["$inc"].(bson.M)["shard_count"] = 1
+	}
+	
+	// Remove empty $inc if not used
+	if len(runUpdate["$inc"].(bson.M)) == 0 {
+		delete(runUpdate, "$inc")
 	}
 
 	_, err := r.collection.UpdateOne(ctx, filter, runUpdate)
