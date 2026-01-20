@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import type { WebSocketEvent, WebSocketTestData } from "@/types/webSocket";
-import { ArrowLeft, Play, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Play, Eye, EyeOff, Search, X, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
@@ -22,6 +22,11 @@ export function TestRunDetailPage() {
   const [hiddenSuiteTypes, setHiddenSuiteTypes] = useState<Set<string>>(
     new Set(["ROOT", "PROJECT", "FILE"])
   );
+  
+  // Filter state
+  const [searchText, setSearchText] = useState("");
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<TestStatus>>(new Set());
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
 
   const fetchRunDetail = useCallback(async (id: string) => {
     try {
@@ -88,7 +93,7 @@ export function TestRunDetailPage() {
     }
   }
 
-  const countTests = (suites: TestSuite[]): number => {
+  const countTests = useCallback((suites: TestSuite[]): number => {
     let total = 0;
     for (const suite of suites) {
       total += suite.tests?.length || 0; // API returns 'tests' (lowercase)
@@ -96,13 +101,114 @@ export function TestRunDetailPage() {
     }
 
     return total;
-  };
+  }, []);
 
   useEffect(() => {
     if (runId) {
       fetchRunDetail(runId);
     }
   }, [runId, fetchRunDetail]);
+
+  // Compute root suite hierarchy (must be computed before early returns)
+  const rootSuite = useMemo(() => {
+    if (!runDetail) {
+      return {
+        id: '',
+        name: '',
+        type: '',
+        runId: runId || '',
+        tests: [],
+        suites: [],
+      } as TestSuite;
+    }
+    return assembleSuiteHierarchy(runDetail.suites || [], runDetail.tests || []);
+  }, [runDetail, runId]);
+
+  // Get unique suite types from the hierarchy
+  const availableSuiteTypes = useMemo(() => {
+    const getSuiteTypes = (suite: TestSuite): Set<string> => {
+      const types = new Set<string>();
+      if (suite.type) types.add(suite.type.toUpperCase());
+      suite.suites?.forEach((s) => {
+        getSuiteTypes(s).forEach((t) => types.add(t));
+      });
+      return types;
+    };
+    return Array.from(getSuiteTypes(rootSuite)).sort();
+  }, [rootSuite]);
+
+  // Extract all unique tags from tests
+  const allTags = useMemo(() => {
+    if (!runDetail?.tests) return [];
+    const tagSet = new Set<string>();
+    runDetail.tests.forEach((test) => {
+      test.tags?.forEach((tag) => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [runDetail?.tests]);
+
+  // Filter tests based on current filters
+  const filteredSuite = useMemo(() => {
+    const hasActiveFilters =
+      searchText.trim() !== "" ||
+      selectedStatuses.size > 0 ||
+      selectedTags.size > 0;
+
+    if (!hasActiveFilters) return rootSuite;
+
+    // Helper to check if a test matches all filters
+    const testMatchesFilters = (test: any): boolean => {
+      // Search text filter
+      if (searchText.trim() !== "") {
+        const search = searchText.toLowerCase();
+        const matchesTitle = test.title?.toLowerCase().includes(search);
+        const matchesId = test.id?.toLowerCase().includes(search);
+        if (!matchesTitle && !matchesId) return false;
+      }
+
+      // Status filter
+      if (selectedStatuses.size > 0) {
+        if (!selectedStatuses.has(test.status as TestStatus)) return false;
+      }
+
+      // Tag filter (test must have ALL selected tags)
+      if (selectedTags.size > 0) {
+        if (!test.tags || test.tags.length === 0) return false;
+        const testTags = new Set(test.tags);
+        for (const tag of selectedTags) {
+          if (!testTags.has(tag)) return false;
+        }
+      }
+
+      return true;
+    };
+
+    // Recursively filter suite hierarchy
+    const filterSuite = (suite: TestSuite): TestSuite => {
+      const filteredTests = suite.tests?.filter(testMatchesFilters) || [];
+      const filteredSubsuites = suite.suites
+        ?.map(filterSuite)
+        .filter((s) => (s.tests?.length || 0) > 0 || (s.suites?.length || 0) > 0) || [];
+
+      return {
+        ...suite,
+        tests: filteredTests,
+        suites: filteredSubsuites,
+      };
+    };
+
+    return filterSuite(rootSuite);
+  }, [rootSuite, searchText, selectedStatuses, selectedTags]);
+
+  // Count filtered tests
+  const filteredTestCount = useMemo(() => {
+    return countTests([filteredSuite]);
+  }, [filteredSuite, countTests]);
+
+  const hasActiveFilters =
+    searchText.trim() !== "" ||
+    selectedStatuses.size > 0 ||
+    selectedTags.size > 0;
 
   // Handle WebSocket events to update test statuses locally
   function updateTestFromEvent(event: WebSocketEvent) {
@@ -334,23 +440,7 @@ export function TestRunDetailPage() {
     overallStatus
   );
 
-  const rootSuite = assembleSuiteHierarchy(
-    runDetail.suites || [],
-    runDetail.tests!
-  );
   console.log("Assembled suite hierarchy:", rootSuite);
-
-  // Get unique suite types from the hierarchy
-  const getSuiteTypes = (suite: TestSuite): Set<string> => {
-    const types = new Set<string>();
-    if (suite.type) types.add(suite.type.toUpperCase());
-    suite.suites?.forEach((s) => {
-      getSuiteTypes(s).forEach((t) => types.add(t));
-    });
-    return types;
-  };
-
-  const availableSuiteTypes = Array.from(getSuiteTypes(rootSuite)).sort();
 
   const toggleSuiteType = (type: string) => {
     setHiddenSuiteTypes((prev) => {
@@ -362,6 +452,37 @@ export function TestRunDetailPage() {
       }
       return newSet;
     });
+  };
+
+  // Filter helper functions
+  const toggleStatus = (status: TestStatus) => {
+    setSelectedStatuses((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(status)) {
+        newSet.delete(status);
+      } else {
+        newSet.add(status);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(tag)) {
+        newSet.delete(tag);
+      } else {
+        newSet.add(tag);
+      }
+      return newSet;
+    });
+  };
+
+  const clearFilters = () => {
+    setSearchText("");
+    setSelectedStatuses(new Set());
+    setSelectedTags(new Set());
   };
 
   return (
@@ -395,7 +516,14 @@ export function TestRunDetailPage() {
       {/* Test Cases List with enhanced design */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Test Cases</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Test Cases
+            {hasActiveFilters && (
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                ({filteredTestCount} of {runDetail.statistics?.total || 0})
+              </span>
+            )}
+          </h2>
           {availableSuiteTypes.length > 0 && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 font-medium">Suites:</span>
@@ -430,6 +558,126 @@ export function TestRunDetailPage() {
           )}
         </div>
 
+        {/* Filter Panel */}
+        <Card className="border-gray-200 bg-gray-50/50">
+          <CardContent className="py-4">
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search test cases by name or ID..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                />
+                {searchText && (
+                  <button
+                    onClick={() => setSearchText("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Status Filters */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filter by Status
+                  </label>
+                  {hasActiveFilters && (
+                    <button
+                      onClick={clearFilters}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                    >
+                      Clear All Filters
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    "PASSED",
+                    "FAILED",
+                    "RUNNING",
+                    "SKIPPED",
+                    "BROKEN",
+                    "TIMEDOUT",
+                    "INTERRUPTED",
+                  ] as TestStatus[]).map((status) => {
+                    const isSelected = selectedStatuses.has(status);
+                    const statusColors: Record<string, string> = {
+                      PASSED: isSelected
+                        ? "bg-green-100 border-green-300 text-green-800"
+                        : "bg-white border-green-200 text-green-600 hover:bg-green-50",
+                      FAILED: isSelected
+                        ? "bg-red-100 border-red-300 text-red-800"
+                        : "bg-white border-red-200 text-red-600 hover:bg-red-50",
+                      RUNNING: isSelected
+                        ? "bg-blue-100 border-blue-300 text-blue-800"
+                        : "bg-white border-blue-200 text-blue-600 hover:bg-blue-50",
+                      SKIPPED: isSelected
+                        ? "bg-gray-100 border-gray-300 text-gray-800"
+                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50",
+                      BROKEN: isSelected
+                        ? "bg-orange-100 border-orange-300 text-orange-800"
+                        : "bg-white border-orange-200 text-orange-600 hover:bg-orange-50",
+                      TIMEDOUT: isSelected
+                        ? "bg-purple-100 border-purple-300 text-purple-800"
+                        : "bg-white border-purple-200 text-purple-600 hover:bg-purple-50",
+                      INTERRUPTED: isSelected
+                        ? "bg-yellow-100 border-yellow-300 text-yellow-800"
+                        : "bg-white border-yellow-200 text-yellow-600 hover:bg-yellow-50",
+                    };
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => toggleStatus(status)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-md text-sm font-medium transition-all border-2",
+                          statusColors[status] || "bg-white border-gray-200 text-gray-600"
+                        )}
+                      >
+                        {status}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tag Filters */}
+              {allTags.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Filter by Tags</label>
+                  <div className="flex flex-wrap gap-2">
+                    {allTags.map((tag) => {
+                      const isSelected = selectedTags.has(tag);
+                      return (
+                        <button
+                          key={tag}
+                          onClick={() => toggleTag(tag)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-md text-sm font-medium transition-all border",
+                            isSelected
+                              ? "bg-indigo-100 border-indigo-300 text-indigo-800"
+                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                          )}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {!runDetail.tests || runDetail.tests.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="py-16">
@@ -447,10 +695,33 @@ export function TestRunDetailPage() {
               </div>
             </CardContent>
           </Card>
+        ) : filteredTestCount === 0 && hasActiveFilters ? (
+          <Card className="border-dashed">
+            <CardContent className="py-16">
+              <div className="text-center max-w-sm mx-auto">
+                <div className="mx-auto h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                  <Filter className="h-8 w-8 text-gray-400" />
+                </div>
+                <h3 className="text-base font-semibold text-gray-900 mb-2">
+                  No Matching Tests
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  No test cases match your current filters. Try adjusting your
+                  search criteria.
+                </p>
+                <button
+                  onClick={clearFilters}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Clear All Filters
+                </button>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
           <div className="transition-all duration-300">
             <TestSuiteRecord
-              suite={rootSuite}
+              suite={filteredSuite}
               hiddenSuiteTypes={hiddenSuiteTypes}
             />
           </div>
