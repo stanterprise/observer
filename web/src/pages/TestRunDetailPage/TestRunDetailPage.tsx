@@ -20,7 +20,7 @@ export function TestRunDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hiddenSuiteTypes, setHiddenSuiteTypes] = useState<Set<string>>(
-    new Set(["ROOT", "PROJECT", "FILE"])
+    new Set(["ROOT", "PROJECT", "FILE"]),
   );
 
   const fetchRunDetail = useCallback(async (id: string) => {
@@ -50,7 +50,7 @@ export function TestRunDetailPage() {
     } catch (err) {
       console.error("Error fetching run details:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to fetch run details"
+        err instanceof Error ? err.message : "Failed to fetch run details",
       );
     } finally {
       setLoading(false);
@@ -60,17 +60,21 @@ export function TestRunDetailPage() {
   // Callback for WebSocket reconnection - refresh data from API
   const handleReconnect = useCallback(() => {
     if (runId) {
-      console.log('[TestRunDetailPage] WebSocket reconnected, refreshing run data');
+      console.log(
+        "[TestRunDetailPage] WebSocket reconnected, refreshing run data",
+      );
       fetchRunDetail(runId);
     }
   }, [runId, fetchRunDetail]);
 
   // Run-specific WebSocket - receives test events for this run (excluding steps for performance)
   useWebSocket({
-    filters: runId ? { 
-      runId,
-      eventTypes: ['test.begin', 'test.end', 'run.end'] // Exclude step events for performance
-    } : undefined,
+    filters: runId
+      ? {
+          runId,
+          eventTypes: ["test.begin", "test.end", "run.end"], // Exclude step events for performance
+        }
+      : undefined,
     onMessage: handleWebSocketEvent,
     onConnect: handleReconnect,
   });
@@ -319,24 +323,24 @@ export function TestRunDetailPage() {
     runDetail.statistics!.running && runDetail.statistics!.running > 0
       ? "RUNNING"
       : runDetail.statistics!.failed > 0
-      ? "FAILED"
-      : runDetail.statistics!.passed === runDetail.statistics!.total &&
-        runDetail.statistics!.total > 0
-      ? "PASSED"
-      : runDetail.statistics!.skipped === runDetail.statistics!.total &&
-        runDetail.statistics!.total > 0
-      ? "SKIPPED"
-      : "NOT_RUN";
+        ? "FAILED"
+        : runDetail.statistics!.passed === runDetail.statistics!.total &&
+            runDetail.statistics!.total > 0
+          ? "PASSED"
+          : runDetail.statistics!.skipped === runDetail.statistics!.total &&
+              runDetail.statistics!.total > 0
+            ? "SKIPPED"
+            : "NOT_RUN";
   console.log(
     "Rendering run detail:",
     runDetail,
     "Overall status:",
-    overallStatus
+    overallStatus,
   );
 
   const rootSuite = assembleSuiteHierarchy(
     runDetail.suites || [],
-    runDetail.tests!
+    runDetail.tests!,
   );
   console.log("Assembled suite hierarchy:", rootSuite);
 
@@ -410,7 +414,7 @@ export function TestRunDetailPage() {
                         "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all border",
                         isHidden
                           ? "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200"
-                          : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                          : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100",
                       )}
                       aria-label={`${
                         isHidden ? "Show" : "Hide"
