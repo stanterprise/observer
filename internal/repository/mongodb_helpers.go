@@ -10,7 +10,7 @@ import (
 )
 
 // validateRunID checks if runID is provided and returns an error if not
-func validateRunID(runID string) error {
+func ValidateRunID(runID string) error {
 	if runID == "" {
 		return fmt.Errorf("runID is required")
 	}
@@ -45,23 +45,24 @@ func buildStepEndUpdate(status string, now time.Time) bson.M {
 	return update
 }
 
-
-
-// AppendTestFailure adds a failure to a test document
-func (r *MongoRepository) AppendTestFailure(ctx context.Context, runID, testID string, failure interface{}) error {
-	if err := validateRunID(runID); err != nil {
+// AppendTestFailure adds a failure to a test document's attempt array
+func (r *MongoRepository) AppendTestFailure(ctx context.Context, runID, testID string, retryIndex int32, failure interface{}) error {
+	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
 
 	now := time.Now()
+	// Target attempts[retry_index].failures using literal index notation
+	failuresPath := fmt.Sprintf("tests.$[test].attempts.%d.failures", retryIndex)
+
 	filter := bson.M{
-		"_id":             runID,
-		"suites.tests.id": testID,
+		"_id":      runID,
+		"tests.id": testID,
 	}
 
 	update := bson.M{
 		"$push": bson.M{
-			"suites.$[].tests.$[test].failures": failure,
+			failuresPath: failure,
 		},
 		"$set": bson.M{
 			"updated_at": now,
@@ -81,21 +82,24 @@ func (r *MongoRepository) AppendTestFailure(ctx context.Context, runID, testID s
 	return nil
 }
 
-// AppendTestError adds an error to a test document
-func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID string, errorDoc interface{}) error {
-	if err := validateRunID(runID); err != nil {
+// AppendTestError adds an error to a test document's attempt array
+func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID string, retryIndex int32, errorDoc interface{}) error {
+	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
 
 	now := time.Now()
+	// Target attempts[retry_index].errors using literal index notation
+	errorsPath := fmt.Sprintf("tests.$[test].attempts.%d.errors", retryIndex)
+
 	filter := bson.M{
-		"_id":             runID,
-		"suites.tests.id": testID,
+		"_id":      runID,
+		"tests.id": testID,
 	}
 
 	update := bson.M{
 		"$push": bson.M{
-			"suites.$[].tests.$[test].errors": errorDoc,
+			errorsPath: errorDoc,
 		},
 		"$set": bson.M{
 			"updated_at": now,
@@ -117,7 +121,7 @@ func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID str
 
 // AppendStdOutput adds stdout output to a test document
 func (r *MongoRepository) AppendStdOutput(ctx context.Context, runID, testID string, output interface{}) error {
-	if err := validateRunID(runID); err != nil {
+	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
 
@@ -151,7 +155,7 @@ func (r *MongoRepository) AppendStdOutput(ctx context.Context, runID, testID str
 
 // AppendStdError adds stderr output to a test document
 func (r *MongoRepository) AppendStdError(ctx context.Context, runID, testID string, output interface{}) error {
-	if err := validateRunID(runID); err != nil {
+	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
 

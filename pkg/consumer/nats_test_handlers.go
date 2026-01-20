@@ -118,7 +118,8 @@ func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMess
 	c.logger.Info("test finish",
 		"id", req.TestCase.Id,
 		"run_id", req.TestCase.RunId,
-		"status", req.TestCase.Status)
+		"status", req.TestCase.Status,
+		"retry_index", req.TestCase.RetryIndex)
 
 	var duration *int64
 	if req.TestCase.Duration != nil {
@@ -126,8 +127,14 @@ func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMess
 		duration = &nanos
 	}
 
+	var endTime *time.Time
+	if req.TestCase.EndTime != nil {
+		t := req.TestCase.EndTime.AsTime()
+		endTime = &t
+	}
+
 	runID := req.TestCase.RunId
-	return c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), req.TestCase.RetryIndex, duration)
+	return c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), req.TestCase.RetryIndex, endTime, duration)
 }
 
 // handleTestFailure processes a test failure event
@@ -181,7 +188,23 @@ func (c *MongoNATSConsumer) handleTestFailure(ctx context.Context, data json.Raw
 		Attachments:    attachments,
 	}
 
-	if err := c.repo.AppendTestFailure(ctx, req.RunId, req.TestId, failure); err != nil {
+	// Fetch test document to get retry_index (failure events don't include it)
+	testDoc, err := c.repo.GetTestFromRun(ctx, req.TestId)
+	if err != nil {
+		return fmt.Errorf("get test for failure: %w", err)
+	}
+	if testDoc == nil {
+		c.logger.Warn("test not found for failure event", "test_id", req.TestId)
+		return nil
+	}
+
+	// Use retry_index from test document (defaults to 0 if nil)
+	retryIndex := int32(0)
+	if testDoc.RetryIndex != nil {
+		retryIndex = *testDoc.RetryIndex
+	}
+
+	if err := c.repo.AppendTestFailure(ctx, req.RunId, req.TestId, retryIndex, failure); err != nil {
 		return fmt.Errorf("append test failure: %w", err)
 	}
 
@@ -239,7 +262,23 @@ func (c *MongoNATSConsumer) handleTestError(ctx context.Context, data json.RawMe
 		Attachments:  attachments,
 	}
 
-	if err := c.repo.AppendTestError(ctx, req.RunId, req.TestId, errorDoc); err != nil {
+	// Fetch test document to get retry_index (error events don't include it)
+	testDoc, err := c.repo.GetTestFromRun(ctx, req.TestId)
+	if err != nil {
+		return fmt.Errorf("get test for error: %w", err)
+	}
+	if testDoc == nil {
+		c.logger.Warn("test not found for error event", "test_id", req.TestId)
+		return nil
+	}
+
+	// Use retry_index from test document (defaults to 0 if nil)
+	retryIndex := int32(0)
+	if testDoc.RetryIndex != nil {
+		retryIndex = *testDoc.RetryIndex
+	}
+
+	if err := c.repo.AppendTestError(ctx, req.RunId, req.TestId, retryIndex, errorDoc); err != nil {
 		return fmt.Errorf("append test error: %w", err)
 	}
 

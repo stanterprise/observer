@@ -135,14 +135,15 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 	}
 
 	// Publish step end event
-	err = repo.UpsertStepEnd(ctx, runID, stepID, testID, "PASSED")
+	err = repo.UpsertStepEnd(ctx, runID, stepID, testID, 0, "PASSED")
 	if err != nil {
 		t.Fatalf("Failed to upsert step end: %v", err)
 	}
 
 	// Publish test end event
 	testDuration := int64(1000000000)
-	err = repo.UpsertTestEnd(ctx, runID, testID, "PASSED", 0, &testDuration)
+	testEndTime := time.Now()
+	err = repo.UpsertTestEnd(ctx, runID, testID, "PASSED", 0, &testEndTime, &testDuration)
 	if err != nil {
 		t.Fatalf("Failed to upsert test end: %v", err)
 	}
@@ -200,15 +201,18 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 		t.Errorf("Test duration = %v, want %v", finalDoc.Tests[0].Duration, testDuration)
 	}
 
-	// Step should be in test's steps array
-	if len(finalDoc.Tests[0].Steps) != 1 {
-		t.Fatalf("Steps count = %v, want 1", len(finalDoc.Tests[0].Steps))
+	// Step should be in test's attempts[0].steps array (attempt-based retries)
+	if len(finalDoc.Tests[0].Attempts) == 0 {
+		t.Fatalf("Test has no attempts array")
 	}
-	if finalDoc.Tests[0].Steps[0].ID != stepID {
-		t.Errorf("Step ID = %v, want %v", finalDoc.Tests[0].Steps[0].ID, stepID)
+	if len(finalDoc.Tests[0].Attempts[0].Steps) != 1 {
+		t.Fatalf("Steps count in attempt 0 = %v, want 1", len(finalDoc.Tests[0].Attempts[0].Steps))
 	}
-	if finalDoc.Tests[0].Steps[0].Status != "PASSED" {
-		t.Errorf("Step status = %v, want PASSED", finalDoc.Tests[0].Steps[0].Status)
+	if finalDoc.Tests[0].Attempts[0].Steps[0].ID != stepID {
+		t.Errorf("Step ID = %v, want %v", finalDoc.Tests[0].Attempts[0].Steps[0].ID, stepID)
+	}
+	if finalDoc.Tests[0].Attempts[0].Steps[0].Status != "PASSED" {
+		t.Errorf("Step status = %v, want PASSED", finalDoc.Tests[0].Attempts[0].Steps[0].Status)
 	}
 
 	// Cleanup stream

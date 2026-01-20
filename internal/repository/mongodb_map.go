@@ -11,7 +11,7 @@ import (
 )
 
 func (r *MongoRepository) MapSuites(ctx context.Context, runID string, name string, metadata map[string]interface{}, totalTests int32, suites []m.SuiteDocument) error {
-	if err := validateRunID(runID); err != nil {
+	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
 	var errs []error
