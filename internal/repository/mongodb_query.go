@@ -362,3 +362,44 @@ func (r *MongoRepository) GetUniqueMarkers(ctx context.Context) ([]*MarkerInfo, 
 
 	return markers, nil
 }
+
+// DeleteTestRun deletes a test run document by ID
+func (r *MongoRepository) DeleteTestRun(ctx context.Context, runID string) error {
+	if err := ValidateRunID(runID); err != nil {
+		return err
+	}
+
+	result, err := r.collection.DeleteOne(ctx, bson.M{"_id": runID})
+	if err != nil {
+		return fmt.Errorf("delete test run: %w", err)
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("test run not found: %s", runID)
+	}
+
+	r.logger.Info("test run deleted", "runID", runID)
+	return nil
+}
+
+// DeleteTestRuns deletes multiple test run documents by IDs
+func (r *MongoRepository) DeleteTestRuns(ctx context.Context, runIDs []string) (int64, error) {
+	if len(runIDs) == 0 {
+		return 0, nil
+	}
+
+	// Validate all run IDs
+	for _, runID := range runIDs {
+		if err := ValidateRunID(runID); err != nil {
+			return 0, fmt.Errorf("invalid runID %s: %w", runID, err)
+		}
+	}
+
+	result, err := r.collection.DeleteMany(ctx, bson.M{"_id": bson.M{"$in": runIDs}})
+	if err != nil {
+		return 0, fmt.Errorf("delete test runs: %w", err)
+	}
+
+	r.logger.Info("test runs deleted", "count", result.DeletedCount, "requested", len(runIDs))
+	return result.DeletedCount, nil
+}

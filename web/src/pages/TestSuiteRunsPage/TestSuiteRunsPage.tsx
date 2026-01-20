@@ -16,6 +16,8 @@ import {
   CircleDashed,
   Clock,
   ArrowUpDown,
+  Trash2,
+  AlertCircle,
 } from "lucide-react";
 
 import type { TestRun } from "@/types/testRun";
@@ -35,6 +37,9 @@ export function TestSuiteRunsPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [selectedRuns, setSelectedRuns] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchRuns = useCallback(async () => {
     try {
@@ -93,6 +98,61 @@ export function TestSuiteRunsPage({
     fetchRuns();
   }, [fetchRuns]);
 
+  const toggleRunSelection = (runId: string) => {
+    setSelectedRuns((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(runId)) {
+        newSet.delete(runId);
+      } else {
+        newSet.add(runId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedRuns.size === runs.length) {
+      setSelectedRuns(new Set());
+    } else {
+      setSelectedRuns(new Set(runs.map((run) => run.id)));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedRuns.size === 0) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(apiUrl("/runs/delete"), {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          runIds: Array.from(selectedRuns),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete runs: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`Deleted ${data.deleted} of ${data.requested} runs`);
+
+      // Remove deleted runs from the list
+      setRuns((prev) => prev.filter((run) => !selectedRuns.has(run.id)));
+      setSelectedRuns(new Set());
+      setShowDeleteConfirm(false);
+      setError(null);
+    } catch (err) {
+      console.error("Error deleting runs:", err);
+      setError(err instanceof Error ? err.message : "Failed to delete runs");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -124,13 +184,87 @@ export function TestSuiteRunsPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Test Suite Runs</h1>
-        <button
-          onClick={fetchRuns}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          {selectedRuns.size > 0 && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
+              disabled={deleting}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete ({selectedRuns.size})
+            </button>
+          )}
+          <button
+            onClick={fetchRuns}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-2 text-red-800">
+              <AlertCircle className="h-5 w-5" />
+              <span>{error}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="max-w-md w-full mx-4">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Delete Test Runs
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Are you sure you want to delete {selectedRuns.size} test run
+                    {selectedRuns.size !== 1 ? "s" : ""}? This action cannot be
+                    undone.
+                  </p>
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                      disabled={deleting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDeleteSelected}
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
+                      disabled={deleting}
+                    >
+                      {deleting ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {runs.length === 0 ? (
         <Card>
@@ -153,6 +287,18 @@ export function TestSuiteRunsPage({
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={runs.length > 0 && selectedRuns.size === runs.length}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                        aria-label="Select all runs"
+                      />
+                    </th>
                     <th
                       scope="col"
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -225,6 +371,15 @@ export function TestSuiteRunsPage({
                       key={run.id}
                       className="hover:bg-gray-50 transition-colors"
                     >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedRuns.has(run.id)}
+                          onChange={() => toggleRunSelection(run.id)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                          aria-label={`Select ${run.name || run.id}`}
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link
                           to={`/suite_runs/${run.id}`}

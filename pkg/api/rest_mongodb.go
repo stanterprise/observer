@@ -36,6 +36,7 @@ func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/runs", h.handleRuns)
 	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
+	mux.HandleFunc("/api/runs/delete", h.handleDeleteRuns) // Handles DELETE /api/runs/delete - delete multiple runs
 	mux.HandleFunc("/api/markers", h.handleMarkers)        // Handles GET /api/markers - list all unique markers
 	mux.HandleFunc("/api/marker/", h.handleMarkerStats) // Handles /api/marker/{markerValue}/stats
 }
@@ -674,6 +675,46 @@ func (h *MongoHandler) handleMarkerStats(w http.ResponseWriter, r *http.Request)
 		"runs":   runStats,
 		"total":  total,
 		"count":  len(runStats),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleDeleteRuns handles DELETE /api/runs/delete - delete multiple test runs
+func (h *MongoHandler) handleDeleteRuns(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		RunIDs []string `json:"runIds"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("failed to decode delete request", "error", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.RunIDs) == 0 {
+		http.Error(w, "No run IDs provided", http.StatusBadRequest)
+		return
+	}
+
+	// Delete test runs
+	deletedCount, err := h.repo.DeleteTestRuns(r.Context(), req.RunIDs)
+	if err != nil {
+		h.logger.Error("failed to delete test runs", "runIds", req.RunIDs, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"deleted":   deletedCount,
+		"requested": len(req.RunIDs),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
