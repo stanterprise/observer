@@ -20,12 +20,14 @@ export function TestRunDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hiddenSuiteTypes, setHiddenSuiteTypes] = useState<Set<string>>(
-    new Set(["ROOT", "PROJECT", "FILE"])
+    new Set(["ROOT", "PROJECT", "FILE"]),
   );
-  
+
   // Filter state
   const [searchText, setSearchText] = useState("");
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<TestStatus>>(new Set());
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<TestStatus>>(
+    new Set(),
+  );
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
 
   const fetchRunDetail = useCallback(async (id: string) => {
@@ -55,7 +57,7 @@ export function TestRunDetailPage() {
     } catch (err) {
       console.error("Error fetching run details:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to fetch run details"
+        err instanceof Error ? err.message : "Failed to fetch run details",
       );
     } finally {
       setLoading(false);
@@ -65,17 +67,21 @@ export function TestRunDetailPage() {
   // Callback for WebSocket reconnection - refresh data from API
   const handleReconnect = useCallback(() => {
     if (runId) {
-      console.log('[TestRunDetailPage] WebSocket reconnected, refreshing run data');
+      console.log(
+        "[TestRunDetailPage] WebSocket reconnected, refreshing run data",
+      );
       fetchRunDetail(runId);
     }
   }, [runId, fetchRunDetail]);
 
   // Run-specific WebSocket - receives test events for this run (excluding steps for performance)
   useWebSocket({
-    filters: runId ? { 
-      runId,
-      eventTypes: ['test.begin', 'test.end', 'run.end'] // Exclude step events for performance
-    } : undefined,
+    filters: runId
+      ? {
+          runId,
+          eventTypes: ["test.begin", "test.end", "run.end"], // Exclude step events for performance
+        }
+      : undefined,
     onMessage: handleWebSocketEvent,
     onConnect: handleReconnect,
   });
@@ -113,15 +119,18 @@ export function TestRunDetailPage() {
   const rootSuite = useMemo(() => {
     if (!runDetail) {
       return {
-        id: '',
-        name: '',
-        type: '',
-        runId: runId || '',
+        id: "",
+        name: "",
+        type: "",
+        runId: runId || "",
         tests: [],
         suites: [],
       } as TestSuite;
     }
-    return assembleSuiteHierarchy(runDetail.suites || [], runDetail.tests || []);
+    return assembleSuiteHierarchy(
+      runDetail.suites || [],
+      runDetail.tests || [],
+    );
   }, [runDetail, runId]);
 
   // Get unique suite types from the hierarchy
@@ -186,9 +195,12 @@ export function TestRunDetailPage() {
     // Recursively filter suite hierarchy
     const filterSuite = (suite: TestSuite): TestSuite => {
       const filteredTests = suite.tests?.filter(testMatchesFilters) || [];
-      const filteredSubsuites = suite.suites
-        ?.map(filterSuite)
-        .filter((s) => (s.tests?.length || 0) > 0 || (s.suites?.length || 0) > 0) || [];
+      const filteredSubsuites =
+        suite.suites
+          ?.map(filterSuite)
+          .filter(
+            (s) => (s.tests?.length || 0) > 0 || (s.suites?.length || 0) > 0,
+          ) || [];
 
       return {
         ...suite,
@@ -425,19 +437,19 @@ export function TestRunDetailPage() {
     runDetail.statistics!.running && runDetail.statistics!.running > 0
       ? "RUNNING"
       : runDetail.statistics!.failed > 0
-      ? "FAILED"
-      : runDetail.statistics!.passed === runDetail.statistics!.total &&
-        runDetail.statistics!.total > 0
-      ? "PASSED"
-      : runDetail.statistics!.skipped === runDetail.statistics!.total &&
-        runDetail.statistics!.total > 0
-      ? "SKIPPED"
-      : "NOT_RUN";
+        ? "FAILED"
+        : runDetail.statistics!.passed === runDetail.statistics!.total &&
+            runDetail.statistics!.total > 0
+          ? "PASSED"
+          : runDetail.statistics!.skipped === runDetail.statistics!.total &&
+              runDetail.statistics!.total > 0
+            ? "SKIPPED"
+            : "NOT_RUN";
   console.log(
     "Rendering run detail:",
     runDetail,
     "Overall status:",
-    overallStatus
+    overallStatus,
   );
 
   console.log("Assembled suite hierarchy:", rootSuite);
@@ -538,7 +550,7 @@ export function TestRunDetailPage() {
                         "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all border",
                         isHidden
                           ? "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200"
-                          : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                          : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100",
                       )}
                       aria-label={`${
                         isHidden ? "Show" : "Hide"
@@ -600,15 +612,17 @@ export function TestRunDetailPage() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {([
-                    "PASSED",
-                    "FAILED",
-                    "RUNNING",
-                    "SKIPPED",
-                    "BROKEN",
-                    "TIMEDOUT",
-                    "INTERRUPTED",
-                  ] as TestStatus[]).map((status) => {
+                  {(
+                    [
+                      "PASSED",
+                      "FAILED",
+                      "RUNNING",
+                      "SKIPPED",
+                      "BROKEN",
+                      "TIMEDOUT",
+                      "INTERRUPTED",
+                    ] as TestStatus[]
+                  ).map((status) => {
                     const isSelected = selectedStatuses.has(status);
                     const statusColors: Record<string, string> = {
                       PASSED: isSelected
@@ -639,7 +653,8 @@ export function TestRunDetailPage() {
                         onClick={() => toggleStatus(status)}
                         className={cn(
                           "px-3 py-1.5 rounded-md text-sm font-medium transition-all border-2",
-                          statusColors[status] || "bg-white border-gray-200 text-gray-600"
+                          statusColors[status] ||
+                            "bg-white border-gray-200 text-gray-600",
                         )}
                       >
                         {status}
@@ -652,7 +667,9 @@ export function TestRunDetailPage() {
               {/* Tag Filters */}
               {allTags.length > 0 && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Filter by Tags</label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Filter by Tags
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     {allTags.map((tag) => {
                       const isSelected = selectedTags.has(tag);
@@ -664,7 +681,7 @@ export function TestRunDetailPage() {
                             "px-3 py-1.5 rounded-md text-sm font-medium transition-all border",
                             isSelected
                               ? "bg-indigo-100 border-indigo-300 text-indigo-800"
-                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50",
                           )}
                         >
                           {tag}
