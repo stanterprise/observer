@@ -74,8 +74,8 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 		TestCaseIds:     req.Suite.TestCaseIds,
 		SubSuiteIds:     req.Suite.SubSuiteIds,
 		// Tags:            req.Suite.Tags, // TODO: Add when available in protobuf
-		StartTime:       startTime,
-		EndTime:         endTime,
+		StartTime: startTime,
+		EndTime:   endTime,
 	}
 
 	// Use ParentSuiteId directly from protobuf (already set in suite object)

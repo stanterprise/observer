@@ -78,16 +78,16 @@ func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.T
 
 	update := bson.M{
 		"$set": bson.M{
-			"tests.$[test].name":                                test.Name,
-			"tests.$[test].title":                               test.Title,
-			"tests.$[test].description":                         test.Description,
-			"tests.$[test].start_time":                          test.StartTime,
-			"tests.$[test].retry_index":                         test.RetryIndex,
-			"tests.$[test].updated_at":                          now,
-			"tests.$[test].attempts.$[attempt].start_time":  test.StartTime,
-			"tests.$[test].attempts.$[attempt].status":      test.Status,
+			"tests.$[test].name":                           test.Name,
+			"tests.$[test].title":                          test.Title,
+			"tests.$[test].description":                    test.Description,
+			"tests.$[test].start_time":                     test.StartTime,
+			"tests.$[test].retry_index":                    test.RetryIndex,
+			"tests.$[test].updated_at":                     now,
+			"tests.$[test].attempts.$[attempt].start_time": test.StartTime,
+			"tests.$[test].attempts.$[attempt].status":     test.Status,
 			"tests.$[test].attempts.$[attempt].updated_at": now,
-			"updated_at": now,
+			"updated_at":                                   now,
 		},
 	}
 

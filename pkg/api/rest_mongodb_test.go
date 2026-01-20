@@ -91,7 +91,7 @@ func TestHandleMarkers_EmptyDatabase(t *testing.T) {
 	if !exists {
 		t.Fatal("Response should have 'markers' field")
 	}
-	
+
 	// markers can be nil (null in JSON) or empty array
 	var markerCount int
 	if markersField == nil {
@@ -103,7 +103,7 @@ func TestHandleMarkers_EmptyDatabase(t *testing.T) {
 		}
 		markerCount = len(markers)
 	}
-	
+
 	if markerCount != 0 {
 		t.Errorf("Expected 0 markers in empty database, got %d", markerCount)
 	}

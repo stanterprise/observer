@@ -36,10 +36,10 @@ func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/runs", h.handleRuns)
 	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
-	mux.HandleFunc("/api/runs/delete", h.handleDeleteRuns)      // Handles DELETE /api/runs/delete - delete multiple runs
-	mux.HandleFunc("/api/runs/marker", h.handleUpdateMarker)    // Handles PUT /api/runs/marker - update marker for runs
-	mux.HandleFunc("/api/markers", h.handleMarkers)             // Handles GET /api/markers - list all unique markers
-	mux.HandleFunc("/api/marker/", h.handleMarkerStats)         // Handles /api/marker/{markerValue}/stats
+	mux.HandleFunc("/api/runs/delete", h.handleDeleteRuns)   // Handles DELETE /api/runs/delete - delete multiple runs
+	mux.HandleFunc("/api/runs/marker", h.handleUpdateMarker) // Handles PUT /api/runs/marker - update marker for runs
+	mux.HandleFunc("/api/markers", h.handleMarkers)          // Handles GET /api/markers - list all unique markers
+	mux.HandleFunc("/api/marker/", h.handleMarkerStats)      // Handles /api/marker/{markerValue}/stats
 }
 
 // handleTestsWithTrends handles both /api/tests and /api/tests/{testId}/trends
@@ -50,19 +50,19 @@ func (h *MongoHandler) handleTestsWithTrends(w http.ResponseWriter, r *http.Requ
 	}
 
 	path := strings.TrimPrefix(r.URL.Path, "/api/tests")
-	
+
 	// Route to trends endpoint if path matches /{testId}/trends
 	if path != "" && path != "/" && strings.HasSuffix(path, "/trends") {
 		h.handleTestTrends(w, r)
 		return
 	}
-	
+
 	// Route to list tests endpoint for /api/tests or /api/tests/
 	if path == "" || path == "/" {
 		h.handleTests(w, r)
 		return
 	}
-	
+
 	// Unknown path pattern
 	http.Error(w, "Not found", http.StatusNotFound)
 }
@@ -489,7 +489,7 @@ func (h *MongoHandler) handleTestTrends(w http.ResponseWriter, r *http.Request) 
 
 	// Extract test ID from URL path: /api/tests/{testId}/trends
 	path := strings.TrimPrefix(r.URL.Path, "/api/tests/")
-	
+
 	// Check if this is a trends request
 	if !strings.HasSuffix(path, "/trends") {
 		http.Error(w, "Not found", http.StatusNotFound)
@@ -565,7 +565,7 @@ func (h *MongoHandler) handleMarkerStats(w http.ResponseWriter, r *http.Request)
 
 	// Extract marker value and check for /stats suffix
 	path := strings.TrimPrefix(r.URL.Path, "/api/marker/")
-	
+
 	// Check if this is a stats request
 	if !strings.HasSuffix(path, "/stats") {
 		http.Error(w, "Not found", http.StatusNotFound)
@@ -693,7 +693,7 @@ func (h *MongoHandler) handleDeleteRuns(w http.ResponseWriter, r *http.Request) 
 	var req struct {
 		RunIDs []string `json:"runIds"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("failed to decode delete request", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -734,7 +734,7 @@ func (h *MongoHandler) handleUpdateMarker(w http.ResponseWriter, r *http.Request
 		RunIDs []string `json:"runIds"`
 		Marker *string  `json:"marker"` // Use pointer to distinguish between "" and null
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("failed to decode marker update request", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)

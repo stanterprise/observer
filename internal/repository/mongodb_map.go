@@ -34,27 +34,27 @@ func (r *MongoRepository) MapSuites(ctx context.Context, runID string, name stri
 		},
 		"$inc": bson.M{},
 	}
-	
+
 	// Name: use first-write wins via $setOnInsert (handled in ensureDocumentExists)
 	// For subsequent calls, only update if name is different
 	if name != "" {
 		runUpdate["$set"].(bson.M)["name"] = name
 	}
-	
+
 	// Metadata: merge at key level to preserve metadata from all shards
 	if len(metadata) > 0 {
 		for k, v := range metadata {
 			runUpdate["$set"].(bson.M)[fmt.Sprintf("metadata.%s", k)] = v
 		}
 	}
-	
+
 	// Total tests: accumulate across shards using $inc
 	if totalTests > 0 {
 		runUpdate["$inc"].(bson.M)["total_tests"] = totalTests
 		// Track number of shards that reported
 		runUpdate["$inc"].(bson.M)["shard_count"] = 1
 	}
-	
+
 	// Remove empty $inc if not used
 	if len(runUpdate["$inc"].(bson.M)) == 0 {
 		delete(runUpdate, "$inc")
