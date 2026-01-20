@@ -46,6 +46,7 @@ The Observer system is composed of three main components:
 
 - **Phase 2 Complete**: NATS JetStream consumer for event processing
 - Persists events to database with idempotent upsert pattern
+- **Supports sharded test execution** - accumulates results from multiple test runners with same run ID
 - Handles database migrations
 - Supports horizontal scaling via durable consumer groups
 - Future: artifact storage, summary generation
@@ -256,6 +257,84 @@ MongoDB can be configured using either a connection URI or split environment var
 mongodb://[user:pass@]host[:port]/database[?options]
 mongodb+srv://[user:pass@]host/database[?options]
 ```
+
+## Sharded Test Execution
+
+Observer supports **sharded test execution** where multiple test runners (shards) execute tests in parallel and report results for the same test run ID. This is useful for:
+
+- Parallel test execution across multiple CI workers
+- Distributed test execution in containerized environments
+- Playwright sharded runs with `--shard=X/Y` flag
+- Any test framework that supports test splitting
+
+### How It Works
+
+When multiple shards report test results with the same `run_id`:
+
+1. **Total test count is accumulated** - Each shard's `total_tests` value is added to the run
+2. **Suites are appended** - All suites from all shards are collected in the same run document
+3. **Metadata is merged** - Metadata keys from all shards are preserved (last write wins per key)
+4. **Shard count is tracked** - The `shard_count` field tracks how many shards reported
+
+### Example: 3-Shard Playwright Execution
+
+```bash
+# Shard 1
+playwright test --shard=1/3 --reporter=@stanterprise/playwright-reporter
+
+# Shard 2
+playwright test --shard=2/3 --reporter=@stanterprise/playwright-reporter
+
+# Shard 3
+playwright test --shard=3/3 --reporter=@stanterprise/playwright-reporter
+```
+
+**Result in Observer:**
+
+```javascript
+{
+  "run_id": "ci-run-123",
+  "total_tests": 150,        // Sum: 50 + 50 + 50
+  "shard_count": 3,          // Three shards reported
+  "suites": [                // Suites from all shards
+    { "id": "suite-1-shard-1", ... },
+    { "id": "suite-2-shard-1", ... },
+    { "id": "suite-1-shard-2", ... },
+    { "id": "suite-2-shard-2", ... },
+    { "id": "suite-1-shard-3", ... }
+  ],
+  "metadata": {              // Merged metadata from all shards
+    "environment": "ci",
+    "shard_id": "shard-3"    // Last shard's value
+  }
+}
+```
+
+### Metadata Merge Strategy
+
+- Metadata keys are merged at the **key level** (not document level)
+- If multiple shards set the same key, **last write wins**
+- Different keys from different shards are **all preserved**
+- Use unique keys per shard (e.g., `shard_1_browser`, `shard_2_browser`) to avoid conflicts
+
+### CI/CD Integration
+
+GitHub Actions example with 3 shards:
+
+```yaml
+test:
+  strategy:
+    matrix:
+      shard: [1, 2, 3]
+  steps:
+    - name: Run tests
+      env:
+        RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      run: |
+        playwright test --shard=${{ matrix.shard }}/3
+```
+
+All shards will report to the same `run_id`, and Observer will accumulate the results.
 
 ## Database Backends
 

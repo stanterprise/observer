@@ -195,7 +195,89 @@ Integration tests validate the architecture:
    - Test in nested suite
    - Verifies nesting limitation
 
-Both tests use testcontainers to provide isolated MongoDB and NATS environments.
+3. **TestShardedExecution_MultipleRunStarts**: Validates sharded test execution
+   - Multiple run start events with same `run_id`
+   - Total test count accumulation across shards
+   - Suite accumulation from all shards
+   - Metadata merge strategy
+   - Shard count tracking
+
+All tests use testcontainers to provide isolated MongoDB and NATS environments.
+
+## Sharded Test Execution Support
+
+The repository supports **sharded test execution** where multiple test runners report results for the same `run_id`. This is implemented through:
+
+### Accumulative Operations
+
+The `MapSuites` method uses MongoDB's `$inc` operator for accumulative fields:
+
+```go
+// Accumulate total_tests from all shards
+if totalTests > 0 {
+    runUpdate["$inc"].(bson.M)["total_tests"] = totalTests
+    runUpdate["$inc"].(bson.M)["shard_count"] = 1
+}
+```
+
+### Metadata Merge Strategy
+
+Metadata is merged at the **key level** rather than document level:
+
+```go
+// Merge metadata at key level to preserve values from all shards
+if len(metadata) > 0 {
+    for k, v := range metadata {
+        runUpdate["$set"].(bson.M)[fmt.Sprintf("metadata.%s", k)] = v
+    }
+}
+```
+
+This allows:
+- Different shards to set different metadata keys
+- Last write wins for conflicting keys
+- Preservation of all unique metadata across shards
+
+### Suite Accumulation
+
+Suites from all shards are appended to the run document:
+
+```go
+// Append suites from all shards
+update := bson.M{
+    "$push": bson.M{"suites": bson.M{"$each": suites}},
+}
+```
+
+### Idempotent Run Start
+
+The architecture supports multiple `ReportRunStart` events with the same `run_id`:
+
+- First call creates the document via `ensureDocumentExists`
+- Subsequent calls update and accumulate values
+- All operations are idempotent (safe for replay)
+- Event classifier marks all run starts as immediate (no buffering needed)
+
+### Tracking Fields
+
+The `TestRunDocument` includes fields for sharding awareness:
+
+```go
+type TestRunDocument struct {
+    // ... other fields ...
+    TotalTests  int32  `bson:"total_tests,omitempty"`   // Accumulated across shards
+    ShardCount  int32  `bson:"shard_count,omitempty"`   // Number of shards that reported
+}
+```
+
+### Use Cases
+
+Sharded execution is designed for:
+
+- **Parallel CI/CD**: Multiple workers executing tests concurrently
+- **Playwright sharding**: `playwright test --shard=X/Y`
+- **Distributed test runners**: Any framework supporting test splitting
+- **Container orchestration**: Kubernetes jobs with multiple pods
 
 ## Future Considerations
 
