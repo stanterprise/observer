@@ -362,3 +362,174 @@ func (r *MongoRepository) GetUniqueMarkers(ctx context.Context) ([]*MarkerInfo, 
 
 	return markers, nil
 }
+
+// DeleteTestRun deletes a test run document by ID
+func (r *MongoRepository) DeleteTestRun(ctx context.Context, runID string) error {
+	if err := ValidateRunID(runID); err != nil {
+		return err
+	}
+
+	result, err := r.collection.DeleteOne(ctx, bson.M{"_id": runID})
+	if err != nil {
+		return fmt.Errorf("delete test run: %w", err)
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("test run not found: %s", runID)
+	}
+
+	r.logger.Info("test run deleted", "runID", runID)
+	return nil
+}
+
+// DeleteTestRuns deletes multiple test run documents by IDs
+func (r *MongoRepository) DeleteTestRuns(ctx context.Context, runIDs []string) (int64, error) {
+	if len(runIDs) == 0 {
+		return 0, nil
+	}
+
+	// Validate all run IDs
+	for _, runID := range runIDs {
+		if err := ValidateRunID(runID); err != nil {
+			return 0, fmt.Errorf("invalid runID %s: %w", runID, err)
+		}
+	}
+
+	result, err := r.collection.DeleteMany(ctx, bson.M{"_id": bson.M{"$in": runIDs}})
+	if err != nil {
+		return 0, fmt.Errorf("delete test runs: %w", err)
+	}
+
+	r.logger.Info("test runs deleted", "count", result.DeletedCount, "requested", len(runIDs))
+	return result.DeletedCount, nil
+}
+
+// UpdateRunMarker updates or sets the MARKER metadata field for a test run
+func (r *MongoRepository) UpdateRunMarker(ctx context.Context, runID string, markerValue string) error {
+	if err := ValidateRunID(runID); err != nil {
+		return err
+	}
+
+	if markerValue == "" {
+		return fmt.Errorf("marker value cannot be empty")
+	}
+
+	now := time.Now()
+	filter := bson.M{"_id": runID}
+	update := bson.M{
+		"$set": bson.M{
+			"metadata.MARKER": markerValue,
+			"updated_at":      now,
+		},
+	}
+
+	result, err := r.collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("update run marker: %w", err)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("test run not found: %s", runID)
+	}
+
+	r.logger.Info("run marker updated", "runID", runID, "marker", markerValue)
+	return nil
+}
+
+// RemoveRunMarker removes the MARKER metadata field from a test run
+func (r *MongoRepository) RemoveRunMarker(ctx context.Context, runID string) error {
+	if err := ValidateRunID(runID); err != nil {
+		return err
+	}
+
+	now := time.Now()
+	filter := bson.M{"_id": runID}
+	update := bson.M{
+		"$unset": bson.M{
+			"metadata.MARKER": "",
+		},
+		"$set": bson.M{
+			"updated_at": now,
+		},
+	}
+
+	result, err := r.collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("remove run marker: %w", err)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("test run not found: %s", runID)
+	}
+
+	r.logger.Info("run marker removed", "runID", runID)
+	return nil
+}
+
+// UpdateRunsMarker updates or sets the MARKER metadata field for multiple test runs
+func (r *MongoRepository) UpdateRunsMarker(ctx context.Context, runIDs []string, markerValue string) (int64, error) {
+	if len(runIDs) == 0 {
+		return 0, nil
+	}
+
+	if markerValue == "" {
+		return 0, fmt.Errorf("marker value cannot be empty")
+	}
+
+	// Validate all run IDs
+	for _, runID := range runIDs {
+		if err := ValidateRunID(runID); err != nil {
+			return 0, fmt.Errorf("invalid runID %s: %w", runID, err)
+		}
+	}
+
+	now := time.Now()
+	filter := bson.M{"_id": bson.M{"$in": runIDs}}
+	update := bson.M{
+		"$set": bson.M{
+			"metadata.MARKER": markerValue,
+			"updated_at":      now,
+		},
+	}
+
+	result, err := r.collection.UpdateMany(ctx, filter, update)
+	if err != nil {
+		return 0, fmt.Errorf("update runs marker: %w", err)
+	}
+
+	r.logger.Info("runs marker updated", "count", result.ModifiedCount, "requested", len(runIDs), "marker", markerValue)
+	return result.ModifiedCount, nil
+}
+
+// RemoveRunsMarker removes the MARKER metadata field from multiple test runs
+func (r *MongoRepository) RemoveRunsMarker(ctx context.Context, runIDs []string) (int64, error) {
+	if len(runIDs) == 0 {
+		return 0, nil
+	}
+
+	// Validate all run IDs
+	for _, runID := range runIDs {
+		if err := ValidateRunID(runID); err != nil {
+			return 0, fmt.Errorf("invalid runID %s: %w", runID, err)
+		}
+	}
+
+	now := time.Now()
+	filter := bson.M{"_id": bson.M{"$in": runIDs}}
+	update := bson.M{
+		"$unset": bson.M{
+			"metadata.MARKER": "",
+		},
+		"$set": bson.M{
+			"updated_at": now,
+		},
+	}
+
+	result, err := r.collection.UpdateMany(ctx, filter, update)
+	if err != nil {
+		return 0, fmt.Errorf("remove runs marker: %w", err)
+	}
+
+	r.logger.Info("runs marker removed", "count", result.ModifiedCount, "requested", len(runIDs))
+	return result.ModifiedCount, nil
+}

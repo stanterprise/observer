@@ -36,8 +36,10 @@ func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/runs", h.handleRuns)
 	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
-	mux.HandleFunc("/api/markers", h.handleMarkers)        // Handles GET /api/markers - list all unique markers
-	mux.HandleFunc("/api/marker/", h.handleMarkerStats) // Handles /api/marker/{markerValue}/stats
+	mux.HandleFunc("/api/runs/delete", h.handleDeleteRuns)      // Handles DELETE /api/runs/delete - delete multiple runs
+	mux.HandleFunc("/api/runs/marker", h.handleUpdateMarker)    // Handles PUT /api/runs/marker - update marker for runs
+	mux.HandleFunc("/api/markers", h.handleMarkers)             // Handles GET /api/markers - list all unique markers
+	mux.HandleFunc("/api/marker/", h.handleMarkerStats)         // Handles /api/marker/{markerValue}/stats
 }
 
 // handleTestsWithTrends handles both /api/tests and /api/tests/{testId}/trends
@@ -674,6 +676,107 @@ func (h *MongoHandler) handleMarkerStats(w http.ResponseWriter, r *http.Request)
 		"runs":   runStats,
 		"total":  total,
 		"count":  len(runStats),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleDeleteRuns handles DELETE /api/runs/delete - delete multiple test runs
+func (h *MongoHandler) handleDeleteRuns(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		RunIDs []string `json:"runIds"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("failed to decode delete request", "error", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.RunIDs) == 0 {
+		http.Error(w, "No run IDs provided", http.StatusBadRequest)
+		return
+	}
+
+	// Delete test runs
+	deletedCount, err := h.repo.DeleteTestRuns(r.Context(), req.RunIDs)
+	if err != nil {
+		h.logger.Error("failed to delete test runs", "runIds", req.RunIDs, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"deleted":   deletedCount,
+		"requested": len(req.RunIDs),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleUpdateMarker handles PUT /api/runs/marker - update or remove marker for test runs
+func (h *MongoHandler) handleUpdateMarker(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		RunIDs []string `json:"runIds"`
+		Marker *string  `json:"marker"` // Use pointer to distinguish between "" and null
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("failed to decode marker update request", "error", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.RunIDs) == 0 {
+		http.Error(w, "No run IDs provided", http.StatusBadRequest)
+		return
+	}
+
+	var modifiedCount int64
+	var err error
+
+	// If marker is nil, remove the marker; if empty string, also remove; otherwise update
+	if req.Marker == nil || *req.Marker == "" {
+		// Remove marker
+		modifiedCount, err = h.repo.RemoveRunsMarker(r.Context(), req.RunIDs)
+		if err != nil {
+			h.logger.Error("failed to remove marker from runs", "runIds", req.RunIDs, "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// Update marker
+		modifiedCount, err = h.repo.UpdateRunsMarker(r.Context(), req.RunIDs, *req.Marker)
+		if err != nil {
+			h.logger.Error("failed to update marker for runs", "runIds", req.RunIDs, "marker", *req.Marker, "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	response := map[string]interface{}{
+		"modified":  modifiedCount,
+		"requested": len(req.RunIDs),
+	}
+
+	if req.Marker != nil && *req.Marker != "" {
+		response["marker"] = *req.Marker
+	} else {
+		response["action"] = "removed"
 	}
 
 	w.Header().Set("Content-Type", "application/json")

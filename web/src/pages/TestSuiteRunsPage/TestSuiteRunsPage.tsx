@@ -16,6 +16,10 @@ import {
   CircleDashed,
   Clock,
   ArrowUpDown,
+  Trash2,
+  AlertCircle,
+  Tag,
+  X,
 } from "lucide-react";
 
 import type { TestRun } from "@/types/testRun";
@@ -35,6 +39,12 @@ export function TestSuiteRunsPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [selectedRuns, setSelectedRuns] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showMarkerDialog, setShowMarkerDialog] = useState(false);
+  const [markerValue, setMarkerValue] = useState("");
+  const [updatingMarker, setUpdatingMarker] = useState(false);
 
   const fetchRuns = useCallback(async () => {
     try {
@@ -93,6 +103,133 @@ export function TestSuiteRunsPage({
     fetchRuns();
   }, [fetchRuns]);
 
+  const toggleRunSelection = (runId: string) => {
+    setSelectedRuns((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(runId)) {
+        newSet.delete(runId);
+      } else {
+        newSet.add(runId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedRuns.size === runs.length) {
+      setSelectedRuns(new Set());
+    } else {
+      setSelectedRuns(new Set(runs.map((run) => run.id)));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedRuns.size === 0) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(apiUrl("/runs/delete"), {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          runIds: Array.from(selectedRuns),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete runs: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`Deleted ${data.deleted} of ${data.requested} runs`);
+
+      // Remove deleted runs from the list
+      setRuns((prev) => prev.filter((run) => !selectedRuns.has(run.id)));
+      setSelectedRuns(new Set());
+      setShowDeleteConfirm(false);
+      setError(null);
+    } catch (err) {
+      console.error("Error deleting runs:", err);
+      setError(err instanceof Error ? err.message : "Failed to delete runs");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleUpdateMarker = async (marker: string | null) => {
+    if (selectedRuns.size === 0) return;
+
+    setUpdatingMarker(true);
+    try {
+      const response = await fetch(apiUrl("/runs/marker"), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          runIds: Array.from(selectedRuns),
+          marker: marker,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update marker: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`Updated marker for ${data.modified} of ${data.requested} runs`);
+
+      // Update runs in the list with new marker
+      setRuns((prev) =>
+        prev.map((run) => {
+          if (selectedRuns.has(run.id)) {
+            return {
+              ...run,
+              metadata: {
+                ...run.metadata,
+                MARKER: marker || undefined,
+              },
+            };
+          }
+          return run;
+        })
+      );
+
+      setSelectedRuns(new Set());
+      setShowMarkerDialog(false);
+      setMarkerValue("");
+      setError(null);
+    } catch (err) {
+      console.error("Error updating marker:", err);
+      setError(err instanceof Error ? err.message : "Failed to update marker");
+    } finally {
+      setUpdatingMarker(false);
+    }
+  };
+
+  const handleSetMarker = () => {
+    setShowMarkerDialog(true);
+    // Pre-fill with existing marker if all selected runs have the same marker
+    const selectedRunsList = runs.filter((run) => selectedRuns.has(run.id));
+    if (selectedRunsList.length > 0) {
+      const firstMarker = selectedRunsList[0].metadata?.MARKER as string | undefined;
+      const allSame = selectedRunsList.every(
+        (run) => run.metadata?.MARKER === firstMarker
+      );
+      if (allSame && firstMarker) {
+        setMarkerValue(firstMarker);
+      } else {
+        setMarkerValue("");
+      }
+    }
+  };
+
+  const handleRemoveMarker = async () => {
+    await handleUpdateMarker(null);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -124,13 +261,177 @@ export function TestSuiteRunsPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Test Suite Runs</h1>
-        <button
-          onClick={fetchRuns}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          {selectedRuns.size > 0 && (
+            <>
+              <button
+                onClick={handleSetMarker}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                disabled={updatingMarker}
+              >
+                <Tag className="h-4 w-4" />
+                Set Marker
+              </button>
+              <button
+                onClick={handleRemoveMarker}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors flex items-center gap-2"
+                disabled={updatingMarker}
+              >
+                <X className="h-4 w-4" />
+                Remove Marker
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
+                disabled={deleting}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete ({selectedRuns.size})
+              </button>
+            </>
+          )}
+          <button
+            onClick={fetchRuns}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-2 text-red-800">
+              <AlertCircle className="h-5 w-5" />
+              <span>{error}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="max-w-md w-full mx-4">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Delete Test Runs
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Are you sure you want to delete {selectedRuns.size} test run
+                    {selectedRuns.size !== 1 ? "s" : ""}? This action cannot be
+                    undone.
+                  </p>
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                      disabled={deleting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDeleteSelected}
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
+                      disabled={deleting}
+                    >
+                      {deleting ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Marker Dialog */}
+      {showMarkerDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="max-w-md w-full mx-4">
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <Tag className="h-6 w-6 text-indigo-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Set Marker for Test Runs
+                    </h3>
+                    <p className="text-gray-600 mb-4">
+                      Set a marker for {selectedRuns.size} test run
+                      {selectedRuns.size !== 1 ? "s" : ""}. Markers help organize and filter runs.
+                    </p>
+                    <div className="mb-4">
+                      <label
+                        htmlFor="marker-input"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
+                        Marker Value
+                      </label>
+                      <input
+                        id="marker-input"
+                        type="text"
+                        value={markerValue}
+                        onChange={(e) => setMarkerValue(e.target.value)}
+                        placeholder="e.g., release-1.0, nightly, staging"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        disabled={updatingMarker}
+                      />
+                    </div>
+                    <div className="flex gap-3 justify-end">
+                      <button
+                        onClick={() => {
+                          setShowMarkerDialog(false);
+                          setMarkerValue("");
+                        }}
+                        className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                        disabled={updatingMarker}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleUpdateMarker(markerValue || null)}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                        disabled={updatingMarker || !markerValue.trim()}
+                      >
+                        {updatingMarker ? (
+                          <>
+                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <Tag className="h-4 w-4" />
+                            Set Marker
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {runs.length === 0 ? (
         <Card>
@@ -155,9 +456,30 @@ export function TestSuiteRunsPage({
                   <tr>
                     <th
                       scope="col"
+                      className="px-6 py-3 text-left"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={runs.length > 0 && selectedRuns.size === runs.length}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                        aria-label="Select all runs"
+                      />
+                    </th>
+                    <th
+                      scope="col"
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
                       Run Name
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      <div className="flex items-center">
+                        <Tag className="h-4 w-4 mr-1 text-indigo-600" />
+                        Marker
+                      </div>
                     </th>
                     <th
                       scope="col"
@@ -226,12 +548,36 @@ export function TestSuiteRunsPage({
                       className="hover:bg-gray-50 transition-colors"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedRuns.has(run.id)}
+                          onChange={() => toggleRunSelection(run.id)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                          aria-label={`Select ${run.name || run.id}`}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <Link
                           to={`/suite_runs/${run.id}`}
                           className="text-blue-600 hover:text-blue-800 font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
                         >
                           {run.name || run.id}
                         </Link>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {run.metadata?.MARKER ? (
+                          <Link
+                            to={`/marker/${encodeURIComponent(
+                              run.metadata.MARKER as string
+                            )}/stats`}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 hover:bg-indigo-200 transition-colors"
+                          >
+                            <Tag className="h-3 w-3 mr-1" />
+                            {run.metadata.MARKER as string}
+                          </Link>
+                        ) : (
+                          <span className="text-gray-400 text-sm italic">No marker</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge status={getRunStatus(run)} />
