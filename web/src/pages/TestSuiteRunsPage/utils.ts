@@ -5,18 +5,50 @@ import type { TestSuite } from "@/types/testSuite";
 
 export function assembleSuiteHierarchy(
   suites: TestSuite[],
-  tests: Test[]
+  tests: Test[],
 ): TestSuite {
-  const tempSuites = suites;
-  const rootSuite = suites.find((suite) => !suite.parentSuiteId)!;
+  // Deduplicate suites by ID - if there are multiple suites with the same ID,
+  // merge their testCaseIds arrays to avoid duplicate rendering
+  const suiteMap = new Map<string, TestSuite>();
 
-  return buildSuiteTree(rootSuite, tempSuites, tests);
+  for (const suite of suites) {
+    if (suiteMap.has(suite.id)) {
+      // Merge testCaseIds if the suite already exists
+      const existing = suiteMap.get(suite.id)!;
+      if (suite.testCaseIds && existing.testCaseIds) {
+        // Deduplicate testCaseIds
+        const mergedIds = new Set([
+          ...existing.testCaseIds,
+          ...suite.testCaseIds,
+        ]);
+        existing.testCaseIds = Array.from(mergedIds);
+      } else if (suite.testCaseIds && !existing.testCaseIds) {
+        // If existing has no testCaseIds yet, copy from the duplicate suite
+        existing.testCaseIds = suite.testCaseIds;
+      }
+    } else {
+      suiteMap.set(suite.id, { ...suite });
+    }
+  }
+
+  const dedupedSuites = Array.from(suiteMap.values());
+
+  // Log deduplication stats
+  if (suites.length !== dedupedSuites.length) {
+    console.log(
+      `[assembleSuiteHierarchy] Deduplicated ${suites.length} suites to ${dedupedSuites.length}`,
+    );
+  }
+
+  const rootSuite = dedupedSuites.find((suite) => !suite.parentSuiteId)!;
+
+  return buildSuiteTree(rootSuite, dedupedSuites, tests);
 }
 
 function buildSuiteTree(
   suite: TestSuite,
   allSuites: TestSuite[],
-  allTests: Test[]
+  allTests: Test[],
 ): TestSuite {
   const children = allSuites.filter((s) => s.parentSuiteId === suite.id);
   const tests = allTests.filter((t) => t.suiteId === suite.id);

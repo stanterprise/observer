@@ -404,6 +404,43 @@ func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Deduplicate suites by ID (defensive measure for data integrity issues)
+	seenSuites := make(map[string]*m.SuiteDocument)
+	uniqueSuites := make([]*m.SuiteDocument, 0, len(doc.Suites))
+	for _, suite := range doc.Suites {
+		if _, exists := seenSuites[suite.ID]; !exists {
+			seenSuites[suite.ID] = suite
+			uniqueSuites = append(uniqueSuites, suite)
+		} else {
+			// Merge testCaseIds from duplicate suites
+			existing := seenSuites[suite.ID]
+			if suite.TestCaseIds != nil && len(suite.TestCaseIds) > 0 {
+				if existing.TestCaseIds == nil {
+					existing.TestCaseIds = suite.TestCaseIds
+				} else {
+					// Deduplicate testCaseIds
+					testCaseIdSet := make(map[string]bool)
+					for _, id := range existing.TestCaseIds {
+						testCaseIdSet[id] = true
+					}
+					for _, id := range suite.TestCaseIds {
+						if !testCaseIdSet[id] {
+							existing.TestCaseIds = append(existing.TestCaseIds, id)
+							testCaseIdSet[id] = true
+						}
+					}
+				}
+			}
+		}
+	}
+	if len(uniqueSuites) < len(doc.Suites) {
+		h.logger.Warn("deduplicated suites in API response",
+			"run_id", runID,
+			"original_count", len(doc.Suites),
+			"unique_count", len(uniqueSuites))
+	}
+	doc.Suites = uniqueSuites
+
 	// Collect all tests (from root and nested suites)
 	var allTests []*m.TestDocument
 	allTests = append(allTests, doc.Tests...)
