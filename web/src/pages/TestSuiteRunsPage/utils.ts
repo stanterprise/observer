@@ -22,6 +22,9 @@ export function assembleSuiteHierarchy(
           ...suite.testCaseIds,
         ]);
         existing.testCaseIds = Array.from(mergedIds);
+      } else if (suite.testCaseIds && !existing.testCaseIds) {
+        // If existing has no testCaseIds yet, copy from the duplicate suite
+        existing.testCaseIds = suite.testCaseIds;
       }
     } else {
       suiteMap.set(suite.id, { ...suite });
