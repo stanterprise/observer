@@ -220,7 +220,7 @@ export function TestRunDetailPage() {
     };
 
     return filterSuite(rootSuite);
-  }, [rootSuite, searchText, selectedStatuses, selectedTags]);
+  }, [rootSuite, hasActiveFilters, searchText, selectedStatuses, selectedTags]);
 
   // Count filtered tests
   const filteredTestCount = useMemo(() => {
