@@ -36,15 +36,17 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 		"status", status)
 
 	// Step 1: Update the current attempt's status, end_time, and duration
+	// CRITICAL: Use array filters to match retry_index field, NOT positional indexing
+	// Positional indexing (attempts.%d) can update the wrong attempt if they're out of order
 	attemptSetFields := bson.M{
-		fmt.Sprintf("tests.$[test].attempts.%d.status", retryIndex):     status,
-		fmt.Sprintf("tests.$[test].attempts.%d.updated_at", retryIndex): now,
+		"tests.$[test].attempts.$[attempt].status":     status,
+		"tests.$[test].attempts.$[attempt].updated_at": now,
 	}
 	if endTime != nil {
-		attemptSetFields[fmt.Sprintf("tests.$[test].attempts.%d.end_time", retryIndex)] = endTime
+		attemptSetFields["tests.$[test].attempts.$[attempt].end_time"] = endTime
 	}
 	if duration != nil {
-		attemptSetFields[fmt.Sprintf("tests.$[test].attempts.%d.duration", retryIndex)] = duration
+		attemptSetFields["tests.$[test].attempts.$[attempt].duration"] = duration
 	}
 
 	filter := bson.M{
@@ -56,6 +58,7 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
 			bson.M{"test.id": testID},
+			bson.M{"attempt.retry_index": retryIndex},
 		},
 	})
 
@@ -124,7 +127,14 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 	setFields["tests.$[test].updated_at"] = now
 
 	// Update test in root-level tests array with aggregated status
-	result, err := r.collection.UpdateOne(ctx, filter, bson.M{"$set": setFields}, arrayFilters)
+	// Only need test filter here (not attempt filter) since we're updating test-level fields
+	testLevelArrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{"test.id": testID},
+		},
+	})
+
+	result, err := r.collection.UpdateOne(ctx, filter, bson.M{"$set": setFields}, testLevelArrayFilters)
 	if err != nil {
 		return fmt.Errorf("update test end: %w", err)
 	}
