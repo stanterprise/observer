@@ -166,7 +166,8 @@ export function TestRunDetailPage() {
     if (!hasActiveFilters) return rootSuite;
 
     // Helper to check if a test matches all filters
-    const testMatchesFilters = (test: any): boolean => {
+    type SuiteTest = NonNullable<TestSuite["tests"]>[number];
+    const testMatchesFilters = (test: SuiteTest): boolean => {
       // Search text filter
       if (searchText.trim() !== "") {
         const search = searchText.toLowerCase();
