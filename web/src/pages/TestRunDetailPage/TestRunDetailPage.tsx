@@ -452,12 +452,6 @@ export function TestRunDetailPage() {
     overallStatus,
   );
 
-  const rootSuite = assembleSuiteHierarchy(
-    runDetail.suites || [],
-    runDetail.tests!,
-  );
-  console.log("Assembled suite hierarchy:", rootSuite);
-
   const toggleSuiteType = (type: string) => {
     setHiddenSuiteTypes((prev) => {
       const newSet = new Set(prev);
