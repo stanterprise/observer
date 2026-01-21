@@ -156,13 +156,22 @@ export function TestRunDetailPage() {
     return Array.from(tagSet).sort();
   }, [runDetail?.tests]);
 
-  // Filter tests based on current filters
-  const filteredSuite = useMemo(() => {
-    const hasActiveFilters =
+  // Check if any filters are currently active
+  const hasActiveFilters = useMemo(() => {
+    return (
       searchText.trim() !== "" ||
       selectedStatuses.size > 0 ||
-      selectedTags.size > 0;
+      selectedTags.size > 0
+    );
+  }, [searchText, selectedStatuses, selectedTags]);
 
+  // Filter tests based on current filters
+  // Note: This filtering modifies the suite hierarchy structure for display purposes only.
+  // When WebSocket events update a test that's currently filtered out, the test will still
+  // be updated in runDetail.tests (the source data), but won't appear in filteredSuite
+  // until the filters are changed to include it. This ensures real-time updates are never
+  // lost while maintaining accurate filtered views.
+  const filteredSuite = useMemo(() => {
     if (!hasActiveFilters) return rootSuite;
 
     // Helper to check if a test matches all filters
@@ -211,17 +220,12 @@ export function TestRunDetailPage() {
     };
 
     return filterSuite(rootSuite);
-  }, [rootSuite, searchText, selectedStatuses, selectedTags]);
+  }, [rootSuite, hasActiveFilters, searchText, selectedStatuses, selectedTags]);
 
   // Count filtered tests
   const filteredTestCount = useMemo(() => {
     return countTests([filteredSuite]);
   }, [filteredSuite, countTests]);
-
-  const hasActiveFilters =
-    searchText.trim() !== "" ||
-    selectedStatuses.size > 0 ||
-    selectedTags.size > 0;
 
   // Handle WebSocket events to update test statuses locally
   function updateTestFromEvent(event: WebSocketEvent) {
@@ -620,6 +624,9 @@ export function TestRunDetailPage() {
                       "BROKEN",
                       "TIMEDOUT",
                       "INTERRUPTED",
+                      "PENDING",
+                      "UNKNOWN",
+                      "NOT_RUN",
                     ] as TestStatus[]
                   ).map((status) => {
                     const isSelected = selectedStatuses.has(status);
@@ -645,6 +652,15 @@ export function TestRunDetailPage() {
                       INTERRUPTED: isSelected
                         ? "bg-yellow-100 border-yellow-300 text-yellow-800"
                         : "bg-white border-yellow-200 text-yellow-600 hover:bg-yellow-50",
+                      PENDING: isSelected
+                        ? "bg-amber-100 border-amber-300 text-amber-800"
+                        : "bg-white border-amber-200 text-amber-600 hover:bg-amber-50",
+                      UNKNOWN: isSelected
+                        ? "bg-slate-100 border-slate-300 text-slate-800"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50",
+                      NOT_RUN: isSelected
+                        ? "bg-zinc-100 border-zinc-300 text-zinc-800"
+                        : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50",
                     };
                     return (
                       <button
