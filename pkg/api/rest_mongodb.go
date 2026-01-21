@@ -36,10 +36,10 @@ func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/runs", h.handleRuns)
 	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
-	mux.HandleFunc("/api/runs/delete", h.handleDeleteRuns)      // Handles DELETE /api/runs/delete - delete multiple runs
-	mux.HandleFunc("/api/runs/marker", h.handleUpdateMarker)    // Handles PUT /api/runs/marker - update marker for runs
-	mux.HandleFunc("/api/markers", h.handleMarkers)             // Handles GET /api/markers - list all unique markers
-	mux.HandleFunc("/api/marker/", h.handleMarkerStats)         // Handles /api/marker/{markerValue}/stats
+	mux.HandleFunc("/api/runs/delete", h.handleDeleteRuns)   // Handles DELETE /api/runs/delete - delete multiple runs
+	mux.HandleFunc("/api/runs/marker", h.handleUpdateMarker) // Handles PUT /api/runs/marker - update marker for runs
+	mux.HandleFunc("/api/markers", h.handleMarkers)          // Handles GET /api/markers - list all unique markers
+	mux.HandleFunc("/api/marker/", h.handleMarkerStats)      // Handles /api/marker/{markerValue}/stats
 }
 
 // handleTestsWithTrends handles both /api/tests and /api/tests/{testId}/trends
@@ -50,19 +50,19 @@ func (h *MongoHandler) handleTestsWithTrends(w http.ResponseWriter, r *http.Requ
 	}
 
 	path := strings.TrimPrefix(r.URL.Path, "/api/tests")
-	
+
 	// Route to trends endpoint if path matches /{testId}/trends
 	if path != "" && path != "/" && strings.HasSuffix(path, "/trends") {
 		h.handleTestTrends(w, r)
 		return
 	}
-	
+
 	// Route to list tests endpoint for /api/tests or /api/tests/
 	if path == "" || path == "/" {
 		h.handleTests(w, r)
 		return
 	}
-	
+
 	// Unknown path pattern
 	http.Error(w, "Not found", http.StatusNotFound)
 }
@@ -404,6 +404,43 @@ func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Deduplicate suites by ID (defensive measure for data integrity issues)
+	seenSuites := make(map[string]*m.SuiteDocument)
+	uniqueSuites := make([]*m.SuiteDocument, 0, len(doc.Suites))
+	for _, suite := range doc.Suites {
+		if _, exists := seenSuites[suite.ID]; !exists {
+			seenSuites[suite.ID] = suite
+			uniqueSuites = append(uniqueSuites, suite)
+		} else {
+			// Merge testCaseIds from duplicate suites
+			existing := seenSuites[suite.ID]
+			if suite.TestCaseIds != nil && len(suite.TestCaseIds) > 0 {
+				if existing.TestCaseIds == nil {
+					existing.TestCaseIds = suite.TestCaseIds
+				} else {
+					// Deduplicate testCaseIds
+					testCaseIdSet := make(map[string]bool)
+					for _, id := range existing.TestCaseIds {
+						testCaseIdSet[id] = true
+					}
+					for _, id := range suite.TestCaseIds {
+						if !testCaseIdSet[id] {
+							existing.TestCaseIds = append(existing.TestCaseIds, id)
+							testCaseIdSet[id] = true
+						}
+					}
+				}
+			}
+		}
+	}
+	if len(uniqueSuites) < len(doc.Suites) {
+		h.logger.Warn("deduplicated suites in API response",
+			"run_id", runID,
+			"original_count", len(doc.Suites),
+			"unique_count", len(uniqueSuites))
+	}
+	doc.Suites = uniqueSuites
+
 	// Collect all tests (from root and nested suites)
 	var allTests []*m.TestDocument
 	allTests = append(allTests, doc.Tests...)
@@ -489,7 +526,7 @@ func (h *MongoHandler) handleTestTrends(w http.ResponseWriter, r *http.Request) 
 
 	// Extract test ID from URL path: /api/tests/{testId}/trends
 	path := strings.TrimPrefix(r.URL.Path, "/api/tests/")
-	
+
 	// Check if this is a trends request
 	if !strings.HasSuffix(path, "/trends") {
 		http.Error(w, "Not found", http.StatusNotFound)
@@ -565,7 +602,7 @@ func (h *MongoHandler) handleMarkerStats(w http.ResponseWriter, r *http.Request)
 
 	// Extract marker value and check for /stats suffix
 	path := strings.TrimPrefix(r.URL.Path, "/api/marker/")
-	
+
 	// Check if this is a stats request
 	if !strings.HasSuffix(path, "/stats") {
 		http.Error(w, "Not found", http.StatusNotFound)
@@ -693,7 +730,7 @@ func (h *MongoHandler) handleDeleteRuns(w http.ResponseWriter, r *http.Request) 
 	var req struct {
 		RunIDs []string `json:"runIds"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("failed to decode delete request", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -734,7 +771,7 @@ func (h *MongoHandler) handleUpdateMarker(w http.ResponseWriter, r *http.Request
 		RunIDs []string `json:"runIds"`
 		Marker *string  `json:"marker"` // Use pointer to distinguish between "" and null
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("failed to decode marker update request", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)

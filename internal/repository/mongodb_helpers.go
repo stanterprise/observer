@@ -52,9 +52,8 @@ func (r *MongoRepository) AppendTestFailure(ctx context.Context, runID, testID s
 	}
 
 	now := time.Now()
-	// Target attempts[retry_index].failures using literal index notation
-	failuresPath := fmt.Sprintf("tests.$[test].attempts.%d.failures", retryIndex)
-
+	// CRITICAL: Use array filters to match retry_index field, NOT positional indexing
+	// Positional indexing can update the wrong attempt if they're out of order
 	filter := bson.M{
 		"_id":      runID,
 		"tests.id": testID,
@@ -62,7 +61,7 @@ func (r *MongoRepository) AppendTestFailure(ctx context.Context, runID, testID s
 
 	update := bson.M{
 		"$push": bson.M{
-			failuresPath: failure,
+			"tests.$[test].attempts.$[attempt].failures": failure,
 		},
 		"$set": bson.M{
 			"updated_at": now,
@@ -71,6 +70,7 @@ func (r *MongoRepository) AppendTestFailure(ctx context.Context, runID, testID s
 
 	arrayFilters := []interface{}{
 		bson.M{"test.id": testID},
+		bson.M{"attempt.retry_index": retryIndex},
 	}
 
 	opts := options.Update().SetArrayFilters(options.ArrayFilters{Filters: arrayFilters})
@@ -89,9 +89,8 @@ func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID str
 	}
 
 	now := time.Now()
-	// Target attempts[retry_index].errors using literal index notation
-	errorsPath := fmt.Sprintf("tests.$[test].attempts.%d.errors", retryIndex)
-
+	// CRITICAL: Use array filters to match retry_index field, NOT positional indexing
+	// Positional indexing can update the wrong attempt if they're out of order
 	filter := bson.M{
 		"_id":      runID,
 		"tests.id": testID,
@@ -99,7 +98,7 @@ func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID str
 
 	update := bson.M{
 		"$push": bson.M{
-			errorsPath: errorDoc,
+			"tests.$[test].attempts.$[attempt].errors": errorDoc,
 		},
 		"$set": bson.M{
 			"updated_at": now,
@@ -108,6 +107,7 @@ func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID str
 
 	arrayFilters := []interface{}{
 		bson.M{"test.id": testID},
+		bson.M{"attempt.retry_index": retryIndex},
 	}
 
 	opts := options.Update().SetArrayFilters(options.ArrayFilters{Filters: arrayFilters})
