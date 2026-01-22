@@ -9,14 +9,19 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// UpsertStepEnd updates step end fields (status).
+// UpsertStepEnd updates step end fields (status, metadata, error fields, duration).
 // With attempt-based retries: steps are stored in attempts[retry_index].steps.
 // - runID: Required. Identifies the document (_id).
 // - stepID: Required. Identifies the step to update.
 // - testID: Required. ID of test containing the step.
 // - retry_index: Required. Retry attempt index containing the step.
+// - status: Step status (e.g., PASSED, FAILED).
+// - metadata: Step metadata including error details (error_stack, error_value, error_snippet, error_location).
+// - errorMsg: Single error message.
+// - errors: Array of error messages.
+// - duration: Step duration in nanoseconds.
 // Returns error if runID is empty or step not found.
-func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepID string, testID string, retry_index int32, status string) error {
+func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepID string, testID string, retry_index int32, status string, metadata map[string]interface{}, errorMsg string, errors []string, duration *int64) error {
 	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
@@ -44,6 +49,26 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepI
 
 	if status != "" {
 		setFields["tests.$[test].attempts.$[attempt].steps.$[step].status"] = status
+	}
+
+	// Update metadata (merge with existing metadata)
+	if metadata != nil && len(metadata) > 0 {
+		for k, v := range metadata {
+			setFields[fmt.Sprintf("tests.$[test].attempts.$[attempt].steps.$[step].metadata.%s", k)] = v
+		}
+	}
+
+	// Update error fields
+	if errorMsg != "" {
+		setFields["tests.$[test].attempts.$[attempt].steps.$[step].error"] = errorMsg
+	}
+	if errors != nil && len(errors) > 0 {
+		setFields["tests.$[test].attempts.$[attempt].steps.$[step].errors"] = errors
+	}
+
+	// Update duration
+	if duration != nil {
+		setFields["tests.$[test].attempts.$[attempt].steps.$[step].duration"] = *duration
 	}
 
 	// Update step in attempts[retry_index].steps array

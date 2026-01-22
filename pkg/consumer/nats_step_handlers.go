@@ -101,5 +101,22 @@ func (c *MongoNATSConsumer) handleStepEnd(ctx context.Context, data json.RawMess
 	// Extract retry_index from Step (defaults to 0 if not set)
 	retryIndex := req.Step.RetryIndex
 
-	return c.repo.UpsertStepEnd(ctx, runID, req.Step.Id, testID, retryIndex, mongoStatusToString(req.Step.Status))
+	// Convert metadata (including error metadata from Playwright reporter)
+	metadata := make(map[string]interface{})
+	for k, v := range req.Step.Metadata {
+		metadata[k] = v
+	}
+
+	// Extract error fields
+	errorMsg := req.Step.Error
+	errors := req.Step.Errors
+
+	// Calculate duration if available
+	var duration *int64
+	if req.Step.Duration != nil {
+		nanos := req.Step.Duration.AsDuration().Nanoseconds()
+		duration = &nanos
+	}
+
+	return c.repo.UpsertStepEnd(ctx, runID, req.Step.Id, testID, retryIndex, mongoStatusToString(req.Step.Status), metadata, errorMsg, errors, duration)
 }
