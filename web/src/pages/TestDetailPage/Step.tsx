@@ -19,6 +19,12 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
   const hasError = step.error || (step.errors && step.errors.length > 0);
   const shouldShowError = hasError && (step.status === "FAILED" || step.status === "BROKEN" || step.status === "TIMEDOUT");
 
+  // Extract error metadata from step.metadata
+  const errorStack = step.metadata?.error_stack as string | undefined;
+  const errorSnippet = step.metadata?.error_snippet as string | undefined;
+  const errorLocation = step.metadata?.error_location as string | undefined;
+  const errorValue = step.metadata?.error_value as string | undefined;
+
   // Update local state when global state changes
   useEffect(() => {
     setIsExpanded(globalExpandAll ?? false);
@@ -57,11 +63,57 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
                 </div>
               )}
               {shouldShowError && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded">
-                  <p className="text-sm font-medium text-red-800">Error</p>
-                  <p className="text-sm text-red-700 mt-1 whitespace-pre-wrap break-words">
-                    {step.error || step.errors?.[0] || "Unknown error"}
-                  </p>
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded space-y-2">
+                  <p className="text-sm font-semibold text-red-800">Error</p>
+                  
+                  {/* Error Message */}
+                  <div>
+                    <p className="text-sm text-red-700 whitespace-pre-wrap break-words">
+                      {step.error || step.errors?.[0] || "Unknown error"}
+                    </p>
+                  </div>
+
+                  {/* Error Value (if different from message) */}
+                  {errorValue && errorValue !== step.error && (
+                    <div>
+                      <p className="text-xs font-medium text-red-800 mb-1">Value:</p>
+                      <p className="text-xs text-red-600 whitespace-pre-wrap break-words">
+                        {errorValue}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Error Location */}
+                  {errorLocation && (
+                    <div>
+                      <p className="text-xs font-medium text-red-800 mb-1">Location:</p>
+                      <p className="text-xs text-red-600 font-mono">
+                        {errorLocation}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Code Snippet */}
+                  {errorSnippet && (
+                    <div>
+                      <p className="text-xs font-medium text-red-800 mb-1">Code Snippet:</p>
+                      <pre className="text-xs text-red-600 bg-red-100 p-2 rounded overflow-x-auto">
+                        {errorSnippet}
+                      </pre>
+                    </div>
+                  )}
+
+                  {/* Stack Trace */}
+                  {errorStack && (
+                    <details className="mt-2">
+                      <summary className="text-xs font-medium text-red-800 cursor-pointer hover:text-red-900">
+                        Stack Trace
+                      </summary>
+                      <pre className="text-xs text-red-600 bg-red-100 p-2 rounded overflow-x-auto mt-1 whitespace-pre-wrap">
+                        {errorStack}
+                      </pre>
+                    </details>
+                  )}
                 </div>
               )}
             </div>
