@@ -1,12 +1,10 @@
 import { Card, CardContent } from "@/components/Card";
 import { TagList } from "@/components/TagList";
 import { useState, useEffect } from "react";
-import {
-  ChevronRight,
-  ChevronDown,
-} from "lucide-react";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import type { Step as StepType } from "@/types/testCase";
 import { Badge } from "@/components/Badge";
+import { ansiToHtml } from "@/utils/ansi";
 
 type StepProps = {
   step: StepType;
@@ -17,7 +15,11 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
   const [isExpanded, setIsExpanded] = useState(globalExpandAll ?? false);
   const hasChildren = step.steps && step.steps.length > 0;
   const hasError = step.error || (step.errors && step.errors.length > 0);
-  const shouldShowError = hasError && (step.status === "FAILED" || step.status === "BROKEN" || step.status === "TIMEDOUT");
+  const shouldShowError =
+    hasError &&
+    (step.status === "FAILED" ||
+      step.status === "BROKEN" ||
+      step.status === "TIMEDOUT");
 
   // Extract error metadata from step.metadata
   const errorStack = step.metadata?.error_stack as string | undefined;
@@ -65,28 +67,40 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
               {shouldShowError && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded space-y-2">
                   <p className="text-sm font-semibold text-red-800">Error</p>
-                  
+
                   {/* Error Message */}
                   <div>
-                    <p className="text-sm text-red-700 whitespace-pre-wrap break-words">
-                      {step.error || step.errors?.[0] || "Unknown error"}
-                    </p>
+                    <div
+                      className="text-sm text-red-700 whitespace-pre-wrap break-words"
+                      dangerouslySetInnerHTML={{
+                        __html: ansiToHtml(
+                          step.error || step.errors?.[0] || "Unknown error",
+                        ),
+                      }}
+                    />
                   </div>
 
                   {/* Error Value (if different from message) */}
                   {errorValue && errorValue !== step.error && (
                     <div>
-                      <p className="text-xs font-medium text-red-800 mb-1">Value:</p>
-                      <p className="text-xs text-red-600 whitespace-pre-wrap break-words">
-                        {errorValue}
+                      <p className="text-xs font-medium text-red-800 mb-1">
+                        Value:
                       </p>
+                      <div
+                        className="text-xs text-red-600 whitespace-pre-wrap break-words"
+                        dangerouslySetInnerHTML={{
+                          __html: ansiToHtml(errorValue),
+                        }}
+                      />
                     </div>
                   )}
 
                   {/* Error Location */}
                   {errorLocation && (
                     <div>
-                      <p className="text-xs font-medium text-red-800 mb-1">Location:</p>
+                      <p className="text-xs font-medium text-red-800 mb-1">
+                        Location:
+                      </p>
                       <p className="text-xs text-red-600 font-mono">
                         {errorLocation}
                       </p>
@@ -96,10 +110,15 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
                   {/* Code Snippet */}
                   {errorSnippet && (
                     <div>
-                      <p className="text-xs font-medium text-red-800 mb-1">Code Snippet:</p>
-                      <pre className="text-xs text-red-600 bg-red-100 p-2 rounded overflow-x-auto">
-                        {errorSnippet}
-                      </pre>
+                      <p className="text-xs font-medium text-red-800 mb-1">
+                        Code Snippet:
+                      </p>
+                      <pre
+                        className="text-xs text-red-600 bg-red-100 p-2 rounded overflow-x-auto"
+                        dangerouslySetInnerHTML={{
+                          __html: ansiToHtml(errorSnippet),
+                        }}
+                      />
                     </div>
                   )}
 
@@ -109,9 +128,12 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
                       <summary className="text-xs font-medium text-red-800 cursor-pointer hover:text-red-900">
                         Stack Trace
                       </summary>
-                      <pre className="text-xs text-red-600 bg-red-100 p-2 rounded overflow-x-auto mt-1 whitespace-pre-wrap">
-                        {errorStack}
-                      </pre>
+                      <pre
+                        className="text-xs text-red-600 bg-red-100 p-2 rounded overflow-x-auto mt-1 whitespace-pre-wrap"
+                        dangerouslySetInnerHTML={{
+                          __html: ansiToHtml(errorStack),
+                        }}
+                      />
                     </details>
                   )}
                 </div>
