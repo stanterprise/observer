@@ -19,67 +19,20 @@ import {
   ChevronRight,
 } from "lucide-react";
 import StepContainer from "./StepContainer";
-
-interface StepDetail {
-  id: string;
-  runId?: string;
-  testCaseRunId: string;
-  parentStepId?: string;
-  status: string;
-  category: string;
-  title: string;
-  startTime?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface AttemptDetail {
-  retryIndex: number;
-  steps?: StepDetail[];
-  status?: string;
-  startTime?: string;
-  endTime?: string;
-  duration?: number;
-  errorMessage?: string;
-  stackTrace?: string;
-  errors?: any[];
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface TestDetail {
-  id: string;
-  runId: string;
-  title: string;
-  name?: string;
-  status: string;
-  metadata?: Record<string, unknown>;
-  tags?: string[];
-  duration?: number;
-  retryCount?: number;
-  retryIndex?: number;
-  timeout?: number;
-  createdAt: string;
-  updatedAt: string;
-  steps?: StepDetail[]; // Legacy field
-  attempts?: AttemptDetail[];
-}
+import type { Attempt, Test } from "@/types/testCase";
 
 interface TestDetailResponse {
   runId: string;
-  tests: TestDetail[];
+  tests: Test[];
 }
 
 // Utility function to format duration
-function formatDuration(ms?: number): string {
-  if (!ms) return "N/A";
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = ms / 1000;
-  if (seconds < 60) return `${seconds.toFixed(2)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = (seconds % 60).toFixed(0);
-  return `${minutes}m ${remainingSeconds}s`;
-}
+const formatDuration = (nanoseconds?: number) => {
+  if (!nanoseconds) return "N/A";
+  const milliseconds = nanoseconds / 1000000;
+  if (milliseconds < 1000) return `${milliseconds.toFixed(0)}ms`;
+  return `${(milliseconds / 1000).toFixed(2)}s`;
+};
 
 // Utility function to convert status to TestStatus
 function getTestStatus(status: string | number | undefined): TestStatus {
@@ -113,14 +66,14 @@ function AttemptsAccordion({
   test,
   attempts,
 }: {
-  test: TestDetail;
-  attempts: AttemptDetail[];
+  test: Test;
+  attempts: Attempt[];
 }) {
   const [openAttempt, setOpenAttempt] = useState<number>(
-    test.retryIndex ?? attempts.length - 1
+    test.retryIndex ?? attempts.length - 1,
   );
 
-  const getAttemptStatus = (attempt: AttemptDetail): TestStatus => {
+  const getAttemptStatus = (attempt: Attempt): TestStatus => {
     if (!attempt.status) return "PENDING";
     return getTestStatus(attempt.status);
   };
@@ -283,6 +236,11 @@ function AttemptsAccordion({
                             title: step.title,
                             startedAt: step.startTime || step.createdAt,
                             finishedAt: step.updatedAt,
+                            error: (step as any).error,
+                            errors: (step as any).errors,
+                            metadata: (step as any).metadata,
+                            duration: (step as any).duration,
+                            location: (step as any).location,
                           })),
                         }}
                       />
@@ -352,7 +310,7 @@ export function TestDetailPage() {
     } catch (err) {
       console.error("Error fetching test details:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to fetch test details"
+        err instanceof Error ? err.message : "Failed to fetch test details",
       );
     } finally {
       setLoading(false);
@@ -373,11 +331,11 @@ export function TestDetailPage() {
       try {
         // Safely extract status - handle both string and numeric values (protobuf enums)
         const rawStatus = eventData.testCase?.status || eventData.status;
-        let status = "RUNNING";
+        let status: TestStatus = "RUNNING";
         if (type === "test.end") {
           if (typeof rawStatus === "number") {
             // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
-            const statusMap: Record<number, string> = {
+            const statusMap: Record<number, TestStatus> = {
               0: "UNKNOWN",
               1: "PASSED",
               2: "FAILED",
@@ -386,9 +344,9 @@ export function TestDetailPage() {
               5: "TIMEDOUT",
               6: "INTERRUPTED",
             };
-            status = statusMap[rawStatus] || "UNKNOWN";
+            status = statusMap[rawStatus] || ("UNKNOWN" as TestStatus);
           } else if (typeof rawStatus === "string") {
-            status = rawStatus.toUpperCase();
+            status = rawStatus.toUpperCase() as TestStatus;
           }
         }
 
@@ -401,7 +359,7 @@ export function TestDetailPage() {
                   status: status,
                   updatedAt: new Date().toISOString(),
                 }
-              : t
+              : t,
           ),
         };
       } catch (error) {
@@ -429,11 +387,11 @@ export function TestDetailPage() {
 
           // Safely extract status - handle both string and numeric values (protobuf enums)
           const rawStatus = eventData.status;
-          let status = "RUNNING";
+          let status: TestStatus = "RUNNING";
           if (type === "step.end") {
             if (typeof rawStatus === "number") {
               // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
-              const statusMap: Record<number, string> = {
+              const statusMap: Record<number, TestStatus> = {
                 0: "UNKNOWN",
                 1: "PASSED",
                 2: "FAILED",
@@ -442,9 +400,9 @@ export function TestDetailPage() {
                 5: "TIMEDOUT",
                 6: "INTERRUPTED",
               };
-              status = statusMap[rawStatus] || "UNKNOWN";
+              status = statusMap[rawStatus] || ("UNKNOWN" as TestStatus);
             } else if (typeof rawStatus === "string") {
-              status = rawStatus.toUpperCase();
+              status = rawStatus.toUpperCase() as TestStatus;
             }
           }
 
@@ -456,7 +414,7 @@ export function TestDetailPage() {
           if (currentTest.attempts && currentTest.attempts.length > 0) {
             const updatedAttempts = [...currentTest.attempts];
             const attemptIndex = updatedAttempts.findIndex(
-              (a) => a.retryIndex === retryIndex
+              (a) => a.retryIndex === retryIndex,
             );
 
             if (attemptIndex !== -1) {
@@ -625,13 +583,6 @@ export function TestDetailPage() {
     return (statusMap[status] || "UNKNOWN") as TestStatus;
   };
 
-  const formatDuration = (nanoseconds?: number) => {
-    if (!nanoseconds) return "N/A";
-    const milliseconds = nanoseconds / 1000000;
-    if (milliseconds < 1000) return `${milliseconds.toFixed(0)}ms`;
-    return `${(milliseconds / 1000).toFixed(2)}s`;
-  };
-
   // Extract test from the tests array (API returns array with single element)
   const test = testDetail.tests[0];
   if (!test) {
@@ -676,7 +627,7 @@ export function TestDetailPage() {
     "attempts:",
     attempts,
     "legacySteps:",
-    legacySteps
+    legacySteps,
   );
   return (
     <div className="space-y-6">
@@ -779,13 +730,13 @@ export function TestDetailPage() {
                 <div className="flex justify-between items-start">
                   <dt className="text-gray-600 font-medium">Started:</dt>
                   <dd className="text-gray-900 text-right ml-4">
-                    {new Date(test.createdAt).toLocaleString()}
+                    {new Date(test.createdAt!).toLocaleString()}
                   </dd>
                 </div>
                 <div className="flex justify-between items-start">
                   <dt className="text-gray-600 font-medium">Last Updated:</dt>
                   <dd className="text-gray-900 text-right ml-4">
-                    {new Date(test.updatedAt).toLocaleString()}
+                    {new Date(test.updatedAt!).toLocaleString()}
                   </dd>
                 </div>
                 <div className="flex justify-between items-start">
@@ -794,7 +745,7 @@ export function TestDetailPage() {
                     {hasAttempts
                       ? attempts.reduce(
                           (sum, attempt) => sum + (attempt.steps?.length || 0),
-                          0
+                          0,
                         )
                       : legacySteps.length}
                   </dd>
@@ -847,7 +798,7 @@ export function TestDetailPage() {
           test={{
             id: test.id,
             runId: test.runId,
-            title: test.title || test.name || test.id,
+            title: test.title || test.id,
             status: testStatus,
             steps: legacySteps.map((step) => ({
               id: step.id,
@@ -857,11 +808,16 @@ export function TestDetailPage() {
                 step.parentStepId && step.parentStepId !== ""
                   ? step.parentStepId
                   : undefined,
-              status: getTestStatus(step.status),
+              status: step.status,
               category: step.category,
               title: step.title,
               startedAt: step.startTime || step.createdAt,
               finishedAt: step.updatedAt,
+              error: step.error,
+              errors: step.errors,
+              metadata: step.metadata,
+              duration: step.duration,
+              location: step.location,
             })),
           }}
         />
