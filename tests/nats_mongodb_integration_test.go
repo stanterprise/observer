@@ -135,7 +135,11 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 	}
 
 	// Publish step end event
-	err = repo.UpsertStepEnd(ctx, runID, stepID, testID, 0, "PASSED")
+	stepMetadata := map[string]interface{}{
+		"test_key": "test_value",
+	}
+	stepDuration := int64(500000000) // 500ms in nanoseconds
+	err = repo.UpsertStepEnd(ctx, runID, stepID, testID, 0, "PASSED", stepMetadata, "", nil, &stepDuration)
 	if err != nil {
 		t.Fatalf("Failed to upsert step end: %v", err)
 	}

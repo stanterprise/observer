@@ -1,16 +1,10 @@
 import { Card, CardContent } from "@/components/Card";
 import { TagList } from "@/components/TagList";
 import { useState, useEffect } from "react";
-import {
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  ChevronRight,
-  ChevronDown,
-} from "lucide-react";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import type { Step as StepType } from "@/types/testCase";
-import type { TestStatus } from "@/types/common";
 import { Badge } from "@/components/Badge";
+import { ansiToHtml } from "@/utils/ansi";
 
 type StepProps = {
   step: StepType;
@@ -20,6 +14,18 @@ type StepProps = {
 export const Step = ({ step, globalExpandAll }: StepProps) => {
   const [isExpanded, setIsExpanded] = useState(globalExpandAll ?? false);
   const hasChildren = step.steps && step.steps.length > 0;
+  const hasError = step.error || (step.errors && step.errors.length > 0);
+  const shouldShowError =
+    hasError &&
+    (step.status === "FAILED" ||
+      step.status === "BROKEN" ||
+      step.status === "TIMEDOUT");
+
+  // Extract error metadata from step.metadata
+  const errorStack = step.metadata?.error_stack as string | undefined;
+  const errorSnippet = step.metadata?.error_snippet as string | undefined;
+  const errorLocation = step.metadata?.error_location as string | undefined;
+  const errorValue = step.metadata?.error_value as string | undefined;
 
   // Update local state when global state changes
   useEffect(() => {
@@ -48,22 +54,7 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
                     )}
                   </button>
                 )}
-                {step.status === "PASSED" ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <Badge status={"success" as TestStatus} />
-                  </>
-                ) : step.status === "FAILED" ? (
-                  <>
-                    <AlertCircle className="w-5 h-5 text-red-600" />
-                    <Badge status={"error" as TestStatus} />
-                  </>
-                ) : (
-                  <>
-                    <Clock className="w-5 h-5 text-yellow-600" />
-                    <Badge status={"pending" as TestStatus} />
-                  </>
-                )}
+                <Badge status={step.status || "UNKNOWN"} />
                 <h3 className="text-base font-medium text-gray-900 truncate">
                   {step.title || step.id}
                 </h3>
@@ -71,6 +62,80 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
               {step.tags && step.tags.length > 0 && (
                 <div className="mt-2 ml-8">
                   <TagList tags={step.tags} />
+                </div>
+              )}
+              {shouldShowError && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded space-y-2">
+                  <p className="text-sm font-semibold text-red-800">Error</p>
+
+                  {/* Error Message */}
+                  <div>
+                    <div
+                      className="text-sm text-red-700 whitespace-pre-wrap break-words"
+                      dangerouslySetInnerHTML={{
+                        __html: ansiToHtml(
+                          step.error || step.errors?.[0] || "Unknown error",
+                        ),
+                      }}
+                    />
+                  </div>
+
+                  {/* Error Value (if different from message) */}
+                  {errorValue && errorValue !== step.error && (
+                    <div>
+                      <p className="text-xs font-medium text-red-800 mb-1">
+                        Value:
+                      </p>
+                      <div
+                        className="text-xs text-red-600 whitespace-pre-wrap break-words"
+                        dangerouslySetInnerHTML={{
+                          __html: ansiToHtml(errorValue),
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Error Location */}
+                  {errorLocation && (
+                    <div>
+                      <p className="text-xs font-medium text-red-800 mb-1">
+                        Location:
+                      </p>
+                      <p className="text-xs text-red-600 font-mono">
+                        {errorLocation}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Code Snippet */}
+                  {errorSnippet && (
+                    <div>
+                      <p className="text-xs font-medium text-red-800 mb-1">
+                        Code Snippet:
+                      </p>
+                      <pre
+                        className="text-xs text-red-600 bg-red-100 p-2 rounded overflow-x-auto"
+                        dangerouslySetInnerHTML={{
+                          __html: ansiToHtml(errorSnippet),
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Stack Trace */}
+                  {errorStack && (
+                    <details className="mt-2">
+                      <summary className="text-xs font-medium text-red-800 cursor-pointer hover:text-red-900">
+                        Stack Trace
+                      </summary>
+                      <pre
+                        className="text-xs text-red-600 bg-red-100 p-2 rounded overflow-x-auto mt-1 whitespace-pre-wrap"
+                        dangerouslySetInnerHTML={{
+                          __html: ansiToHtml(errorStack),
+                        }}
+                      />
+                    </details>
+                  )}
                 </div>
               )}
             </div>
