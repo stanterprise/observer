@@ -2,14 +2,10 @@ import { Card, CardContent } from "@/components/Card";
 import { TagList } from "@/components/TagList";
 import { useState, useEffect } from "react";
 import {
-  CheckCircle2,
-  AlertCircle,
-  Clock,
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
 import type { Step as StepType } from "@/types/testCase";
-import type { TestStatus } from "@/types/common";
 import { Badge } from "@/components/Badge";
 
 type StepProps = {
@@ -20,6 +16,8 @@ type StepProps = {
 export const Step = ({ step, globalExpandAll }: StepProps) => {
   const [isExpanded, setIsExpanded] = useState(globalExpandAll ?? false);
   const hasChildren = step.steps && step.steps.length > 0;
+  const hasError = step.error || (step.errors && step.errors.length > 0);
+  const shouldShowError = hasError && (step.status === "FAILED" || step.status === "BROKEN" || step.status === "TIMEDOUT");
 
   // Update local state when global state changes
   useEffect(() => {
@@ -48,22 +46,7 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
                     )}
                   </button>
                 )}
-                {step.status === "PASSED" ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <Badge status={"success" as TestStatus} />
-                  </>
-                ) : step.status === "FAILED" ? (
-                  <>
-                    <AlertCircle className="w-5 h-5 text-red-600" />
-                    <Badge status={"error" as TestStatus} />
-                  </>
-                ) : (
-                  <>
-                    <Clock className="w-5 h-5 text-yellow-600" />
-                    <Badge status={"pending" as TestStatus} />
-                  </>
-                )}
+                <Badge status={step.status || "UNKNOWN"} />
                 <h3 className="text-base font-medium text-gray-900 truncate">
                   {step.title || step.id}
                 </h3>
@@ -71,6 +54,14 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
               {step.tags && step.tags.length > 0 && (
                 <div className="mt-2 ml-8">
                   <TagList tags={step.tags} />
+                </div>
+              )}
+              {shouldShowError && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded">
+                  <p className="text-sm font-medium text-red-800">Error</p>
+                  <p className="text-sm text-red-700 mt-1 whitespace-pre-wrap break-words">
+                    {step.error || step.errors?.[0] || "Unknown error"}
+                  </p>
                 </div>
               )}
             </div>
