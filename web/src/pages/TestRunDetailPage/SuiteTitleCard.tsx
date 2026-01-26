@@ -35,10 +35,10 @@ export const SuiteTitleCard = ({
           <div
             className="bg-linear-to-r from-green-500 to-green-600 transition-all duration-500 ease-out relative overflow-hidden"
             style={{
-              width: `${(stats.passed / stats.total) * 100}%`,
+              width: `${(stats.passed / runDetail.totalTests!) * 100}%`,
             }}
             title={`${stats.passed} passed (${Math.round(
-              (stats.passed / stats.total) * 100
+              (stats.passed / runDetail.totalTests!) * 100,
             )}%)`}
           >
             <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
@@ -48,10 +48,10 @@ export const SuiteTitleCard = ({
           <div
             className="bg-linear-to-r from-red-500 to-red-600 transition-all duration-500 ease-out"
             style={{
-              width: `${(totalFailedTestsCounts / stats.total) * 100}%`,
+              width: `${(totalFailedTestsCounts / runDetail.totalTests!) * 100}%`,
             }}
             title={`${totalFailedTestsCounts} failed (${Math.round(
-              (totalFailedTestsCounts / stats.total) * 100
+              (totalFailedTestsCounts / runDetail.totalTests!) * 100,
             )}%)`}
           />
         )}
@@ -59,10 +59,10 @@ export const SuiteTitleCard = ({
           <div
             className="bg-linear-to-r from-gray-400 to-gray-500 transition-all duration-500 ease-out"
             style={{
-              width: `${(stats.skipped / stats.total) * 100}%`,
+              width: `${(stats.skipped / runDetail.totalTests!) * 100}%`,
             }}
             title={`${stats.skipped} skipped (${Math.round(
-              (stats.skipped / stats.total) * 100
+              (stats.skipped / runDetail.totalTests!) * 100,
             )}%)`}
           />
         )}
@@ -70,10 +70,10 @@ export const SuiteTitleCard = ({
           <div
             className="bg-linear-to-r from-blue-400 to-blue-500 transition-all duration-500 ease-out animate-pulse"
             style={{
-              width: `${(runningPendingCount / stats.total) * 100}%`,
+              width: `${(runningPendingCount / runDetail.totalTests!) * 100}%`,
             }}
             title={`${runningPendingCount} running/pending (${Math.round(
-              (runningPendingCount / stats.total) * 100
+              (runningPendingCount / runDetail.totalTests!) * 100,
             )}%)`}
           />
         )}
@@ -87,7 +87,7 @@ export const SuiteTitleCard = ({
             <div className="flex items-center gap-4 text-sm text-gray-600">
               <span className="font-medium">Total Tests:</span>
               <span className="font-bold text-gray-900">
-                {runDetail.tests!.length}
+                {runDetail.totalTests}
               </span>
               {runDetail.createdAt && (
                 <>
@@ -101,7 +101,7 @@ export const SuiteTitleCard = ({
                         year: "numeric",
                         hour: "2-digit",
                         minute: "2-digit",
-                      }
+                      },
                     )}
                   </span>
                 </>
