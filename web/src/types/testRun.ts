@@ -31,4 +31,6 @@ export interface RunStatistics {
   interrupted?: number;
   unknown?: number;
   lastUpdated?: string;
+  expected?: number;
+  flaky?: number;
 }

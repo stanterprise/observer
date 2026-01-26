@@ -50,8 +50,15 @@ export function TestRunDetailPage() {
         interrupted: data.tests.filter((t: any) => t.status === "INTERRUPTED")
           .length,
         unknown: data.tests.filter((t: any) => t.status === "UNKNOWN").length,
+        expected: data.tests.filter(
+          (t: any) => t.status === "PASSED" && t.attempts.length === 1,
+        ).length,
+        flaky: data.tests.filter(
+          (t: any) => t.status === "PASSED" && t.attempts.length > 1,
+        ).length,
       };
       console.log("Fetched run details:", data);
+
       setRunDetail(data);
       setError(null);
     } catch (err) {
@@ -294,25 +301,31 @@ export function TestRunDetailPage() {
           }
         }
 
-        // Recalculate statistics
-        const newStats = runDetail.statistics
-          ? runDetail.statistics
-          : {
-              total: updatedTests.length,
-              passed: 0,
-              failed: 0,
-              skipped: 0,
-              running: 0,
-              broken: 0,
-              timedout: 0,
-              interrupted: 0,
-              unknown: 0,
-            };
+        // Recalculate statistics from scratch
+        const newStats = {
+          total: updatedTests.length,
+          passed: 0,
+          failed: 0,
+          skipped: 0,
+          running: 0,
+          broken: 0,
+          timedout: 0,
+          interrupted: 0,
+          unknown: 0,
+          expected: 0,
+          flaky: 0,
+        };
 
         updatedTests.forEach((test) => {
           switch (test.status) {
             case "PASSED":
               newStats.passed++;
+              // Calculate expected (1 attempt) and flaky (>1 attempts)
+              if (test.attempts && test.attempts.length === 1) {
+                newStats.expected++;
+              } else if (test.attempts && test.attempts.length > 1) {
+                newStats.flaky++;
+              }
               break;
             case "FAILED":
               newStats.failed++;
@@ -321,21 +334,19 @@ export function TestRunDetailPage() {
               newStats.skipped++;
               break;
             case "RUNNING":
-              newStats.running ? newStats.running++ : (newStats.running = 1);
+              newStats.running++;
               break;
             case "BROKEN":
-              newStats.broken ? newStats.broken++ : (newStats.broken = 1);
+              newStats.broken++;
               break;
             case "TIMEDOUT":
-              newStats.timedout ? newStats.timedout++ : (newStats.timedout = 1);
+              newStats.timedout++;
               break;
             case "INTERRUPTED":
-              newStats.interrupted
-                ? newStats.interrupted++
-                : (newStats.interrupted = 1);
+              newStats.interrupted++;
               break;
             default:
-              newStats.unknown ? newStats.unknown++ : (newStats.unknown = 1);
+              newStats.unknown++;
           }
         });
 
