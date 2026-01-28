@@ -14,6 +14,7 @@ import (
 	"github.com/stanterprise/observer/internal/database"
 	"github.com/stanterprise/observer/internal/repository"
 	"github.com/stanterprise/observer/pkg/api"
+	"github.com/stanterprise/observer/pkg/storage"
 	"github.com/stanterprise/observer/pkg/websocket"
 )
 
@@ -46,6 +47,27 @@ func main() {
 	// Create MongoDB repository and handler
 	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
 	mongoHandler := api.NewMongoHandler(repo, logger)
+
+	// Initialize storage driver (optional)
+	storageDriver, err := storage.NewDriverFromEnv(logger)
+	if err != nil {
+		logger.Error("failed to initialize storage driver", "error", err)
+		os.Exit(1)
+	}
+	if storageDriver != nil {
+		logger.Info("storage driver initialized for API", "driver", storageDriver.Name())
+		// Ensure cleanup
+		defer func() {
+			if closeErr := storageDriver.Close(); closeErr != nil {
+				logger.Warn("failed to close storage driver", "error", closeErr)
+			}
+		}()
+	} else {
+		logger.Info("storage driver not configured; attachment retrieval will use inline storage only")
+	}
+
+	// Create attachment handler
+	attachmentHandler := api.NewAttachmentHandler(repo, storageDriver, logger)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub(logger)
@@ -115,6 +137,7 @@ func main() {
 
 	// REST API endpoints
 	mongoHandler.RegisterRoutes(mux)
+	attachmentHandler.RegisterRoutes(mux)
 
 	addr := ":" + *port
 

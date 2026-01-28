@@ -12,6 +12,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stanterprise/observer/internal/repository"
 	"github.com/stanterprise/observer/pkg/publisher"
+	"github.com/stanterprise/observer/pkg/storage"
 	"github.com/stanterprise/proto-go/testsystem/v1/common"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -47,12 +48,13 @@ func extractTestID(testCaseRunID, runID string) string {
 //
 // All operations follow an upsert pattern: update if entity exists, insert if not found.
 type MongoNATSConsumer struct {
-	nc       *nats.Conn
-	js       jetstream.JetStream
-	logger   *slog.Logger
-	repo     *repository.MongoRepository
-	stream   string
-	consumer jetstream.Consumer
+	nc            *nats.Conn
+	js            jetstream.JetStream
+	logger        *slog.Logger
+	repo          *repository.MongoRepository
+	storageDriver storage.Driver
+	stream        string
+	consumer      jetstream.Consumer
 }
 
 // MongoNATSConsumerConfig holds configuration for MongoDB NATS consumer
@@ -94,9 +96,23 @@ func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo
 		cfg.MaxWait = 5 * time.Second
 	}
 
+	// Initialize storage driver (optional)
+	storageDriver, err := storage.NewDriverFromEnv(logger)
+	if err != nil {
+		return nil, fmt.Errorf("initialize storage driver: %w", err)
+	}
+	if storageDriver != nil {
+		logger.Info("storage driver initialized", "driver", storageDriver.Name())
+	} else {
+		logger.Info("storage driver not configured; using inline attachment storage")
+	}
+
 	// Connect to NATS
 	nc, err := nats.Connect(cfg.URL, nats.Name("observer-mongo-processor"))
 	if err != nil {
+		if storageDriver != nil {
+			storageDriver.Close()
+		}
 		return nil, fmt.Errorf("connect to NATS: %w", err)
 	}
 
@@ -104,21 +120,28 @@ func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo
 	js, err := jetstream.New(nc)
 	if err != nil {
 		nc.Close()
+		if storageDriver != nil {
+			storageDriver.Close()
+		}
 		return nil, fmt.Errorf("create jetstream context: %w", err)
 	}
 
 	c := &MongoNATSConsumer{
-		nc:     nc,
-		js:     js,
-		logger: logger,
-		repo:   repo,
-		stream: cfg.StreamName,
+		nc:            nc,
+		js:            js,
+		logger:        logger,
+		repo:          repo,
+		storageDriver: storageDriver,
+		stream:        cfg.StreamName,
 	}
 
 	// Ensure consumer exists
 	consumer, err := c.ensureConsumer(context.Background(), cfg.ConsumerName)
 	if err != nil {
 		nc.Close()
+		if storageDriver != nil {
+			storageDriver.Close()
+		}
 		return nil, fmt.Errorf("ensure consumer: %w", err)
 	}
 	c.consumer = consumer
@@ -271,6 +294,11 @@ func mongoStatusToString(status common.TestStatus) string {
 
 // Close closes the NATS connection
 func (c *MongoNATSConsumer) Close() error {
+	if c.storageDriver != nil {
+		if err := c.storageDriver.Close(); err != nil {
+			c.logger.Warn("failed to close storage driver", "error", err)
+		}
+	}
 	if c.nc != nil {
 		c.nc.Close()
 		c.logger.Info("MongoDB NATS consumer closed")
