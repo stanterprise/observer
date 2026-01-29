@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
@@ -117,6 +118,16 @@ func (h *AttachmentHandler) handleInlineAttachment(w http.ResponseWriter, r *htt
 		return
 	}
 
+	contentBytes := []byte(content)
+	if encoding, ok := attachment["content_encoding"].(string); ok && encoding == "base64" {
+		decoded, err := base64.StdEncoding.DecodeString(content)
+		if err != nil {
+			h.logger.Error("failed to decode base64 attachment", "error", err)
+		} else {
+			contentBytes = decoded
+		}
+	}
+
 	// Set content type
 	if mimeType, ok := attachment["mime_type"].(string); ok && mimeType != "" {
 		w.Header().Set("Content-Type", mimeType)
@@ -130,7 +141,7 @@ func (h *AttachmentHandler) handleInlineAttachment(w http.ResponseWriter, r *htt
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(content))
+	w.Write(contentBytes)
 }
 
 // handleProxyAttachment proxies attachment content through the API
@@ -177,7 +188,7 @@ func (h *AttachmentHandler) findAttachmentByStorageKey(ctx context.Context, stor
 	// We need direct access to the collection for this query
 	// Since the repository doesn't expose the collection, we'll need to add a method
 	// For now, let's use a workaround by searching through recent runs
-	
+
 	// Get all test runs and search through their attachments
 	// This is not optimal but works for the initial implementation
 	runs, _, err := h.repo.ListTestRuns(ctx, nil, 100, 0)

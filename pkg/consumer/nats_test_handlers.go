@@ -3,6 +3,7 @@ package consumer
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -132,8 +133,19 @@ func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMess
 		endTime = &t
 	}
 
+	// Convert attachments
+	attachments := make([]map[string]interface{}, 0, len(req.TestCase.Attachments))
+	for _, att := range req.TestCase.Attachments {
+		attMap, err := c.processAttachment(ctx, att)
+		if err != nil {
+			c.logger.Error("failed to process attachment", "error", err)
+			continue
+		}
+		attachments = append(attachments, attMap)
+	}
+
 	runID := req.TestCase.RunId
-	return c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), req.TestCase.RetryIndex, endTime, duration)
+	return c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), req.TestCase.RetryIndex, endTime, duration, attachments)
 }
 
 // handleTestFailure processes a test failure event
@@ -288,7 +300,8 @@ func (c *MongoNATSConsumer) processAttachment(ctx context.Context, att *common.A
 
 		if len(content) < inlineThreshold {
 			// Small attachments: store inline
-			attMap["content"] = string(content)
+			attMap["content"] = base64.StdEncoding.EncodeToString(content)
+			attMap["content_encoding"] = "base64"
 			attMap["storage"] = "inline"
 			attMap["size"] = len(content)
 		} else if c.storageDriver != nil {
@@ -301,7 +314,8 @@ func (c *MongoNATSConsumer) processAttachment(ctx context.Context, att *common.A
 					"name", att.Name,
 					"size", len(content),
 					"error", err)
-				attMap["content"] = string(content)
+				attMap["content"] = base64.StdEncoding.EncodeToString(content)
+				attMap["content_encoding"] = "base64"
 				attMap["storage"] = "inline"
 				attMap["size"] = len(content)
 			} else {
@@ -317,7 +331,8 @@ func (c *MongoNATSConsumer) processAttachment(ctx context.Context, att *common.A
 			}
 		} else {
 			// No storage driver configured: store inline
-			attMap["content"] = string(content)
+			attMap["content"] = base64.StdEncoding.EncodeToString(content)
+			attMap["content_encoding"] = "base64"
 			attMap["storage"] = "inline"
 			attMap["size"] = len(content)
 		}
@@ -329,4 +344,3 @@ func (c *MongoNATSConsumer) processAttachment(ctx context.Context, att *common.A
 
 	return attMap, nil
 }
-
