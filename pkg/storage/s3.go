@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -19,11 +18,10 @@ import (
 
 // S3Driver implements storage.Driver for S3-compatible storage
 type S3Driver struct {
-	client     *s3.Client
-	bucket     string
-	publicURL  string
-	logger     *slog.Logger
-	usePresign bool
+	client    *s3.Client
+	bucket    string
+	publicURL string
+	logger    *slog.Logger
 }
 
 // NewS3Driver creates a new S3 storage driver
@@ -89,11 +87,10 @@ func NewS3Driver(cfg Config, logger *slog.Logger) (*S3Driver, error) {
 		"path_style", cfg.S3UsePathStyle)
 
 	return &S3Driver{
-		client:     client,
-		bucket:     cfg.S3Bucket,
-		publicURL:  strings.TrimRight(cfg.S3PublicURL, "/"),
-		logger:     logger,
-		usePresign: cfg.S3PublicURL == "", // Use presigned URLs if no public URL configured
+		client:    client,
+		bucket:    cfg.S3Bucket,
+		publicURL: strings.TrimRight(cfg.S3PublicURL, "/"),
+		logger:    logger,
 	}, nil
 }
 
@@ -111,19 +108,19 @@ func (d *S3Driver) Upload(ctx context.Context, name, mimeType string, content io
 	// Storage key format: attachments/{id}{ext}
 	storageKey := fmt.Sprintf("attachments/%s%s", id, ext)
 
-	// Read content into buffer to get size
-	buf := new(bytes.Buffer)
-	size, err := io.Copy(buf, content)
-	if err != nil {
-		return nil, fmt.Errorf("read content: %w", err)
+	// Wrap reader to count bytes as they're uploaded (stream directly without buffering)
+	var size int64
+	countingReader := &sizeCountingReader{
+		reader: content,
+		size:   &size,
 	}
 
-	// Upload to S3
+	// Upload to S3 - stream directly without buffering entire content in memory
 	uploadedAt := time.Now()
-	_, err = d.client.PutObject(ctx, &s3.PutObjectInput{
+	_, err := d.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(d.bucket),
 		Key:         aws.String(storageKey),
-		Body:        bytes.NewReader(buf.Bytes()),
+		Body:        countingReader,
 		ContentType: aws.String(mimeType),
 		Metadata: map[string]string{
 			"original-name": name,
@@ -159,6 +156,18 @@ func (d *S3Driver) Upload(ctx context.Context, name, mimeType string, content io
 		StorageURI: storageURI,
 		UploadedAt: uploadedAt,
 	}, nil
+}
+
+// sizeCountingReader wraps an io.Reader and counts bytes read
+type sizeCountingReader struct {
+	reader io.Reader
+	size   *int64
+}
+
+func (r *sizeCountingReader) Read(p []byte) (n int, err error) {
+	n, err = r.reader.Read(p)
+	*r.size += int64(n)
+	return n, err
 }
 
 // Download retrieves an attachment from S3

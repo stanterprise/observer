@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository"
 	"github.com/stanterprise/observer/pkg/storage"
 )
@@ -165,8 +166,21 @@ func (h *AttachmentHandler) handleProxyAttachment(w http.ResponseWriter, r *http
 	}
 
 	// Set content length if available
-	if size, ok := attachment["size"].(int64); ok {
-		w.Header().Set("Content-Length", fmt.Sprintf("%d", size))
+	if rawSize, ok := attachment["size"]; ok {
+		var size int64
+		switch v := rawSize.(type) {
+		case int64:
+			size = v
+		case int32:
+			size = int64(v)
+		case int:
+			size = int64(v)
+		case float64:
+			size = int64(v)
+		}
+		if size > 0 {
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", size))
+		}
 	}
 
 	// Set content disposition with filename
@@ -181,26 +195,33 @@ func (h *AttachmentHandler) handleProxyAttachment(w http.ResponseWriter, r *http
 	}
 }
 
-// findAttachmentByStorageKey searches for an attachment by its storage key in all test runs
-// This is a simplified implementation that scans test documents for the storage key.
+// findAttachmentByStorageKey searches for an attachment by its storage key in all test runs.
+// This implementation scans test documents for the storage key using paginated queries.
 // In production, you might want to maintain a separate index or collection for attachments.
 func (h *AttachmentHandler) findAttachmentByStorageKey(ctx context.Context, storageKey string) (map[string]interface{}, error) {
-	// We need direct access to the collection for this query
-	// Since the repository doesn't expose the collection, we'll need to add a method
-	// For now, let's use a workaround by searching through recent runs
+	const pageSize int64 = 100
+	var offset int64 = 0
 
-	// Get all test runs and search through their attachments
-	// This is not optimal but works for the initial implementation
-	runs, _, err := h.repo.ListTestRuns(ctx, nil, 100, 0)
-	if err != nil {
-		return nil, fmt.Errorf("list runs failed: %w", err)
-	}
-
-	// Search through runs for the attachment
-	for _, run := range runs {
-		if attachment := h.findAttachmentInTestRun(run, storageKey); attachment != nil {
-			return attachment, nil
+	for {
+		// Get a page of test runs and search through their attachments
+		runs, _, err := h.repo.ListTestRuns(ctx, nil, pageSize, offset)
+		if err != nil {
+			return nil, fmt.Errorf("list runs failed: %w", err)
 		}
+
+		// No more runs to search
+		if len(runs) == 0 {
+			break
+		}
+
+		// Search through runs for the attachment
+		for _, run := range runs {
+			if attachment := h.findAttachmentInTestRun(run, storageKey); attachment != nil {
+				return attachment, nil
+			}
+		}
+
+		offset += pageSize
 	}
 
 	return nil, fmt.Errorf("attachment not found")
@@ -208,15 +229,114 @@ func (h *AttachmentHandler) findAttachmentByStorageKey(ctx context.Context, stor
 
 // findAttachmentInTestRun searches for an attachment within a test run
 func (h *AttachmentHandler) findAttachmentInTestRun(run interface{}, storageKey string) map[string]interface{} {
-	// Convert run to map for recursive search
-	runMap, ok := run.(map[string]interface{})
+	// Convert run to document structure for search
+	// ListTestRuns returns *models.TestRunDocument structs
+	doc, ok := run.(*models.TestRunDocument)
 	if !ok {
 		return nil
 	}
-	return h.findAttachmentInRun(runMap, storageKey)
+	return h.searchAttachmentsInTestRun(doc, storageKey)
+}
+
+// searchAttachmentsInTestRun searches for an attachment within a TestRunDocument
+func (h *AttachmentHandler) searchAttachmentsInTestRun(doc *models.TestRunDocument, storageKey string) map[string]interface{} {
+	// Search in top-level tests
+	for _, test := range doc.Tests {
+		if attachment := h.searchAttachmentsInTest(test, storageKey); attachment != nil {
+			return attachment
+		}
+	}
+
+	// Search in suites
+	for _, suite := range doc.Suites {
+		if attachment := h.searchAttachmentsInSuite(suite, storageKey); attachment != nil {
+			return attachment
+		}
+	}
+
+	return nil
+}
+
+// searchAttachmentsInSuite searches for an attachment within a SuiteDocument
+func (h *AttachmentHandler) searchAttachmentsInSuite(suite *models.SuiteDocument, storageKey string) map[string]interface{} {
+	// Search in suite's tests
+	for _, test := range suite.Tests {
+		if attachment := h.searchAttachmentsInTest(test, storageKey); attachment != nil {
+			return attachment
+		}
+	}
+
+	// Search in nested suites
+	for _, nestedSuite := range suite.Suites {
+		if attachment := h.searchAttachmentsInSuite(nestedSuite, storageKey); attachment != nil {
+			return attachment
+		}
+	}
+
+	return nil
+}
+
+// searchAttachmentsInTest searches for an attachment within a TestDocument
+func (h *AttachmentHandler) searchAttachmentsInTest(test *models.TestDocument, storageKey string) map[string]interface{} {
+	// Search in attempts
+	for _, attempt := range test.Attempts {
+		for _, att := range attempt.Attachments {
+			if key, ok := att["storage_key"].(string); ok && key == storageKey {
+				return att
+			}
+		}
+
+		// Search in failures
+		for _, failure := range attempt.Failures {
+			for _, att := range failure.Attachments {
+				if key, ok := att["storage_key"].(string); ok && key == storageKey {
+					return att
+				}
+			}
+		}
+
+		// Search in errors
+		for _, error := range attempt.Errors {
+			for _, att := range error.Attachments {
+				if key, ok := att["storage_key"].(string); ok && key == storageKey {
+					return att
+				}
+			}
+		}
+
+		// Search in steps
+		for _, step := range attempt.Steps {
+			if attachment := h.searchAttachmentsInStep(step, storageKey); attachment != nil {
+				return attachment
+			}
+		}
+	}
+
+	// Also search legacy attachments field for backward compatibility
+	for _, att := range test.Attachments {
+		if key, ok := att["storage_key"].(string); ok && key == storageKey {
+			return att
+		}
+	}
+
+	return nil
+}
+
+// searchAttachmentsInStep searches for an attachment within a StepDocument (recursive for nested steps)
+func (h *AttachmentHandler) searchAttachmentsInStep(step *models.StepDocument, storageKey string) map[string]interface{} {
+	// Steps don't have attachments directly, only tests do
+	// Search in nested steps
+	for _, nestedStep := range step.Steps {
+		if attachment := h.searchAttachmentsInStep(nestedStep, storageKey); attachment != nil {
+			return attachment
+		}
+	}
+
+	return nil
 }
 
 // findAttachmentInRun recursively searches for an attachment by storage key within a run document
+// Deprecated: Use searchAttachmentsInTestRun instead
 func (h *AttachmentHandler) findAttachmentInRun(data interface{}, storageKey string) map[string]interface{} {
 	switch v := data.(type) {
 	case map[string]interface{}:

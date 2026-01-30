@@ -140,8 +140,8 @@ Attachments are stored in test documents with the following structure:
 {
   "name": "screenshot.png",
   "mime_type": "image/png",
-  "storage_key": "attachments/abc123-screenshot.png",
-  "storage_uri": "http://localhost:8080/api/attachments/attachments/abc123-screenshot.png",
+  "storage_key": "abc123-def456.png",
+  "storage_uri": "http://localhost:8080/api/attachments/abc123-def456.png",
   "size": 153600,
   "storage": "local",
   "uploaded_at": "2026-01-28T00:00:00Z"
