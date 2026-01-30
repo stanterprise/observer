@@ -134,7 +134,7 @@ Attachments are stored in test documents with the following structure:
 }
 ```
 
-### External Storage Attachment
+### External Storage Attachment (Local)
 
 ```json
 {
@@ -147,6 +147,22 @@ Attachments are stored in test documents with the following structure:
   "uploaded_at": "2026-01-28T00:00:00Z"
 }
 ```
+
+### External Storage Attachment (S3)
+
+```json
+{
+  "name": "screenshot.png",
+  "mime_type": "image/png",
+  "storage_key": "attachments/abc123-def456.png",
+  "storage_uri": "http://localhost:8080/api/attachments/attachments/abc123-def456.png",
+  "size": 153600,
+  "storage": "s3",
+  "uploaded_at": "2026-01-28T00:00:00Z"
+}
+```
+
+> **Note:** Storage key format differs between drivers. Local driver uses flat keys (`{id}.{ext}`), while S3 driver uses prefixed keys (`attachments/{id}.{ext}`) for better organization in bucket storage.
 
 ### External URI Reference
 

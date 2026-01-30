@@ -106,6 +106,7 @@ func (d *S3Driver) Upload(ctx context.Context, name, mimeType string, content io
 	}
 
 	// Storage key format: attachments/{id}{ext}
+	// Note: S3 uses a prefix for organization, local driver stores flat
 	storageKey := fmt.Sprintf("attachments/%s%s", id, ext)
 
 	// Wrap reader to count bytes as they're uploaded (stream directly without buffering)
