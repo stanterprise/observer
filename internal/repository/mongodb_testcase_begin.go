@@ -78,17 +78,21 @@ func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.T
 
 	update := bson.M{
 		"$set": bson.M{
-			"tests.$[test].name":                                test.Name,
-			"tests.$[test].title":                               test.Title,
-			"tests.$[test].description":                         test.Description,
-			"tests.$[test].start_time":                          test.StartTime,
-			"tests.$[test].retry_index":                         test.RetryIndex,
-			"tests.$[test].updated_at":                          now,
-			"tests.$[test].attempts.$[attempt].start_time":  test.StartTime,
-			"tests.$[test].attempts.$[attempt].status":      test.Status,
+			"tests.$[test].name":                           test.Name,
+			"tests.$[test].title":                          test.Title,
+			"tests.$[test].description":                    test.Description,
+			"tests.$[test].start_time":                     test.StartTime,
+			"tests.$[test].retry_index":                    test.RetryIndex,
+			"tests.$[test].updated_at":                     now,
+			"tests.$[test].attempts.$[attempt].start_time": test.StartTime,
+			"tests.$[test].attempts.$[attempt].status":     test.Status,
 			"tests.$[test].attempts.$[attempt].updated_at": now,
-			"updated_at": now,
+			"updated_at":                                   now,
 		},
+	}
+	if test.Attachments != nil {
+		update["$set"].(bson.M)["tests.$[test].attempts.$[attempt].attachments"] = test.Attachments
+		update["$set"].(bson.M)["tests.$[test].attachments"] = test.Attachments
 	}
 
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
@@ -124,12 +128,13 @@ func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.T
 func appendTestAttempt(r *MongoRepository, ctx context.Context, runID string, test *m.TestDocument, suiteID string, now time.Time, testUpdateResult *mongo.UpdateResult) error {
 	// Create attempt object for current retry_index
 	currentAttempt := &m.AttemptDocument{
-		RetryIndex: *test.RetryIndex,
-		Steps:      []*m.StepDocument{},
-		StartTime:  test.StartTime,
-		Status:     test.Status,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		RetryIndex:  *test.RetryIndex,
+		Steps:       []*m.StepDocument{},
+		StartTime:   test.StartTime,
+		Status:      test.Status,
+		Attachments: test.Attachments,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
 	r.logger.Debug("Attempt not found, trying to append",
@@ -192,12 +197,13 @@ func appendTestAttempt(r *MongoRepository, ctx context.Context, runID string, te
 	attemptStatus := test.Status
 	test.Status = "" // Clear test-level status - will be set correctly on TestEnd
 	currentAttempt = &m.AttemptDocument{
-		RetryIndex: *test.RetryIndex,
-		Steps:      []*m.StepDocument{},
-		StartTime:  test.StartTime,
-		Status:     attemptStatus, // Use saved status for attempt
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		RetryIndex:  *test.RetryIndex,
+		Steps:       []*m.StepDocument{},
+		StartTime:   test.StartTime,
+		Status:      attemptStatus, // Use saved status for attempt
+		Attachments: test.Attachments,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	test.Attempts = []*m.AttemptDocument{currentAttempt}
 

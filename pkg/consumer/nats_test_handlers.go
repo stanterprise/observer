@@ -1,13 +1,16 @@
 package consumer
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
+	"github.com/stanterprise/proto-go/testsystem/v1/common"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -50,15 +53,12 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 	}
 
 	// Convert attachments
-	var attachments []map[string]interface{}
+	attachments := make([]map[string]interface{}, 0, len(req.TestCase.Attachments))
 	for _, att := range req.TestCase.Attachments {
-		attMap := make(map[string]interface{})
-		attMap["name"] = att.Name
-		attMap["mime_type"] = att.MimeType
-		if content := att.GetContent(); len(content) > 0 {
-			attMap["content"] = string(content)
-		} else if att.GetUri() != "" {
-			attMap["uri"] = att.GetUri()
+		attMap, err := c.processAttachment(ctx, att)
+		if err != nil {
+			c.logger.Error("failed to process attachment", "error", err)
+			continue
 		}
 		attachments = append(attachments, attMap)
 	}
@@ -133,8 +133,19 @@ func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMess
 		endTime = &t
 	}
 
+	// Convert attachments
+	attachments := make([]map[string]interface{}, 0, len(req.TestCase.Attachments))
+	for _, att := range req.TestCase.Attachments {
+		attMap, err := c.processAttachment(ctx, att)
+		if err != nil {
+			c.logger.Error("failed to process attachment", "error", err)
+			continue
+		}
+		attachments = append(attachments, attMap)
+	}
+
 	runID := req.TestCase.RunId
-	return c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), req.TestCase.RetryIndex, endTime, duration)
+	return c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), req.TestCase.RetryIndex, endTime, duration, attachments)
 }
 
 // handleTestFailure processes a test failure event
@@ -167,16 +178,10 @@ func (c *MongoNATSConsumer) handleTestFailure(ctx context.Context, data json.Raw
 	// Convert attachments to map slice
 	attachments := make([]map[string]interface{}, 0, len(req.Attachments))
 	for _, att := range req.Attachments {
-		attMap := map[string]interface{}{
-			"name":      att.Name,
-			"mime_type": att.MimeType,
-		}
-		// Handle oneof payload
-		if content := att.GetContent(); content != nil {
-			attMap["content"] = content
-		}
-		if uri := att.GetUri(); uri != "" {
-			attMap["uri"] = uri
+		attMap, err := c.processAttachment(ctx, att)
+		if err != nil {
+			c.logger.Error("failed to process attachment", "error", err)
+			continue
 		}
 		attachments = append(attachments, attMap)
 	}
@@ -241,16 +246,10 @@ func (c *MongoNATSConsumer) handleTestError(ctx context.Context, data json.RawMe
 	// Convert attachments to map slice
 	attachments := make([]map[string]interface{}, 0, len(req.Attachments))
 	for _, att := range req.Attachments {
-		attMap := map[string]interface{}{
-			"name":      att.Name,
-			"mime_type": att.MimeType,
-		}
-		// Handle oneof payload
-		if content := att.GetContent(); content != nil {
-			attMap["content"] = content
-		}
-		if uri := att.GetUri(); uri != "" {
-			attMap["uri"] = uri
+		attMap, err := c.processAttachment(ctx, att)
+		if err != nil {
+			c.logger.Error("failed to process attachment", "error", err)
+			continue
 		}
 		attachments = append(attachments, attMap)
 	}
@@ -283,4 +282,65 @@ func (c *MongoNATSConsumer) handleTestError(ctx context.Context, data json.RawMe
 	}
 
 	return nil
+}
+
+// processAttachment processes an attachment and returns a map suitable for MongoDB storage.
+// It uses a size-based strategy:
+// - < 100KB: Store inline as base64 content
+// - >= 100KB: Store in external storage (if configured)
+// Falls back to inline storage if external storage is not configured.
+func (c *MongoNATSConsumer) processAttachment(ctx context.Context, att *common.Attachment) (map[string]interface{}, error) {
+	attMap := make(map[string]interface{})
+	attMap["name"] = att.Name
+	attMap["mime_type"] = att.MimeType
+
+	// Handle attachment content
+	if content := att.GetContent(); len(content) > 0 {
+		const inlineThreshold = 100 * 1024 // 100KB
+
+		if len(content) < inlineThreshold {
+			// Small attachments: store inline
+			attMap["content"] = base64.StdEncoding.EncodeToString(content)
+			attMap["content_encoding"] = "base64"
+			attMap["storage"] = "inline"
+			attMap["size"] = len(content)
+		} else if c.storageDriver != nil {
+			// Large attachments: store in external storage
+			reader := bytes.NewReader(content)
+			metadata, err := c.storageDriver.Upload(ctx, att.Name, att.MimeType, reader)
+			if err != nil {
+				// Log error but don't fail the event processing
+				c.logger.Error("storage upload failed, falling back to inline",
+					"name", att.Name,
+					"size", len(content),
+					"error", err)
+				attMap["content"] = base64.StdEncoding.EncodeToString(content)
+				attMap["content_encoding"] = "base64"
+				attMap["storage"] = "inline"
+				attMap["size"] = len(content)
+			} else {
+				attMap["storage_key"] = metadata.StorageKey
+				attMap["storage_uri"] = metadata.StorageURI
+				attMap["size"] = metadata.Size
+				attMap["storage"] = c.storageDriver.Name()
+				attMap["uploaded_at"] = metadata.UploadedAt
+				c.logger.Info("attachment stored externally",
+					"name", att.Name,
+					"size", metadata.Size,
+					"storage", c.storageDriver.Name())
+			}
+		} else {
+			// No storage driver configured: store inline
+			attMap["content"] = base64.StdEncoding.EncodeToString(content)
+			attMap["content_encoding"] = "base64"
+			attMap["storage"] = "inline"
+			attMap["size"] = len(content)
+		}
+	} else if uri := att.GetUri(); uri != "" {
+		// External URI reference
+		attMap["uri"] = uri
+		attMap["storage"] = "external"
+	}
+
+	return attMap, nil
 }

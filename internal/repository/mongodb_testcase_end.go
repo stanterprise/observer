@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// UpsertTestEnd updates test end fields (status, duration) and corresponding attempt fields.
+// UpsertTestEnd updates test end fields (status, duration, attachments) and corresponding attempt fields.
 // With attempt-based retries: updates both test-level status and attempts[retry_index] status/end_time/duration.
 // - runID: Required. Identifies the document (_id).
 // - testID: Required. Identifies the test to update.
@@ -18,8 +18,9 @@ import (
 // - status: New status to set (optional).
 // - endTime: End time for the attempt (optional).
 // - duration: New duration to set (optional).
+// - attachments: Attachments for this attempt (optional).
 // Returns error if runID is empty or test not found.
-func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testID string, status string, retryIndex int32, endTime *time.Time, duration *int64) error {
+func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testID string, status string, retryIndex int32, endTime *time.Time, duration *int64, attachments []map[string]interface{}) error {
 	if err := ValidateRunID(runID); err != nil {
 		return err
 	}
@@ -47,6 +48,9 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 	}
 	if duration != nil {
 		attemptSetFields["tests.$[test].attempts.$[attempt].duration"] = duration
+	}
+	if attachments != nil {
+		attemptSetFields["tests.$[test].attempts.$[attempt].attachments"] = attachments
 	}
 
 	filter := bson.M{
@@ -121,6 +125,11 @@ func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testI
 	// Update test-level duration (current attempt duration)
 	if duration != nil {
 		setFields["tests.$[test].duration"] = duration
+	}
+
+	// Update test-level attachments (backward compatibility)
+	if attachments != nil {
+		setFields["tests.$[test].attachments"] = attachments
 	}
 
 	// Update test-level updated_at

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import StepContainer from "./StepContainer";
 import type { Attempt, Test } from "@/types/testCase";
+import { getTestAttachments } from "@/lib/attemptUtils";
 
 interface TestDetailResponse {
   runId: string;
@@ -32,6 +33,72 @@ const formatDuration = (nanoseconds?: number) => {
   const milliseconds = nanoseconds / 1000000;
   if (milliseconds < 1000) return `${milliseconds.toFixed(0)}ms`;
   return `${(milliseconds / 1000).toFixed(2)}s`;
+};
+
+const formatBytes = (bytes?: number) => {
+  if (!bytes && bytes !== 0) return "Unknown size";
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(2)} MB`;
+  const gb = mb / 1024;
+  return `${gb.toFixed(2)} GB`;
+};
+
+const getAttachmentUrl = (attachment: Record<string, any>) => {
+  if (attachment.storage_key) {
+    return apiUrl(`/attachments/${encodeURIComponent(attachment.storage_key)}`);
+  }
+  if (attachment.storage_uri) {
+    return attachment.storage_uri as string;
+  }
+  if (attachment.uri) {
+    return attachment.uri as string;
+  }
+  return undefined;
+};
+
+const getInlineMediaUrl = (attachment: Record<string, any>) => {
+  const mimeType = attachment.mime_type || "application/octet-stream";
+  const content = attachment.content;
+  if (!content || typeof content !== "string") return undefined;
+  if (attachment.content_encoding === "base64") {
+    return `data:${mimeType};base64,${content}`;
+  }
+  return undefined;
+};
+
+const decodeBase64ToUtf8 = (value: string) => {
+  try {
+    const binary = atob(value.replace(/\s+/g, ""));
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch {
+    return value;
+  }
+};
+
+const isLikelyBase64 = (value: string) => {
+  if (value.length < 16 || value.length % 4 !== 0) return false;
+  return /^[A-Za-z0-9+/=\s]+$/.test(value);
+};
+
+const decodeInlineContent = (attachment: Record<string, any>) => {
+  const content = attachment.content;
+  if (!content || typeof content !== "string") return "";
+  if (attachment.content_encoding === "base64") {
+    return decodeBase64ToUtf8(content);
+  }
+  const mimeType = attachment.mime_type || "";
+  const isTextual =
+    mimeType.startsWith("text/") ||
+    mimeType === "application/json" ||
+    mimeType === "text/csv";
+  if (isTextual && isLikelyBase64(content)) {
+    return decodeBase64ToUtf8(content);
+  }
+  return content;
 };
 
 // Utility function to convert status to TestStatus
@@ -267,6 +334,15 @@ export function TestDetailPage() {
   const [testDetail, setTestDetail] = useState<TestDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeAttachment, setActiveAttachment] = useState<{
+    attachment: Record<string, any>;
+    url?: string;
+    inlineUrl?: string;
+    isImage: boolean;
+    isVideo: boolean;
+    isAudio: boolean;
+    contentText: string;
+  } | null>(null);
 
   // Run-specific WebSocket - receives ALL events for this run (including steps)
   useWebSocket({
@@ -618,6 +694,7 @@ export function TestDetailPage() {
   const hasAttempts = test.attempts && test.attempts.length > 0;
   const attempts = test.attempts || [];
   const legacySteps = test.steps || [];
+  const attachments = getTestAttachments(test);
 
   console.log(
     "Rendering TestDetailPage for test:",
@@ -789,6 +866,174 @@ export function TestDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {attachments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Attachments</CardTitle>
+            <p className="text-sm text-gray-600 mt-1">
+              {attachments.length} attachment
+              {attachments.length > 1 ? "s" : ""} associated with this test
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {attachments.map((attachment, index) => {
+                const url = getAttachmentUrl(attachment);
+                const storageType = attachment.storage || "inline";
+                const content = decodeInlineContent(attachment);
+                const previewLimit = 400;
+                const preview = content ? content.slice(0, previewLimit) : "";
+                const isImage =
+                  typeof attachment.mime_type === "string" &&
+                  attachment.mime_type.startsWith("image/");
+                const isVideo =
+                  typeof attachment.mime_type === "string" &&
+                  attachment.mime_type.startsWith("video/");
+                const isAudio =
+                  typeof attachment.mime_type === "string" &&
+                  attachment.mime_type.startsWith("audio/");
+                const inlineMediaUrl = getInlineMediaUrl(attachment);
+                const mediaUrl = url || inlineMediaUrl;
+                const canPreview = isImage || isVideo || isAudio || content;
+                const handleAttachmentClick = () => {
+                  if (!canPreview) return;
+                  setActiveAttachment({
+                    attachment,
+                    url,
+                    inlineUrl: inlineMediaUrl,
+                    isImage,
+                    isVideo,
+                    isAudio,
+                    contentText: content,
+                  });
+                };
+
+                return (
+                  <div
+                    key={`${attachment.storage_key || attachment.uri || attachment.name || "attachment"}-${index}`}
+                    className="border border-gray-200 rounded-lg p-4 bg-white"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 truncate">
+                          {attachment.name || "Attachment"}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {attachment.mime_type || "unknown"} •{" "}
+                          {formatBytes(attachment.size)} • {storageType}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {url && (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-200 rounded-md hover:bg-blue-50 transition-colors"
+                          >
+                            Open
+                          </a>
+                        )}
+                        {canPreview && (
+                          <button
+                            type="button"
+                            onClick={handleAttachmentClick}
+                            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-900 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                          >
+                            View
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {isImage && mediaUrl && (
+                      <button
+                        type="button"
+                        onClick={handleAttachmentClick}
+                        className="mt-3 block"
+                      >
+                        <img
+                          src={mediaUrl}
+                          alt={attachment.name || "Attachment"}
+                          className="max-h-64 rounded-md border border-gray-200 bg-gray-50"
+                        />
+                      </button>
+                    )}
+                    {storageType === "inline" && !isImage && preview && (
+                      <div className="mt-3 bg-gray-50 border border-gray-200 rounded-md p-3">
+                        <pre className="text-xs text-gray-700 whitespace-pre-wrap wrap-break-word">
+                          {preview}
+                        </pre>
+                        {content.length > previewLimit && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Preview truncated
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeAttachment && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setActiveAttachment(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="max-h-full w-full max-w-5xl">
+            {activeAttachment.isImage &&
+              (activeAttachment.url || activeAttachment.inlineUrl) && (
+                <img
+                  src={activeAttachment.url || activeAttachment.inlineUrl}
+                  alt={activeAttachment.attachment.name || "Attachment"}
+                  className="max-h-[80vh] w-full object-contain rounded-lg"
+                />
+              )}
+            {activeAttachment.isVideo &&
+              (activeAttachment.url || activeAttachment.inlineUrl) && (
+                <video
+                  src={activeAttachment.url || activeAttachment.inlineUrl}
+                  controls
+                  className="max-h-[80vh] w-full rounded-lg"
+                />
+              )}
+            {activeAttachment.isAudio &&
+              (activeAttachment.url || activeAttachment.inlineUrl) && (
+                <div className="bg-white rounded-lg p-6">
+                  <audio
+                    src={activeAttachment.url || activeAttachment.inlineUrl}
+                    controls
+                    className="w-full"
+                  />
+                </div>
+              )}
+            {!activeAttachment.isImage &&
+              !activeAttachment.isVideo &&
+              !activeAttachment.isAudio && (
+                <div className="bg-white rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                    {activeAttachment.attachment.name || "Attachment"}
+                  </h3>
+                  {activeAttachment.contentText ? (
+                    <pre className="text-sm text-gray-700 whitespace-pre-wrap wrap-break-word max-h-[70vh] overflow-auto">
+                      {activeAttachment.contentText}
+                    </pre>
+                  ) : (
+                    <p className="text-sm text-gray-600">
+                      Preview not available.
+                    </p>
+                  )}
+                </div>
+              )}
+          </div>
+        </div>
+      )}
 
       {/* Test Execution Steps - Attempts Accordion */}
       {hasAttempts ? (
