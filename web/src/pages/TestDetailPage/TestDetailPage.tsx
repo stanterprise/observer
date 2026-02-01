@@ -59,16 +59,6 @@ const getAttachmentUrl = (attachment: Record<string, any>) => {
   return undefined;
 };
 
-const getInlineImageUrl = (attachment: Record<string, any>) => {
-  const mimeType = attachment.mime_type || "application/octet-stream";
-  const content = attachment.content;
-  if (!content || typeof content !== "string") return undefined;
-  if (attachment.content_encoding === "base64") {
-    return `data:${mimeType};base64,${content}`;
-  }
-  return undefined;
-};
-
 const getInlineMediaUrl = (attachment: Record<string, any>) => {
   const mimeType = attachment.mime_type || "application/octet-stream";
   const content = attachment.content;
@@ -79,15 +69,34 @@ const getInlineMediaUrl = (attachment: Record<string, any>) => {
   return undefined;
 };
 
+const decodeBase64ToUtf8 = (value: string) => {
+  try {
+    const binary = atob(value.replace(/\s+/g, ""));
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch {
+    return value;
+  }
+};
+
+const isLikelyBase64 = (value: string) => {
+  if (value.length < 16 || value.length % 4 !== 0) return false;
+  return /^[A-Za-z0-9+/=\s]+$/.test(value);
+};
+
 const decodeInlineContent = (attachment: Record<string, any>) => {
   const content = attachment.content;
   if (!content || typeof content !== "string") return "";
   if (attachment.content_encoding === "base64") {
-    try {
-      return atob(content);
-    } catch {
-      return content;
-    }
+    return decodeBase64ToUtf8(content);
+  }
+  const mimeType = attachment.mime_type || "";
+  const isTextual =
+    mimeType.startsWith("text/") ||
+    mimeType === "application/json" ||
+    mimeType === "text/csv";
+  if (isTextual && isLikelyBase64(content)) {
+    return decodeBase64ToUtf8(content);
   }
   return content;
 };
@@ -884,9 +893,6 @@ export function TestDetailPage() {
                 const isAudio =
                   typeof attachment.mime_type === "string" &&
                   attachment.mime_type.startsWith("audio/");
-                const inlineImageUrl = isImage
-                  ? getInlineImageUrl(attachment)
-                  : undefined;
                 const inlineMediaUrl = getInlineMediaUrl(attachment);
                 const mediaUrl = url || inlineMediaUrl;
                 const canPreview = isImage || isVideo || isAudio || content;

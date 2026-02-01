@@ -119,6 +119,48 @@ func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID str
 	return nil
 }
 
+// AppendTestAttachments adds attachments to a test attempt and legacy test-level attachments array.
+func (r *MongoRepository) AppendTestAttachments(ctx context.Context, runID, testID string, retryIndex int32, attachments []map[string]interface{}) error {
+	if err := ValidateRunID(runID); err != nil {
+		return err
+	}
+	if testID == "" {
+		return fmt.Errorf("testID is required")
+	}
+	if len(attachments) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	filter := bson.M{
+		"_id":      runID,
+		"tests.id": testID,
+	}
+
+	update := bson.M{
+		"$push": bson.M{
+			"tests.$[test].attempts.$[attempt].attachments": bson.M{"$each": attachments},
+			"tests.$[test].attachments":                     bson.M{"$each": attachments},
+		},
+		"$set": bson.M{
+			"updated_at": now,
+		},
+	}
+
+	arrayFilters := []interface{}{
+		bson.M{"test.id": testID},
+		bson.M{"attempt.retry_index": retryIndex},
+	}
+
+	opts := options.Update().SetArrayFilters(options.ArrayFilters{Filters: arrayFilters})
+	_, err := r.collection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		return fmt.Errorf("append test attachments: %w", err)
+	}
+
+	return nil
+}
+
 // AppendStdOutput adds stdout output to a test document
 func (r *MongoRepository) AppendStdOutput(ctx context.Context, runID, testID string, output interface{}) error {
 	if err := ValidateRunID(runID); err != nil {
