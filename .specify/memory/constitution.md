@@ -7,7 +7,7 @@
 - Services are split: ingestion (gRPC → NATS), processor (NATS → DB + storage), API (DB + WebSocket), web UI (React).
 - Ingestion MUST remain stateless and MUST NOT write to MongoDB.
 - Processor MUST be the only service that persists events to MongoDB.
-- API MUST be read-only against MongoDB.
+- API MUST be read-only against MongoDB application data. If it writes operational metadata (e.g., auth/session), it MUST be to a separate store/collection explicitly approved.
 - Legacy monolith compatibility MUST be preserved unless explicitly approved.
 
 ### II. Event-First Contract
@@ -15,11 +15,11 @@
 - gRPC handlers MUST validate inputs and publish to NATS JetStream.
 - All state mutations MUST be driven by NATS consumers.
 - Event envelopes MUST preserve event type and timestamp.
-- Unknown event types MUST be acked to avoid redelivery loops.
+- Unknown event types MUST be acked to avoid redelivery loops AND MUST emit a warning log and metric (`unknown_event_type_total`) including the event_type.
 
 ### III. MongoDB Safety Rules (NON-NEGOTIABLE)
 
-- All nested updates MUST include root \_id in the filter.
+- All nested updates MUST include root `_id` in the filter.
 - Use arrayFilters for nested updates; positional indexing is forbidden for attempts/steps.
 - All writes MUST be idempotent and safe for redelivery.
 - Schema changes MUST be additive and backward compatible.
@@ -30,6 +30,7 @@
 - Inline attachments MUST be base64-encoded and include content_encoding=base64.
 - External storage MUST record storage_key, storage_uri, storage, size, uploaded_at.
 - API retrieval MUST respect storage type (inline/local/s3/external).
+- Attachment retrieval endpoints MUST enforce the same authorization as the parent run/test data; possession of storage_key alone is not sufficient authorization.
 
 ### V. Logging and Errors
 
@@ -55,7 +56,8 @@
 
 - Assume at-least-once delivery from NATS; duplicates MUST not change final state.
 - Processing MUST tolerate out-of-order events; do not assume monotonic timestamps.
-- Idempotency MUST be based on stable event identifiers (event_id / run_id + sequence), not timestamps alone.
+- Idempotency MUST be based on the canonical event identifier: envelope.event_id (UUID) plus producer if needed.
+- If event_id is absent, the processor MUST derive a deterministic key from {run_id, suite_id/test_id/step_id, attempt, event_type, sequence}.
 - If ordering is required within a partition (e.g. per run_id), consumers MUST enforce it explicitly.
 
 ### IX. MongoDB Data Model Invariants
@@ -63,6 +65,7 @@
 - TestRun documents MUST stay within MongoDB document size limits; avoid unbounded arrays without retention/compaction rules.
 - Any new query pattern MUST include an index plan (which fields, why).
 - API queries MUST be bounded (limit, projection); avoid full-document fetches unless required.
+- All list endpoints MUST define a default limit and a hard maximum limit.
 
 ### X. Migrations and Rollouts
 
@@ -79,7 +82,8 @@
 
 ### XII. Observability
 
-- All services MUST emit structured logs with run_id and event_id where available.
+- All services MUST emit structured logs with run_id when the request/event relates to a run.
+- Processor logs MUST include event_id (or the canonical idempotency key).
 - Processor MUST record processing outcomes (success/failure, latency) in metrics and/or persisted status.
 - NATS consumer lag/backlog visibility MUST be maintained when changing consumer behavior.
 
@@ -94,6 +98,7 @@
 - Do not introduce new major libraries/frameworks without explicit approval.
 - Avoid refactors that are not required for the spec; prefer local, minimal change sets.
 - Keep service boundaries intact; do not merge services or bypass NATS to “simplify.”
+- Background processing MUST remain in processor/worker services; API MUST not introduce new consumers/workers.
 
 ## Development Workflow Rules
 
@@ -102,6 +107,7 @@
 - Prefer minimal diffs and preserve public APIs.
 - Do not reformat unrelated code.
 - Maintain attempt-based retries and legacy fields for compatibility.
+- Any change to gRPC/protobuf or API response shapes MUST update corresponding client types and fixtures (UI and tests).
 
 ### Web UI Rules
 
@@ -119,6 +125,7 @@
 - Backend changes MUST pass go test ./tests.
 - Web changes MUST pass npm run build.
 - Lint/vet failures MUST be resolved before merging.
+- PR descriptions MUST state how the change was validated using the above commands.
 
 ## Developer Experience
 
@@ -131,4 +138,4 @@
 - This constitution overrides all other guidance unless explicitly amended.
 - Amendments require updating this file and documenting rationale in the PR description.
 
-**Version**: 1.0.0 | **Ratified**: 2026-02-01 | **Last Amended**: 2026-02-01
+**Version**: 1.1.0 | **Ratified**: 2026-02-01 | **Last Amended**: 2026-02-01
