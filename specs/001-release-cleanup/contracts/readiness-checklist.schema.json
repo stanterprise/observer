@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Release Readiness Checklist",
+  "type": "object",
+  "required": [
+    "id",
+    "version",
+    "generated_at",
+    "scope",
+    "overall_status",
+    "decision",
+    "gates",
+    "evidence_index_path"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "version": { "type": "string" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "scope": { "type": "string" },
+    "overall_status": {
+      "type": "string",
+      "enum": ["pass", "fail", "blocked", "approve-with-risk"]
+    },
+    "decision": {
+      "type": "object",
+      "required": ["status", "rationale", "decided_by", "decided_at"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["approve", "block", "approve-with-risk"]
+        },
+        "rationale": { "type": "string" },
+        "decided_by": { "type": "string" },
+        "decided_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/gate" }
+    },
+    "evidence_index_path": { "type": "string" }
+  },
+  "definitions": {
+    "gate": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "description",
+        "status",
+        "owner",
+        "evidence_paths"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pass", "fail", "na"] },
+        "owner": { "type": "string" },
+        "evidence_paths": { "type": "array", "items": { "type": "string" } },
+        "remediation_task_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "risk_ids": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
