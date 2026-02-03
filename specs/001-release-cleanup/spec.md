@@ -2,8 +2,16 @@
 
 **Feature Branch**: `001-release-cleanup`  
 **Created**: February 2, 2026  
-**Status**: Draft  
+**Updated**: February 3, 2026  
+**Status**: Specification Complete - Implementation Plan Ready  
 **Input**: User description: "Create or update the feature specification for cleaning the application and repository before public release. Review workspace context and produce a spec that covers cleanup scope, tasks, constraints, acceptance criteria, and risks. Focus on repo hygiene, docs, build, security/secrets, licensing, CI, and release readiness. Do not implement code; just generate spec artifacts."
+
+## Related Documents
+
+- **[Implementation Plan](./IMPLEMENTATION_PLAN.md)** - Detailed 8-phase execution plan with tasks, timelines, and resources
+- **[Quick Start Guide](./QUICK_START.md)** - Team member onboarding and role-specific instructions
+- **[Readiness Checklist](./artifacts/readiness-checklist.md)** - Gate-by-gate tracking with pass/fail criteria
+- **[Requirements Checklist](./checklists/requirements.md)** - Specification quality validation
 
 ## Clarifications
 
