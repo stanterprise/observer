@@ -12,7 +12,7 @@ This implementation plan translates the [Release Readiness Cleanup specification
 ## Technology Stack
 
 **Observer System Components:**
-- **Backend**: Go 1.23+ with gRPC, NATS JetStream, MongoDB
+- **Backend**: Go 1.24+ with gRPC, NATS JetStream, MongoDB
 - **Frontend**: React + TypeScript + Tailwind CSS
 - **Infrastructure**: Docker, Docker Compose, Kubernetes/Helm
 - **CI/CD**: GitHub Actions with BuildKit optimization
@@ -221,14 +221,7 @@ This implementation plan translates the [Release Readiness Cleanup specification
 2. **Current Files Scan**
    ```bash
    # Scan working tree
-   gitleaks detect --source . --verbose --report-path gitleaks-report.json
-   ```
-
-3. **Git History Scan** (FR-006a)
-   ```bash
-   # Scan full history
-   gitleaks detect --source . --log-opts="--all" --verbose \
-     --report-path gitleaks-history-report.json
+   gitleaks detect --source . --verbose --report-path specs/001-release-cleanup/artifacts/gitleaks-report.json
    ```
 
 4. **Configuration Review**

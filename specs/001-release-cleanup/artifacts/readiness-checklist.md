@@ -38,7 +38,7 @@ This checklist maps functional requirements (FR-001 through FR-011) to verifiabl
 
 ---
 
-### Gate 1.2: Public Documentation Set Identified (FR-004)
+### Gate 1.2: Public Documentation Set Identified (FR-003, FR-004)
 **Status**: 🔄 IN PROGRESS  
 **Owner**: Technical Writer  
 **Priority**: P2
@@ -119,11 +119,11 @@ make build-all
 - [ ] docker-compose.yml uses safe default passwords
 - [ ] GitHub Actions workflows have no leaked secrets
 
-**Evidence**: `artifacts/gitleaks-report.json`, `artifacts/security-findings.md`
+**Evidence**: `specs/001-release-cleanup/artifacts/gitleaks-report.json`, `specs/001-release-cleanup/artifacts/security-findings.md`
 
 **Test Commands**:
 ```bash
-gitleaks detect --source . --verbose --report-path artifacts/gitleaks-report.json
+gitleaks detect --source . --verbose --report-path specs/001-release-cleanup/artifacts/gitleaks-report.json
 ```
 
 **Notes**: _To be completed in Phase 5_
@@ -141,12 +141,12 @@ gitleaks detect --source . --verbose --report-path artifacts/gitleaks-report.jso
 - [ ] Any findings documented with remediation plan
 - [ ] History rewrite completed if necessary (BFG Repo-Cleaner)
 
-**Evidence**: `artifacts/gitleaks-history-report.json`, `artifacts/security-findings.md`
+**Evidence**: `specs/001-release-cleanup/artifacts/gitleaks-history-report.json`, `specs/001-release-cleanup/artifacts/security-findings.md`
 
 **Test Commands**:
 ```bash
 gitleaks detect --source . --log-opts="--all" --verbose \
-  --report-path artifacts/gitleaks-history-report.json
+  --report-path specs/001-release-cleanup/artifacts/gitleaks-history-report.json
 ```
 
 **Notes**: _To be completed in Phase 5_
@@ -362,7 +362,7 @@ cd web && npm list --all > ../artifacts/web-dependencies.txt
 
 ---
 
-## Phase 8: Final Validation
+## Final Validation
 
 ### Gate 8.1: All Required Gates Evaluated (SC-001, FR-011)
 **Status**: 🔄 IN PROGRESS  
