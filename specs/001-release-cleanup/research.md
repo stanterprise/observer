@@ -23,3 +23,34 @@
 - **Decision**: Record a license inventory artifact (generated list of dependencies + licenses) referenced by the readiness checklist.
 - **Rationale**: Provides objective evidence for licensing gate and supports legal review.
 - **Alternatives considered**: Rely on go.mod/package.json only; rejected as not sufficient for attribution or obligations tracking.
+
+---
+
+# Phase 0 Findings
+
+## Documentation audit
+
+- **Public docs set** (per Decision 2) is present and generally coherent: README.md, QUICKSTART.md, DEPLOYMENT.md, docs/README.md, docs/architecture/.
+- **Inconsistency found**: README.md listed Go 1.23+ while go.mod requires Go 1.24 with toolchain 1.24.9. (Remediation: update README to match toolchain.)
+- **Credentials in examples**: Multiple docs included default `root:password` MongoDB examples. These are non-secret placeholders but should be replaced with explicit `<db-password>` / `change-me` placeholders for public release.
+- **Internal-only docs**: Root-level guides like STEP*COMPONENT*\* and some docs under docs/ (e.g., implementation plans and summaries) are likely internal and should be flagged as non-public or archived. This will be tracked as cleanup tasks.
+
+## Secrets and sensitive data scan (working tree)
+
+- **Result**: No hardcoded private keys or tokens detected in the working tree search. Findings were limited to placeholder credentials and example passwords in documentation and editor configs.
+- **Examples**: `.vscode/settings.json`, `.vscode/launch.json`, CODESPACES.md, BUILD_QUICK_REF.md, and multiple docs referenced `root:password` defaults.
+- **Action**: Replace defaults with explicit placeholders and remove inline credentials from editor configs.
+- **Git history**: Ran gitleaks over full history; initial false positives in docs/ATTACHMENT_STORAGE.md were allowlisted with a scoped rule. Clean scan report saved to specs/001-release-cleanup/artifacts/gitleaks-report.json.
+
+## Build & deployment configuration review
+
+- **Build tooling**: Makefile targets cover build, test, lint, and infra; Dockerfiles are present for each service and AIO; docker-compose profiles support AIO and distributed modes.
+- **Documentation**: Build steps are documented in README.md and BUILD_QUICK_REF.md, but Go version mismatch required correction (see docs audit).
+- **CI**: GitHub workflows exist for build/helm publish, but there is no explicit release readiness gate or checklist validation step yet.
+- **Validation**: Build and test steps succeeded; `npm audit fix` remediated vulnerabilities (current audit clean).
+
+## Licensing audit
+
+- **LICENSE**: MIT license added at repo root.
+- **Attribution**: ATTRIBUTION.md added with inventory references; Go module list and web license inventory generated.
+- **Action**: Generate a full Go license report in CI/Linux and confirm compatibility before release signoff (local attempt produced an empty report).

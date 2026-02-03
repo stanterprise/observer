@@ -6,7 +6,7 @@ This directory contains the configuration for GitHub Codespaces and VS Code Dev 
 
 ### Container Features
 
-- **Go 1.23** (Debian Bookworm base)
+- **Go 1.24** (Debian Bookworm base)
 - **Node.js LTS** with npm and Yarn - For Web UI development
 - **Docker-in-Docker** - Full Docker and Docker Compose support
 - **Protocol Buffers** - `protoc` compiler for gRPC code generation
@@ -63,7 +63,7 @@ Automatically started on container creation:
 All necessary environment variables are set from `.env.example`:
 
 ```bash
-MONGODB_URI=mongodb://root:password@localhost:27017/observer?authSource=admin
+MONGODB_URI=mongodb://root:change-me@localhost:27017/observer?authSource=admin
 NATS_URL=nats://localhost:4222
 ```
 

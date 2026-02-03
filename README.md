@@ -77,7 +77,7 @@ The fastest way to start developing is with GitHub Codespaces—a complete, pre-
 
 Codespaces includes:
 
-- ✅ Go 1.23 with all dev tools (gopls, golangci-lint, delve)
+- ✅ Go 1.24 with all dev tools (gopls, golangci-lint, delve)
 - ✅ Docker and Docker Compose
 - ✅ MongoDB and NATS auto-started
 - ✅ VS Code with debugging and Go extensions
@@ -89,7 +89,7 @@ See [CODESPACES.md](CODESPACES.md) for the complete guide.
 
 For local development, ensure you have:
 
-- Go 1.23+
+- Go 1.24+
 - Docker and Docker Compose
 - Protocol Buffers compiler (for code generation)
 - Make
@@ -126,10 +126,10 @@ make nats-up       # Start NATS
 NATS_URL='nats://localhost:4222' ./bin/ingestion
 
 # API (requires MongoDB)
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' ./bin/api
+MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' ./bin/api
 
 # Processor (requires MongoDB)
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' ./bin/processor
+MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' ./bin/processor
 ```
 
 ### Run Legacy Monolithic Server
@@ -220,11 +220,11 @@ make docker-buildx-aio      # Fast cached builds
 
 ### Processor Service
 
-| Variable       | Default | Description                                 |
-| -------------- | ------- | ------------------------------------------- |
-| `MONGODB_URI`  | -       | MongoDB connection string (required)        |
-| `NATS_URL`     | -       | NATS server URL (required)                  |
-| `NATS_STREAM`  | -       | JetStream stream name                       |
+| Variable      | Default | Description                          |
+| ------------- | ------- | ------------------------------------ |
+| `MONGODB_URI` | -       | MongoDB connection string (required) |
+| `NATS_URL`    | -       | NATS server URL (required)           |
+| `NATS_STREAM` | -       | JetStream stream name                |
 
 ### API Service
 
@@ -240,18 +240,19 @@ make docker-buildx-aio      # Fast cached builds
 
 MongoDB can be configured using either a connection URI or split environment variables:
 
-| Variable            | Default    | Description                           |
-| ------------------- | ---------- | ------------------------------------- |
-| `MONGODB_URI`       | -          | Full MongoDB connection URI           |
-| `MONGO_URI`         | -          | Alias for `MONGODB_URI`               |
-| `MONGO_HOST`        | -          | MongoDB server host                   |
-| `MONGO_PORT`        | `27017`    | MongoDB server port                   |
-| `MONGO_USER`        | -          | MongoDB username                      |
-| `MONGO_PASSWORD`    | -          | MongoDB password                      |
-| `MONGO_DATABASE`    | `observer` | MongoDB database name                 |
-| `MONGO_AUTH_SOURCE` | `admin`    | MongoDB authentication source         |
+| Variable            | Default    | Description                   |
+| ------------------- | ---------- | ----------------------------- |
+| `MONGODB_URI`       | -          | Full MongoDB connection URI   |
+| `MONGO_URI`         | -          | Alias for `MONGODB_URI`       |
+| `MONGO_HOST`        | -          | MongoDB server host           |
+| `MONGO_PORT`        | `27017`    | MongoDB server port           |
+| `MONGO_USER`        | -          | MongoDB username              |
+| `MONGO_PASSWORD`    | -          | MongoDB password              |
+| `MONGO_DATABASE`    | `observer` | MongoDB database name         |
+| `MONGO_AUTH_SOURCE` | `admin`    | MongoDB authentication source |
 
 **Connection URI format:**
+
 ```
 mongodb://[user:pass@]host[:port]/database[?options]
 mongodb+srv://[user:pass@]host/database[?options]
@@ -271,6 +272,7 @@ MongoDB provides a document-based data model that aligns well with test run hier
 - **Better suited** for hierarchical test structures (suites → tests → steps)
 
 **Docker Compose with MongoDB:**
+
 ```bash
 docker compose --profile dist up -d
 ```

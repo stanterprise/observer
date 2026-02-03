@@ -1,0 +1,100 @@
+[
+  {
+    "id": "evidence-docs-audit",
+    "gate_id": "gate-docs",
+    "description": "Phase 0 documentation audit findings and remediation notes.",
+    "path": "specs/001-release-cleanup/research.md",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-docs-public-set",
+    "gate_id": "gate-docs",
+    "description": "Curated public documentation set (root + docs/architecture).",
+    "path": "docs/README.md",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-docs-review",
+    "gate_id": "gate-docs",
+    "description": "Documentation review and link check results.",
+    "path": "specs/001-release-cleanup/artifacts/docs-review.md",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-secrets-working-tree",
+    "gate_id": "gate-secrets",
+    "description": "Working tree scan: placeholders only, no private keys found.",
+    "path": "specs/001-release-cleanup/research.md",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-secrets-gitleaks",
+    "gate_id": "gate-secrets",
+    "description": "History-aware secrets scan (gitleaks) report.",
+    "path": "specs/001-release-cleanup/artifacts/gitleaks-report.json",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-build-docs",
+    "gate_id": "gate-build",
+    "description": "Build and test steps documented in README and build quick ref.",
+    "path": "README.md",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-build-validation",
+    "gate_id": "gate-build",
+    "description": "Build and test validation results.",
+    "path": "specs/001-release-cleanup/artifacts/build-validation.md",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-npm-audit",
+    "gate_id": "gate-build",
+    "description": "npm audit report for web dependencies.",
+    "path": "specs/001-release-cleanup/artifacts/npm-audit.json",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-ci-workflows",
+    "gate_id": "gate-ci",
+    "description": "Existing CI workflows in .github/workflows.",
+    "path": ".github/workflows",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-ci-readiness-gate",
+    "gate_id": "gate-ci",
+    "description": "Readiness gate workflow definition.",
+    "path": ".github/workflows/readiness-gate.yml",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-license-file",
+    "gate_id": "gate-licensing",
+    "description": "MIT license text.",
+    "path": "LICENSE",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-attribution",
+    "gate_id": "gate-licensing",
+    "description": "Attribution inventory references.",
+    "path": "ATTRIBUTION.md",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-go-modules",
+    "gate_id": "gate-licensing",
+    "description": "Go module list for attribution.",
+    "path": "specs/001-release-cleanup/artifacts/go-modules.json",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-web-licenses",
+    "gate_id": "gate-licensing",
+    "description": "Web dependency license inventory.",
+    "path": "specs/001-release-cleanup/artifacts/web-licenses.json",
+    "collected_at": "2026-02-02T00:00:00Z"
+  }
+]

@@ -2,7 +2,7 @@
 # Script to insert test data with tags into MongoDB for demonstration
 
 # MongoDB connection details
-MONGO_URI="mongodb://root:password@localhost:27017/observer?authSource=admin"
+MONGO_URI="${MONGO_URI:-mongodb://root:change-me@localhost:27017/observer?authSource=admin}"
 
 # Insert a test run with tags using mongosh
 docker exec -i observer-mongodb mongosh "$MONGO_URI" <<'EOF'

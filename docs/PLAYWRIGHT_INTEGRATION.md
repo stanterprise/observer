@@ -57,12 +57,12 @@ make build-all
 NATS_URL='nats://localhost:4222' ./bin/ingestion &
 
 # Start processor service (consumes NATS, writes to DB)
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
 NATS_URL='nats://localhost:4222' \
 ./bin/processor &
 
 # Start API service (optional, for future web UI)
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
 ./bin/api &
 ```
 
@@ -188,7 +188,6 @@ Current version: `v0.0.9`
 ### Supported Events
 
 1. **TestBeginEvent** - Sent when a test starts
-
    - `id` - Unique test identifier
    - `runId` - Test run identifier (shared across related tests)
    - `title` - Test name
@@ -198,13 +197,11 @@ Current version: `v0.0.9`
    - `timeout` - Timeout in milliseconds (optional)
 
 2. **TestEndEvent** - Sent when a test completes
-
    - `id` - Test identifier
    - `status` - PASSED, FAILED, SKIPPED, BROKEN, TIMEDOUT, INTERRUPTED
    - `duration` - Execution time (protobuf Duration type)
 
 3. **StepBeginEvent** - Sent when a test step starts
-
    - `id` - Step identifier
    - `testCaseRunId` - Parent test identifier
    - `title` - Step description
@@ -220,7 +217,6 @@ Current version: `v0.0.9`
 ### Suite Events
 
 5. **SuiteBeginEvent** - Sent when a test suite starts
-
    - `suite.id` - Unique suite run identifier
    - `suite.name` - Suite name
    - `suite.description` - Suite description
@@ -287,7 +283,7 @@ jobs:
         image: mongo:7
         env:
           MONGO_INITDB_ROOT_USERNAME: root
-          MONGO_INITDB_ROOT_PASSWORD: password
+          MONGO_INITDB_ROOT_PASSWORD: change-me
 
       observer-nats:
         image: nats:2.10-alpine
@@ -311,7 +307,7 @@ jobs:
       - name: View test results
         if: always()
         run: |
-          docker compose exec -T observer-db mongosh --username root --password password --authenticationDatabase admin --eval \
+          docker compose exec -T observer-db mongosh --username root --password change-me --authenticationDatabase admin --eval \
             "db.getSiblingDB('observer').test_runs.find({}, { _id: 1, title: 1, status: 1 }).sort({ created_at: -1 }).limit(10).toArray()"
 ```
 

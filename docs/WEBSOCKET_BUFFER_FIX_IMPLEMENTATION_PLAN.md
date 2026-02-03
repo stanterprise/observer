@@ -2,11 +2,12 @@
 
 **Target**: Fix WebSocket buffer overflow under high load (6+ concurrent test runs with abundant steps)  
 **Goal**: Achieve zero dropped messages and client disconnects while maintaining UI state accuracy  
-**Effort**: 3-5 days of focused development  
+**Effort**: 3-5 days of focused development
 
 ## Problem Summary
 
 Current WebSocket implementation suffers from:
+
 1. **Buffer saturation**: 1024-size buffers fill in seconds under high load
 2. **Client disconnection**: Clients dropped when their send buffer fills
 3. **Broadcast blocking**: NATS consumer blocks when hub broadcast channel fills
@@ -68,7 +69,7 @@ func TestEventPriorityClassification(t *testing.T) {
 		{publisher.EventTypeTestEnd, false, true},
 		{publisher.EventTypeRunStart, false, true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(string(tt.eventType), func(t *testing.T) {
 			if got := isLowPriorityEvent(tt.eventType); got != tt.isLowPri {
@@ -89,6 +90,7 @@ func TestEventPriorityClassification(t *testing.T) {
 **Task**: Modify `Hub.Run()` method to filter before broadcasting to each client
 
 **Current code** (around line 223-266):
+
 ```go
 case message := <-h.broadcast:
 	// Parse the event to check filters
@@ -117,6 +119,7 @@ case message := <-h.broadcast:
 ```
 
 **New code**:
+
 ```go
 case message := <-h.broadcast:
 	// Parse the event to check filters
@@ -129,14 +132,14 @@ case message := <-h.broadcast:
 	h.mu.RLock()
 	sentCount := 0
 	filteredCount := 0
-	
+
 	for client := range h.clients {
 		// SMART FILTERING: Skip low-priority events if client doesn't match
 		if isLowPriorityEvent(event.Type) && !client.matchesFilters(&event) {
 			filteredCount++
 			continue
 		}
-		
+
 		// High-priority events OR matching low-priority events
 		if !client.matchesFilters(&event) {
 			continue
@@ -151,7 +154,7 @@ case message := <-h.broadcast:
 		}
 	}
 	h.mu.RUnlock()
-	
+
 	// Log filtering effectiveness for monitoring
 	if filteredCount > 0 {
 		h.logger.Debug("filtered low-priority event",
@@ -269,6 +272,7 @@ func TestSmartFiltering_HighPriorityBroadcastToAll(t *testing.T) {
 **Task**: Update buffer sizes in `NewHub()` and `ServeWS()`
 
 **Changes**:
+
 ```go
 // Line 100: Hub broadcast channel
 broadcast: make(chan []byte, 4096), // Changed from 1024
@@ -284,6 +288,7 @@ send: make(chan []byte, 2048), // Changed from 1024
 **Task**: Modify `consumeNATSEvents()` to use non-blocking send to broadcast channel
 
 **Current code** (around line 322-347):
+
 ```go
 select {
 case h.broadcast <- normalizedData:
@@ -307,6 +312,7 @@ default:
 **Task**: Add periodic metrics logging in `Hub.Run()`
 
 **Add new ticker** (after line 199):
+
 ```go
 func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 	// Start NATS consumer in separate goroutine if configured
@@ -354,6 +360,7 @@ func (h *Hub) Run(ctx context.Context, cfg NATSConfig) {
 **Task**: Track processed events to prevent duplicates
 
 **Add after imports**:
+
 ```typescript
 interface ProcessedEvent {
   type: string;
@@ -364,12 +371,13 @@ interface ProcessedEvent {
 // Helper to generate event hash
 function getEventHash(event: WebSocketEvent): string {
   const data = event.data as any;
-  const id = data.id || data.testCase?.id || data.test?.id || data.runId || '';
+  const id = data.id || data.testCase?.id || data.test?.id || data.runId || "";
   return `${event.type}-${id}-${event.timestamp}`;
 }
 ```
 
 **Modify `useWebSocket` hook**:
+
 ```typescript
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   // ... existing state
@@ -400,29 +408,29 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             for (const evt of events) {
               if (evt.trim()) {
                 const parsedEvent = JSON.parse(evt) as WebSocketEvent;
-                
+
                 // Check for duplicates
                 const hash = getEventHash(parsedEvent);
                 if (processedEventsRef.current.has(hash)) {
-                  console.debug('Skipping duplicate event:', hash);
+                  console.debug("Skipping duplicate event:", hash);
                   continue;
                 }
                 processedEventsRef.current.add(hash);
-                
+
                 onMessageRef.current?.(parsedEvent);
               }
             }
           } else {
             const data = JSON.parse(event.data) as WebSocketEvent;
-            
+
             // Check for duplicates
             const hash = getEventHash(data);
             if (processedEventsRef.current.has(hash)) {
-              console.debug('Skipping duplicate event:', hash);
+              console.debug("Skipping duplicate event:", hash);
               return;
             }
             processedEventsRef.current.add(hash);
-            
+
             onMessageRef.current?.(data);
           }
         } catch (error) {
@@ -445,19 +453,20 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 **Task**: Refresh statistics from API on reconnect
 
 **Add new effect**:
+
 ```typescript
 // Add after existing effects (around line 56)
 useEffect(() => {
   // Refresh data when WebSocket reconnects after disconnection
   let wasDisconnected = false;
-  
+
   return () => {
     // Track disconnection state
     if (!isConnected && wasDisconnected === false) {
       wasDisconnected = true;
     } else if (isConnected && wasDisconnected) {
       // Reconnected - refresh data
-      console.log('[TestSuiteRunsPage] WebSocket reconnected, refreshing data');
+      console.log("[TestSuiteRunsPage] WebSocket reconnected, refreshing data");
       fetchRuns();
       wasDisconnected = false;
     }
@@ -466,21 +475,17 @@ useEffect(() => {
 ```
 
 **Better approach** - add `onConnect` callback:
+
 ```typescript
 // In App.tsx or TestSuiteRunsPage
 const handleReconnect = useCallback(() => {
-  console.log('[TestSuiteRunsPage] WebSocket reconnected, syncing state');
+  console.log("[TestSuiteRunsPage] WebSocket reconnected, syncing state");
   fetchRuns(); // Refresh from database
 }, [fetchRuns]);
 
 const { isConnected } = useWebSocket({
   filters: {
-    eventTypes: [
-      "run.start",
-      "run.end",
-      "test.begin",
-      "test.end",
-    ],
+    eventTypes: ["run.start", "run.end", "test.begin", "test.end"],
   },
   onMessage: handleWebSocketMessage,
   onConnect: handleReconnect, // Add this
@@ -495,7 +500,9 @@ const { isConnected } = useWebSocket({
 // Add onConnect callback to useWebSocket (around line 27)
 const handleReconnect = useCallback(() => {
   if (runId) {
-    console.log('[TestRunDetailPage] WebSocket reconnected, refreshing run data');
+    console.log(
+      "[TestRunDetailPage] WebSocket reconnected, refreshing run data",
+    );
     fetchRunDetail(runId);
   }
 }, [runId, fetchRunDetail]);
@@ -512,6 +519,7 @@ useWebSocket({
 **File**: `web/src/pages/TestRunDetailPage/TestRunDetailPage.tsx`
 
 **Current filter** (around line 27):
+
 ```typescript
 useWebSocket({
   filters: runId ? { runId } : undefined,
@@ -520,12 +528,15 @@ useWebSocket({
 ```
 
 **Update to exclude steps**:
+
 ```typescript
 useWebSocket({
-  filters: runId ? { 
-    runId,
-    eventTypes: ['test.begin', 'test.end', 'run.end'] // Exclude steps
-  } : undefined,
+  filters: runId
+    ? {
+        runId,
+        eventTypes: ["test.begin", "test.end", "run.end"], // Exclude steps
+      }
+    : undefined,
   onMessage: handleWebSocketEvent,
   onConnect: handleReconnect,
 });
@@ -540,12 +551,14 @@ useWebSocket({
 ### 3.1 Backend Unit Tests
 
 **Run**:
+
 ```bash
 cd /home/runner/work/observer/observer
 go test ./pkg/websocket/... -v -count=1
 ```
 
 **Expected results**:
+
 - All existing tests pass
 - New tests for smart filtering pass
 - New tests for event priority classification pass
@@ -650,7 +663,7 @@ func TestWebSocketUnderHeavyLoad(t *testing.T) {
 
 	// Check metrics
 	metrics := hub.GetMetrics()
-	
+
 	t.Logf("Load test completed:")
 	t.Logf("  Total events: %d", totalEvents)
 	t.Logf("  Duration: %v", duration)
@@ -676,6 +689,7 @@ func TestWebSocketUnderHeavyLoad(t *testing.T) {
 ```
 
 **Run**:
+
 ```bash
 go test ./tests/ -v -run TestWebSocketUnderHeavyLoad
 ```
@@ -685,16 +699,18 @@ go test ./tests/ -v -run TestWebSocketUnderHeavyLoad
 **Manual test steps**:
 
 1. Start backend services:
+
 ```bash
 make mongo-up nats-up
 NATS_URL=nats://localhost:4222 ./bin/ingestion &
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
   NATS_URL=nats://localhost:4222 ./bin/processor &
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
   NATS_URL=nats://localhost:4222 ./bin/api &
 ```
 
 2. Start web UI:
+
 ```bash
 cd web && npm run dev
 ```
@@ -702,6 +718,7 @@ cd web && npm run dev
 3. Open browser to `http://localhost:3000`
 
 4. Run load test from Playwright reporter:
+
 ```bash
 # In stanterprise-playwright-reporter directory
 npm test -- --workers=6 # 6 concurrent workers
@@ -726,6 +743,7 @@ This file (already created).
 **File**: `docs/WEBSOCKET_IMPROVEMENTS.md`
 
 Add new section:
+
 ```markdown
 ## Buffer Overflow Fixes (January 2026)
 
@@ -757,12 +775,12 @@ Add new section:
 
 Load test: 6 concurrent runs × 500 tests × 50 steps = 150K events over 60s
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| Dropped messages | 5000+ | 0 | 100% |
-| Client disconnects | Frequent | 0 | 100% |
-| Events/sec throughput | ~500 | ~2500 | 5x |
-| UI state accuracy | ~85% | 100% | +15% |
+| Metric                | Before   | After | Improvement |
+| --------------------- | -------- | ----- | ----------- |
+| Dropped messages      | 5000+    | 0     | 100%        |
+| Client disconnects    | Frequent | 0     | 100%        |
+| Events/sec throughput | ~500     | ~2500 | 5x          |
+| UI state accuracy     | ~85%     | 100%  | +15%        |
 ```
 
 ### 4.2 Update Architecture Docs
@@ -770,6 +788,7 @@ Load test: 6 concurrent runs × 500 tests × 50 steps = 150K events over 60s
 **File**: `docs/architecture/02-dataflow.md`
 
 Add section on WebSocket filtering:
+
 ```markdown
 ### WebSocket Event Filtering
 
@@ -784,15 +803,17 @@ The WebSocket hub implements smart filtering to reduce client bandwidth:
    - step.begin, step.end (requires testId or runId filter)
 
 3. **Filtering Algorithm**:
-   ```
-   for each event:
-     parse event type and data
-     for each connected client:
-       if event is low-priority AND client filter doesn't match:
-         skip (don't send)
-       else if client filter matches:
-         send to client (with overflow handling)
-   ```
+```
+
+for each event:
+parse event type and data
+for each connected client:
+if event is low-priority AND client filter doesn't match:
+skip (don't send)
+else if client filter matches:
+send to client (with overflow handling)
+
+```
 
 This reduces WebSocket traffic by 90-99% for multi-run scenarios while ensuring
 all clients see critical test/run state changes.
@@ -803,12 +824,14 @@ all clients see critical test/run state changes.
 **File**: `DEPLOYMENT.md`
 
 Add WebSocket tuning section:
-```markdown
+
+````markdown
 ## WebSocket Configuration
 
 ### Buffer Sizing
 
 Default buffer sizes are suitable for up to 10 concurrent test runs:
+
 - Hub broadcast: 4096 messages
 - Client send: 2048 messages per client
 
@@ -821,25 +844,30 @@ api:
     WS_HUB_BUFFER_SIZE: "8192"
     WS_CLIENT_BUFFER_SIZE: "4096"
 ```
+````
 
 ### Monitoring
 
 Monitor WebSocket health via logs:
+
 ```bash
 docker logs observer-api | grep "websocket hub metrics"
 ```
 
 Key metrics:
+
 - `connected_clients`: Number of active WebSocket connections
 - `dropped_messages`: Messages dropped due to full client buffers
 - `dropped_broadcasts`: Events dropped due to full hub channel
 - `queue_utilization_pct`: Hub broadcast channel usage
 
 Alert on:
+
 - `dropped_messages` increasing steadily
 - `queue_utilization_pct` > 80%
 - `connected_clients` unexpectedly dropping
-```
+
+````
 
 ---
 
@@ -868,16 +896,17 @@ cd web && npm test
 # Linting
 go fmt ./...
 cd web && npm run lint
-```
+````
 
 ### 5.3 Performance Benchmarking
 
 Create benchmark for filtering:
+
 ```go
 // pkg/websocket/websocket_bench_test.go
 func BenchmarkEventFiltering(b *testing.B) {
 	hub := NewHub(nil)
-	
+
 	// Create 100 clients with various filters
 	for i := 0; i < 100; i++ {
 		client := &Client{
@@ -910,6 +939,7 @@ func BenchmarkEventFiltering(b *testing.B) {
 ```
 
 Run benchmark:
+
 ```bash
 go test ./pkg/websocket/ -bench=. -benchmem
 ```
@@ -919,6 +949,7 @@ go test ./pkg/websocket/ -bench=. -benchmem
 ## Implementation Order Summary
 
 ### Day 1: Backend Core Changes
+
 1. ✅ Event priority classification helpers
 2. ✅ Smart filtering in `Hub.Run()`
 3. ✅ Increased buffer sizes
@@ -926,24 +957,28 @@ go test ./pkg/websocket/ -bench=. -benchmem
 5. ✅ Unit tests for filtering
 
 ### Day 2: Backend Testing
+
 1. ✅ Integration tests for smart filtering
 2. ✅ Load test implementation
 3. ✅ Run load test and verify metrics
 4. ✅ Fix any issues found
 
 ### Day 3: Frontend Changes
+
 1. ✅ Event deduplication in `useWebSocket`
 2. ✅ Reconnection state sync
 3. ✅ Remove step events from filters
 4. ✅ Manual testing in browser
 
 ### Day 4: Documentation
+
 1. ✅ Update WEBSOCKET_IMPROVEMENTS.md
 2. ✅ Update architecture docs
 3. ✅ Update deployment guides
 4. ✅ Add monitoring section
 
 ### Day 5: Review & Deploy
+
 1. ✅ Code review checklist
 2. ✅ Full test suite
 3. ✅ Performance benchmarks
@@ -954,18 +989,21 @@ go test ./pkg/websocket/ -bench=. -benchmem
 ## Success Criteria
 
 ### Functional Requirements
+
 - ✅ Zero client disconnections under simulated load (6 runs × 500 tests × 50 steps)
 - ✅ Dropped message rate < 1% under load
 - ✅ UI statistics match database state after test completion
 - ✅ WebSocket reconnection automatically syncs state
 
 ### Performance Requirements
+
 - ✅ Handle 2500+ events/sec without buffer overflow
 - ✅ < 100ms p99 latency for high-priority events
 - ✅ < 5% CPU overhead for filtering logic
 - ✅ < 10MB memory per 100 connected clients
 
 ### Observability Requirements
+
 - ✅ Metrics logged every 60 seconds
 - ✅ Dropped events logged with reason (filter vs buffer-full)
 - ✅ Buffer utilization percentage tracked
@@ -976,18 +1014,22 @@ go test ./pkg/websocket/ -bench=. -benchmem
 ## Risk Mitigation
 
 ### Risk: Smart filtering has bugs, wrong clients get filtered
+
 **Mitigation**: Comprehensive unit tests for all filter combinations
 **Fallback**: Feature flag to disable filtering, revert to broadcast-all
 
 ### Risk: Increased buffers cause OOM in production
+
 **Mitigation**: Monitor memory usage, make buffer sizes configurable
 **Fallback**: Reduce buffer sizes, accept higher drop rate
 
 ### Risk: Frontend deduplication has false positives
+
 **Mitigation**: Use strong hash (type + id + timestamp)
 **Fallback**: Remove deduplication, accept duplicate processing
 
 ### Risk: Load test doesn't reflect production patterns
+
 **Mitigation**: Capture production event traces, replay in test
 **Fallback**: Monitor production metrics, adjust if needed
 
@@ -1021,16 +1063,19 @@ If issues arise in production:
 ## Appendix A: Key Files Modified
 
 ### Backend
+
 - `pkg/websocket/websocket.go` (smart filtering, buffer sizes, metrics)
 - `pkg/websocket/websocket_test.go` (new tests)
 - `tests/websocket_load_test.go` (new file)
 
 ### Frontend
+
 - `web/src/hooks/useWebSocket.ts` (deduplication, reconnect sync)
 - `web/src/pages/TestSuiteRunsPage/TestSuiteRunsPage.tsx` (reconnect callback)
 - `web/src/pages/TestRunDetailPage/TestRunDetailPage.tsx` (filter adjustment)
 
 ### Documentation
+
 - `docs/WEBSOCKET_BUFFER_FIX_IMPLEMENTATION_PLAN.md` (this file)
 - `docs/WEBSOCKET_IMPROVEMENTS.md` (updated)
 - `docs/architecture/02-dataflow.md` (updated)
@@ -1067,16 +1112,19 @@ make test
 ## Appendix C: Monitoring Queries
 
 ### Check dropped events
+
 ```bash
 docker logs observer-api | grep "dropped"
 ```
 
 ### Check buffer utilization
+
 ```bash
 docker logs observer-api | grep "queue_utilization_pct"
 ```
 
 ### Watch WebSocket connections
+
 ```bash
 watch -n 1 'docker logs observer-api --tail 50 | grep "client connected\|client disconnected"'
 ```

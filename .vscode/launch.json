@@ -26,7 +26,7 @@
       "env": {
         "NATS_URL": "nats://localhost:4222",
         "NATS_STREAM": "tests_events",
-        "MONGODB_URI": "mongodb://root:password@localhost:27017/observer?authSource=admin"
+        "MONGODB_URI": "${env:MONGODB_URI}"
       },
       "args": [],
       "showLog": true,
@@ -42,7 +42,7 @@
         "PORT": "8080",
         "NATS_URL": "nats://localhost:4222",
         "NATS_STREAM": "tests_events",
-        "MONGODB_URI": "mongodb://root:password@localhost:27017/observer?authSource=admin"
+        "MONGODB_URI": "${env:MONGODB_URI}"
       },
       "args": [],
       "showLog": true,
@@ -55,7 +55,7 @@
       "mode": "debug",
       "program": "${workspaceFolder}/server",
       "env": {
-        "MONGODB_URI": "mongodb://root:password@localhost:27017/observer?authSource=admin",
+        "MONGODB_URI": "${env:MONGODB_URI}",
         "NATS_URL": "nats://localhost:4222"
       },
       "args": [],

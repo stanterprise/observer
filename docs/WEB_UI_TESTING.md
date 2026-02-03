@@ -9,13 +9,13 @@ Before testing the Web UI, ensure the following services are running:
 3. **Ingestion Service** (creates NATS stream): `NATS_URL='nats://localhost:4222' ./bin/ingestion`
 4. **Processor Service** (processes events):
    ```bash
-   MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+   MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
    NATS_URL='nats://localhost:4222' \
    ./bin/processor
    ```
 5. **API Service** (provides REST API and WebSocket):
    ```bash
-   MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+   MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
    NATS_URL='nats://localhost:4222' \
    ./bin/api
    ```

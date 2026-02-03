@@ -140,8 +140,8 @@ Attachments are stored in test documents with the following structure:
 {
   "name": "screenshot.png",
   "mime_type": "image/png",
-  "storage_key": "abc123-def456.png",
-  "storage_uri": "http://localhost:8080/api/attachments/abc123-def456.png",
+  "storage_key": "attachment-id.png",
+  "storage_uri": "http://localhost:8080/api/attachments/attachment-id.png",
   "size": 153600,
   "storage": "local",
   "uploaded_at": "2026-01-28T00:00:00Z"
@@ -154,8 +154,8 @@ Attachments are stored in test documents with the following structure:
 {
   "name": "screenshot.png",
   "mime_type": "image/png",
-  "storage_key": "attachments/abc123-def456.png",
-  "storage_uri": "http://localhost:8080/api/attachments/attachments/abc123-def456.png",
+  "storage_key": "attachments/attachment-id.png",
+  "storage_uri": "http://localhost:8080/api/attachments/attachments/attachment-id.png",
   "size": 153600,
   "storage": "s3",
   "uploaded_at": "2026-01-28T00:00:00Z"
@@ -196,6 +196,7 @@ attMap, err := c.processAttachment(ctx, attachment)
 ```
 
 This helper automatically:
+
 1. Checks attachment size
 2. Uploads to external storage if > 100KB and driver is available
 3. Falls back to inline storage if upload fails or no driver is configured
@@ -264,6 +265,7 @@ The API generates presigned URLs with 15-minute expiration for S3 attachments. T
 ### Access Control
 
 Attachment retrieval requires knowledge of the storage key. For production use, consider adding:
+
 - Authentication on the `/api/attachments/` endpoint
 - Run-based authorization (ensure user has access to the test run)
 - Rate limiting to prevent abuse
@@ -273,6 +275,7 @@ Attachment retrieval requires knowledge of the storage key. For production use, 
 ### Attachments Not Uploading
 
 1. Check storage driver initialization logs:
+
    ```
    storage driver initialized driver=local
    ```
@@ -319,7 +322,7 @@ The Playwright reporter automatically attaches screenshots and videos to test re
 
 ```typescript
 // Screenshot is automatically uploaded
-await page.screenshot({ path: 'screenshot.png' });
+await page.screenshot({ path: "screenshot.png" });
 
 // Large video is stored externally
 // Small logs are stored inline

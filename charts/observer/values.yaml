@@ -51,7 +51,7 @@ aio:
     # existingClaim: ""
 
   env:
-    MONGODB_URI: mongodb://root:password@localhost:27017/observer?authSource=admin
+    MONGODB_URI: mongodb://root:change-me@localhost:27017/observer?authSource=admin
     STORAGE_DRIVER: local
     ARTIFACTS_DIR: /data/artifacts
     NATS_URL: nats://localhost:4222
@@ -185,11 +185,11 @@ mongodb:
   auth:
     enabled: true
     rootUser: root
-    rootPassword: password
+    rootPassword: change-me
     usernames:
       - observer
     passwords:
-      - password
+      - change-me
     databases:
       - observer
   persistence:
@@ -280,8 +280,7 @@ ingress:
   web:
     enabled: false
     className: "nginx"
-    annotations:
-      {}
+    annotations: {}
       # cert-manager.io/cluster-issuer: "letsencrypt-prod"
       # nginx.ingress.kubernetes.io/ssl-redirect: "true"
     hosts:
@@ -289,8 +288,7 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
-    tls:
-      []
+    tls: []
       # - secretName: observer-web-tls
       #   hosts:
       #     - observer.example.com
@@ -299,8 +297,7 @@ ingress:
   api:
     enabled: false
     className: "nginx"
-    annotations:
-      {}
+    annotations: {}
       # cert-manager.io/cluster-issuer: "letsencrypt-prod"
       # nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
       # nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
@@ -310,8 +307,7 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
-    tls:
-      []
+    tls: []
       # - secretName: observer-api-tls
       #   hosts:
       #     - api.observer.example.com
@@ -328,8 +324,7 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
-    tls:
-      []
+    tls: []
       # - secretName: observer-grpc-tls
       #   hosts:
       #     - grpc.observer.example.com

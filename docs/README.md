@@ -1,6 +1,6 @@
 # Observer Documentation
 
-This folder contains the maintained documentation set for Observer.
+This folder contains the maintained **public documentation set** for Observer.
 
 ## Start here
 
@@ -50,3 +50,10 @@ This folder contains the maintained documentation set for Observer.
 Some older “status report” / “implementation summary” documents were generated during earlier Copilot-assisted work and are kept for archaeology only.
 
 - Archive index: [archive/README.md](archive/README.md)
+
+## Internal-only documents
+
+The following files are **not** part of the public documentation set and should be treated as internal references:
+
+- Root-level STEP*COMPONENT*\* guides
+- Implementation plans and fix summaries in docs/ that are superseded by current guides

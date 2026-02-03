@@ -1,0 +1,91 @@
+{
+  "id": "readiness-001-release-cleanup",
+  "version": "1.0",
+  "generated_at": "2026-02-02T00:00:00Z",
+  "scope": "Release readiness cleanup for public repository release (docs, build, secrets, licensing, CI).",
+  "overall_status": "fail",
+  "decision": {
+    "status": "block",
+    "rationale": "Pending licensing decision and full Go license report.",
+    "decided_by": "release-owner",
+    "decided_at": "2026-02-02T00:00:00Z"
+  },
+  "gates": [
+    {
+      "id": "gate-docs",
+      "name": "Documentation readiness",
+      "description": "Public documentation set is accurate, consistent, and free of unsafe defaults.",
+      "status": "pass",
+      "owner": "tbd",
+      "evidence_paths": [
+        "specs/001-release-cleanup/research.md",
+        "README.md",
+        "QUICKSTART.md",
+        "DEPLOYMENT.md",
+        "docs/README.md",
+        "docs/architecture/",
+        "specs/001-release-cleanup/artifacts/docs-review.md"
+      ],
+      "risk_ids": ["RISK-001"]
+    },
+    {
+      "id": "gate-build",
+      "name": "Build & test readiness",
+      "description": "Build and test instructions succeed on a clean checkout.",
+      "status": "pass",
+      "owner": "tbd",
+      "evidence_paths": [
+        "specs/001-release-cleanup/research.md",
+        "README.md",
+        "BUILD_QUICK_REF.md",
+        "specs/001-release-cleanup/artifacts/build-validation.md"
+      ],
+      "risk_ids": ["RISK-002", "RISK-006"]
+    },
+    {
+      "id": "gate-secrets",
+      "name": "Secrets & sensitive data",
+      "description": "No secrets in working tree or git history; examples use placeholders.",
+      "status": "pass",
+      "owner": "tbd",
+      "evidence_paths": [
+        "specs/001-release-cleanup/research.md",
+        ".env.example",
+        ".vscode/settings.json",
+        ".vscode/launch.json",
+        "specs/001-release-cleanup/artifacts/gitleaks-report.json"
+      ],
+      "risk_ids": ["RISK-003"]
+    },
+    {
+      "id": "gate-licensing",
+      "name": "Licensing & attribution",
+      "description": "LICENSE and attribution inventory are complete and compatible.",
+      "status": "fail",
+      "owner": "tbd",
+      "evidence_paths": [
+        "specs/001-release-cleanup/research.md",
+        "LICENSE",
+        "ATTRIBUTION.md",
+        "specs/001-release-cleanup/artifacts/go-modules.json",
+        "specs/001-release-cleanup/artifacts/web-licenses.json"
+      ],
+      "remediation_task_ids": ["LIC-001"],
+      "risk_ids": ["RISK-004"]
+    },
+    {
+      "id": "gate-ci",
+      "name": "CI readiness gating",
+      "description": "Required CI checks and readiness validation are defined and passing.",
+      "status": "pass",
+      "owner": "tbd",
+      "evidence_paths": [
+        "specs/001-release-cleanup/research.md",
+        ".github/workflows/",
+        ".github/workflows/readiness-gate.yml"
+      ],
+      "risk_ids": ["RISK-005"]
+    }
+  ],
+  "evidence_index_path": "specs/001-release-cleanup/artifacts/evidence-index.json"
+}

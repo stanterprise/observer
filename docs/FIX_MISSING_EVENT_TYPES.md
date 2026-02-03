@@ -167,12 +167,12 @@ CodeQL analysis: 0 vulnerabilities found.
    NATS_URL=nats://localhost:4222 ./bin/ingestion
 
    # Terminal 2: Processor
-   MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+   MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
    NATS_URL=nats://localhost:4222 \
    ./bin/processor
 
    # Terminal 3: API with WebSocket
-   MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+   MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
    NATS_URL=nats://localhost:4222 \
    ./bin/api
    ```

@@ -1,0 +1,100 @@
+[
+  {
+    "id": "DOC-001",
+    "title": "Complete public documentation audit",
+    "priority": "P1",
+    "owner": "tbd",
+    "status": "done",
+    "acceptance_criteria": [
+      "Review curated public docs set end-to-end",
+      "Confirm no conflicting setup or deployment steps",
+      "Archive or mark non-public docs clearly"
+    ],
+    "related_gate_id": "gate-docs"
+  },
+  {
+    "id": "DOC-002",
+    "title": "Remove unsafe default credentials from docs",
+    "priority": "P1",
+    "owner": "tbd",
+    "status": "done",
+    "acceptance_criteria": [
+      "Replace default credentials with placeholders",
+      "Ensure examples reference .env.example where applicable"
+    ],
+    "related_gate_id": "gate-docs"
+  },
+  {
+    "id": "BLD-001",
+    "title": "Validate build and test steps on clean checkout",
+    "priority": "P1",
+    "owner": "tbd",
+    "status": "done",
+    "acceptance_criteria": [
+      "Run make build-all successfully",
+      "Run go test ./tests successfully",
+      "Run web build (npm run build) successfully"
+    ],
+    "related_gate_id": "gate-build"
+  },
+  {
+    "id": "BLD-002",
+    "title": "Triage npm audit vulnerabilities",
+    "priority": "P2",
+    "owner": "tbd",
+    "status": "done",
+    "acceptance_criteria": [
+      "Run npm audit and capture findings",
+      "Remediate or document accepted risks"
+    ],
+    "related_gate_id": "gate-build"
+  },
+  {
+    "id": "SEC-001",
+    "title": "Run history-aware secrets scan",
+    "priority": "P0",
+    "owner": "tbd",
+    "status": "done",
+    "acceptance_criteria": [
+      "Run gitleaks (or equivalent) against full git history",
+      "Document findings and remediation steps"
+    ],
+    "related_gate_id": "gate-secrets"
+  },
+  {
+    "id": "SEC-002",
+    "title": "Remove inline credentials from tooling configs",
+    "priority": "P2",
+    "owner": "tbd",
+    "status": "done",
+    "acceptance_criteria": [
+      "VS Code settings and launch configs use env vars",
+      "Docs use placeholders for example credentials"
+    ],
+    "related_gate_id": "gate-secrets"
+  },
+  {
+    "id": "LIC-001",
+    "title": "Select license and publish attribution inventory",
+    "priority": "P0",
+    "owner": "tbd",
+    "status": "in-progress",
+    "acceptance_criteria": [
+      "Add LICENSE file with approved license text",
+      "Create attribution inventory for Go and web dependencies"
+    ],
+    "related_gate_id": "gate-licensing"
+  },
+  {
+    "id": "CI-001",
+    "title": "Add readiness validation to CI",
+    "priority": "P1",
+    "owner": "tbd",
+    "status": "done",
+    "acceptance_criteria": [
+      "Define readiness checklist validation job",
+      "Ensure job is required for release approval"
+    ],
+    "related_gate_id": "gate-ci"
+  }
+]

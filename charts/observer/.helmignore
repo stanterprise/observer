@@ -25,3 +25,13 @@
 .github/
 .travis.yml
 .gitlab-ci.yml
+
+# Dependencies / build output
+node_modules/
+dist/
+build/
+coverage/
+
+# Env files
+.env
+.env.*

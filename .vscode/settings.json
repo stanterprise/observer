@@ -1,91 +1,89 @@
 {
-    "go.useLanguageServer": true,
-    "go.toolsManagement.autoUpdate": true,
-    "go.lintTool": "golangci-lint",
-    "go.lintOnSave": "workspace",
-    "go.testFlags": [
-        "-v"
-    ],
-    "go.buildTags": "",
-    "go.coverOnSave": false,
-    "go.coverageDecorator": {
-        "type": "gutter"
-    },
-    "go.testEnvVars": {
-        "MONGODB_URI": "mongodb://root:password@localhost:27017/observer?authSource=admin",
-        "NATS_URL": "nats://localhost:4222"
-    },
-    "[go]": {
-        "editor.formatOnSave": true,
-        "editor.codeActionsOnSave": {
-            "source.organizeImports": "always"
-        },
-        "editor.suggest.snippetsPreventQuickSuggestions": false
-    },
-    "[go.mod]": {
-        "editor.formatOnSave": true,
-        "editor.codeActionsOnSave": {
-            "source.organizeImports": "always"
-        }
-    },
-    "gopls": {
-        "ui.semanticTokens": true,
-        "ui.completion.usePlaceholders": true,
-        "ui.diagnostic.analyses": {
-            "composites": false,
-            "nilness": true,
-            "unusedparams": true,
-            "unusedwrite": true,
-            "useany": true
-        },
-        "formatting.gofumpt": true
-    },
-    "files.exclude": {
-        "**/.git": true,
-        "**/.DS_Store": true,
-        "**/bin": true,
-        "**/coverage.out": true
-    },
-    "files.watcherExclude": {
-        "**/bin/**": true,
-        "**/.git/objects/**": true,
-        "**/.git/subtree-cache/**": true,
-        "**/node_modules/**": true,
-        "**/.hg/store/**": true
-    },
-    "search.exclude": {
-        "**/bin": true,
-        "**/coverage.out": true,
-        "**/vendor": true
-    },
+  "go.useLanguageServer": true,
+  "go.toolsManagement.autoUpdate": true,
+  "go.lintTool": "golangci-lint",
+  "go.lintOnSave": "workspace",
+  "go.testFlags": ["-v"],
+  "go.buildTags": "",
+  "go.coverOnSave": false,
+  "go.coverageDecorator": {
+    "type": "gutter"
+  },
+  "go.testEnvVars": {
+    "MONGODB_URI": "${env:MONGODB_URI}",
+    "NATS_URL": "nats://localhost:4222"
+  },
+  "[go]": {
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
-        "source.fixAll": "explicit"
+      "source.organizeImports": "always"
     },
-    "terminal.integrated.defaultProfile.linux": "bash",
-    "terminal.integrated.env.linux": {
-        "MONGODB_URI": "mongodb://root:password@localhost:27017/observer?authSource=admin",
-        "NATS_URL": "nats://localhost:4222",
-        "NATS_STREAM": "tests_events"
-    },
-    "files.eol": "\n",
-    "files.insertFinalNewline": true,
-    "files.trimFinalNewlines": true,
-    "files.trimTrailingWhitespace": true,
-    "[markdown]": {
-        "files.trimTrailingWhitespace": false
-    },
-    "makefile.configureOnOpen": true,
-    "proto3.compile.path": "protoc",
-    "chat.promptFilesRecommendations": {
-        "speckit.constitution": true,
-        "speckit.specify": true,
-        "speckit.plan": true,
-        "speckit.tasks": true,
-        "speckit.implement": true
-    },
-    "chat.tools.terminal.autoApprove": {
-        ".specify/scripts/bash/": true,
-        ".specify/scripts/powershell/": true
+    "editor.suggest.snippetsPreventQuickSuggestions": false
+  },
+  "[go.mod]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "always"
     }
+  },
+  "gopls": {
+    "ui.semanticTokens": true,
+    "ui.completion.usePlaceholders": true,
+    "ui.diagnostic.analyses": {
+      "composites": false,
+      "nilness": true,
+      "unusedparams": true,
+      "unusedwrite": true,
+      "useany": true
+    },
+    "formatting.gofumpt": true
+  },
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/bin": true,
+    "**/coverage.out": true
+  },
+  "files.watcherExclude": {
+    "**/bin/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.hg/store/**": true
+  },
+  "search.exclude": {
+    "**/bin": true,
+    "**/coverage.out": true,
+    "**/vendor": true
+  },
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit"
+  },
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.env.linux": {
+    "MONGODB_URI": "${env:MONGODB_URI}",
+    "NATS_URL": "nats://localhost:4222",
+    "NATS_STREAM": "tests_events"
+  },
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.trimTrailingWhitespace": true,
+  "[markdown]": {
+    "files.trimTrailingWhitespace": false
+  },
+  "makefile.configureOnOpen": true,
+  "proto3.compile.path": "protoc",
+  "chat.promptFilesRecommendations": {
+    "speckit.constitution": true,
+    "speckit.specify": true,
+    "speckit.plan": true,
+    "speckit.tasks": true,
+    "speckit.implement": true
+  },
+  "chat.tools.terminal.autoApprove": {
+    ".specify/scripts/bash/": true,
+    ".specify/scripts/powershell/": true
+  }
 }

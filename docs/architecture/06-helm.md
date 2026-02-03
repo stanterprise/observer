@@ -120,12 +120,12 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer
 
 ### Database Configuration
 
-| Key                         | Description                                   | Default    |
-| --------------------------- | --------------------------------------------- | ---------- |
-| `mongodb.enabled`           | Deploy MongoDB                                | `true`     |
-| `mongodb.auth.rootUser`     | MongoDB root username                         | `root`     |
-| `mongodb.auth.rootPassword` | MongoDB root password                         | `password` |
-| `externalDatabase.host`     | External DB host (when mongodb.enabled=false) | `""`       |
+| Key                         | Description                                   | Default         |
+| --------------------------- | --------------------------------------------- | --------------- |
+| `mongodb.enabled`           | Deploy MongoDB                                | `true`          |
+| `mongodb.auth.rootUser`     | MongoDB root username                         | `root`          |
+| `mongodb.auth.rootPassword` | MongoDB root password                         | `<db-password>` |
+| `externalDatabase.host`     | External DB host (when mongodb.enabled=false) | `""`            |
 
 ### NATS Configuration
 
@@ -203,7 +203,7 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
   --set mongodb.enabled=false \
   --set externalDatabase.host=mongodb.prod.example.com \
   --set externalDatabase.username=observer \
-  --set externalDatabase.password=<secret-password>
+  --set externalDatabase.password=<db-password>
 ```
 
 ## Dependencies

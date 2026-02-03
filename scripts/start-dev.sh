@@ -3,6 +3,8 @@
 
 set -e
 
+DEFAULT_MONGODB_URI="mongodb://root:change-me@localhost:27017/observer?authSource=admin"
+
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -37,7 +39,7 @@ echo "Ingestion PID: $INGESTION_PID"
 sleep 2
 
 echo -e "${YELLOW}6. Starting Processor service...${NC}"
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+MONGODB_URI="${MONGODB_URI:-$DEFAULT_MONGODB_URI}" \
 NATS_URL='nats://localhost:4222' \
     ./bin/processor > /tmp/observer-processor.log 2>&1 &
 PROCESSOR_PID=$!
@@ -46,7 +48,7 @@ echo "Processor PID: $PROCESSOR_PID"
 sleep 2
 
 echo -e "${YELLOW}7. Starting API service...${NC}"
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+MONGODB_URI="${MONGODB_URI:-$DEFAULT_MONGODB_URI}" \
 NATS_URL='nats://localhost:4222' \
     ./bin/api > /tmp/observer-api.log 2>&1 &
 API_PID=$!

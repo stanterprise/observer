@@ -1,0 +1,46 @@
+[
+  {
+    "id": "RISK-001",
+    "severity": "medium",
+    "impact": "Public docs may still contain inconsistencies or internal-only guidance.",
+    "mitigation": "Complete the curated docs audit and archive or annotate non-public docs.",
+    "acceptance_rationale": "Docs review completed; curated set verified and internal-only docs noted.",
+    "related_gate_ids": ["gate-docs"]
+  },
+  {
+    "id": "RISK-002",
+    "severity": "high",
+    "impact": "Build or tests may fail on clean checkout, delaying release.",
+    "mitigation": "Run documented build/test steps and capture evidence.",
+    "related_gate_ids": ["gate-build"]
+  },
+  {
+    "id": "RISK-003",
+    "severity": "high",
+    "impact": "Secrets may exist in git history or unreviewed files.",
+    "mitigation": "Run history-aware scanning and remediate any findings.",
+    "related_gate_ids": ["gate-secrets"]
+  },
+  {
+    "id": "RISK-004",
+    "severity": "critical",
+    "impact": "Missing or incompatible licensing could block public release.",
+    "mitigation": "Select a license with legal review and publish attribution. Generate a full Go license report in CI/Linux.",
+    "related_gate_ids": ["gate-licensing"]
+  },
+  {
+    "id": "RISK-005",
+    "severity": "medium",
+    "impact": "Release readiness checks are not enforced by CI.",
+    "mitigation": "Add readiness validation workflow and require it for release.",
+    "related_gate_ids": ["gate-ci"]
+  },
+  {
+    "id": "RISK-006",
+    "severity": "medium",
+    "impact": "Web dependencies report moderate/high vulnerabilities in npm audit output.",
+    "mitigation": "Run npm audit, triage findings, and remediate or document accepted risk.",
+    "acceptance_rationale": "Remediated via npm audit fix; npm audit now reports 0 vulnerabilities.",
+    "related_gate_ids": ["gate-build"]
+  }
+]

@@ -7,14 +7,12 @@ This repository is fully configured for [GitHub Codespaces](https://github.com/f
 ### Launch a Codespace
 
 1. **From GitHub Web UI:**
-
    - Navigate to this repository on GitHub
    - Click the **Code** button (green)
    - Select the **Codespaces** tab
    - Click **Create codespace on main**
 
 2. **From VS Code Desktop:**
-
    - Install the [GitHub Codespaces extension](https://marketplace.visualstudio.com/items?itemName=GitHub.codespaces)
    - Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
    - Select "Codespaces: Create New Codespace"
@@ -30,7 +28,7 @@ This repository is fully configured for [GitHub Codespaces](https://github.com/f
 
 The Codespace will automatically:
 
-1. ✅ Build the Go 1.23 development container with Node.js LTS
+1. ✅ Build the Go 1.24 development container with Node.js LTS
 2. ✅ Install development tools (golangci-lint, protoc, gopls, delve, TypeScript)
 3. ✅ Download Go dependencies
 4. ✅ Build all service components
@@ -57,7 +55,7 @@ docker compose ps
 
 **Backend:**
 
-- **Go 1.23** with gopls language server
+- **Go 1.24** with gopls language server
 - **Delve** debugger
 - **golangci-lint** for code quality
 - **protoc** for gRPC code generation
@@ -77,7 +75,7 @@ docker compose ps
 All required variables are pre-set:
 
 ```bash
-MONGODB_URI=mongodb://root:password@localhost:27017/observer?authSource=admin
+MONGODB_URI=mongodb://root:change-me@localhost:27017/observer?authSource=admin
 NATS_URL=nats://localhost:4222
 ```
 
@@ -269,7 +267,7 @@ Run different services in separate terminals for easier monitoring.
 Edit `.env` file:
 
 ```bash
-export MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin'
+export MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin'
 export NATS_URL='nats://localhost:4222'
 ```
 
@@ -289,7 +287,7 @@ go test ./pkg/server -v
 
 ### Docker Compose Logs
 
-MONGODB_URI=mongodb://root:password@localhost:27017/observer?authSource=admin
+MONGODB_URI=mongodb://root:change-me@localhost:27017/observer?authSource=admin
 # All services
 docker compose logs -f
 
@@ -397,7 +395,7 @@ go install golang.org/x/tools/gopls@latest
 docker compose ps mongodb
 
 # Test connection
-docker compose exec mongodb mongosh --username root --password password --authenticationDatabase admin --eval "db.adminCommand({ ping: 1 })" observer
+docker compose exec mongodb mongosh --username root --password change-me --authenticationDatabase admin --eval "db.adminCommand({ ping: 1 })" observer
 
 # Reset database
 make mongo-reset

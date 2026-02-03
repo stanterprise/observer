@@ -1,27 +1,30 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Cleanup Task",
-  "type": "object",
-  "required": [
-    "id",
-    "title",
-    "priority",
-    "owner",
-    "status",
-    "acceptance_criteria",
-    "related_gate_id"
-  ],
-  "properties": {
-    "id": { "type": "string" },
-    "title": { "type": "string" },
-    "priority": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
-    "owner": { "type": "string" },
-    "status": {
-      "type": "string",
-      "enum": ["open", "in-progress", "blocked", "done"]
-    },
-    "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
-    "related_gate_id": { "type": "string" },
-    "due_date": { "type": "string", "format": "date" }
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "id",
+      "title",
+      "priority",
+      "owner",
+      "status",
+      "acceptance_criteria",
+      "related_gate_id"
+    ],
+    "properties": {
+      "id": { "type": "string" },
+      "title": { "type": "string" },
+      "priority": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
+      "owner": { "type": "string" },
+      "status": {
+        "type": "string",
+        "enum": ["open", "in-progress", "blocked", "done"]
+      },
+      "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
+      "related_gate_id": { "type": "string" },
+      "due_date": { "type": "string", "format": "date" }
+    }
   }
 }

@@ -360,9 +360,9 @@ make mongo-up nats-up
 
 # Run services individually (separate terminals)
 NATS_URL=nats://localhost:4222 ./bin/ingestion
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
     NATS_URL=nats://localhost:4222 ./bin/processor
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
     NATS_URL=nats://localhost:4222 ./bin/api
 
 # Run web UI

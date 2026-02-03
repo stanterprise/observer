@@ -7,3 +7,16 @@
 docs/
 coverage.out
 *.test
+node_modules/
+web/node_modules/
+web/dist/
+dist/
+build/
+.idea
+*.log
+*.log.*
+.env
+.env.*
+coverage/
+Dockerfile*
+.dockerignore

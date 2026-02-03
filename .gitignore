@@ -29,6 +29,26 @@ bin/
 observer
 coverage.out
 
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+*.log.*
+
+# Node/JS
+node_modules/
+dist/
+build/
+
+# Env files (keep example tracked)
+.env
+.env.*
+!.env.example
+
 # Test database files
 tests/test_*
 *.db

@@ -1,17 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Risk Register Item",
-  "type": "object",
-  "required": ["id", "severity", "impact", "related_gate_ids"],
-  "properties": {
-    "id": { "type": "string" },
-    "severity": {
-      "type": "string",
-      "enum": ["low", "medium", "high", "critical"]
-    },
-    "impact": { "type": "string" },
-    "mitigation": { "type": "string" },
-    "acceptance_rationale": { "type": "string" },
-    "related_gate_ids": { "type": "array", "items": { "type": "string" } }
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "severity", "impact", "related_gate_ids"],
+    "properties": {
+      "id": { "type": "string" },
+      "severity": {
+        "type": "string",
+        "enum": ["low", "medium", "high", "critical"]
+      },
+      "impact": { "type": "string" },
+      "mitigation": { "type": "string" },
+      "acceptance_rationale": { "type": "string" },
+      "related_gate_ids": { "type": "array", "items": { "type": "string" } }
+    }
   }
 }

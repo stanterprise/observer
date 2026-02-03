@@ -28,6 +28,7 @@ All images are available at `ghcr.io/stanterprise/observer/`:
 ### Image Tags
 
 Images are tagged with:
+
 - `latest` - Latest build from main branch
 - `main` - Main branch build
 - `develop` - Develop branch build
@@ -65,6 +66,7 @@ docker run -d \
 ```
 
 Access:
+
 - Web UI: http://localhost:3000
 - gRPC: localhost:50051
 - API: http://localhost:8080
@@ -164,6 +166,7 @@ kubectl get all -l app.kubernetes.io/instance=observer
 Best for: Development, testing, proof-of-concept, small-scale deployments
 
 **Features:**
+
 - Single pod deployment
 - Embedded MongoDB database
 - Embedded NATS server
@@ -199,6 +202,7 @@ kubectl port-forward svc/observer-aio 50051:50051
 Best for: Production, CI/CD, high-scale deployments, high availability
 
 **Features:**
+
 - Separate pods for each service
 - Horizontal scaling with HPA
 - External or embedded MongoDB
@@ -218,11 +222,12 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
   --set mongodb.enabled=false \
   --set externalDatabase.host=mongodb.example.com \
   --set externalDatabase.username=observer \
-  --set externalDatabase.password=securepassword \
+  --set externalDatabase.password=<db-password> \
   --set externalDatabase.database=observer
 ```
 
 **Services:**
+
 - `observer-ingestion`: gRPC endpoint (port 50051)
 - `observer-processor`: Event processor (no external port)
 - `observer-api`: REST/GraphQL API + WebSocket (port 8080)
@@ -263,7 +268,7 @@ aio:
   persistence:
     enabled: true
     size: 10Gi
-    storageClass: "standard"  # or your preferred storage class
+    storageClass: "standard" # or your preferred storage class
 ```
 
 #### Distributed Mode
@@ -375,7 +380,7 @@ kubectl create namespace observer
 
 # Create secrets for sensitive data (optional but recommended)
 kubectl create secret generic observer-db-secret \
-  --from-literal=password='your-secure-password' \
+  --from-literal=password='<db-password>' \
   -n observer
 
 # Install with production values
@@ -390,7 +395,7 @@ image:
 
 distributed:
   enabled: true
-  
+
   ingestion:
     replicaCount: 3
     autoscaling:
@@ -400,7 +405,7 @@ distributed:
     resources:
       requests: { cpu: 200m, memory: 256Mi }
       limits: { cpu: 1000m, memory: 512Mi }
-  
+
   processor:
     replicaCount: 3
     autoscaling:
@@ -410,7 +415,7 @@ distributed:
     resources:
       requests: { cpu: 500m, memory: 512Mi }
       limits: { cpu: 2000m, memory: 2Gi }
-  
+
   api:
     replicaCount: 3
     autoscaling:
@@ -420,7 +425,7 @@ distributed:
     resources:
       requests: { cpu: 200m, memory: 256Mi }
       limits: { cpu: 1000m, memory: 1Gi }
-  
+
   web:
         replicaCount: 2
     resources:
@@ -473,7 +478,7 @@ ingress:
     - secretName: observer-tls
       hosts:
         - observer.example.com
-  
+
   grpc:
     enabled: true
     annotations:
@@ -498,7 +503,7 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
   --set externalDatabase.host=mongodb.example.com \
   --set externalDatabase.port=27017 \
   --set externalDatabase.username=observer \
-  --set externalDatabase.password=securepassword \
+  --set externalDatabase.password=<db-password> \
   --set externalDatabase.database=observer \
   --set externalDatabase.authSource=admin
 ```
@@ -633,5 +638,6 @@ kubectl delete namespace observer
 ## Support
 
 For issues and questions:
+
 - GitHub Issues: https://github.com/stanterprise/observer/issues
 - Documentation: https://github.com/stanterprise/observer/tree/main/docs

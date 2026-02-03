@@ -44,7 +44,7 @@ make build-api && ./bin/api
 ### With database (recommended)
 
 ```bash
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' ./bin/api
+MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' ./bin/api
 ```
 
 ### With NATS for WebSocket events
@@ -56,7 +56,7 @@ NATS_URL='nats://localhost:4222' ./bin/api
 ### Full configuration (database + WebSocket)
 
 ```bash
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
 NATS_URL='nats://localhost:4222' \
 ./bin/api
 ```
@@ -206,12 +206,10 @@ A simple HTML test client is available at [`../../docs/websocket-test-client.htm
 ### Types
 
 - **TestCaseRun** - Represents a test execution
-
   - `id`, `runId`, `title`, `status`, `metadata`, `createdAt`, `updatedAt`
   - `steps` - Associated step runs
 
 - **StepRun** - Represents a test step execution
-
   - `id`, `runId`, `testCaseRunId`, `status`, `createdAt`, `updatedAt`
   - `testCase` - Parent test case
 

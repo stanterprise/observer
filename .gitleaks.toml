@@ -1,0 +1,8 @@
+title = "Observer gitleaks config"
+
+[allowlist]
+  description = "Allow example storage_key values in documentation"
+  paths = ["docs/ATTACHMENT_STORAGE.md"]
+  regexes = [
+    '''storage_key"\\s*:\\s*"[^"]+"'''
+  ]

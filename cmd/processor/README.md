@@ -29,7 +29,7 @@ Then run the processor:
 
 ```bash
 make build-processor
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+MONGODB_URI='mongodb://root:change-me@localhost:27017/observer?authSource=admin' \
 NATS_URL='nats://localhost:4222' \
 ./bin/processor
 ```
