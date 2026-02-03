@@ -6,7 +6,7 @@
   "overall_status": "fail",
   "decision": {
     "status": "block",
-    "rationale": "Pending licensing decision and full Go license report.",
+    "rationale": "Licensing blocked: github.com/stanterprise/proto-go has no LICENSE; attribution incomplete until confirmed. CI readiness workflow removed due to gitleaks licensing limitations.",
     "decided_by": "release-owner",
     "decided_at": "2026-02-02T00:00:00Z"
   },
@@ -68,6 +68,7 @@
         "LICENSE",
         "ATTRIBUTION.md",
         "specs/001-release-cleanup/artifacts/go-modules.json",
+        "specs/001-release-cleanup/artifacts/go-licenses.txt",
         "specs/001-release-cleanup/artifacts/web-licenses.json"
       ],
       "remediation_task_ids": ["LIC-001"],
@@ -77,13 +78,13 @@
       "id": "gate-ci",
       "name": "CI readiness gating",
       "description": "Required CI checks and readiness validation are defined and passing.",
-      "status": "pass",
+      "status": "fail",
       "owner": "tbd",
       "evidence_paths": [
         "specs/001-release-cleanup/research.md",
-        ".github/workflows/",
-        ".github/workflows/readiness-gate.yml"
+        ".github/workflows/"
       ],
+      "remediation_task_ids": ["CI-001"],
       "risk_ids": ["RISK-005"]
     }
   ],

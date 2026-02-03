@@ -7,3 +7,7 @@ They are preserved for context, but they are **not maintained** and may contain 
 ## 2025-11 (Copilot task reports)
 
 - See [2025-11-copilot/](2025-11-copilot/)
+
+## 2026 Release cleanup
+
+- See [2026-release-cleanup/](2026-release-cleanup/)

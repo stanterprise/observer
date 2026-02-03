@@ -57,3 +57,4 @@ The following files are **not** part of the public documentation set and should 
 
 - Root-level STEP*COMPONENT*\* guides
 - Implementation plans and fix summaries in docs/ that are superseded by current guides
+- Archived summaries are stored in archive/2026-release-cleanup/

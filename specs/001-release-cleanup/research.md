@@ -53,4 +53,4 @@
 
 - **LICENSE**: MIT license added at repo root.
 - **Attribution**: ATTRIBUTION.md added with inventory references; Go module list and web license inventory generated.
-- **Action**: Generate a full Go license report in CI/Linux and confirm compatibility before release signoff (local attempt produced an empty report).
+- **Action**: Go license report generated; `Unknown` entries remain for github.com/stanterprise/proto-go. Confirm license in that repo and update attribution before signoff.

@@ -1,5 +1,3 @@
-> ARCHIVED: This document is archived. Use archive/2026-release-cleanup/BUFFER_FIX_SUMMARY.md instead.
-
 # WebSocket Buffer Overflow Fix - Implementation Summary
 
 **Date:** January 8, 2026  
@@ -200,48 +198,4 @@ go hub.Run(ctx, websocket.NATSConfig{
     BatchSize:    10,
     MaxWait:      5 * time.Second,
 })
-
-// Periodically check health
-go func() {
-    for {
-        time.Sleep(60 * time.Second)
-        metrics := hub.GetMetrics()
-        logger.Info("websocket metrics",
-            "clients", metrics.ConnectedClients,
-            "dropped_messages", metrics.DroppedMessages,
-            "queue_pct", float64(metrics.BroadcastQueueSize)/float64(metrics.BroadcastCapacity)*100)
-    }
-}()
 ```
-
-## Backward Compatibility
-
-✅ **Fully backward compatible** - no API changes, no client-side updates required.
-
-The fix is transparent to existing clients and doesn't change the WebSocket protocol or message format.
-
-## Related Documentation
-
-- [WEBSOCKET_IMPROVEMENTS.md](./WEBSOCKET_IMPROVEMENTS.md) - Detailed analysis and recommendations
-- [WEBSOCKET_IMPLEMENTATION.md](./WEBSOCKET_IMPLEMENTATION.md) - Original implementation
-- [pkg/websocket/websocket.go](../pkg/websocket/websocket.go) - Updated implementation
-- [pkg/websocket/buffer_test.go](../pkg/websocket/buffer_test.go) - Test suite
-
-## Next Steps
-
-1. ✅ **Deploy to staging** - Test with realistic load (Playwright test suite)
-2. ⏳ **Monitor metrics** - Observe drop rates and queue utilization
-3. ⏳ **Production deployment** - Roll out to production environment
-4. ⏳ **Add event normalization** - Complete model conversion for all event types (see WEBSOCKET_IMPROVEMENTS.md)
-5. ⏳ **Frontend handlers** - Add handlers for `run.end`, `suite.*`, `test.failure` events
-
-## Conclusion
-
-The buffer overflow issue is **resolved**. The WebSocket system now gracefully handles high event rates (including step events) by:
-
-1. **Keeping clients connected** even when their network is slow
-2. **Dropping old messages** to make room for new events
-3. **Never blocking** the NATS consumer
-4. **Providing visibility** through metrics
-
-This ensures a reliable real-time experience for users monitoring test execution, even under heavy load conditions with hundreds of events per second.

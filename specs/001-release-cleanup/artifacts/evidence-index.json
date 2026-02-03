@@ -63,13 +63,6 @@
     "collected_at": "2026-02-02T00:00:00Z"
   },
   {
-    "id": "evidence-ci-readiness-gate",
-    "gate_id": "gate-ci",
-    "description": "Readiness gate workflow definition.",
-    "path": ".github/workflows/readiness-gate.yml",
-    "collected_at": "2026-02-02T00:00:00Z"
-  },
-  {
     "id": "evidence-license-file",
     "gate_id": "gate-licensing",
     "description": "MIT license text.",
@@ -91,10 +84,24 @@
     "collected_at": "2026-02-02T00:00:00Z"
   },
   {
+    "id": "evidence-go-licenses",
+    "gate_id": "gate-licensing",
+    "description": "Go dependency license report (go-licenses).",
+    "path": "specs/001-release-cleanup/artifacts/go-licenses.txt",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
     "id": "evidence-web-licenses",
     "gate_id": "gate-licensing",
     "description": "Web dependency license inventory.",
     "path": "specs/001-release-cleanup/artifacts/web-licenses.json",
+    "collected_at": "2026-02-02T00:00:00Z"
+  },
+  {
+    "id": "evidence-readiness-review",
+    "gate_id": "gate-licensing",
+    "description": "Release readiness gate review summary.",
+    "path": "specs/001-release-cleanup/artifacts/readiness-review.md",
     "collected_at": "2026-02-02T00:00:00Z"
   }
 ]

@@ -81,7 +81,8 @@
     "status": "in-progress",
     "acceptance_criteria": [
       "Add LICENSE file with approved license text",
-      "Create attribution inventory for Go and web dependencies"
+      "Create attribution inventory for Go and web dependencies",
+      "Resolve Unknown licenses for github.com/stanterprise/proto-go"
     ],
     "related_gate_id": "gate-licensing"
   },
@@ -90,7 +91,7 @@
     "title": "Add readiness validation to CI",
     "priority": "P1",
     "owner": "tbd",
-    "status": "done",
+    "status": "open",
     "acceptance_criteria": [
       "Define readiness checklist validation job",
       "Ensure job is required for release approval"

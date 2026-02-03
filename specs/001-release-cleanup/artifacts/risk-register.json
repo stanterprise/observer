@@ -25,7 +25,7 @@
     "id": "RISK-004",
     "severity": "critical",
     "impact": "Missing or incompatible licensing could block public release.",
-    "mitigation": "Select a license with legal review and publish attribution. Generate a full Go license report in CI/Linux.",
+    "mitigation": "Select a license with legal review and publish attribution. Confirm license for github.com/stanterprise/proto-go (Unknown in report) and update attribution.",
     "related_gate_ids": ["gate-licensing"]
   },
   {

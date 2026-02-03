@@ -1,5 +1,3 @@
-> ARCHIVED: This document is archived. Use archive/2026-release-cleanup/STATUS.md instead.
-
 # Project Status (Short)
 
 **Last updated**: 2025-12-17
@@ -8,9 +6,9 @@ Observer is a test observability system that ingests test execution events via g
 
 ## Where to look
 
-- Run it: [../QUICKSTART.md](../QUICKSTART.md)
-- System design: [architecture/00-overview.md](architecture/00-overview.md)
-- Roadmap: [architecture/10-next-steps.md](architecture/10-next-steps.md)
+- Run it: [../../QUICKSTART.md](../../QUICKSTART.md)
+- System design: [../architecture/00-overview.md](../architecture/00-overview.md)
+- Roadmap: [../architecture/10-next-steps.md](../architecture/10-next-steps.md)
 
 ## Key capabilities
 
@@ -20,4 +18,4 @@ Observer is a test observability system that ingests test execution events via g
 
 ## Notes
 
-If you find older documents at the repository root that read like “implementation summary” or “status report”, they are considered historical and are archived under [archive/](archive/README.md).
+If you find older documents at the repository root that read like “implementation summary” or “status report”, they are considered historical and are archived under [archive/](../README.md).

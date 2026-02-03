@@ -1,5 +1,3 @@
-> ARCHIVED: This document is archived. Use archive/2026-release-cleanup/TAGS_VISUAL_SUMMARY.md instead.
-
 # Tags Feature Implementation - Visual Summary
 
 ## Overview
