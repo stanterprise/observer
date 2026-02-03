@@ -7,7 +7,7 @@
 - Services are split: ingestion (gRPC → NATS), processor (NATS → DB + storage), API (DB + WebSocket), web UI (React).
 - Ingestion MUST remain stateless and MUST NOT write to MongoDB.
 - Processor MUST be the only service that persists events to MongoDB.
-- API MUST be read-only against MongoDB application data. If it writes operational metadata (e.g., auth/session), it MUST be to a separate store/collection explicitly approved.
+- If API writes operational metadata (e.g., auth/session), it MUST be to a separate store/collection explicitly approved.
 - Legacy monolith compatibility MUST be preserved unless explicitly approved.
 
 ### II. Event-First Contract
