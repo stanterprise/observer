@@ -95,7 +95,7 @@ export function Layout() {
               >
                 Support
               </a>
-              <span className="text-gray-400">v1.0.0</span>
+              <span className="text-gray-400">v0.0.11</span>
             </div>
           </div>
         </div>
