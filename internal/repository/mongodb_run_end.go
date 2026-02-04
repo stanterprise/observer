@@ -124,7 +124,7 @@ func checkShardCompletion(ctx context.Context, r *MongoRepository, runID string)
 
 	totalRaw, ok := shardState.Metadata["shard.total"]
 	if !ok {
-		return false, nil
+		return true, nil
 	}
 
 	var total int64
