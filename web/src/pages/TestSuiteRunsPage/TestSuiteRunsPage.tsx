@@ -21,6 +21,7 @@ import type { TestRun } from "@/types/testRun";
 import { getRunStatus } from "./utils";
 
 export function TestSuiteRunsPage() {
+  const pollIntervalMs = 10_000;
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,9 +33,12 @@ export function TestSuiteRunsPage() {
   const [markerValue, setMarkerValue] = useState("");
   const [updatingMarker, setUpdatingMarker] = useState(false);
 
-  const fetchRuns = useCallback(async () => {
+  const fetchRuns = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       // Fetch all run statistics in a single request
       const response = await fetch(apiUrl("/runs"));
       if (!response.ok) {
@@ -56,13 +60,25 @@ export function TestSuiteRunsPage() {
       console.error("Error fetching runs:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch runs");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     fetchRuns();
   }, [fetchRuns]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      fetchRuns({ silent: true });
+    }, pollIntervalMs);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [fetchRuns, pollIntervalMs]);
 
   const toggleRunSelection = (runId: string) => {
     setSelectedRuns((prev) => {
@@ -256,7 +272,7 @@ export function TestSuiteRunsPage() {
             </>
           )}
           <button
-            onClick={fetchRuns}
+            onClick={() => fetchRuns()}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             Refresh

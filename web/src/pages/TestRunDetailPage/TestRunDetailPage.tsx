@@ -13,6 +13,7 @@ import TestSuiteRecord from "./TestSuiteRecord";
 import type { TestRun } from "@/types/testRun";
 
 export function TestRunDetailPage() {
+  const pollIntervalMs = 10_000;
   const { runId } = useParams<{ runId: string }>();
   const [runDetail, setRunDetail] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,46 +29,57 @@ export function TestRunDetailPage() {
   );
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
 
-  const fetchRunDetail = useCallback(async (id: string) => {
-    try {
-      setLoading(true);
-      const response = await fetch(apiUrl(`/runs/${id}`));
-      if (!response.ok) {
-        throw new Error(`Failed to fetch run details: ${response.statusText}`);
+  const fetchRunDetail = useCallback(
+    async (id: string, options?: { silent?: boolean }) => {
+      const silent = options?.silent ?? false;
+      try {
+        if (!silent) {
+          setLoading(true);
+        }
+        const response = await fetch(apiUrl(`/runs/${id}`));
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch run details: ${response.statusText}`,
+          );
+        }
+        const data = await response.json();
+
+        data.statistics = {
+          total: data.tests.length,
+          passed: data.tests.filter((t: any) => t.status === "PASSED").length,
+          failed: data.tests.filter((t: any) => t.status === "FAILED").length,
+          skipped: data.tests.filter((t: any) => t.status === "SKIPPED").length,
+          running: data.tests.filter((t: any) => t.status === "RUNNING").length,
+          broken: data.tests.filter((t: any) => t.status === "BROKEN").length,
+          timedout: data.tests.filter((t: any) => t.status === "TIMEDOUT")
+            .length,
+          interrupted: data.tests.filter((t: any) => t.status === "INTERRUPTED")
+            .length,
+          unknown: data.tests.filter((t: any) => t.status === "UNKNOWN").length,
+          expected: data.tests.filter(
+            (t: any) => t.status === "PASSED" && t.attempts.length === 1,
+          ).length,
+          flaky: data.tests.filter(
+            (t: any) => t.status === "PASSED" && t.attempts.length > 1,
+          ).length,
+        };
+        console.log("Fetched run details:", data);
+
+        setRunDetail(data);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching run details:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch run details",
+        );
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
       }
-      const data = await response.json();
-
-      data.statistics = {
-        total: data.tests.length,
-        passed: data.tests.filter((t: any) => t.status === "PASSED").length,
-        failed: data.tests.filter((t: any) => t.status === "FAILED").length,
-        skipped: data.tests.filter((t: any) => t.status === "SKIPPED").length,
-        running: data.tests.filter((t: any) => t.status === "RUNNING").length,
-        broken: data.tests.filter((t: any) => t.status === "BROKEN").length,
-        timedout: data.tests.filter((t: any) => t.status === "TIMEDOUT").length,
-        interrupted: data.tests.filter((t: any) => t.status === "INTERRUPTED")
-          .length,
-        unknown: data.tests.filter((t: any) => t.status === "UNKNOWN").length,
-        expected: data.tests.filter(
-          (t: any) => t.status === "PASSED" && t.attempts.length === 1,
-        ).length,
-        flaky: data.tests.filter(
-          (t: any) => t.status === "PASSED" && t.attempts.length > 1,
-        ).length,
-      };
-      console.log("Fetched run details:", data);
-
-      setRunDetail(data);
-      setError(null);
-    } catch (err) {
-      console.error("Error fetching run details:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch run details",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const countTests = useCallback((suites: TestSuite[]): number => {
     let total = 0;
@@ -84,6 +96,17 @@ export function TestRunDetailPage() {
       fetchRunDetail(runId);
     }
   }, [runId, fetchRunDetail]);
+
+  useEffect(() => {
+    if (!runId) return;
+    const intervalId = window.setInterval(() => {
+      fetchRunDetail(runId, { silent: true });
+    }, pollIntervalMs);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [runId, fetchRunDetail, pollIntervalMs]);
 
   // Compute root suite hierarchy (must be computed before early returns)
   const rootSuite = useMemo(() => {

@@ -324,6 +324,7 @@ function AttemptsAccordion({
 }
 
 export function TestDetailPage() {
+  const pollIntervalMs = 10_000;
   const { runId, testId } = useParams<{ runId: string; testId: string }>();
   const [testDetail, setTestDetail] = useState<TestDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -338,15 +339,15 @@ export function TestDetailPage() {
     contentText: string;
   } | null>(null);
 
-  useEffect(() => {
-    if (testId) {
-      fetchTestDetail(testId);
-    }
-  }, [testId]);
-
-  const fetchTestDetail = async (id: string) => {
+  const fetchTestDetail = async (
+    id: string,
+    options?: { silent?: boolean },
+  ) => {
+    const silent = options?.silent ?? false;
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       if (!runId) {
         throw new Error("Run ID is required");
       }
@@ -363,9 +364,28 @@ export function TestDetailPage() {
         err instanceof Error ? err.message : "Failed to fetch test details",
       );
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
+
+  useEffect(() => {
+    if (testId) {
+      fetchTestDetail(testId);
+    }
+  }, [testId]);
+
+  useEffect(() => {
+    if (!testId) return;
+    const intervalId = window.setInterval(() => {
+      fetchTestDetail(testId, { silent: true });
+    }, pollIntervalMs);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [testId, pollIntervalMs, runId]);
 
   if (loading) {
     return (
