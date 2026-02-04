@@ -59,7 +59,7 @@ func (r *MongoRepository) MarkRunningTestsAsTimedOut(ctx context.Context, runID 
 		return err
 	}
 
-	if !checkShardCompletion(ctx, r, runID) {
+	if ok, err := checkShardCompletion(ctx, r, runID); !ok || err != nil {
 		return nil
 	}
 
@@ -69,6 +69,9 @@ func (r *MongoRepository) MarkRunningTestsAsTimedOut(ctx context.Context, runID 
 	}
 	update := bson.M{
 		"$set": bson.M{
+			"tests.$[test].status":                         "TIMEDOUT",
+			"tests.$[test].end_time":                       now,
+			"tests.$[test].updated_at":                     now,
 			"tests.$[test].attempts.$[attempt].status":     "TIMEDOUT",
 			"tests.$[test].attempts.$[attempt].end_time":   now,
 			"tests.$[test].attempts.$[attempt].updated_at": now,
@@ -91,7 +94,7 @@ func (r *MongoRepository) MarkRunningTestsAsTimedOut(ctx context.Context, runID 
 	return nil
 }
 
-func checkShardCompletion(ctx context.Context, r *MongoRepository, runID string) bool {
+func checkShardCompletion(ctx context.Context, r *MongoRepository, runID string) (bool, error) {
 	var shardState struct {
 		Shards struct {
 			Finished *int64 `bson:"finished"`
@@ -105,9 +108,9 @@ func checkShardCompletion(ctx context.Context, r *MongoRepository, runID string)
 	})
 	if err := r.collection.FindOne(ctx, bson.M{"_id": runID}, projection).Decode(&shardState); err != nil {
 		if err == mongo.ErrNoDocuments {
-			return false
+			return false, nil
 		}
-		return false
+		return false, err
 	}
 
 	finished := int64(0)
@@ -117,7 +120,7 @@ func checkShardCompletion(ctx context.Context, r *MongoRepository, runID string)
 
 	totalRaw, ok := shardState.Metadata["shard.total"]
 	if !ok {
-		return false
+		return false, nil
 	}
 
 	var total int64
@@ -133,16 +136,16 @@ func checkShardCompletion(ctx context.Context, r *MongoRepository, runID string)
 	case string:
 		parsed, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			return false
+			return false, err
 		}
 		total = parsed
 	default:
-		return false
+		return false, nil
 	}
 
 	if finished != total {
-		return false
+		return false, nil
 	}
 
-	return true
+	return true, nil
 }
