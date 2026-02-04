@@ -433,10 +433,10 @@ export function TestSuiteRunsPage() {
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-[1220px] w-full table-auto divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left">
+                    <th scope="col" className="px-6 py-3 text-left w-12">
                       <input
                         type="checkbox"
                         checked={
@@ -449,13 +449,13 @@ export function TestSuiteRunsPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[38rem]"
                     >
                       Run Name
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[14rem]"
                     >
                       <div className="flex items-center">
                         <Tag className="h-4 w-4 mr-1 text-indigo-600" />
@@ -464,41 +464,35 @@ export function TestSuiteRunsPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10rem]"
                     >
                       Status
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10rem]"
+                    >
+                      Result
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[16rem]"
                     >
                       <div className="flex items-center justify-center">
                         <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
                         Passed
                       </div>
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
+                      {" + "}
                       <div className="flex items-center justify-center">
                         <XCircle className="h-4 w-4 mr-1 text-red-600" />
                         Failed
                       </div>
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
+                      {" + "}
                       <div className="flex items-center justify-center">
                         <CircleDashed className="h-4 w-4 mr-1 text-gray-600" />
                         Skipped
                       </div>
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
+                      {" / "}
                       <div className="flex items-center justify-center">
                         <Play className="h-4 w-4 mr-1 text-blue-600" />
                         Total
@@ -506,7 +500,7 @@ export function TestSuiteRunsPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[14rem]"
                     >
                       <button
                         onClick={toggleSortOrder}
@@ -523,87 +517,94 @@ export function TestSuiteRunsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {sortedRuns.map((run) => (
-                    <tr
-                      key={run.id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          checked={selectedRuns.has(run.id)}
-                          onChange={() => toggleRunSelection(run.id)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
-                          aria-label={`Select ${run.name || run.id}`}
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          to={`/suite_runs/${run.id}`}
-                          className="text-blue-600 hover:text-blue-800 font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
-                        >
-                          {run.name || run.id}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {run.metadata?.MARKER ? (
+                  {sortedRuns.map((run) => {
+                    const status = getRunStatus(run);
+                    return (
+                      <tr
+                        key={run.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-6 py-4 w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedRuns.has(run.id)}
+                            onChange={() => toggleRunSelection(run.id)}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                            aria-label={`Select ${run.name || run.id}`}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-normal break-words max-w-[38rem]">
                           <Link
-                            to={`/marker/${encodeURIComponent(
-                              run.metadata.MARKER as string,
-                            )}/stats`}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 hover:bg-indigo-200 transition-colors"
+                            to={`/suite_runs/${run.id}`}
+                            className="text-blue-600 hover:text-blue-800 font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
                           >
-                            <Tag className="h-3 w-3 mr-1" />
-                            {run.metadata.MARKER as string}
+                            {run.name || run.id}
                           </Link>
-                        ) : (
-                          <span className="text-gray-400 text-sm italic">
-                            No marker
+                        </td>
+                        <td className="px-6 py-4 whitespace-normal break-words max-w-[14rem]">
+                          {run.metadata?.MARKER ? (
+                            <Link
+                              to={`/marker/${encodeURIComponent(
+                                run.metadata.MARKER as string,
+                              )}/stats`}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 hover:bg-indigo-200 transition-colors"
+                            >
+                              <Tag className="h-3 w-3 mr-1" />
+                              {run.metadata.MARKER as string}
+                            </Link>
+                          ) : (
+                            <span className="text-gray-400 text-sm italic">
+                              No marker
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Badge
+                            status={
+                              status === "RUNNING" ? "RUNNING" : "COMPLETED"
+                            }
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {status !== "RUNNING" && <Badge status={status} />}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className="text-green-600 font-semibold">
+                            {run.statistics!.passed}
                           </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge status={getRunStatus(run)} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="text-green-600 font-semibold">
-                          {run.statistics!.passed}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="text-red-600 font-semibold">
-                          {run.statistics!.failed +
-                            (run.statistics!.broken || 0) +
-                            (run.statistics!.timedout || 0) +
-                            (run.statistics!.interrupted || 0)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="text-gray-600 font-semibold">
-                          {run.statistics!.skipped}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="text-blue-600 font-semibold">
-                          {run.statistics!.total}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {run.updatedAt ? (
-                          <div className="flex flex-col">
-                            <span>
-                              {new Date(run.updatedAt).toLocaleDateString()}
-                            </span>
-                            <span className="text-xs text-gray-400">
-                              {new Date(run.updatedAt).toLocaleTimeString()}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">N/A</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          {" + "}
+                          <span className="text-red-600 font-semibold">
+                            {run.statistics!.failed +
+                              (run.statistics!.broken || 0) +
+                              (run.statistics!.timedout || 0) +
+                              (run.statistics!.interrupted || 0)}
+                          </span>
+                          {" + "}
+                          <span className="text-gray-600 font-semibold">
+                            {run.statistics!.skipped}
+                          </span>
+                          {" / "}
+                          <span className="text-blue-600 font-semibold">
+                            {run.statistics!.total}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-normal text-sm text-gray-500">
+                          {run.updatedAt ? (
+                            <div className="flex flex-col">
+                              <span>
+                                {new Date(run.updatedAt).toLocaleDateString()}
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                {new Date(run.updatedAt).toLocaleTimeString()}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
