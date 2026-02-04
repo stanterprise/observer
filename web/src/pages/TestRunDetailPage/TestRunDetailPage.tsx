@@ -2,10 +2,8 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
-import type { WebSocketEvent, WebSocketTestData } from "@/types/webSocket";
 import { ArrowLeft, Play, Eye, EyeOff, Search, X, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useWebSocket } from "@/hooks/useWebSocket";
 
 import { SuiteTitleCard } from "./SuiteTitleCard";
 import type { TestStatus } from "@/types/common";
@@ -70,41 +68,6 @@ export function TestRunDetailPage() {
       setLoading(false);
     }
   }, []);
-
-  // Callback for WebSocket reconnection - refresh data from API
-  const handleReconnect = useCallback(() => {
-    if (runId) {
-      console.log(
-        "[TestRunDetailPage] WebSocket reconnected, refreshing run data",
-      );
-      fetchRunDetail(runId);
-    }
-  }, [runId, fetchRunDetail]);
-
-  // Run-specific WebSocket - receives test events for this run (excluding steps for performance)
-  useWebSocket({
-    filters: runId
-      ? {
-          runId,
-          eventTypes: ["test.begin", "test.end", "run.end"], // Exclude step events for performance
-        }
-      : undefined,
-    onMessage: handleWebSocketEvent,
-    onConnect: handleReconnect,
-  });
-
-  function handleWebSocketEvent(event: WebSocketEvent) {
-    const { type, data } = event;
-    if (type === "test.end" || type === "test.begin") {
-      const testData = data as WebSocketTestData;
-      const testRunId = testData.runId || testData.testCase?.runId;
-
-      if (testRunId === runId) {
-        console.log("WebSocket event received for run:", testData);
-        updateTestFromEvent(event);
-      }
-    }
-  }
 
   const countTests = useCallback((suites: TestSuite[]): number => {
     let total = 0;
@@ -174,10 +137,8 @@ export function TestRunDetailPage() {
 
   // Filter tests based on current filters
   // Note: This filtering modifies the suite hierarchy structure for display purposes only.
-  // When WebSocket events update a test that's currently filtered out, the test will still
-  // be updated in runDetail.tests (the source data), but won't appear in filteredSuite
-  // until the filters are changed to include it. This ensures real-time updates are never
-  // lost while maintaining accurate filtered views.
+  // Tests are still updated in runDetail.tests (the source data), but won't appear in
+  // filteredSuite until filters are changed to include them.
   const filteredSuite = useMemo(() => {
     if (!hasActiveFilters) return rootSuite;
 
@@ -233,138 +194,6 @@ export function TestRunDetailPage() {
   const filteredTestCount = useMemo(() => {
     return countTests([filteredSuite]);
   }, [filteredSuite, countTests]);
-
-  // Handle WebSocket events to update test statuses locally
-  function updateTestFromEvent(event: WebSocketEvent) {
-    if (!runDetail) return;
-
-    const { type, data } = event;
-    const testData = data as WebSocketTestData;
-
-    setRunDetail((prevDetail) => {
-      if (!prevDetail || !prevDetail.tests) return prevDetail;
-
-      try {
-        const testId = testData.testCase?.id || testData.id;
-        // Safely extract status - handle both string and numeric values (protobuf enums)
-        const rawStatus = testData.testCase?.status || testData.status;
-        let status = "running";
-        if (type === "test.end") {
-          if (typeof rawStatus === "number") {
-            // Protobuf enum mapping: 0=UNKNOWN, 1=PASSED, 2=FAILED, 3=SKIPPED, etc.
-            const statusMap: Record<number, string> = {
-              0: "unknown",
-              1: "passed",
-              2: "failed",
-              3: "skipped",
-              4: "broken",
-              5: "timedout",
-              6: "interrupted",
-            };
-            status = statusMap[rawStatus] || "unknown";
-          } else if (typeof rawStatus === "string") {
-            status = rawStatus.toLowerCase();
-          }
-        }
-
-        // Update or add test in the tests array
-        const updatedTests = [...prevDetail.tests];
-        const testIndex = updatedTests.findIndex((t) => t.id === testId);
-
-        if (type === "test.begin") {
-          if (testIndex === -1) {
-            // Add new test
-            updatedTests.push({
-              id: testId || "",
-              runId: testData.runId || testData.testCase?.runId || "",
-              title:
-                testData.testCase?.name || testData.testCase?.description || "",
-              status: "RUNNING",
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            });
-          } else {
-            // Update existing test
-            updatedTests[testIndex] = {
-              ...updatedTests[testIndex],
-              status: "RUNNING",
-              updatedAt: new Date().toISOString(),
-            };
-          }
-        } else if (type === "test.end") {
-          if (testIndex >= 0) {
-            updatedTests[testIndex] = {
-              ...updatedTests[testIndex],
-              status: status as TestStatus,
-              updatedAt: new Date().toISOString(),
-            };
-          }
-        }
-
-        // Recalculate statistics from scratch
-        const newStats = {
-          total: updatedTests.length,
-          passed: 0,
-          failed: 0,
-          skipped: 0,
-          running: 0,
-          broken: 0,
-          timedout: 0,
-          interrupted: 0,
-          unknown: 0,
-          expected: 0,
-          flaky: 0,
-        };
-
-        updatedTests.forEach((test) => {
-          switch (test.status) {
-            case "PASSED":
-              newStats.passed++;
-              // Calculate expected (1 attempt) and flaky (>1 attempts)
-              if (test.attempts && test.attempts.length === 1) {
-                newStats.expected++;
-              } else if (test.attempts && test.attempts.length > 1) {
-                newStats.flaky++;
-              }
-              break;
-            case "FAILED":
-              newStats.failed++;
-              break;
-            case "SKIPPED":
-              newStats.skipped++;
-              break;
-            case "RUNNING":
-              newStats.running++;
-              break;
-            case "BROKEN":
-              newStats.broken++;
-              break;
-            case "TIMEDOUT":
-              newStats.timedout++;
-              break;
-            case "INTERRUPTED":
-              newStats.interrupted++;
-              break;
-            default:
-              newStats.unknown++;
-          }
-        });
-
-        console.log("Updated run detail from WebSocket:", {
-          tests: updatedTests,
-          statistics: newStats,
-        });
-        return {
-          ...prevDetail,
-          tests: updatedTests,
-          statistics: newStats,
-        };
-      } catch (error) {
-        console.error("Error updating run detail from WebSocket:", error);
-        return prevDetail;
-      }
-    });
-  }
 
   if (loading) {
     return (

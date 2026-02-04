@@ -3,11 +3,6 @@ import { Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
-import type {
-  WebSocketEvent,
-  WebSocketRunData,
-  WebSocketTestData,
-} from "@/types/webSocket";
 
 import {
   Play,
@@ -23,18 +18,9 @@ import {
 } from "lucide-react";
 
 import type { TestRun } from "@/types/testRun";
-import { handleStartRun, handleUpdateRun } from "./suiteEventHandlers";
 import { getRunStatus } from "./utils";
 
-interface TestSuiteRunsPageProps {
-  onWebSocketEvent: WebSocketEvent | null;
-  refreshTrigger?: number; // Trigger refresh on WebSocket reconnection
-}
-
-export function TestSuiteRunsPage({
-  onWebSocketEvent,
-  refreshTrigger = 0,
-}: TestSuiteRunsPageProps) {
+export function TestSuiteRunsPage() {
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,31 +59,6 @@ export function TestSuiteRunsPage({
       setLoading(false);
     }
   }, []);
-
-  // Handle WebSocket events from App.tsx
-  useEffect(() => {
-    if (!onWebSocketEvent) return;
-
-    const { type, data } = onWebSocketEvent;
-
-    if (type === "run.start") {
-      console.log("[TestSuiteRunsPage] Handling run.start event");
-      handleStartRun(data as WebSocketRunData, setRuns);
-    }
-
-    if (type === "test.begin" || type === "test.end") {
-      console.log("[TestSuiteRunsPage] Handling test event:", type);
-      handleUpdateRun(data as WebSocketTestData, type, setRuns);
-    }
-  }, [onWebSocketEvent]);
-
-  // Refresh data when WebSocket reconnects
-  useEffect(() => {
-    if (refreshTrigger > 0) {
-      console.log('[TestSuiteRunsPage] WebSocket reconnected, refreshing data from API');
-      fetchRuns();
-    }
-  }, [refreshTrigger, fetchRuns]);
 
   useEffect(() => {
     fetchRuns();
@@ -179,7 +140,9 @@ export function TestSuiteRunsPage({
       }
 
       const data = await response.json();
-      console.log(`Updated marker for ${data.modified} of ${data.requested} runs`);
+      console.log(
+        `Updated marker for ${data.modified} of ${data.requested} runs`,
+      );
 
       // Update runs in the list with new marker
       setRuns((prev) =>
@@ -194,7 +157,7 @@ export function TestSuiteRunsPage({
             };
           }
           return run;
-        })
+        }),
       );
 
       setSelectedRuns(new Set());
@@ -214,9 +177,11 @@ export function TestSuiteRunsPage({
     // Pre-fill with existing marker if all selected runs have the same marker
     const selectedRunsList = runs.filter((run) => selectedRuns.has(run.id));
     if (selectedRunsList.length > 0) {
-      const firstMarker = selectedRunsList[0].metadata?.MARKER as string | undefined;
+      const firstMarker = selectedRunsList[0].metadata?.MARKER as
+        | string
+        | undefined;
       const allSame = selectedRunsList.every(
-        (run) => run.metadata?.MARKER === firstMarker
+        (run) => run.metadata?.MARKER === firstMarker,
       );
       if (allSame && firstMarker) {
         setMarkerValue(firstMarker);
@@ -377,7 +342,8 @@ export function TestSuiteRunsPage({
                     </h3>
                     <p className="text-gray-600 mb-4">
                       Set a marker for {selectedRuns.size} test run
-                      {selectedRuns.size !== 1 ? "s" : ""}. Markers help organize and filter runs.
+                      {selectedRuns.size !== 1 ? "s" : ""}. Markers help
+                      organize and filter runs.
                     </p>
                     <div className="mb-4">
                       <label
@@ -454,13 +420,12 @@ export function TestSuiteRunsPage({
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left"
-                    >
+                    <th scope="col" className="px-6 py-3 text-left">
                       <input
                         type="checkbox"
-                        checked={runs.length > 0 && selectedRuns.size === runs.length}
+                        checked={
+                          runs.length > 0 && selectedRuns.size === runs.length
+                        }
                         onChange={toggleSelectAll}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
                         aria-label="Select all runs"
@@ -568,7 +533,7 @@ export function TestSuiteRunsPage({
                         {run.metadata?.MARKER ? (
                           <Link
                             to={`/marker/${encodeURIComponent(
-                              run.metadata.MARKER as string
+                              run.metadata.MARKER as string,
                             )}/stats`}
                             className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 hover:bg-indigo-200 transition-colors"
                           >
@@ -576,7 +541,9 @@ export function TestSuiteRunsPage({
                             {run.metadata.MARKER as string}
                           </Link>
                         ) : (
-                          <span className="text-gray-400 text-sm italic">No marker</span>
+                          <span className="text-gray-400 text-sm italic">
+                            No marker
+                          </span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

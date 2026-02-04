@@ -1,12 +1,8 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { Activity, CheckCircle, XCircle } from "lucide-react";
+import { Activity } from "lucide-react";
 import { cn } from "../lib/utils";
 
-interface LayoutProps {
-  isConnected: boolean;
-}
-
-export function Layout({ isConnected }: LayoutProps) {
+export function Layout() {
   const location = useLocation();
 
   const isActive = (path: string) => {
@@ -40,7 +36,7 @@ export function Layout({ isConnected }: LayoutProps) {
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive("/") && location.pathname === "/"
                     ? "bg-blue-50 text-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50",
                 )}
               >
                 <span className="hidden sm:inline">Dashboard</span>
@@ -52,7 +48,7 @@ export function Layout({ isConnected }: LayoutProps) {
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive("/suite_runs")
                     ? "bg-blue-50 text-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50",
                 )}
               >
                 Test Runs
@@ -63,46 +59,11 @@ export function Layout({ isConnected }: LayoutProps) {
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive("/markers") || isActive("/marker/")
                     ? "bg-blue-50 text-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50",
                 )}
               >
                 Markers
               </Link>
-              <div
-                className="flex items-center ml-2 md:ml-4 px-3 py-1.5 rounded-md bg-gray-50"
-                role="status"
-                aria-live="polite"
-              >
-                {isConnected ? (
-                  <>
-                    <CheckCircle
-                      className="h-4 w-4 mr-1.5 text-green-600"
-                      aria-hidden="true"
-                    />
-                    <span className="text-sm text-green-600 font-medium hidden sm:inline">
-                      Connected
-                    </span>
-                    <span
-                      className="h-2 w-2 bg-green-600 rounded-full animate-pulse sm:hidden"
-                      aria-label="Connected"
-                    />
-                  </>
-                ) : (
-                  <>
-                    <XCircle
-                      className="h-4 w-4 mr-1.5 text-red-600"
-                      aria-hidden="true"
-                    />
-                    <span className="text-sm text-red-600 font-medium hidden sm:inline">
-                      Disconnected
-                    </span>
-                    <span
-                      className="h-2 w-2 bg-red-600 rounded-full sm:hidden"
-                      aria-label="Disconnected"
-                    />
-                  </>
-                )}
-              </div>
             </div>
           </div>
         </div>
