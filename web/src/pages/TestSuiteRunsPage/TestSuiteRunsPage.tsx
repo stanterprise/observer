@@ -21,7 +21,7 @@ import type { TestRun } from "@/types/testRun";
 import { getRunStatus } from "./utils";
 
 export function TestSuiteRunsPage() {
-  const pollIntervalMs = 10_000;
+  const pollIntervalMs = 5_000;
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -476,26 +476,30 @@ export function TestSuiteRunsPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[16rem]"
+                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[10rem]"
                     >
-                      <div className="flex items-center justify-center">
-                        <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
-                        Passed
+                      <div className="inline-flex items-center justify-center">
+                        <span className="inline-flex items-center justify-center">
+                          <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                          Passed
+                        </span>
+                        {" + "}
+                        <span className="inline-flex items-center justify-center">
+                          <XCircle className="h-4 w-4 mr-1 text-red-600" />
+                          Failed
+                        </span>
+                        {" + "}
+                        <span className="inline-flex items-center justify-center">
+                          <CircleDashed className="h-4 w-4 mr-1 text-gray-600" />
+                          Skipped
+                        </span>
                       </div>
-                      {" + "}
-                      <div className="flex items-center justify-center">
-                        <XCircle className="h-4 w-4 mr-1 text-red-600" />
-                        Failed
-                      </div>
-                      {" + "}
-                      <div className="flex items-center justify-center">
-                        <CircleDashed className="h-4 w-4 mr-1 text-gray-600" />
-                        Skipped
-                      </div>
-                      {" / "}
-                      <div className="flex items-center justify-center">
-                        <Play className="h-4 w-4 mr-1 text-blue-600" />
-                        Total
+                      <div className="inline-flex items-center justify-center">
+                        {" / "}
+                        <div className="flex items-center justify-center">
+                          <Play className="h-4 w-4 mr-1 text-blue-600" />
+                          Total
+                        </div>
                       </div>
                     </th>
                     <th
