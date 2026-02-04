@@ -20,14 +20,15 @@ func (r *MongoRepository) MarkRunningTestsAsTimedOut(ctx context.Context, runID 
 	}
 	update := bson.M{
 		"$set": bson.M{
-			"tests.$[test].status":     "TIMEDOUT",
-			"tests.$[test].end_time":   now,
-			"tests.$[test].updated_at": now,
+			"tests.$[test].attempts.$[attempt].status":     "TIMEDOUT",
+			"tests.$[test].attempts.$[attempt].end_time":   now,
+			"tests.$[test].attempts.$[attempt].updated_at": now,
 		},
 	}
 	arrayFilters := options.ArrayFilters{
 		Filters: []interface{}{
-			bson.M{"test.status": "RUNNING"},
+			bson.M{"test.attempts": bson.M{"$elemMatch": bson.M{"status": "RUNNING"}}},
+			bson.M{"attempt.status": "RUNNING"},
 		},
 	}
 	updateOptions := options.Update().SetArrayFilters(arrayFilters)
