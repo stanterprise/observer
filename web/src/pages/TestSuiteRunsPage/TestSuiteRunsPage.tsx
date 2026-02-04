@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { apiUrl } from "@/lib/config";
+import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 
@@ -21,7 +21,7 @@ import type { TestRun } from "@/types/testRun";
 import { getRunStatus } from "./utils";
 
 export function TestSuiteRunsPage() {
-  const pollIntervalMs = 5_000;
+  const pollIntervalMs = config.pollingIntervalMs;
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

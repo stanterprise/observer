@@ -6,6 +6,7 @@ export const config = {
   // In distributed mode, Nginx will proxy /api/* to the API service
   // In AIO mode, the API service runs on port 8080 within the same container
   apiUrl: import.meta.env.VITE_API_URL || "/api",
+  pollingIntervalMs: Number(import.meta.env.VITE_POLLING_INTERVAL_MS) || 5_000,
 };
 
 // Helper to construct API URLs

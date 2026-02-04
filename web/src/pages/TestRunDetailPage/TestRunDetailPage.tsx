@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
-import { apiUrl } from "@/lib/config";
+import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { ArrowLeft, Play, Eye, EyeOff, Search, X, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,7 @@ import TestSuiteRecord from "./TestSuiteRecord";
 import type { TestRun } from "@/types/testRun";
 
 export function TestRunDetailPage() {
-  const pollIntervalMs = 10_000;
+  const pollIntervalMs = config.pollingIntervalMs;
   const { runId } = useParams<{ runId: string }>();
   const [runDetail, setRunDetail] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
