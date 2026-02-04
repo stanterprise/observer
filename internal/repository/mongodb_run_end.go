@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -129,6 +130,12 @@ func checkShardCompletion(ctx context.Context, r *MongoRepository, runID string)
 		total = int64(v)
 	case float32:
 		total = int64(v)
+	case string:
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return false
+		}
+		total = parsed
 	default:
 		return false
 	}
