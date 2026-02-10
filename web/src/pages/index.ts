@@ -4,5 +4,6 @@ import TestRunDetailPage from "./TestRunDetailPage";
 import TestTrendsPage from "./TestTrendsPage";
 import { MarkerStatsPage } from "./MarkerStatsPage";
 import { MarkerBrowsePage } from "./MarkerBrowsePage";
+import { TagTerritoryPage } from "./TagTerritoryPage";
 
-export { TestDetailPage, TestSuiteRunsPage, TestRunDetailPage, TestTrendsPage, MarkerStatsPage, MarkerBrowsePage };
+export { TestDetailPage, TestSuiteRunsPage, TestRunDetailPage, TestTrendsPage, MarkerStatsPage, MarkerBrowsePage, TagTerritoryPage };
