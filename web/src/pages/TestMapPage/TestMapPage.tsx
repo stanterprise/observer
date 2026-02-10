@@ -48,15 +48,16 @@ interface TestBoxProps {
   isHighlighted: boolean;
   isFaded: boolean; // New prop for fading non-highlighted tests
   onClick: () => void;
-  size: number; // Dynamic size in pixels
+  width: number; // Width in pixels
+  height: number; // Height in pixels
 }
 
-function TestBox({ test, isHighlighted, isFaded, onClick, size }: TestBoxProps) {
+function TestBox({ test, isHighlighted, isFaded, onClick, width, height }: TestBoxProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const colorClass = getTestStatusColor(test);
   
-  // Scale border width based on size (1px for small, 2px for large)
-  const borderWidth = size < 12 ? 1 : 2;
+  // Scale border width based on height (1px for small, 2px for large)
+  const borderWidth = height < 24 ? 1 : 2;
 
   return (
     <div className="relative">
@@ -68,8 +69,8 @@ function TestBox({ test, isHighlighted, isFaded, onClick, size }: TestBoxProps) 
           !isHighlighted && "hover:scale-105 hover:shadow-md"
         )}
         style={{ 
-          width: `${size}px`, 
-          height: `${size}px`,
+          width: `${width}px`, 
+          height: `${height}px`,
           borderWidth: `${borderWidth}px`,
           opacity: isFaded ? 0.25 : 1, // Apply fading when isFaded is true
         }}
@@ -174,35 +175,44 @@ export function TestMapPage() {
     return () => window.removeEventListener('resize', updateDimensions);
   }, [runDetail]);
 
-  // Calculate optimal test box size based on total test count and available space
-  const testBoxSize = useMemo(() => {
-    if (!runDetail?.tests || runDetail.tests.length === 0) return 32;
+  // Calculate optimal test box dimensions based on total test count and available space
+  const testBoxDimensions = useMemo(() => {
+    if (!runDetail?.tests || runDetail.tests.length === 0) {
+      return { width: 100, height: 28 }; // Default rectangular dimensions
+    }
     
     const totalTests = runDetail.tests.length;
     const { width, height } = containerDimensions;
     
     // Reserve space for padding and gaps
     const availableWidth = width - 48; // Account for card padding (24px each side)
-    const availableHeight = height - 80; // Account for header and padding (reduced from 120)
+    const availableHeight = height - 80; // Account for header and padding
     
-    if (availableWidth <= 0 || availableHeight <= 0) return 32;
+    if (availableWidth <= 0 || availableHeight <= 0) {
+      return { width: 100, height: 28 };
+    }
     
-    // Enforce 8:6 aspect ratio (1.333...)
-    const TARGET_ASPECT_RATIO = 8 / 6;
-    const cols = Math.ceil(Math.sqrt(totalTests * TARGET_ASPECT_RATIO));
-    const rows = Math.ceil(totalTests / cols);
+    // Fixed height for one line of text (comfortable reading height)
+    const BOX_HEIGHT = 28; // Height for one line of text with padding
+    const MIN_HEIGHT = 24;
+    const MAX_HEIGHT = 32;
+    const boxHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, BOX_HEIGHT));
     
-    // Calculate size that fits all tests
+    // Calculate how many rows we can fit
     const gap = 2; // Gap between boxes in pixels
-    const sizeByWidth = (availableWidth - (cols - 1) * gap) / cols;
-    const sizeByHeight = (availableHeight - (rows - 1) * gap) / rows;
+    const maxRows = Math.floor((availableHeight + gap) / (boxHeight + gap));
     
-    // Use the larger of the two sizes to maximize box size and fill container better
-    const calculatedSize = Math.floor(Math.max(sizeByWidth, sizeByHeight));
+    // Calculate how many columns we need
+    const cols = Math.ceil(totalTests / maxRows);
     
-    // Set minimum size to 32px (old maximum), no maximum to allow filling viewport
-    const MIN_SIZE = 32;
-    return Math.max(MIN_SIZE, calculatedSize);
+    // Calculate width to fill available space
+    const boxWidth = Math.floor((availableWidth - (cols - 1) * gap) / cols);
+    
+    // Set minimum width for usability
+    const MIN_WIDTH = 60;
+    const finalWidth = Math.max(MIN_WIDTH, boxWidth);
+    
+    return { width: finalWidth, height: boxHeight };
   }, [runDetail?.tests, containerDimensions]);
 
   // Extract all tags with occurrence counts
@@ -387,7 +397,8 @@ export function TestMapPage() {
                         <TestBox
                           key={test.id}
                           test={test}
-                          size={testBoxSize}
+                          width={testBoxDimensions.width}
+                          height={testBoxDimensions.height}
                           isHighlighted={isHighlighted}
                           isFaded={isFaded}
                           onClick={() => handleTestClick(test.id)}

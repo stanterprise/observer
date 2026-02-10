@@ -1,7 +1,7 @@
 # Test Map Feature Documentation
 
 ## Overview
-The Test Map is a visual representation page that displays all tests as a single rectangular grid with dynamic sizing based on test count. Features an 8:6 aspect ratio for balanced layout and visual fading for tag filtering. No scrolling required - all tests are visible at once.
+The Test Map is a visual representation page that displays all tests as rectangular bars with dynamic sizing based on test count. Each test is shown as a wide, short rectangle optimized for displaying text. Features visual fading for tag filtering and maximum space utilization.
 
 ## Access
 Navigate to Test Map from any Test Run Detail page via the "View Test Map" button in the header.
@@ -11,11 +11,11 @@ Navigate to Test Map from any Test Run Detail page via the "View Test Map" butto
 ## Features
 
 ### Visual Test Grid
-- **Single rectangular grid** of all tests (no suite wrappers)
-- **8:6 aspect ratio**: Grid maintains consistent 8:6 (1.333...) ratio for balanced rectangular layout
-- **Dynamic sizing**: Test boxes automatically scale from 4px to 32px based on total test count
+- **Rectangular test bars**: Each test is displayed as a wide rectangle (not square)
+- **Text-optimized height**: Height fixed at ~28px (comfortable for a line of text)
+- **Dynamic width**: Width scales to fill available horizontal space
 - **No scrolling**: All tests fit in viewport
-- Tests flow left-to-right, top-to-bottom
+- Tests flow left-to-right, top-to-bottom, wrapping to new rows
 - Hover over any test to see detailed tooltip with:
   - Test title
   - Status (including "Flaky" indicator)
@@ -24,14 +24,19 @@ Navigate to Test Map from any Test Run Detail page via the "View Test Map" butto
   - Retry count for flaky tests
 
 ### Dynamic Sizing
-Test box size is automatically calculated to fill the available viewport space while maintaining the 8:6 aspect ratio:
-- **Minimum size**: 32px (ensures readability)
-- **Maximum size**: No limit - boxes scale up to fill available space
-- **Few tests (10-50)**: Larger boxes (50-100px+) to fill viewport
-- **Many tests (100-200)**: Medium boxes (32-60px) filling space efficiently
-- **Very many tests (500+)**: Boxes default to 32px minimum
+Test boxes are rectangular with dimensions calculated to maximize space utilization:
+- **Height**: Fixed at 24-32px (optimized for text display)
+- **Width**: Dynamically calculated based on available space and test count
+- **Minimum width**: 60px (ensures usability)
+- **No maximum width**: Boxes expand to fill horizontal space
+- **Layout**: Rows calculated based on available vertical space, columns adjust accordingly
 
-The algorithm ensures test objects always fill the map container, with larger boxes for fewer tests and maintaining 32px minimum for readability.
+**Examples:**
+- **50 tests**: Wide bars (~200-300px width × 28px height) in few rows
+- **125 tests**: Medium bars (~100-150px width × 28px height) in more rows
+- **500+ tests**: Narrower bars (~60-80px width × 28px height) filling all rows
+
+The algorithm maximizes horizontal space usage while keeping a comfortable text-readable height.
 
 ### Status Colors
 - 🟢 **Green**: PASSED
@@ -67,7 +72,7 @@ The algorithm ensures test objects always fill the map container, with larger bo
 ### Component Structure
 ```
 TestMapPage (web/src/pages/TestMapPage/TestMapPage.tsx)
-└── TestBox: Individual test square with hover tooltip and dynamic sizing
+└── TestBox: Individual rectangular test bar with hover tooltip and dynamic dimensions
 ```
 
 ### Dynamic Sizing Algorithm
@@ -76,22 +81,28 @@ TestMapPage (web/src/pages/TestMapPage/TestMapPage.tsx)
 const availableWidth = containerWidth - 48;   // Card padding (24px each side)
 const availableHeight = viewportHeight - 80;  // Header and padding
 
-// 2. Calculate optimal grid dimensions with 8:6 aspect ratio
-const TARGET_ASPECT_RATIO = 8 / 6;
-const cols = Math.ceil(Math.sqrt(totalTests * TARGET_ASPECT_RATIO));
-const rows = Math.ceil(totalTests / cols);
+// 2. Fixed height optimized for text (one line)
+const BOX_HEIGHT = 28;  // Fixed height for comfortable text display
+const MIN_HEIGHT = 24;
+const MAX_HEIGHT = 32;
+const boxHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, BOX_HEIGHT));
 
-// 3. Calculate size that fits
+// 3. Calculate how many rows we can fit
 const gap = 2;
-const sizeByWidth = (availableWidth - (cols - 1) * gap) / cols;
-const sizeByHeight = (availableHeight - (rows - 1) * gap) / rows;
+const maxRows = Math.floor((availableHeight + gap) / (boxHeight + gap));
 
-// 4. Use the LARGER dimension to maximize box size and fill container
-const calculatedSize = Math.floor(Math.max(sizeByWidth, sizeByHeight));
-const size = Math.max(32, calculatedSize);
+// 4. Calculate columns needed
+const cols = Math.ceil(totalTests / maxRows);
+
+// 5. Calculate width to fill available space
+const boxWidth = Math.floor((availableWidth - (cols - 1) * gap) / cols);
+
+// 6. Apply minimum width constraint
+const MIN_WIDTH = 60;
+const finalWidth = Math.max(MIN_WIDTH, boxWidth);
 ```
 
-This maximizes box size by using the larger of the two calculated dimensions, ensuring the container is filled as much as possible. One dimension may slightly overflow (with flex-wrap handling), but this provides better space utilization.
+This creates rectangular test bars with fixed, text-optimized height and variable width that maximizes horizontal space utilization.
 
 ### Visual Fading Logic
 When tags are selected:
