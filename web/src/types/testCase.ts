@@ -8,7 +8,7 @@ export interface Attempt {
   status?: TestStatus;
   startTime?: string;
   endTime?: string;
-  duration?: number;
+  duration?: number; // Duration in nanoseconds
   attachments?: Record<string, any>[];
   errorMessage?: string;
   stackTrace?: string;
@@ -32,7 +32,7 @@ export interface Test {
   // Test-level timing (aggregated across attempts)
   startTime?: string; // Earliest start from first attempt
   endTime?: string; // Latest end from current attempt
-  duration?: number; // Duration from current attempt
+  duration?: number; // Duration in nanoseconds (from current attempt)
 
   // Retry tracking
   retryCount?: number;
@@ -65,7 +65,7 @@ export interface Step {
   title: string;
   description?: string;
   startTime?: string;
-  duration?: number;
+  duration?: number; // Duration in nanoseconds
   type?: string;
   steps?: Step[];
   metadata?: Record<string, string>;
