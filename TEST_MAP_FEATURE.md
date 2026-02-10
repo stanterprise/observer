@@ -73,8 +73,8 @@ TestMapPage (web/src/pages/TestMapPage/TestMapPage.tsx)
 ### Dynamic Sizing Algorithm
 ```typescript
 // 1. Measure available space
-const availableWidth = containerWidth - 48;
-const availableHeight = viewportHeight - 320;
+const availableWidth = containerWidth - 48;   // Card padding (24px each side)
+const availableHeight = viewportHeight - 80;  // Header and padding
 
 // 2. Calculate optimal grid dimensions with 8:6 aspect ratio
 const TARGET_ASPECT_RATIO = 8 / 6;
@@ -86,12 +86,12 @@ const gap = 2;
 const sizeByWidth = (availableWidth - (cols - 1) * gap) / cols;
 const sizeByHeight = (availableHeight - (rows - 1) * gap) / rows;
 
-// 4. Use calculated size with 32px minimum (no maximum)
-const calculatedSize = Math.floor(Math.min(sizeByWidth, sizeByHeight));
+// 4. Use the LARGER dimension to maximize box size and fill container
+const calculatedSize = Math.floor(Math.max(sizeByWidth, sizeByHeight));
 const size = Math.max(32, calculatedSize);
 ```
 
-This ensures boxes always fill the available space, scaling up for fewer tests and maintaining minimum 32px for readability.
+This maximizes box size by using the larger of the two calculated dimensions, ensuring the container is filled as much as possible. One dimension may slightly overflow (with flex-wrap handling), but this provides better space utilization.
 
 ### Visual Fading Logic
 When tags are selected:

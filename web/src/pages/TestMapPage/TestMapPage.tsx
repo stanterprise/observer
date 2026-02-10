@@ -182,8 +182,8 @@ export function TestMapPage() {
     const { width, height } = containerDimensions;
     
     // Reserve space for padding and gaps
-    const availableWidth = width - 48; // Account for card padding
-    const availableHeight = height - 120; // Account for header and padding
+    const availableWidth = width - 48; // Account for card padding (24px each side)
+    const availableHeight = height - 80; // Account for header and padding (reduced from 120)
     
     if (availableWidth <= 0 || availableHeight <= 0) return 32;
     
@@ -197,7 +197,8 @@ export function TestMapPage() {
     const sizeByWidth = (availableWidth - (cols - 1) * gap) / cols;
     const sizeByHeight = (availableHeight - (rows - 1) * gap) / rows;
     
-    const calculatedSize = Math.floor(Math.min(sizeByWidth, sizeByHeight));
+    // Use the larger of the two sizes to maximize box size and fill container better
+    const calculatedSize = Math.floor(Math.max(sizeByWidth, sizeByHeight));
     
     // Set minimum size to 32px (old maximum), no maximum to allow filling viewport
     const MIN_SIZE = 32;
