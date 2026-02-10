@@ -30,7 +30,7 @@ export const SuiteTitleCard = ({
   return (
     <Card className="overflow-hidden shadow-lg border-gray-200">
       {/* Enhanced Progress Bar */}
-      <div className="h-2 bg-gray-100 flex relative group">
+      <div className="h-8 bg-gray-100 flex relative group">
         {stats.passed > 0 && (
           <div
             className="bg-linear-to-r from-green-500 to-green-600 transition-all duration-500 ease-out relative overflow-hidden"

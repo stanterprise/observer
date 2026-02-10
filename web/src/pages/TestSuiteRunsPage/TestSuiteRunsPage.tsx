@@ -1,13 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { apiUrl } from "@/lib/config";
+import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
-import type {
-  WebSocketEvent,
-  WebSocketRunData,
-  WebSocketTestData,
-} from "@/types/webSocket";
 
 import {
   Play,
@@ -23,18 +18,10 @@ import {
 } from "lucide-react";
 
 import type { TestRun } from "@/types/testRun";
-import { handleStartRun, handleUpdateRun } from "./suiteEventHandlers";
 import { getRunStatus } from "./utils";
 
-interface TestSuiteRunsPageProps {
-  onWebSocketEvent: WebSocketEvent | null;
-  refreshTrigger?: number; // Trigger refresh on WebSocket reconnection
-}
-
-export function TestSuiteRunsPage({
-  onWebSocketEvent,
-  refreshTrigger = 0,
-}: TestSuiteRunsPageProps) {
+export function TestSuiteRunsPage() {
+  const pollIntervalMs = config.pollingIntervalMs;
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,9 +33,12 @@ export function TestSuiteRunsPage({
   const [markerValue, setMarkerValue] = useState("");
   const [updatingMarker, setUpdatingMarker] = useState(false);
 
-  const fetchRuns = useCallback(async () => {
+  const fetchRuns = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       // Fetch all run statistics in a single request
       const response = await fetch(apiUrl("/runs"));
       if (!response.ok) {
@@ -70,38 +60,25 @@ export function TestSuiteRunsPage({
       console.error("Error fetching runs:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch runs");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
-
-  // Handle WebSocket events from App.tsx
-  useEffect(() => {
-    if (!onWebSocketEvent) return;
-
-    const { type, data } = onWebSocketEvent;
-
-    if (type === "run.start") {
-      console.log("[TestSuiteRunsPage] Handling run.start event");
-      handleStartRun(data as WebSocketRunData, setRuns);
-    }
-
-    if (type === "test.begin" || type === "test.end") {
-      console.log("[TestSuiteRunsPage] Handling test event:", type);
-      handleUpdateRun(data as WebSocketTestData, type, setRuns);
-    }
-  }, [onWebSocketEvent]);
-
-  // Refresh data when WebSocket reconnects
-  useEffect(() => {
-    if (refreshTrigger > 0) {
-      console.log('[TestSuiteRunsPage] WebSocket reconnected, refreshing data from API');
-      fetchRuns();
-    }
-  }, [refreshTrigger, fetchRuns]);
 
   useEffect(() => {
     fetchRuns();
   }, [fetchRuns]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      fetchRuns({ silent: true });
+    }, pollIntervalMs);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [fetchRuns, pollIntervalMs]);
 
   const toggleRunSelection = (runId: string) => {
     setSelectedRuns((prev) => {
@@ -179,7 +156,9 @@ export function TestSuiteRunsPage({
       }
 
       const data = await response.json();
-      console.log(`Updated marker for ${data.modified} of ${data.requested} runs`);
+      console.log(
+        `Updated marker for ${data.modified} of ${data.requested} runs`,
+      );
 
       // Update runs in the list with new marker
       setRuns((prev) =>
@@ -194,7 +173,7 @@ export function TestSuiteRunsPage({
             };
           }
           return run;
-        })
+        }),
       );
 
       setSelectedRuns(new Set());
@@ -214,9 +193,11 @@ export function TestSuiteRunsPage({
     // Pre-fill with existing marker if all selected runs have the same marker
     const selectedRunsList = runs.filter((run) => selectedRuns.has(run.id));
     if (selectedRunsList.length > 0) {
-      const firstMarker = selectedRunsList[0].metadata?.MARKER as string | undefined;
+      const firstMarker = selectedRunsList[0].metadata?.MARKER as
+        | string
+        | undefined;
       const allSame = selectedRunsList.every(
-        (run) => run.metadata?.MARKER === firstMarker
+        (run) => run.metadata?.MARKER === firstMarker,
       );
       if (allSame && firstMarker) {
         setMarkerValue(firstMarker);
@@ -291,7 +272,7 @@ export function TestSuiteRunsPage({
             </>
           )}
           <button
-            onClick={fetchRuns}
+            onClick={() => fetchRuns()}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             Refresh
@@ -377,7 +358,8 @@ export function TestSuiteRunsPage({
                     </h3>
                     <p className="text-gray-600 mb-4">
                       Set a marker for {selectedRuns.size} test run
-                      {selectedRuns.size !== 1 ? "s" : ""}. Markers help organize and filter runs.
+                      {selectedRuns.size !== 1 ? "s" : ""}. Markers help
+                      organize and filter runs.
                     </p>
                     <div className="mb-4">
                       <label
@@ -451,16 +433,15 @@ export function TestSuiteRunsPage({
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-[1220px] w-full table-auto divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left"
-                    >
+                    <th scope="col" className="px-6 py-3 text-left w-12">
                       <input
                         type="checkbox"
-                        checked={runs.length > 0 && selectedRuns.size === runs.length}
+                        checked={
+                          runs.length > 0 && selectedRuns.size === runs.length
+                        }
                         onChange={toggleSelectAll}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
                         aria-label="Select all runs"
@@ -468,13 +449,13 @@ export function TestSuiteRunsPage({
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[38rem]"
                     >
                       Run Name
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[14rem]"
                     >
                       <div className="flex items-center">
                         <Tag className="h-4 w-4 mr-1 text-indigo-600" />
@@ -483,49 +464,47 @@ export function TestSuiteRunsPage({
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10rem]"
                     >
                       Status
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10rem]"
                     >
-                      <div className="flex items-center justify-center">
-                        <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
-                        Passed
+                      Result
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[10rem]"
+                    >
+                      <div className="inline-flex items-center justify-center">
+                        <span className="inline-flex items-center justify-center">
+                          <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                          Passed
+                        </span>
+                        {" + "}
+                        <span className="inline-flex items-center justify-center">
+                          <XCircle className="h-4 w-4 mr-1 text-red-600" />
+                          Failed
+                        </span>
+                        {" + "}
+                        <span className="inline-flex items-center justify-center">
+                          <CircleDashed className="h-4 w-4 mr-1 text-gray-600" />
+                          Skipped
+                        </span>
+                      </div>
+                      <div className="inline-flex items-center justify-center">
+                        {" / "}
+                        <div className="flex items-center justify-center">
+                          <Play className="h-4 w-4 mr-1 text-blue-600" />
+                          Total
+                        </div>
                       </div>
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      <div className="flex items-center justify-center">
-                        <XCircle className="h-4 w-4 mr-1 text-red-600" />
-                        Failed
-                      </div>
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      <div className="flex items-center justify-center">
-                        <CircleDashed className="h-4 w-4 mr-1 text-gray-600" />
-                        Skipped
-                      </div>
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      <div className="flex items-center justify-center">
-                        <Play className="h-4 w-4 mr-1 text-blue-600" />
-                        Total
-                      </div>
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[14rem]"
                     >
                       <button
                         onClick={toggleSortOrder}
@@ -542,85 +521,94 @@ export function TestSuiteRunsPage({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {sortedRuns.map((run) => (
-                    <tr
-                      key={run.id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          checked={selectedRuns.has(run.id)}
-                          onChange={() => toggleRunSelection(run.id)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
-                          aria-label={`Select ${run.name || run.id}`}
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          to={`/suite_runs/${run.id}`}
-                          className="text-blue-600 hover:text-blue-800 font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
-                        >
-                          {run.name || run.id}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {run.metadata?.MARKER ? (
+                  {sortedRuns.map((run) => {
+                    const status = getRunStatus(run);
+                    return (
+                      <tr
+                        key={run.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-6 py-4 w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedRuns.has(run.id)}
+                            onChange={() => toggleRunSelection(run.id)}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                            aria-label={`Select ${run.name || run.id}`}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-normal break-words max-w-[38rem]">
                           <Link
-                            to={`/marker/${encodeURIComponent(
-                              run.metadata.MARKER as string
-                            )}/stats`}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 hover:bg-indigo-200 transition-colors"
+                            to={`/suite_runs/${run.id}`}
+                            className="text-blue-600 hover:text-blue-800 font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
                           >
-                            <Tag className="h-3 w-3 mr-1" />
-                            {run.metadata.MARKER as string}
+                            {run.name || run.id}
                           </Link>
-                        ) : (
-                          <span className="text-gray-400 text-sm italic">No marker</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge status={getRunStatus(run)} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="text-green-600 font-semibold">
-                          {run.statistics!.passed}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="text-red-600 font-semibold">
-                          {run.statistics!.failed +
-                            (run.statistics!.broken || 0) +
-                            (run.statistics!.timedout || 0) +
-                            (run.statistics!.interrupted || 0)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="text-gray-600 font-semibold">
-                          {run.statistics!.skipped}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <span className="text-blue-600 font-semibold">
-                          {run.statistics!.total}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {run.updatedAt ? (
-                          <div className="flex flex-col">
-                            <span>
-                              {new Date(run.updatedAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-normal break-words max-w-[14rem]">
+                          {run.metadata?.MARKER ? (
+                            <Link
+                              to={`/marker/${encodeURIComponent(
+                                run.metadata.MARKER as string,
+                              )}/stats`}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 hover:bg-indigo-200 transition-colors"
+                            >
+                              <Tag className="h-3 w-3 mr-1" />
+                              {run.metadata.MARKER as string}
+                            </Link>
+                          ) : (
+                            <span className="text-gray-400 text-sm italic">
+                              No marker
                             </span>
-                            <span className="text-xs text-gray-400">
-                              {new Date(run.updatedAt).toLocaleTimeString()}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">N/A</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Badge
+                            status={
+                              status === "RUNNING" ? "RUNNING" : "COMPLETED"
+                            }
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {status !== "RUNNING" && <Badge status={status} />}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className="text-green-600 font-semibold">
+                            {run.statistics!.passed}
+                          </span>
+                          {" + "}
+                          <span className="text-red-600 font-semibold">
+                            {run.statistics!.failed +
+                              (run.statistics!.broken || 0) +
+                              (run.statistics!.timedout || 0) +
+                              (run.statistics!.interrupted || 0)}
+                          </span>
+                          {" + "}
+                          <span className="text-gray-600 font-semibold">
+                            {run.statistics!.skipped}
+                          </span>
+                          {" / "}
+                          <span className="text-blue-600 font-semibold">
+                            {run.statistics!.total}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-normal text-sm text-gray-500">
+                          {run.updatedAt ? (
+                            <div className="flex flex-col">
+                              <span>
+                                {new Date(run.updatedAt).toLocaleDateString()}
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                {new Date(run.updatedAt).toLocaleTimeString()}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
