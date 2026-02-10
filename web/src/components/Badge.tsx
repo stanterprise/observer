@@ -12,14 +12,14 @@ import {
 } from "lucide-react";
 
 interface BadgeProps {
-  status: TestStatus;
+  status: TestStatus | "COMPLETED";
   className?: string;
   showIcon?: boolean;
 }
 
 export function Badge({ status, className, showIcon = true }: BadgeProps) {
   const statusConfig: Record<
-    TestStatus,
+    TestStatus | "COMPLETED",
     { color: string; icon: typeof CheckCircle; label: string }
   > = {
     PASSED: {
@@ -72,6 +72,11 @@ export function Badge({ status, className, showIcon = true }: BadgeProps) {
       icon: MinusCircle,
       label: "not run",
     },
+    COMPLETED: {
+      color: "bg-green-100 text-green-800 border-green-200",
+      icon: CheckCircle,
+      label: "completed",
+    },
   };
 
   const config = statusConfig[status] || statusConfig.UNKNOWN;
@@ -82,7 +87,7 @@ export function Badge({ status, className, showIcon = true }: BadgeProps) {
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border",
         config.color,
-        className
+        className,
       )}
       role="status"
       aria-label={`Test status: ${config.label}`}
