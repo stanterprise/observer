@@ -199,10 +199,9 @@ export function TestMapPage() {
     
     const calculatedSize = Math.floor(Math.min(sizeByWidth, sizeByHeight));
     
-    // Clamp between min and max sizes
-    const MIN_SIZE = 4;
-    const MAX_SIZE = 32;
-    return Math.max(MIN_SIZE, Math.min(MAX_SIZE, calculatedSize));
+    // Set minimum size to 32px (old maximum), no maximum to allow filling viewport
+    const MIN_SIZE = 32;
+    return Math.max(MIN_SIZE, calculatedSize);
   }, [runDetail?.tests, containerDimensions]);
 
   // Extract all tags with occurrence counts

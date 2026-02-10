@@ -24,14 +24,14 @@ Navigate to Test Map from any Test Run Detail page via the "View Test Map" butto
   - Retry count for flaky tests
 
 ### Dynamic Sizing
-Test box size is automatically calculated to fit all tests without scrolling:
-- **10-50 tests**: 24-32px boxes (~8×6 grid)
-- **50-100 tests**: 16-24px boxes (~10×8 grid)
-- **100-300 tests**: 10-16px boxes (~14×12 grid)
-- **300-500 tests**: 8-12px boxes (~18×15 grid)
-- **500+ tests**: 4-8px boxes (~24×20 grid)
+Test box size is automatically calculated to fill the available viewport space while maintaining the 8:6 aspect ratio:
+- **Minimum size**: 32px (ensures readability)
+- **Maximum size**: No limit - boxes scale up to fill available space
+- **Few tests (10-50)**: Larger boxes (50-100px+) to fill viewport
+- **Many tests (100-200)**: Medium boxes (32-60px) filling space efficiently
+- **Very many tests (500+)**: Boxes default to 32px minimum
 
-The algorithm targets 8:6 aspect ratio and adjusts grid dimensions to fit actual test count.
+The algorithm ensures test objects always fill the map container, with larger boxes for fewer tests and maintaining 32px minimum for readability.
 
 ### Status Colors
 - 🟢 **Green**: PASSED
@@ -86,9 +86,12 @@ const gap = 2;
 const sizeByWidth = (availableWidth - (cols - 1) * gap) / cols;
 const sizeByHeight = (availableHeight - (rows - 1) * gap) / rows;
 
-// 4. Clamp to min/max
-const size = Math.max(4, Math.min(32, Math.floor(Math.min(sizeByWidth, sizeByHeight))));
+// 4. Use calculated size with 32px minimum (no maximum)
+const calculatedSize = Math.floor(Math.min(sizeByWidth, sizeByHeight));
+const size = Math.max(32, calculatedSize);
 ```
+
+This ensures boxes always fill the available space, scaling up for fewer tests and maintaining minimum 32px for readability.
 
 ### Visual Fading Logic
 When tags are selected:
