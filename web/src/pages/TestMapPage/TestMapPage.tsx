@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
@@ -6,7 +6,6 @@ import { ArrowLeft, Map, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TestRun } from "@/types/testRun";
 import type { Test } from "@/types/testCase";
-import type { TestSuite } from "@/types/testSuite";
 import type { TestStatus } from "@/types/common";
 
 // Helper to determine if a test is flaky (passed with retries)
@@ -48,21 +47,30 @@ interface TestBoxProps {
   test: Test;
   isHighlighted: boolean;
   onClick: () => void;
+  size: number; // Dynamic size in pixels
 }
 
-function TestBox({ test, isHighlighted, onClick }: TestBoxProps) {
+function TestBox({ test, isHighlighted, onClick, size }: TestBoxProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const colorClass = getTestStatusColor(test);
+  
+  // Scale border width based on size (1px for small, 2px for large)
+  const borderWidth = size < 12 ? 1 : 2;
 
   return (
     <div className="relative">
       <div
         className={cn(
-          "w-8 h-8 rounded border-2 cursor-pointer transition-all duration-200",
+          "rounded cursor-pointer transition-all duration-200",
           colorClass,
-          isHighlighted && "ring-4 ring-blue-300 scale-110",
+          isHighlighted && "ring-2 ring-blue-300 scale-110",
           !isHighlighted && "hover:scale-105 hover:shadow-md"
         )}
+        style={{ 
+          width: `${size}px`, 
+          height: `${size}px`,
+          borderWidth: `${borderWidth}px`,
+        }}
         onClick={onClick}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
@@ -96,47 +104,6 @@ function TestBox({ test, isHighlighted, onClick }: TestBoxProps) {
   );
 }
 
-interface SuiteBoxProps {
-  suite: TestSuite;
-  allTests: Test[];
-  highlightedTestIds: Set<string>;
-  onTestClick: (testId: string) => void;
-}
-
-function SuiteBox({ suite, allTests, highlightedTestIds, onTestClick }: SuiteBoxProps) {
-  // Get tests for this suite
-  const suiteTests = useMemo(() => {
-    return allTests.filter(test => test.suiteId === suite.id);
-  }, [allTests, suite.id]);
-
-  if (suiteTests.length === 0) {
-    return null;
-  }
-
-  return (
-    <Card className="border-gray-300 hover:border-blue-400 transition-colors">
-      <CardContent className="p-4">
-        <div className="mb-3">
-          <h3 className="font-semibold text-sm text-gray-900 truncate" title={suite.name}>
-            {suite.name}
-          </h3>
-          <p className="text-xs text-gray-500">{suiteTests.length} tests</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {suiteTests.map(test => (
-            <TestBox
-              key={test.id}
-              test={test}
-              isHighlighted={highlightedTestIds.has(test.id)}
-              onClick={() => onTestClick(test.id)}
-            />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export function TestMapPage() {
   const pollIntervalMs = config.pollingIntervalMs;
   const { runId } = useParams<{ runId: string }>();
@@ -145,6 +112,8 @@ export function TestMapPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
 
   const fetchRunDetail = useCallback(
     async (id: string, options?: { silent?: boolean }) => {
@@ -188,6 +157,51 @@ export function TestMapPage() {
       window.clearInterval(intervalId);
     };
   }, [runId, fetchRunDetail, pollIntervalMs]);
+
+  // Measure container dimensions
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setContainerDimensions({ width: rect.width, height: rect.height });
+      }
+    };
+
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, [runDetail]);
+
+  // Calculate optimal test box size based on total test count and available space
+  const testBoxSize = useMemo(() => {
+    if (!runDetail?.tests || runDetail.tests.length === 0) return 32;
+    
+    const totalTests = runDetail.tests.length;
+    const { width, height } = containerDimensions;
+    
+    // Reserve space for padding and gaps
+    const availableWidth = width - 48; // Account for card padding
+    const availableHeight = height - 120; // Account for header and padding
+    
+    if (availableWidth <= 0 || availableHeight <= 0) return 32;
+    
+    // Calculate grid dimensions - try to make it roughly rectangular
+    const aspectRatio = availableWidth / availableHeight;
+    const cols = Math.ceil(Math.sqrt(totalTests * aspectRatio));
+    const rows = Math.ceil(totalTests / cols);
+    
+    // Calculate size that fits all tests
+    const gap = 2; // Gap between boxes in pixels
+    const sizeByWidth = (availableWidth - (cols - 1) * gap) / cols;
+    const sizeByHeight = (availableHeight - (rows - 1) * gap) / rows;
+    
+    const calculatedSize = Math.floor(Math.min(sizeByWidth, sizeByHeight));
+    
+    // Clamp between min and max sizes
+    const MIN_SIZE = 4;
+    const MAX_SIZE = 32;
+    return Math.max(MIN_SIZE, Math.min(MAX_SIZE, calculatedSize));
+  }, [runDetail?.tests, containerDimensions]);
 
   // Extract all tags with occurrence counts
   const tagOccurrences = useMemo((): Record<string, number> => {
@@ -326,7 +340,7 @@ export function TestMapPage() {
             <CardContent className="p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  Test Suites & Tests
+                  Test Map
                 </h2>
                 <div className="flex items-center gap-4 text-xs">
                   <div className="flex items-center gap-2">
@@ -348,22 +362,31 @@ export function TestMapPage() {
                 </div>
               </div>
               
-              {!runDetail.suites || runDetail.suites.length === 0 ? (
+              {!runDetail.tests || runDetail.tests.length === 0 ? (
                 <div className="text-center py-16 text-gray-500">
                   <Map className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                  <p>No test suites available</p>
+                  <p>No tests available</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto">
-                  {runDetail.suites.map(suite => (
-                    <SuiteBox
-                      key={suite.id}
-                      suite={suite}
-                      allTests={runDetail.tests || []}
-                      highlightedTestIds={highlightedTestIds}
-                      onTestClick={handleTestClick}
-                    />
-                  ))}
+                <div 
+                  ref={containerRef}
+                  className="min-h-[500px]"
+                  style={{ height: 'calc(100vh - 320px)' }}
+                >
+                  <div 
+                    className="flex flex-wrap content-start"
+                    style={{ gap: '2px' }}
+                  >
+                    {runDetail.tests.map(test => (
+                      <TestBox
+                        key={test.id}
+                        test={test}
+                        size={testBoxSize}
+                        isHighlighted={highlightedTestIds.has(test.id)}
+                        onClick={() => handleTestClick(test.id)}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </CardContent>
