@@ -46,11 +46,12 @@ const getStatusLabel = (test: Test): string => {
 interface TestBoxProps {
   test: Test;
   isHighlighted: boolean;
+  isFaded: boolean; // New prop for fading non-highlighted tests
   onClick: () => void;
   size: number; // Dynamic size in pixels
 }
 
-function TestBox({ test, isHighlighted, onClick, size }: TestBoxProps) {
+function TestBox({ test, isHighlighted, isFaded, onClick, size }: TestBoxProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const colorClass = getTestStatusColor(test);
   
@@ -70,6 +71,7 @@ function TestBox({ test, isHighlighted, onClick, size }: TestBoxProps) {
           width: `${size}px`, 
           height: `${size}px`,
           borderWidth: `${borderWidth}px`,
+          opacity: isFaded ? 0.25 : 1, // Apply fading when isFaded is true
         }}
         onClick={onClick}
         onMouseEnter={() => setShowTooltip(true)}
@@ -185,9 +187,9 @@ export function TestMapPage() {
     
     if (availableWidth <= 0 || availableHeight <= 0) return 32;
     
-    // Calculate grid dimensions - try to make it roughly rectangular
-    const aspectRatio = availableWidth / availableHeight;
-    const cols = Math.ceil(Math.sqrt(totalTests * aspectRatio));
+    // Enforce 8:6 aspect ratio (1.333...)
+    const TARGET_ASPECT_RATIO = 8 / 6;
+    const cols = Math.ceil(Math.sqrt(totalTests * TARGET_ASPECT_RATIO));
     const rows = Math.ceil(totalTests / cols);
     
     // Calculate size that fits all tests
@@ -377,15 +379,21 @@ export function TestMapPage() {
                     className="flex flex-wrap content-start"
                     style={{ gap: '2px' }}
                   >
-                    {runDetail.tests.map(test => (
-                      <TestBox
-                        key={test.id}
-                        test={test}
-                        size={testBoxSize}
-                        isHighlighted={highlightedTestIds.has(test.id)}
-                        onClick={() => handleTestClick(test.id)}
-                      />
-                    ))}
+                    {runDetail.tests.map(test => {
+                      const isHighlighted = highlightedTestIds.has(test.id);
+                      const isFaded = selectedTags.size > 0 && !isHighlighted;
+                      
+                      return (
+                        <TestBox
+                          key={test.id}
+                          test={test}
+                          size={testBoxSize}
+                          isHighlighted={isHighlighted}
+                          isFaded={isFaded}
+                          onClick={() => handleTestClick(test.id)}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               )}
