@@ -1,7 +1,7 @@
 # Test Map Feature Documentation
 
 ## Overview
-The Test Map is a visual representation page that displays test suites and their tests in a canvas-like grid layout with interactive tag-based filtering.
+The Test Map is a visual representation page that displays all tests as a single rectangular grid with dynamic sizing based on test count. No scrolling required - all tests are visible at once.
 
 ## Access
 Navigate to Test Map from any Test Run Detail page via the "View Test Map" button in the header.
@@ -11,14 +11,26 @@ Navigate to Test Map from any Test Run Detail page via the "View Test Map" butto
 ## Features
 
 ### Visual Test Grid
-- Test suites displayed as cards in a responsive grid (1-3 columns)
-- Tests shown as 32x32px colored squares within each suite
+- **Single rectangular grid** of all tests (no suite wrappers)
+- **Dynamic sizing**: Test boxes automatically scale from 4px to 32px based on total test count
+- **No scrolling**: All tests fit in viewport
+- Tests flow left-to-right, top-to-bottom
 - Hover over any test to see detailed tooltip with:
   - Test title
   - Status (including "Flaky" indicator)
   - Duration in milliseconds
   - Tags
   - Retry count for flaky tests
+
+### Dynamic Sizing
+Test box size is automatically calculated to fit all tests without scrolling:
+- **10-50 tests**: 24-32px boxes (~7x7 grid)
+- **50-100 tests**: 16-24px boxes (~10x10 grid)
+- **100-300 tests**: 10-16px boxes (~17x17 grid)
+- **300-500 tests**: 8-12px boxes (~22x22 grid)
+- **500+ tests**: 4-8px boxes (~30x30 grid)
+
+The algorithm considers viewport dimensions and creates a roughly rectangular grid.
 
 ### Status Colors
 - 🟢 **Green**: PASSED
@@ -41,6 +53,7 @@ Navigate to Test Map from any Test Run Detail page via the "View Test Map" butto
 - Automatically polls for updates every 5 seconds
 - Updates are silent (no loading spinner on refresh)
 - Test status colors update automatically
+- Recalculates box sizes if test count changes
 
 ### Navigation
 - **Click any test**: Navigate to Test Detail page
@@ -52,8 +65,27 @@ Navigate to Test Map from any Test Run Detail page via the "View Test Map" butto
 ### Component Structure
 ```
 TestMapPage (web/src/pages/TestMapPage/TestMapPage.tsx)
-├── SuiteBox: Displays a test suite with tests
-└── TestBox: Individual test square with hover tooltip
+└── TestBox: Individual test square with hover tooltip and dynamic sizing
+```
+
+### Dynamic Sizing Algorithm
+```typescript
+// 1. Measure available space
+const availableWidth = containerWidth - 48;
+const availableHeight = viewportHeight - 320;
+
+// 2. Calculate optimal grid dimensions
+const aspectRatio = availableWidth / availableHeight;
+const cols = Math.ceil(Math.sqrt(totalTests * aspectRatio));
+const rows = Math.ceil(totalTests / cols);
+
+// 3. Calculate size that fits
+const gap = 2;
+const sizeByWidth = (availableWidth - (cols - 1) * gap) / cols;
+const sizeByHeight = (availableHeight - (rows - 1) * gap) / rows;
+
+// 4. Clamp to min/max
+const size = Math.max(4, Math.min(32, Math.floor(Math.min(sizeByWidth, sizeByHeight))));
 ```
 
 ### Data Flow
@@ -67,6 +99,8 @@ TestMapPage (web/src/pages/TestMapPage/TestMapPage.tsx)
 - `runDetail`: Full test run data
 - `selectedTags`: Set of currently selected tags
 - `highlightedTestIds`: Computed set of tests to highlight
+- `containerDimensions`: Current container width/height for sizing
+- `testBoxSize`: Computed optimal box size (4-32px)
 - `loading`, `error`: Standard UI states
 
 ## Use Cases
@@ -74,8 +108,8 @@ TestMapPage (web/src/pages/TestMapPage/TestMapPage.tsx)
 ### Finding Smoke Tests
 1. Open Test Map
 2. Click "smoke" tag in sidebar
-3. All smoke tests are highlighted
-4. Visual distribution across suites is clear
+3. All smoke tests are highlighted with blue ring
+4. Visual distribution across entire map is clear
 
 ### Identifying Flaky Tests
 1. Open Test Map
@@ -89,10 +123,17 @@ TestMapPage (web/src/pages/TestMapPage/TestMapPage.tsx)
 3. Only tests with both tags are highlighted
 4. Shows overlap between test categories
 
+### Assessing Test Run Health
+1. Open Test Map
+2. Get instant visual overview of entire run
+3. Red squares (failures) stand out immediately
+4. See distribution and patterns at a glance
+
 ## Responsive Design
-- **Desktop (lg+)**: 3-column grid with sticky sidebar
-- **Tablet (md)**: 2-column grid
-- **Mobile**: Single column with sidebar below
+- **Desktop**: Full viewport height minus headers (~calc(100vh - 320px))
+- **Tablet**: Same behavior with slightly smaller container
+- **Mobile**: Tag sidebar moves below map, full width available
+- **Window Resize**: Automatically recalculates box sizes
 
 ## Accessibility
 - Semantic HTML structure
@@ -126,9 +167,9 @@ Route is defined in `web/src/App.tsx`:
 ```
 
 ## Future Enhancements
+- Zoom control to override calculated size
+- Density selector (compact/normal/comfortable)
+- Optional suite boundary dividers
 - Search/filter by test name
 - Export map as image
-- Adjustable test box sizes
-- Suite type filtering
-- WebSocket for real-time updates
-- Virtual scrolling for large test suites
+- WebSocket for real-time updates instead of polling
