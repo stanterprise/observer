@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type {
   TagTerritoryMapProps,
   SimulationState,
@@ -76,16 +76,23 @@ export function TagTerritoryMap({
     };
   }, []);
 
+  // Select top tags based on tests and max visible tags
+  const selectedTagsData = useMemo(() => {
+    if (tests.length === 0) return [];
+    return selectTopTags(tests, maxVisibleTags);
+  }, [tests, maxVisibleTags]);
+
+  // Update selectedTags when selectedTagsData changes
+  useEffect(() => {
+    setSelectedTags(selectedTagsData);
+  }, [selectedTagsData]);
+
   // Start simulation when tests change
   useEffect(() => {
-    if (!workerRef.current || tests.length === 0) return;
-
-    // Select top tags
-    const topTags = selectTopTags(tests, maxVisibleTags);
-    setSelectedTags(topTags);
+    if (!workerRef.current || tests.length === 0 || selectedTagsData.length === 0) return;
 
     // Filter tests to only include those with selected tags
-    const tagNames = new Set(topTags.map((t) => t.name));
+    const tagNames = new Set(selectedTagsData.map((t) => t.name));
     const filteredTests = tests.filter((test) =>
       test.tags.some((tag) => tagNames.has(tag)),
     );
@@ -115,11 +122,11 @@ export function TagTerritoryMap({
       type: "init",
       config,
       tests: filteredTests,
-      tags: topTags,
+      tags: selectedTagsData,
     });
 
     workerRef.current.postMessage({ type: "step" });
-  }, [tests, maxVisibleTags, width, height]);
+  }, [tests, maxVisibleTags, width, height, selectedTagsData]);
 
   // Render canvas
   useEffect(() => {
