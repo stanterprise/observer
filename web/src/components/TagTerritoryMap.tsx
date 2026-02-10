@@ -8,6 +8,7 @@ import type {
   TagInfo,
 } from "@/types/tagTerritory";
 import { selectTopTags, getStatusColor } from "@/utils/tagSelection";
+import { formatDuration } from "@/utils/timeUtils";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_MAX_VISIBLE_TAGS = 30;
@@ -42,6 +43,24 @@ export function TagTerritoryMap({
   });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  // Helper function to check if a point is within a tag label
+  const isPointInTagLabel = useCallback(
+    (tag: TagNode, x: number, y: number, ctx: CanvasRenderingContext2D): boolean => {
+      const isFocused = focusedTag === tag.name;
+      ctx.font = isFocused ? "bold 14px sans-serif" : "12px sans-serif";
+      const metrics = ctx.measureText(tag.name);
+      const padding = 6;
+      const labelWidth = metrics.width + padding * 2;
+      const labelHeight = 20;
+
+      const dx = Math.abs(tag.x - x);
+      const dy = Math.abs(tag.y - y);
+
+      return dx < labelWidth / 2 && dy < labelHeight / 2;
+    },
+    [focusedTag],
+  );
 
   // Initialize worker
   useEffect(() => {
@@ -307,13 +326,14 @@ export function TagTerritoryMap({
       }
 
       // Check for hovered tag
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
       let foundTag: TagNode | null = null;
       for (const tag of state.tags) {
-        const dx = tag.x - x;
-        const dy = tag.y - y;
-        // Check if mouse is over tag label area
-        const labelWidth = tag.name.length * 7;
-        if (Math.abs(dx) < labelWidth / 2 && Math.abs(dy) < 10) {
+        if (isPointInTagLabel(tag, x, y, ctx)) {
           foundTag = tag;
           break;
         }
@@ -321,7 +341,7 @@ export function TagTerritoryMap({
 
       setHoveredTag(foundTag);
     },
-    [state, hoveredTest, isPanning, panStart, getMousePosition, onTestHover],
+    [state, hoveredTest, isPanning, panStart, getMousePosition, onTestHover, isPointInTagLabel],
   );
 
   const handleMouseDown = useCallback(
@@ -331,14 +351,14 @@ export function TagTerritoryMap({
         if (!state) return;
 
         const { x, y } = getMousePosition(e);
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
 
         // Check for tag click
         for (const tag of state.tags) {
-          const dx = tag.x - x;
-          const dy = tag.y - y;
-          // Check if click is within tag label area
-          const labelWidth = tag.name.length * 7;
-          if (Math.abs(dx) < labelWidth / 2 && Math.abs(dy) < 10) {
+          if (isPointInTagLabel(tag, x, y, ctx)) {
             // Toggle focused tag
             if (focusedTag === tag.name) {
               setFocusedTag(null);
@@ -355,7 +375,7 @@ export function TagTerritoryMap({
         setPanStart({ x: e.clientX, y: e.clientY });
       }
     },
-    [state, focusedTag, getMousePosition, onTagClick],
+    [state, focusedTag, getMousePosition, onTagClick, isPointInTagLabel],
   );
 
   const handleMouseUp = useCallback(() => {
@@ -479,7 +499,7 @@ export function TagTerritoryMap({
           </h4>
           <div className="text-xs text-gray-600 space-y-1">
             <div>Status: {hoveredTest.test.status}</div>
-            <div>Duration: {hoveredTest.test.durationMs}ms</div>
+            <div>Duration: {formatDuration(hoveredTest.test.durationMs)}</div>
             {hoveredTest.test.retries > 0 && (
               <div>Retries: {hoveredTest.test.retries}</div>
             )}

@@ -2,6 +2,17 @@ import type { TagTerritoryTest, TagInfo } from "@/types/tagTerritory";
 import type { TestStatus } from "@/types/common";
 
 /**
+ * Check if a test status represents a failure state
+ */
+export function isFailedStatus(status: TestStatus): boolean {
+  return (
+    status === "FAILED" ||
+    status === "BROKEN" ||
+    status === "TIMEDOUT"
+  );
+}
+
+/**
  * Calculate impact score for a tag based on:
  * - Number of tests with the tag
  * - Extra weight for failed tests
@@ -20,8 +31,8 @@ export function calculateTagImpact(
   let score = count;
 
   // Bonus for failed tests (2x weight)
-  const failedCount = testsWithTag.filter(
-    (t) => t.status === "FAILED" || t.status === "BROKEN" || t.status === "TIMEDOUT",
+  const failedCount = testsWithTag.filter((t) =>
+    isFailedStatus(t.status),
   ).length;
   score += failedCount * 2;
 
@@ -123,11 +134,7 @@ export function calculateTestMass(test: TagTerritoryTest): number {
   let mass = 1;
 
   // Increase mass for failed tests
-  if (
-    test.status === "FAILED" ||
-    test.status === "BROKEN" ||
-    test.status === "TIMEDOUT"
-  ) {
+  if (isFailedStatus(test.status)) {
     mass += 2;
   }
 

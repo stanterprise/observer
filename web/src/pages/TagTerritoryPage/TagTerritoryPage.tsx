@@ -5,6 +5,7 @@ import { ArrowLeft, Filter } from "lucide-react";
 import { TagTerritoryMap } from "@/components/TagTerritoryMap";
 import type { TagTerritoryTest } from "@/types/tagTerritory";
 import type { TestRun } from "@/types/testRun";
+import { NS_TO_MS } from "@/utils/timeUtils";
 
 export function TagTerritoryPage() {
   const { runId } = useParams<{ runId: string }>();
@@ -47,7 +48,7 @@ export function TagTerritoryPage() {
       name: test.title,
       tags: test.tags || [],
       status: test.status,
-      durationMs: test.duration ? test.duration / 1_000_000 : 0, // Convert nanoseconds to milliseconds
+      durationMs: test.duration ? test.duration / NS_TO_MS : 0,
       retries: test.retryCount || 0,
     }),
   );
