@@ -8,6 +8,8 @@ import {
   TestTrendsPage,
   MarkerStatsPage,
   MarkerBrowsePage,
+  TagTerritoryDemoPage,
+  TagTerritoryPage,
 } from "./pages";
 import DashboardPage from "./components/DashboardPage";
 
@@ -25,7 +27,10 @@ function App() {
           </Route>
           <Route path="tests/:testId/trends" element={<TestTrendsPage />} />
           <Route path="markers" element={<MarkerBrowsePage />} />
-          <Route path="marker/:markerValue/stats" element={<MarkerStatsPage />} />
+          <Route
+            path="marker/:markerValue/stats"
+            element={<MarkerStatsPage />}
+          />
           <Route path="demo/territory" element={<TagTerritoryDemoPage />} />
         </Route>
       </Routes>

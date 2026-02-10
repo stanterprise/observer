@@ -21,7 +21,7 @@ COPY pkg/ ./pkg/
 
 # Build ingestion binary with optimizations
 # TARGETARCH is automatically set by BuildKit for multi-platform builds
-ARG TARGETARCH
+ARG TARGETARCH=amd64
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build -ldflags='-w -s -extldflags "-static"' \
     -o /bin/ingestion ./cmd/ingestion
