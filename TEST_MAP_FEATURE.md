@@ -1,7 +1,7 @@
 # Test Map Feature Documentation
 
 ## Overview
-The Test Map is a visual representation page that displays all tests as a single rectangular grid with dynamic sizing based on test count. No scrolling required - all tests are visible at once.
+The Test Map is a visual representation page that displays all tests as a single rectangular grid with dynamic sizing based on test count. Features an 8:6 aspect ratio for balanced layout and visual fading for tag filtering. No scrolling required - all tests are visible at once.
 
 ## Access
 Navigate to Test Map from any Test Run Detail page via the "View Test Map" button in the header.
@@ -12,6 +12,7 @@ Navigate to Test Map from any Test Run Detail page via the "View Test Map" butto
 
 ### Visual Test Grid
 - **Single rectangular grid** of all tests (no suite wrappers)
+- **8:6 aspect ratio**: Grid maintains consistent 8:6 (1.333...) ratio for balanced rectangular layout
 - **Dynamic sizing**: Test boxes automatically scale from 4px to 32px based on total test count
 - **No scrolling**: All tests fit in viewport
 - Tests flow left-to-right, top-to-bottom
@@ -24,13 +25,13 @@ Navigate to Test Map from any Test Run Detail page via the "View Test Map" butto
 
 ### Dynamic Sizing
 Test box size is automatically calculated to fit all tests without scrolling:
-- **10-50 tests**: 24-32px boxes (~7x7 grid)
-- **50-100 tests**: 16-24px boxes (~10x10 grid)
-- **100-300 tests**: 10-16px boxes (~17x17 grid)
-- **300-500 tests**: 8-12px boxes (~22x22 grid)
-- **500+ tests**: 4-8px boxes (~30x30 grid)
+- **10-50 tests**: 24-32px boxes (~8×6 grid)
+- **50-100 tests**: 16-24px boxes (~10×8 grid)
+- **100-300 tests**: 10-16px boxes (~14×12 grid)
+- **300-500 tests**: 8-12px boxes (~18×15 grid)
+- **500+ tests**: 4-8px boxes (~24×20 grid)
 
-The algorithm considers viewport dimensions and creates a roughly rectangular grid.
+The algorithm targets 8:6 aspect ratio and adjusts grid dimensions to fit actual test count.
 
 ### Status Colors
 - 🟢 **Green**: PASSED
@@ -48,6 +49,7 @@ The algorithm considers viewport dimensions and creates a roughly rectangular gr
 - Multi-select enabled - select multiple tags to filter
 - Counter shows number of highlighted tests
 - "Clear Selection" button to reset filters
+- **Visual fading**: Non-highlighted tests fade to 25% opacity when tags are selected for clear distinction
 
 ### Real-time Updates
 - Automatically polls for updates every 5 seconds
@@ -74,9 +76,9 @@ TestMapPage (web/src/pages/TestMapPage/TestMapPage.tsx)
 const availableWidth = containerWidth - 48;
 const availableHeight = viewportHeight - 320;
 
-// 2. Calculate optimal grid dimensions
-const aspectRatio = availableWidth / availableHeight;
-const cols = Math.ceil(Math.sqrt(totalTests * aspectRatio));
+// 2. Calculate optimal grid dimensions with 8:6 aspect ratio
+const TARGET_ASPECT_RATIO = 8 / 6;
+const cols = Math.ceil(Math.sqrt(totalTests * TARGET_ASPECT_RATIO));
 const rows = Math.ceil(totalTests / cols);
 
 // 3. Calculate size that fits
@@ -87,6 +89,21 @@ const sizeByHeight = (availableHeight - (rows - 1) * gap) / rows;
 // 4. Clamp to min/max
 const size = Math.max(4, Math.min(32, Math.floor(Math.min(sizeByWidth, sizeByHeight))));
 ```
+
+### Visual Fading Logic
+When tags are selected:
+```typescript
+const isHighlighted = highlightedTestIds.has(test.id);
+const isFaded = selectedTags.size > 0 && !isHighlighted;
+
+// In TestBox component:
+style={{ opacity: isFaded ? 0.25 : 1 }}
+```
+
+This creates a clear visual distinction:
+- **Highlighted tests**: 100% opacity + blue ring + scale
+- **Non-highlighted tests**: 25% opacity (faded)
+- **No tags selected**: All tests at 100% opacity
 
 ### Data Flow
 1. Fetches test run data: `GET /api/runs/:runId`
@@ -100,16 +117,17 @@ const size = Math.max(4, Math.min(32, Math.floor(Math.min(sizeByWidth, sizeByHei
 - `selectedTags`: Set of currently selected tags
 - `highlightedTestIds`: Computed set of tests to highlight
 - `containerDimensions`: Current container width/height for sizing
-- `testBoxSize`: Computed optimal box size (4-32px)
+- `testBoxSize`: Computed optimal box size (4-32px) using 8:6 aspect ratio
 - `loading`, `error`: Standard UI states
 
 ## Use Cases
 
-### Finding Smoke Tests
+### Finding Smoke Tests with Visual Focus
 1. Open Test Map
 2. Click "smoke" tag in sidebar
-3. All smoke tests are highlighted with blue ring
-4. Visual distribution across entire map is clear
+3. All smoke tests are highlighted with blue ring at full opacity
+4. All other tests fade to 25% opacity
+5. Instantly see distribution and focus on smoke tests
 
 ### Identifying Flaky Tests
 1. Open Test Map
@@ -117,11 +135,12 @@ const size = Math.max(4, Math.min(32, Math.floor(Math.min(sizeByWidth, sizeByHei
 3. Hover to see retry count
 4. Click to investigate details
 
-### Multi-tag Analysis
-1. Select "integration" tag
+### Multi-tag Analysis with Clear Distinction
+1. Select "integration" tag - non-matching tests fade
 2. Also select "api" tag
-3. Only tests with both tags are highlighted
-4. Shows overlap between test categories
+3. Only tests with both tags remain bright
+4. All other tests at 25% opacity
+5. Shows overlap between test categories with clear visual hierarchy
 
 ### Assessing Test Run Health
 1. Open Test Map
