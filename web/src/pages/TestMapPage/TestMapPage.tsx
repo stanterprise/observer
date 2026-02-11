@@ -40,7 +40,9 @@ const getStatusLabel = (test: Test): string => {
   if (isFlaky(test)) {
     return "Flaky";
   }
-  return test.status.charAt(0) + test.status.slice(1).toLowerCase().replace("_", " ");
+  return (
+    test.status.charAt(0) + test.status.slice(1).toLowerCase().replace("_", " ")
+  );
 };
 
 interface TestBoxProps {
@@ -52,10 +54,17 @@ interface TestBoxProps {
   height: number; // Height in pixels
 }
 
-function TestBox({ test, isHighlighted, isFaded, onClick, width, height }: TestBoxProps) {
+function TestBox({
+  test,
+  isHighlighted,
+  isFaded,
+  onClick,
+  width,
+  height,
+}: TestBoxProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const colorClass = getTestStatusColor(test);
-  
+
   // Scale border width based on height (1px for small, 2px for large)
   const borderWidth = height < 24 ? 1 : 2;
 
@@ -66,10 +75,10 @@ function TestBox({ test, isHighlighted, isFaded, onClick, width, height }: TestB
           "rounded cursor-pointer transition-all duration-200",
           colorClass,
           isHighlighted && "ring-2 ring-blue-300 scale-110",
-          !isHighlighted && "hover:scale-105 hover:shadow-md"
+          !isHighlighted && "hover:scale-105 hover:shadow-md",
         )}
-        style={{ 
-          width: `${width}px`, 
+        style={{
+          width: `${width}px`,
           height: `${height}px`,
           borderWidth: `${borderWidth}px`,
           opacity: isFaded ? 0.25 : 1, // Apply fading when isFaded is true
@@ -85,7 +94,12 @@ function TestBox({ test, isHighlighted, isFaded, onClick, width, height }: TestB
         <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl pointer-events-none">
           <div className="font-semibold mb-1 truncate">{test.title}</div>
           <div className="space-y-1 text-gray-300">
-            <div>Status: <span className="font-medium text-white">{getStatusLabel(test)}</span></div>
+            <div>
+              Status:{" "}
+              <span className="font-medium text-white">
+                {getStatusLabel(test)}
+              </span>
+            </div>
             {test.duration && (
               <div>Duration: {(test.duration / 1_000_000).toFixed(2)}ms</div>
             )}
@@ -116,7 +130,10 @@ export function TestMapPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
+  const [containerDimensions, setContainerDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
 
   const fetchRunDetail = useCallback(
     async (id: string, options?: { silent?: boolean }) => {
@@ -127,21 +144,25 @@ export function TestMapPage() {
         }
         const response = await fetch(apiUrl(`/runs/${id}`));
         if (!response.ok) {
-          throw new Error(`Failed to fetch run details: ${response.statusText}`);
+          throw new Error(
+            `Failed to fetch run details: ${response.statusText}`,
+          );
         }
         const data = await response.json();
         setRunDetail(data);
         setError(null);
       } catch (err) {
         console.error("Error fetching run details:", err);
-        setError(err instanceof Error ? err.message : "Failed to fetch run details");
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch run details",
+        );
       } finally {
         if (!silent) {
           setLoading(false);
         }
       }
     },
-    []
+    [],
   );
 
   useEffect(() => {
@@ -171,61 +192,61 @@ export function TestMapPage() {
     };
 
     updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+    window.addEventListener("resize", updateDimensions);
+    return () => window.removeEventListener("resize", updateDimensions);
   }, [runDetail]);
 
   // Calculate optimal test box dimensions based on total test count and available space
   const testBoxDimensions = useMemo(() => {
     if (!runDetail?.tests || runDetail.tests.length === 0) {
-      return { width: 100, height: 28 }; // Default rectangular dimensions
+      return { width: 100, height: 32 }; // Default rectangular dimensions
     }
-    
+
     const totalTests = runDetail.tests.length;
     const { width, height } = containerDimensions;
-    
+
     // Reserve space for padding and gaps
     const availableWidth = width - 48; // Account for card padding (24px each side)
     const availableHeight = height - 80; // Account for header and padding
-    
+
     if (availableWidth <= 0 || availableHeight <= 0) {
       return { width: 100, height: 28 };
     }
-    
+
     // Fixed height for one line of text (comfortable reading height)
-    const BOX_HEIGHT = 28; // Height for one line of text with padding
+    const BOX_HEIGHT = 32; // Height for one line of text with padding
     const MIN_HEIGHT = 24;
     const MAX_HEIGHT = 32;
     const boxHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, BOX_HEIGHT));
-    
+
     // Calculate how many rows we can fit
     const gap = 2; // Gap between boxes in pixels
     const maxRows = Math.floor((availableHeight + gap) / (boxHeight + gap));
-    
+
     // Calculate how many columns we need
     const cols = Math.ceil(totalTests / maxRows);
-    
+
     // Calculate width to fill available space
     const boxWidth = Math.floor((availableWidth - (cols - 1) * gap) / cols);
-    
+
     // Set minimum width for usability
     const MIN_WIDTH = 60;
     const finalWidth = Math.max(MIN_WIDTH, boxWidth);
-    
+
     return { width: finalWidth, height: boxHeight };
   }, [runDetail?.tests, containerDimensions]);
 
   // Extract all tags with occurrence counts
   const tagOccurrences = useMemo((): Record<string, number> => {
     if (!runDetail?.tests) return {};
-    
+
     const counts: Record<string, number> = {};
-    runDetail.tests.forEach(test => {
-      test.tags?.forEach(tag => {
+    runDetail.tests.forEach((test) => {
+      test.tags?.forEach((tag) => {
         counts[tag] = (counts[tag] || 0) + 1;
       });
     });
-    
+
     return counts;
   }, [runDetail?.tests]);
 
@@ -239,19 +260,19 @@ export function TestMapPage() {
   // Get highlighted test IDs based on selected tags
   const highlightedTestIds = useMemo(() => {
     if (selectedTags.size === 0) return new Set<string>();
-    
+
     const ids = new Set<string>();
-    runDetail?.tests?.forEach(test => {
-      if (test.tags && test.tags.some(tag => selectedTags.has(tag))) {
+    runDetail?.tests?.forEach((test) => {
+      if (test.tags && test.tags.some((tag) => selectedTags.has(tag))) {
         ids.add(test.id);
       }
     });
-    
+
     return ids;
   }, [selectedTags, runDetail?.tests]);
 
   const toggleTag = (tag: string) => {
-    setSelectedTags(prev => {
+    setSelectedTags((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(tag)) {
         newSet.delete(tag);
@@ -306,7 +327,9 @@ export function TestMapPage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Failed to Load Test Map
               </h3>
-              <p className="text-sm text-gray-600 mb-6">{error || "Unknown error"}</p>
+              <p className="text-sm text-gray-600 mb-6">
+                {error || "Unknown error"}
+              </p>
               <Link
                 to={`/suite_runs/${runId}`}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -373,26 +396,26 @@ export function TestMapPage() {
                   </div>
                 </div>
               </div>
-              
+
               {!runDetail.tests || runDetail.tests.length === 0 ? (
                 <div className="text-center py-16 text-gray-500">
                   <Map className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                   <p>No tests available</p>
                 </div>
               ) : (
-                <div 
+                <div
                   ref={containerRef}
                   className="min-h-[500px]"
-                  style={{ height: 'calc(100vh - 320px)' }}
+                  style={{ height: "calc(100vh - 320px)" }}
                 >
-                  <div 
+                  <div
                     className="flex flex-wrap content-start"
-                    style={{ gap: '2px' }}
+                    style={{ gap: "8px" }}
                   >
-                    {runDetail.tests.map(test => {
+                    {runDetail.tests.map((test) => {
                       const isHighlighted = highlightedTestIds.has(test.id);
                       const isFaded = selectedTags.size > 0 && !isHighlighted;
-                      
+
                       return (
                         <TestBox
                           key={test.id}
@@ -419,7 +442,7 @@ export function TestMapPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Filter by Tags
               </h2>
-              
+
               {sortedTags.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-8">
                   No tags available
@@ -427,15 +450,15 @@ export function TestMapPage() {
               ) : (
                 <>
                   <div className="mb-4 text-xs text-gray-500">
-                    {selectedTags.size > 0 
-                      ? `${highlightedTestIds.size} test${highlightedTestIds.size !== 1 ? 's' : ''} highlighted`
+                    {selectedTags.size > 0
+                      ? `${highlightedTestIds.size} test${highlightedTestIds.size !== 1 ? "s" : ""} highlighted`
                       : "Select tags to highlight tests"}
                   </div>
                   <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                    {sortedTags.map(tag => {
+                    {sortedTags.map((tag) => {
                       const count = tagOccurrences[tag] || 0;
                       const isSelected = selectedTags.has(tag);
-                      
+
                       return (
                         <button
                           key={tag}
@@ -444,17 +467,19 @@ export function TestMapPage() {
                             "w-full text-left px-3 py-2 rounded-lg border transition-all text-sm",
                             isSelected
                               ? "bg-blue-100 border-blue-300 text-blue-900 font-medium"
-                              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300",
                           )}
                         >
                           <div className="flex items-center justify-between">
                             <span className="truncate flex-1">{tag}</span>
-                            <span className={cn(
-                              "ml-2 px-2 py-0.5 rounded text-xs font-medium",
-                              isSelected 
-                                ? "bg-blue-200 text-blue-800" 
-                                : "bg-gray-100 text-gray-600"
-                            )}>
+                            <span
+                              className={cn(
+                                "ml-2 px-2 py-0.5 rounded text-xs font-medium",
+                                isSelected
+                                  ? "bg-blue-200 text-blue-800"
+                                  : "bg-gray-100 text-gray-600",
+                              )}
+                            >
                               {count}
                             </span>
                           </div>
@@ -462,7 +487,7 @@ export function TestMapPage() {
                       );
                     })}
                   </div>
-                  
+
                   {selectedTags.size > 0 && (
                     <button
                       onClick={() => setSelectedTags(new Set())}
