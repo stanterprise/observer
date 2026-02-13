@@ -9,8 +9,8 @@
       "program": "${workspaceFolder}/cmd/ingestion",
       "env": {
         "PORT": "50051",
-        "NATS_URL": "${env:NATS_URL}",
-        "NATS_STREAM": "${env:NATS_STREAM}",
+        "NATS_URL": "${env:NATS_URL:nats://localhost:4222}",
+        "NATS_STREAM": "${env:NATS_STREAM:tests_events}",
         "NATS_SUBJECT_PREFIX": "tests.events.v1"
       },
       "args": [],
@@ -24,9 +24,9 @@
       "mode": "debug",
       "program": "${workspaceFolder}/cmd/processor",
       "env": {
-        "NATS_URL": "${env:NATS_URL}",
-        "NATS_STREAM": "${env:NATS_STREAM}",
-        "MONGODB_URI": "${env:MONGODB_URI}"
+        "NATS_URL": "${env:NATS_URL:nats://localhost:4222}",
+        "NATS_STREAM": "${env:NATS_STREAM:tests_events}",
+        "MONGODB_URI": "${env:MONGODB_URI:mongodb://root:password@localhost:27017/observer?authSource=admin}"
       },
       "args": [],
       "showLog": true,
@@ -40,9 +40,9 @@
       "program": "${workspaceFolder}/cmd/api",
       "env": {
         "PORT": "8080",
-        "NATS_URL": "${env:NATS_URL}",
-        "NATS_STREAM": "${env:NATS_STREAM}",
-        "MONGODB_URI": "${env:MONGODB_URI}"
+        "NATS_URL": "${env:NATS_URL:nats://localhost:4222}",
+        "NATS_STREAM": "${env:NATS_STREAM:tests_events}",
+        "MONGODB_URI": "${env:MONGODB_URI:mongodb://root:password@localhost:27017/observer?authSource=admin}"
       },
       "args": [],
       "showLog": true,
@@ -55,8 +55,8 @@
       "mode": "debug",
       "program": "${workspaceFolder}/server",
       "env": {
-        "MONGODB_URI": "${env:MONGODB_URI}",
-        "NATS_URL": "${env:NATS_URL}"
+        "MONGODB_URI": "${env:MONGODB_URI:mongodb://root:password@localhost:27017/observer?authSource=admin}",
+        "NATS_URL": "${env:NATS_URL:nats://localhost:4222}"
       },
       "args": [],
       "showLog": true,

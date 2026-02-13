@@ -10,8 +10,8 @@
     "type": "gutter"
   },
   "go.testEnvVars": {
-    "MONGODB_URI": "${env:MONGODB_URI}",
-    "NATS_URL": "${env:NATS_URL}"
+    "MONGODB_URI": "${env:MONGODB_URI:mongodb://root:password@localhost:27017/observer?authSource=admin}",
+    "NATS_URL": "${env:NATS_URL:nats://localhost:4222}"
   },
   "[go]": {
     "editor.formatOnSave": true,
@@ -62,9 +62,9 @@
   },
   "terminal.integrated.defaultProfile.linux": "bash",
   "terminal.integrated.env.linux": {
-    "MONGODB_URI": "${env:MONGODB_URI}",
-    "NATS_URL": "${env:NATS_URL}",
-    "NATS_STREAM": "${env:NATS_STREAM}"
+    "MONGODB_URI": "${env:MONGODB_URI:mongodb://root:password@localhost:27017/observer?authSource=admin}",
+    "NATS_URL": "${env:NATS_URL:nats://localhost:4222}",
+    "NATS_STREAM": "${env:NATS_STREAM:tests_events}"
   },
   "files.eol": "\n",
   "files.insertFinalNewline": true,
