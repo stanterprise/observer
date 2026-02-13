@@ -220,11 +220,11 @@ make docker-buildx-aio      # Fast cached builds
 
 ### Processor Service
 
-| Variable       | Default | Description                                 |
-| -------------- | ------- | ------------------------------------------- |
-| `MONGODB_URI`  | -       | MongoDB connection string (required)        |
-| `NATS_URL`     | -       | NATS server URL (required)                  |
-| `NATS_STREAM`  | -       | JetStream stream name                       |
+| Variable      | Default | Description                          |
+| ------------- | ------- | ------------------------------------ |
+| `MONGODB_URI` | -       | MongoDB connection string (required) |
+| `NATS_URL`    | -       | NATS server URL (required)           |
+| `NATS_STREAM` | -       | JetStream stream name                |
 
 ### API Service
 
@@ -240,18 +240,19 @@ make docker-buildx-aio      # Fast cached builds
 
 MongoDB can be configured using either a connection URI or split environment variables:
 
-| Variable            | Default    | Description                           |
-| ------------------- | ---------- | ------------------------------------- |
-| `MONGODB_URI`       | -          | Full MongoDB connection URI           |
-| `MONGO_URI`         | -          | Alias for `MONGODB_URI`               |
-| `MONGO_HOST`        | -          | MongoDB server host                   |
-| `MONGO_PORT`        | `27017`    | MongoDB server port                   |
-| `MONGO_USER`        | -          | MongoDB username                      |
-| `MONGO_PASSWORD`    | -          | MongoDB password                      |
-| `MONGO_DATABASE`    | `observer` | MongoDB database name                 |
-| `MONGO_AUTH_SOURCE` | `admin`    | MongoDB authentication source         |
+| Variable            | Default    | Description                   |
+| ------------------- | ---------- | ----------------------------- |
+| `MONGODB_URI`       | -          | Full MongoDB connection URI   |
+| `MONGO_URI`         | -          | Alias for `MONGODB_URI`       |
+| `MONGO_HOST`        | -          | MongoDB server host           |
+| `MONGO_PORT`        | `27017`    | MongoDB server port           |
+| `MONGO_USER`        | -          | MongoDB username              |
+| `MONGO_PASSWORD`    | -          | MongoDB password              |
+| `MONGO_DATABASE`    | `observer` | MongoDB database name         |
+| `MONGO_AUTH_SOURCE` | `admin`    | MongoDB authentication source |
 
 **Connection URI format:**
+
 ```
 mongodb://[user:pass@]host[:port]/database[?options]
 mongodb+srv://[user:pass@]host/database[?options]
@@ -271,6 +272,7 @@ MongoDB provides a document-based data model that aligns well with test run hier
 - **Better suited** for hierarchical test structures (suites → tests → steps)
 
 **Docker Compose with MongoDB:**
+
 ```bash
 docker compose --profile dist up -d
 ```
@@ -459,6 +461,14 @@ The project uses optimized GitHub Actions workflows with BuildKit cache mounts f
 - [GitHub Actions Integration](docs/GITHUB_ACTIONS_BUILDS.md) - CI/CD examples and best practices
 - [Quick Reference](BUILD_QUICK_REF.md) - Essential commands and troubleshooting
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, workflow, and testing guidance.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+
 ## License
 
-(Choose and add a license file if needed.)
+Licensed under the MIT License. See [LICENSE](LICENSE).
