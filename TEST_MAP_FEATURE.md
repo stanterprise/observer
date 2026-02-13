@@ -82,7 +82,7 @@ const availableWidth = containerWidth - 48;   // Card padding (24px each side)
 const availableHeight = viewportHeight - 80;  // Header and padding
 
 // 2. Fixed height optimized for text (one line)
-const BOX_HEIGHT = 28;  // Fixed height for comfortable text display
+const BOX_HEIGHT = 32;  // Fixed height for comfortable text display
 const MIN_HEIGHT = 24;
 const MAX_HEIGHT = 32;
 const boxHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, BOX_HEIGHT));
@@ -131,7 +131,7 @@ This creates a clear visual distinction:
 - `selectedTags`: Set of currently selected tags
 - `highlightedTestIds`: Computed set of tests to highlight
 - `containerDimensions`: Current container width/height for sizing
-- `testBoxSize`: Computed optimal box size (4-32px) using 8:6 aspect ratio
+- `testBoxDimensions`: Computed box dimensions with independent width/height (height ~24–32px, width ≥ ~60px, width scales to fill horizontal space)
 - `loading`, `error`: Standard UI states
 
 ## Use Cases

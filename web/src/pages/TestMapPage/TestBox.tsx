@@ -79,6 +79,12 @@ export default function TestBox({
           opacity: isFaded ? 0.25 : 1, // Apply fading when isFaded is true
         }}
         onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
         role="button"
@@ -103,7 +109,7 @@ export default function TestBox({
             )}
             {isFlaky(test) && (
               <div className="text-amber-300">
-                ⚠️ Passed with {test.attempts!.length} attempts
+                ⚠️ Passed with {test.attempts?.length ?? 0} attempts
               </div>
             )}
           </div>

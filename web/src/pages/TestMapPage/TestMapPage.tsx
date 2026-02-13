@@ -80,7 +80,7 @@ export function TestMapPage() {
     updateDimensions();
     window.addEventListener("resize", updateDimensions);
     return () => window.removeEventListener("resize", updateDimensions);
-  }, [runDetail]);
+  }, []);
 
   // Calculate optimal test box dimensions based on total test count and available space
   const testBoxDimensions = useMemo(() => {
