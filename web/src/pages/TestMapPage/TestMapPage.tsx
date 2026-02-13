@@ -296,7 +296,7 @@ export function TestMapPage() {
                 >
                   <div
                     className="flex flex-wrap content-start"
-                    style={{ gap: "8px" }}
+                    style={{ gap: "2px" }}
                   >
                     {runDetail.tests.map((test) => {
                       const isHighlighted = highlightedTestIds.has(test.id);
