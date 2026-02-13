@@ -462,6 +462,24 @@ The project uses optimized GitHub Actions workflows with BuildKit cache mounts f
 - [GitHub Actions Integration](docs/GITHUB_ACTIONS_BUILDS.md) - CI/CD examples and best practices
 - [Quick Reference](BUILD_QUICK_REF.md) - Essential commands and troubleshooting
 
+## Development Documentation
+
+This project includes comprehensive development documentation:
+
+- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** - Community guidelines
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+
+### Internal Documentation
+
+The repository contains development workflow documentation used during the project's evolution:
+
+- **`.github/agents/`** - AI agent configurations for development automation (see [.github/README.md](.github/README.md))
+- **`.specify/`** - Project specification and governance documentation (see [.specify/README.md](.specify/README.md))
+- **`docs/archive/`** - Historical development notes and implementation summaries (see [docs/archive/README.md](docs/archive/README.md))
+
+These files document our development process and provide context for architectural decisions. Contributors don't need to interact with them directly.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, workflow, and testing guidance.
