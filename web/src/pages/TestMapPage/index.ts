@@ -1,0 +1,1 @@
+export { TestMapPage } from "./TestMapPage";
