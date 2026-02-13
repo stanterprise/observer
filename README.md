@@ -220,11 +220,12 @@ make docker-buildx-aio      # Fast cached builds
 
 ### Processor Service
 
-| Variable      | Default | Description                          |
-| ------------- | ------- | ------------------------------------ |
-| `MONGODB_URI` | -       | MongoDB connection string (required) |
-| `NATS_URL`    | -       | NATS server URL (required)           |
-| `NATS_STREAM` | -       | JetStream stream name                |
+| Variable         | Default                 | Description                                   |
+| ---------------- | ----------------------- | --------------------------------------------- |
+| `MONGODB_URI`    | -                       | MongoDB connection string (required)          |
+| `NATS_URL`       | `nats://localhost:4222` | NATS server URL                               |
+| `NATS_STREAM`    | `tests_events`          | JetStream stream name                         |
+| `NATS_CONSUMER`  | `processor`             | Durable consumer name for JetStream consumer  |
 
 ### API Service
 
@@ -471,4 +472,4 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## License
 
-Licensed under the MIT License. See [LICENSE](LICENSE).
+Licensed under the Apache License 2.0. See [LICENSE](LICENSE).
