@@ -33,11 +33,11 @@ export default ({ test, runId }: TestRecordProps) => {
                     {formatDuration(test.duration)}
                   </span>
                 </div>
-                {test.retryCount !== undefined && test.retryCount > 0 && (
+                {(test.attempts?.length ?? 0) > 1 && (
                   <div className="flex items-center">
                     <span className="font-medium">Retries:</span>
                     <span className="ml-1 font-semibold text-gray-700">
-                      {test.retryCount}
+                      {(test.attempts?.length ?? 0) - 1}
                     </span>
                   </div>
                 )}
