@@ -10,6 +10,7 @@
 #
 # OPTIONS:
 #   --domain <domain>          Domain name (required)
+#   --domain-alias <domain>    Additional domain/SAN (repeatable)
 #   --jwt-secret <secret>      JWT secret (optional, will be generated)
 #   --mongo-password <pwd>     MongoDB password (optional, will be generated)
 #   --ssl <type>              SSL type: letsencrypt, self-signed, none (default: none)
@@ -24,6 +25,7 @@
 #   # With Let's Encrypt SSL
 #   ./scripts/deploy-digitalocean.sh \
 #     --domain observer.example.com \
+#     --domain-alias www.observer.example.com \
 #     --ssl letsencrypt \
 #     --email admin@example.com
 #
@@ -45,6 +47,8 @@ NC='\033[0m' # No Color
 
 # Configuration
 DOMAIN_NAME=""
+DOMAIN_ALIASES=""
+TLS_SERVER_NAMES=""
 JWT_SECRET=""
 MONGODB_PASSWORD=""
 SSL_TYPE="none"
@@ -151,6 +155,26 @@ validate_domain() {
     print_success "Domain name validated: $DOMAIN_NAME"
 }
 
+build_tls_server_names() {
+    local aliases="$DOMAIN_ALIASES"
+
+    # If no aliases provided and primary domain is not an IPv4 address, include www.
+    if [[ -z "$aliases" && ! "$DOMAIN_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        aliases="www.$DOMAIN_NAME"
+    fi
+
+    # Normalize separators and trim whitespace.
+    aliases=$(echo "$aliases" | tr ',' ' ' | xargs)
+
+    if [[ -n "$aliases" ]]; then
+        TLS_SERVER_NAMES="$DOMAIN_NAME $aliases"
+    else
+        TLS_SERVER_NAMES="$DOMAIN_NAME"
+    fi
+
+    print_info "TLS server names: $TLS_SERVER_NAMES"
+}
+
 generate_secrets() {
     print_header "Generating Secrets"
 
@@ -196,6 +220,8 @@ create_env_file() {
 
 # Domain & SSL Configuration
 DOMAIN_NAME=$DOMAIN_NAME
+DOMAIN_ALIASES=$DOMAIN_ALIASES
+TLS_SERVER_NAMES=$TLS_SERVER_NAMES
 SSL_CERT_PATH=/etc/letsencrypt
 
 # Security Configuration
@@ -248,7 +274,11 @@ build_and_start() {
 
     cd "$SCRIPT_DIR"
 
-    docker compose -f docker-compose.digitalocean.yml up -d
+    if [[ "$SSL_TYPE" == "letsencrypt" ]]; then
+        docker compose -f docker-compose.digitalocean.yml --profile certbot up -d
+    else
+        docker compose -f docker-compose.digitalocean.yml up -d
+    fi
 
     print_success "Services started"
 }
@@ -287,26 +317,47 @@ setup_letsencrypt() {
         exit 1
     fi
 
-    # Create certificate directory
-    mkdir -p "/etc/letsencrypt/live/$DOMAIN_NAME"
+    local cert_path="/etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem"
 
-    # Install certbot if not present
-    if ! command -v certbot &> /dev/null; then
-        print_info "Installing certbot..."
-        apt-get update
-        apt-get install -y certbot python3-certbot-nginx
+    # Skip bootstrap if certificate already exists.
+    if [[ -f "$cert_path" ]]; then
+        print_info "Existing certificate found for $DOMAIN_NAME, skipping bootstrap"
+        return
     fi
 
-    print_info "Obtaining Let's Encrypt certificate..."
-    print_warning "Make sure $DOMAIN_NAME is pointing to this server's IP"
-    read -p "Press Enter to continue..."
+    print_info "Bootstrapping first Let's Encrypt certificate for $DOMAIN_NAME"
+    print_warning "DNS must point $DOMAIN_NAME to this droplet before continuing"
 
-    certbot certonly --standalone \
-        -d "$DOMAIN_NAME" \
-        --email "$LE_EMAIL" \
+    mkdir -p /etc/letsencrypt
+    mkdir -p /var/www/certbot
+
+    # Ensure compose services are stopped so standalone certbot can bind port 80.
+    cd "$SCRIPT_DIR"
+    docker compose -f docker-compose.digitalocean.yml down || true
+
+    local domains=()
+    local alias
+    domains+=("-d" "$DOMAIN_NAME")
+    for alias in $DOMAIN_ALIASES; do
+        domains+=("-d" "$alias")
+    done
+
+    docker run --rm \
+        -p 80:80 \
+        -v /etc/letsencrypt:/etc/letsencrypt \
+        -v /var/www/certbot:/var/www/certbot \
+        docker.io/certbot/certbot:latest certonly \
+        --standalone \
+        --preferred-challenges http \
         --agree-tos \
-        --non-interactive \
-        --preferred-challenges http
+        --no-eff-email \
+        --email "$LE_EMAIL" \
+        "${domains[@]}"
+
+    if [[ ! -f "$cert_path" ]]; then
+        print_error "Let's Encrypt certificate bootstrap failed for $DOMAIN_NAME"
+        exit 1
+    fi
 
     print_success "Let's Encrypt certificate obtained"
 }
@@ -387,10 +438,15 @@ print_summary() {
     echo ""
     echo "✓ Observer has been successfully deployed!"
     echo ""
+    local web_scheme="http"
+    if [[ "$SSL_TYPE" == "letsencrypt" || "$SSL_TYPE" == "self-signed" ]]; then
+        web_scheme="https"
+    fi
+
     echo "Access Information:"
-    echo "  Web UI:     http://$DOMAIN_NAME"
+    echo "  Web UI:     ${web_scheme}://$DOMAIN_NAME"
     echo "  gRPC:       $DOMAIN_NAME:50051"
-    echo "  API:        http://$DOMAIN_NAME/api"
+    echo "  API:        ${web_scheme}://$DOMAIN_NAME/api"
     echo ""
     echo "Management:"
     echo "  View logs:     docker compose -f docker-compose.digitalocean.yml logs -f"
@@ -423,6 +479,14 @@ main() {
         case $1 in
             --domain)
                 DOMAIN_NAME="$2"
+                shift 2
+                ;;
+            --domain-alias)
+                if [[ -n "$DOMAIN_ALIASES" ]]; then
+                    DOMAIN_ALIASES="$DOMAIN_ALIASES $2"
+                else
+                    DOMAIN_ALIASES="$2"
+                fi
                 shift 2
                 ;;
             --jwt-secret)
@@ -458,16 +522,23 @@ main() {
     # Run deployment steps
     check_requirements
     validate_domain
+    build_tls_server_names
     generate_secrets
     setup_directories
     create_env_file
     pull_images
+
+    # For first-time Let's Encrypt setup, certificate must exist before nginx starts.
+    if [[ "$SSL_TYPE" == "letsencrypt" ]]; then
+        setup_letsencrypt
+    fi
+
     build_and_start
 
     if wait_for_healthy; then
         case $SSL_TYPE in
             letsencrypt)
-                setup_letsencrypt
+                print_info "Let's Encrypt mode enabled"
                 ;;
             self-signed)
                 setup_self_signed_cert
