@@ -1,0 +1,188 @@
+version: "3.9"
+
+# ============================================================================
+# Observer Deployment for DigitalOcean Droplet
+# ============================================================================
+# This docker-compose configuration is optimized for production deployment
+# on a DigitalOcean droplet (2GB+ RAM recommended).
+#
+# REQUIRED SETUP:
+#   1. Copy .env.digitalocean to .env: cp .env.digitalocean .env
+#   2. Edit .env with your domain and secrets
+#   3. Run: docker compose -f docker-compose.digitalocean.yml up -d
+#   4. Check health: curl http://localhost/health
+#
+# DEPLOYMENT MODES:
+#   - Single droplet (all-in-one): Recommended for small deployments
+#   - Multi-droplet (distributed): For high availability
+#
+# ============================================================================
+
+services:
+  # ============================================================================
+  # All-in-One Deployment (Single Container)
+  # Best for small/medium deployments on a single droplet
+  # ============================================================================
+  observer:
+    image: ghcr.io/stanterprise/observer/aio:latest
+    container_name: observer
+    restart: always
+
+    # Resource constraints (adjust based on droplet size)
+    # 2GB droplet: 512M memory, 1 CPU
+    # 4GB droplet: 1G memory, 2 CPUs
+    # 8GB droplet: 2G memory, 4 CPUs
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "1"
+          memory: 1G
+
+    environment:
+      # MongoDB configuration
+      MONGODB_URI: mongodb://localhost:27017/observer
+
+      # Storage configuration for artifacts
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_BASE_PATH: /data/artifacts
+      # Update this to your actual domain/IP in production
+      STORAGE_LOCAL_BASE_URL: https://${DOMAIN_NAME:-localhost}/api/attachments
+
+      # Logging
+      LOG_LEVEL: info
+
+      # Security: JWT token for API (generate with: openssl rand -base64 32)
+      JWT_SECRET: ${JWT_SECRET}
+
+    ports:
+      # Web UI (accessed via nginx reverse proxy on port 80/443)
+      - "127.0.0.1:3000:80"
+
+      # gRPC ingestion endpoint (exposed for test reporters)
+      - "0.0.0.0:${GRPC_PORT:-50051}:50051"
+
+      # API service (for internal communication with nginx)
+      - "127.0.0.1:8080:8080"
+
+      # NATS monitoring dashboard (optional, restrict access)
+      - "127.0.0.1:8222:8222"
+
+    volumes:
+      # Persistent data volume
+      - observer-data:/data
+      # SSL certificates (mount from host if using Let's Encrypt)
+      - ${SSL_CERT_PATH:-/etc/letsencrypt}/certs:/certs:ro
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    networks:
+      - observer-network
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=observer"
+
+  # ============================================================================
+  # Nginx Reverse Proxy (SSL/TLS Termination)
+  # ============================================================================
+  nginx:
+    image: docker.io/library/nginx:latest
+    container_name: observer-nginx
+    restart: always
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+
+    volumes:
+      # Nginx configuration (uncomment if you have a custom config file)
+      # - ./docker/nginx/nginx.conf.template:/etc/nginx/nginx.conf:ro
+
+      # SSL certificates (Let's Encrypt)
+      - ${SSL_CERT_PATH:-/etc/letsencrypt}/live/${DOMAIN_NAME:-localhost}:/etc/nginx/certs:ro
+
+      # Let's Encrypt challenge directory
+      - /var/www/certbot:/var/www/certbot:ro
+
+    environment:
+      # Template variables for nginx
+      API_BACKEND_HOST: observer
+      API_BACKEND_PORT: "3000"
+      DOMAIN_NAME: ${DOMAIN_NAME:-localhost}
+
+    depends_on:
+      - observer
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    networks:
+      - observer-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=nginx"
+
+  # ============================================================================
+  # Certbot (Let's Encrypt SSL Certificate Management)
+  # Only run if using Let's Encrypt (not needed for self-signed certs)
+  # ============================================================================
+  certbot:
+    image: docker.io/certbot/certbot:latest
+    container_name: observer-certbot
+    restart: unless-stopped
+
+    # Comment out volumes if not using certbot
+    volumes:
+      - ${SSL_CERT_PATH:-/etc/letsencrypt}:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+
+    # Renew certificates every 12 hours
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done;'
+
+    # Disable if not using certbot
+    profiles: ["certbot"]
+
+    networks:
+      - observer-network
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  observer-data:
+    driver: local
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  observer-network:
+    driver: bridge
