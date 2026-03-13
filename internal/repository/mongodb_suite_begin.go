@@ -175,7 +175,12 @@ func (r *MongoRepository) upsertNestedSuite(ctx context.Context, runID string, s
 	}
 
 	if result.MatchedCount == 0 {
-		return fmt.Errorf("parent suite not found: runID=%s, parentSuiteID=%s", runID, parentSuiteID)
+		return &ErrParentNotFound{
+			ParentType: "suite",
+			ParentID:   parentSuiteID,
+			ChildType:  "suite",
+			ChildID:    suite.ID,
+		}
 	}
 
 	r.logger.Info("suite begin (nested, inserted)", "runID", runID, "suiteID", suite.ID, "parentID", parentSuiteID)

@@ -90,13 +90,34 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepI
 	}
 
 	if result.MatchedCount == 0 {
-		r.logger.Error("step not found for UpsertStepEnd",
+		// The run document or parent test was not found.
+		r.logger.Warn("parent test not found for UpsertStepEnd",
 			"runID", runID,
 			"stepID", stepID,
 			"testID", testID,
-			"retryIndex", retry_index,
-			"filter", filter)
-		return fmt.Errorf("step not found: runID=%s, stepID=%s, testID=%s, retryIndex=%d", runID, stepID, testID, retry_index)
+			"retryIndex", retry_index)
+		return &ErrParentNotFound{
+			ParentType: "test",
+			ParentID:   testID,
+			ChildType:  "step",
+			ChildID:    stepID,
+		}
+	}
+
+	if result.ModifiedCount == 0 {
+		// The run document and test were found but the step was not found within
+		// the attempt. This is a race condition: StepEnd arrived before StepBegin.
+		r.logger.Warn("step not found within attempt for UpsertStepEnd",
+			"runID", runID,
+			"stepID", stepID,
+			"testID", testID,
+			"retryIndex", retry_index)
+		return &ErrParentNotFound{
+			ParentType: "step",
+			ParentID:   stepID,
+			ChildType:  "step_end",
+			ChildID:    stepID,
+		}
 	}
 
 	r.logger.Info("step end",

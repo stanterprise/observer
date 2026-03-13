@@ -28,6 +28,26 @@ func ptrInt32(v int32) *int32 {
 	return &v
 }
 
+// calcNakDelay returns an exponentially increasing delay for NAK retries to give
+// parent events time to be processed before the next delivery attempt.
+// Delays: 1s, 2s, 4s, 8s, 16s, 30s (capped). deliveryCount is the 1-based count
+// of how many times the message has already been delivered.
+func calcNakDelay(deliveryCount uint64) time.Duration {
+	const maxDelay = 30 * time.Second
+	if deliveryCount == 0 {
+		return time.Second
+	}
+	// Cap the shift to avoid overflow (2^5 seconds = 32s already exceeds 30s cap)
+	if deliveryCount > 5 {
+		return maxDelay
+	}
+	delay := time.Duration(uint64(time.Second) << (deliveryCount - 1))
+	if delay > maxDelay {
+		return maxDelay
+	}
+	return delay
+}
+
 // extractTestID extracts the test ID from a test case run ID.
 // TestCaseRunId format is typically: {runId}-{testId}
 // This function strips the runId prefix to get just the testId.
@@ -176,9 +196,17 @@ func (c *MongoNATSConsumer) ensureConsumer(ctx context.Context, consumerName str
 		Durable:       consumerName,
 		AckPolicy:     jetstream.AckExplicitPolicy,
 		DeliverPolicy: jetstream.DeliverAllPolicy,
-		MaxDeliver:    5,
+		MaxDeliver:    10,
 		AckWait:       30 * time.Second,
-		Description:   "MongoDB test event processor consumer",
+		// BackOff provides graduated delays for AckWait timeout retries
+		BackOff: []time.Duration{
+			1 * time.Second,
+			2 * time.Second,
+			5 * time.Second,
+			10 * time.Second,
+			30 * time.Second,
+		},
+		Description: "MongoDB test event processor consumer",
 	}
 
 	consumer, err = c.js.CreateOrUpdateConsumer(ctx, c.stream, consumerCfg)
@@ -215,7 +243,32 @@ func (c *MongoNATSConsumer) Start(ctx context.Context, cfg MongoNATSConsumerConf
 					c.logger.Error("process message failed",
 						"subject", msg.Subject(),
 						"error", err)
-					if nakErr := msg.Nak(); nakErr != nil {
+					var nakErr error
+					var parentErr *repository.ErrParentNotFound
+					if errors.As(err, &parentErr) {
+						// Race condition: parent entity not yet persisted.
+						// Use exponential backoff so the parent event has time
+						// to be processed before the next delivery attempt.
+						meta, metaErr := msg.Metadata()
+						if metaErr == nil {
+							delay := calcNakDelay(meta.NumDelivered)
+							c.logger.Warn("parent entity not found, retrying with backoff",
+								"delay", delay,
+								"delivery_count", meta.NumDelivered,
+								"parent_type", parentErr.ParentType,
+								"parent_id", parentErr.ParentID,
+								"child_type", parentErr.ChildType,
+								"child_id", parentErr.ChildID)
+							nakErr = msg.NakWithDelay(delay)
+						} else {
+							c.logger.Warn("could not get message metadata, using immediate NAK",
+								"error", metaErr)
+							nakErr = msg.Nak()
+						}
+					} else {
+						nakErr = msg.Nak()
+					}
+					if nakErr != nil {
 						c.logger.Error("failed to nak message", "error", nakErr)
 					}
 				} else {

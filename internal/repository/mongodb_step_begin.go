@@ -84,7 +84,12 @@ func (r *MongoRepository) upsertStepInTestAttempt(ctx context.Context, runID str
 			"retryIndex", retry_index,
 			"stepID", step.ID,
 			"filter", filter)
-		return fmt.Errorf("parent test not found: runID=%s, testID=%s, retryIndex=%d", runID, testID, retry_index)
+		return &ErrParentNotFound{
+			ParentType: "test",
+			ParentID:   testID,
+			ChildType:  "step",
+			ChildID:    step.ID,
+		}
 	}
 
 	r.logger.Info("step begin (inserted)",

@@ -224,7 +224,12 @@ func appendTestAttempt(r *MongoRepository, ctx context.Context, runID string, te
 	}
 
 	if result.MatchedCount == 0 {
-		return fmt.Errorf("test run document not found: runID=%s", runID)
+		return &ErrParentNotFound{
+			ParentType: "run",
+			ParentID:   runID,
+			ChildType:  "test",
+			ChildID:    test.ID,
+		}
 	}
 
 	r.logger.Info("test begin (test created)",
