@@ -16,11 +16,12 @@ import (
 
 func main() {
 	var (
-		natsURL      = flag.String("nats-url", envOr("NATS_URL", "nats://localhost:4222"), "NATS server URL")
-		streamName   = flag.String("stream", envOr("NATS_STREAM", "tests_events"), "NATS stream name")
-		consumerName = flag.String("consumer", envOr("NATS_CONSUMER", "processor"), "NATS consumer name")
-		batchSize    = flag.Int("batch-size", 10, "Number of messages to fetch per batch")
-		maxWait      = flag.Duration("max-wait", 5*time.Second, "Maximum wait time for messages")
+		natsURL        = flag.String("nats-url", envOr("NATS_URL", "nats://localhost:4222"), "NATS server URL")
+		streamName     = flag.String("stream", envOr("NATS_STREAM", "tests_events"), "NATS stream name")
+		consumerName   = flag.String("consumer", envOr("NATS_CONSUMER", "processor"), "NATS consumer name")
+		batchSize      = flag.Int("batch-size", 10, "Number of messages to fetch per batch")
+		maxWait        = flag.Duration("max-wait", 5*time.Second, "Maximum wait time for messages")
+		retainMessages = flag.Bool("retain-messages", envOr("RETAIN_MESSAGES", "") == "true", "Retain all raw messages in MongoDB (overrides RETAIN_MESSAGES env var)")
 	)
 	flag.Parse()
 
@@ -45,15 +46,23 @@ func main() {
 
 	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
 
-	cfg := consumer.MongoNATSConsumerConfig{
-		URL:          *natsURL,
-		StreamName:   *streamName,
-		ConsumerName: *consumerName,
-		BatchSize:    *batchSize,
-		MaxWait:      *maxWait,
+	// Optionally create the raw message repository when retention is enabled.
+	var rawMsgRepo *repository.RawMessageRepository
+	if *retainMessages {
+		rawMsgRepo = repository.NewRawMessageRepository(mongoDB.RawMessagesCollection(), logger)
+		logger.Info("raw message retention enabled", "collection", "raw_messages")
 	}
 
-	natsConsumer, err := consumer.NewMongoNATSConsumer(cfg, logger, repo)
+	cfg := consumer.MongoNATSConsumerConfig{
+		URL:            *natsURL,
+		StreamName:     *streamName,
+		ConsumerName:   *consumerName,
+		BatchSize:      *batchSize,
+		MaxWait:        *maxWait,
+		RetainMessages: *retainMessages,
+	}
+
+	natsConsumer, err := consumer.NewMongoNATSConsumer(cfg, logger, repo, rawMsgRepo)
 	if err != nil {
 		logger.Error("failed to create MongoDB NATS consumer", "error", err)
 		os.Exit(1)
@@ -63,7 +72,8 @@ func main() {
 	logger.Info("processor service starting",
 		"nats_url", *natsURL,
 		"stream", *streamName,
-		"consumer", *consumerName)
+		"consumer", *consumerName,
+		"retain_messages", *retainMessages)
 
 	errChan := make(chan error, 1)
 	go func() {
@@ -113,3 +123,4 @@ func envOr(key, def string) string {
 	}
 	return def
 }
+

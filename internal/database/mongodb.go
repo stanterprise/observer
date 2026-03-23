@@ -168,6 +168,11 @@ func (m *MongoDBConnection) TestRunsCollection() *mongo.Collection {
 	return m.Collection("test_runs")
 }
 
+// RawMessagesCollection returns the raw_messages collection handle used for message retention.
+func (m *MongoDBConnection) RawMessagesCollection() *mongo.Collection {
+	return m.Collection("raw_messages")
+}
+
 // IsMongoDBURI checks if the provided DSN is a MongoDB URI
 func IsMongoDBURI(dsn string) bool {
 	return strings.HasPrefix(dsn, "mongodb://") || strings.HasPrefix(dsn, "mongodb+srv://")

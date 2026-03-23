@@ -10,6 +10,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository"
 	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/stanterprise/observer/pkg/storage"
@@ -48,26 +49,33 @@ func extractTestID(testCaseRunID, runID string) string {
 //
 // All operations follow an upsert pattern: update if entity exists, insert if not found.
 type MongoNATSConsumer struct {
-	nc            *nats.Conn
-	js            jetstream.JetStream
-	logger        *slog.Logger
-	repo          *repository.MongoRepository
-	storageDriver storage.Driver
-	stream        string
-	consumer      jetstream.Consumer
+	nc             *nats.Conn
+	js             jetstream.JetStream
+	logger         *slog.Logger
+	repo           *repository.MongoRepository
+	rawMessageRepo *repository.RawMessageRepository
+	storageDriver  storage.Driver
+	stream         string
+	consumer       jetstream.Consumer
 }
 
 // MongoNATSConsumerConfig holds configuration for MongoDB NATS consumer
 type MongoNATSConsumerConfig struct {
-	URL          string
-	StreamName   string
-	ConsumerName string
-	BatchSize    int
-	MaxWait      time.Duration
+	URL            string
+	StreamName     string
+	ConsumerName   string
+	BatchSize      int
+	MaxWait        time.Duration
+	// RetainMessages enables storing every raw NATS message payload in a dedicated
+	// MongoDB collection ("raw_messages") for auditing and debugging purposes.
+	// Set via the RETAIN_MESSAGES environment variable.
+	RetainMessages bool
 }
 
-// NewMongoNATSConsumer creates a new NATS JetStream consumer with MongoDB backend
-func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *repository.MongoRepository) (*MongoNATSConsumer, error) {
+// NewMongoNATSConsumer creates a new NATS JetStream consumer with MongoDB backend.
+// If rawMessageRepo is non-nil and cfg.RetainMessages is true, every received message
+// will be persisted to the raw_messages collection before processing.
+func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *repository.MongoRepository, rawMessageRepo *repository.RawMessageRepository) (*MongoNATSConsumer, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}
@@ -127,12 +135,13 @@ func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo
 	}
 
 	c := &MongoNATSConsumer{
-		nc:            nc,
-		js:            js,
-		logger:        logger,
-		repo:          repo,
-		storageDriver: storageDriver,
-		stream:        cfg.StreamName,
+		nc:             nc,
+		js:             js,
+		logger:         logger,
+		repo:           repo,
+		rawMessageRepo: rawMessageRepo,
+		storageDriver:  storageDriver,
+		stream:         cfg.StreamName,
 	}
 
 	// Ensure consumer exists
@@ -146,12 +155,14 @@ func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo
 	}
 	c.consumer = consumer
 
+	retainMsg := cfg.RetainMessages && rawMessageRepo != nil
 	logger.Info("MongoDB NATS consumer initialized",
 		"url", cfg.URL,
 		"stream", cfg.StreamName,
 		"consumer", cfg.ConsumerName,
 		"batch_size", cfg.BatchSize,
-		"max_wait", cfg.MaxWait)
+		"max_wait", cfg.MaxWait,
+		"retain_messages", retainMsg)
 
 	return c, nil
 }
@@ -240,6 +251,17 @@ func (c *MongoNATSConsumer) processMessage(ctx context.Context, msg jetstream.Ms
 		"subject", msg.Subject(),
 		"timestamp", event.Timestamp)
 
+	// Persist the raw message when retention is enabled.
+	if c.rawMessageRepo != nil {
+		if err := c.retainRawMessage(ctx, msg, event); err != nil {
+			// Log but do not fail processing – retention is best-effort.
+			c.logger.Warn("failed to retain raw message",
+				"subject", msg.Subject(),
+				"event_type", event.Type,
+				"error", err)
+		}
+	}
+
 	switch event.Type {
 	case publisher.EventTypeSuiteBegin:
 		return c.handleSuiteBegin(ctx, event.Data)
@@ -285,6 +307,24 @@ func (c *MongoNATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMe
 
 	c.logger.Debug("heartbeat", "source_id", req.SourceId)
 	return nil
+}
+
+// retainRawMessage persists the raw NATS message to the raw_messages collection.
+func (c *MongoNATSConsumer) retainRawMessage(ctx context.Context, msg jetstream.Msg, event publisher.Event) error {
+	doc := &m.RawMessageDocument{
+		Subject:    msg.Subject(),
+		EventType:  string(event.Type),
+		Payload:    msg.Data(),
+		Stream:     c.stream,
+		ReceivedAt: time.Now(),
+	}
+
+	// Attach JetStream sequence number when available.
+	if meta, err := msg.Metadata(); err == nil {
+		doc.Sequence = meta.Sequence.Stream
+	}
+
+	return c.rawMessageRepo.Insert(ctx, doc)
 }
 
 // mongoStatusToString converts protobuf status to string
