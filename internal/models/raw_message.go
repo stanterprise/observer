@@ -11,8 +11,8 @@ type RetainedMessage struct {
 	// EventType is the decoded event type from the message envelope.
 	EventType string `bson:"event_type" json:"eventType"`
 
-	// Payload contains the raw JSON bytes of the full NATS message (event envelope).
-	Payload []byte `bson:"payload" json:"payload"`
+	// Payload contains the parsed JSON of the full NATS message (event envelope).
+	Payload interface{} `bson:"payload" json:"payload"`
 
 	// Sequence is the JetStream sequence number of the message within the stream.
 	Sequence uint64 `bson:"sequence,omitempty" json:"sequence,omitempty"`

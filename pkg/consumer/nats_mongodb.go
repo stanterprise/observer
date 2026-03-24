@@ -61,11 +61,11 @@ type MongoNATSConsumer struct {
 
 // MongoNATSConsumerConfig holds configuration for MongoDB NATS consumer
 type MongoNATSConsumerConfig struct {
-	URL            string
-	StreamName     string
-	ConsumerName   string
-	BatchSize      int
-	MaxWait        time.Duration
+	URL          string
+	StreamName   string
+	ConsumerName string
+	BatchSize    int
+	MaxWait      time.Duration
 	// RetainMessages enables storing every raw NATS message payload in a dedicated
 	// MongoDB collection ("raw_messages") for auditing and debugging purposes.
 	// Set via the RETAIN_MESSAGES environment variable.
@@ -321,10 +321,29 @@ func (c *MongoNATSConsumer) retainRawMessage(ctx context.Context, msg jetstream.
 		return nil
 	}
 
+	// Store the payload as parsed JSON map for readability
+	var parsedPayload interface{}
+	err := json.Unmarshal(msg.Data(), &parsedPayload)
+	if err != nil {
+		// If parsing fails, store as string
+		parsedPayload = map[string]interface{}{
+			"raw":   string(msg.Data()),
+			"error": err.Error(),
+		}
+	} else {
+		// For valid JSON, attempt to extract and flatten the data field if it exists
+		if eventMap, ok := parsedPayload.(map[string]interface{}); ok {
+			if dataField, hasData := eventMap["data"]; hasData {
+				// Return the nested data field for cleaner output
+				parsedPayload = dataField
+			}
+		}
+	}
+
 	retained := m.RetainedMessage{
 		Subject:    msg.Subject(),
 		EventType:  string(event.Type),
-		Payload:    msg.Data(),
+		Payload:    parsedPayload,
 		Stream:     c.stream,
 		ReceivedAt: time.Now(),
 	}
