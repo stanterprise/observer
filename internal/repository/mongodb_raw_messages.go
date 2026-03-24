@@ -7,11 +7,13 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // RawMessageRepository handles persistence of raw NATS messages for auditing and debugging.
+// All messages for a given run are stored in a single document identified by the run_id.
 type RawMessageRepository struct {
 	collection *mongo.Collection
 	logger     *slog.Logger
@@ -28,30 +30,51 @@ func NewRawMessageRepository(collection *mongo.Collection, logger *slog.Logger) 
 	}
 }
 
-// Insert persists a raw message document to MongoDB.
-// The document ID is auto-generated if empty.
-func (r *RawMessageRepository) Insert(ctx context.Context, doc *m.RawMessageDocument) error {
-	if doc == nil {
-		return fmt.Errorf("raw message document is nil")
+// CollectionName returns the MongoDB collection name that raw messages are inserted into.
+func (r *RawMessageRepository) CollectionName() string {
+	return r.collection.Name()
+}
+
+// DatabaseName returns the MongoDB database name that raw messages are inserted into.
+func (r *RawMessageRepository) DatabaseName() string {
+	return r.collection.Database().Name()
+}
+
+// AppendMessage appends a single retained message to the run document identified by
+// runID.  If the document does not yet exist it is created (upsert).  All messages
+// belonging to the same run are therefore stored in one document.
+func (r *RawMessageRepository) AppendMessage(ctx context.Context, runID string, msg m.RetainedMessage) error {
+	if runID == "" {
+		return fmt.Errorf("runID is required")
 	}
 
-	if doc.ID == "" {
-		doc.ID = primitive.NewObjectID().Hex()
+	now := time.Now()
+	if msg.ReceivedAt.IsZero() {
+		msg.ReceivedAt = now
 	}
 
-	if doc.ReceivedAt.IsZero() {
-		doc.ReceivedAt = time.Now()
+	filter := bson.M{"_id": runID}
+	update := bson.M{
+		"$push": bson.M{
+			"messages": msg,
+		},
+		"$set": bson.M{
+			"updated_at": now,
+		},
+		"$setOnInsert": bson.M{
+			"created_at": now,
+		},
+	}
+	opts := options.Update().SetUpsert(true)
+
+	if _, err := r.collection.UpdateOne(ctx, filter, update, opts); err != nil {
+		return fmt.Errorf("append raw message: %w", err)
 	}
 
-	if _, err := r.collection.InsertOne(ctx, doc); err != nil {
-		return fmt.Errorf("insert raw message: %w", err)
-	}
-
-	r.logger.Debug("raw message stored",
-		"id", doc.ID,
-		"subject", doc.Subject,
-		"event_type", doc.EventType,
-		"sequence", doc.Sequence)
+	r.logger.Debug("raw message appended",
+		"run_id", runID,
+		"event_type", msg.EventType,
+		"sequence", msg.Sequence)
 
 	return nil
 }

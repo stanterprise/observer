@@ -47,13 +47,14 @@ func setupRawMessageTestRepo(t *testing.T) (*RawMessageRepository, func()) {
 	return repo, cleanup
 }
 
-func TestRawMessageRepository_Insert(t *testing.T) {
+func TestRawMessageRepository_AppendMessage_CreatesDocument(t *testing.T) {
 	repo, cleanup := setupRawMessageTestRepo(t)
 	defer cleanup()
 
 	ctx := context.Background()
+	runID := "run-append-test-1"
 
-	doc := &m.RawMessageDocument{
+	msg := m.RetainedMessage{
 		Subject:   "tests.events.v1.test.begin",
 		EventType: "test.begin",
 		Payload:   []byte(`{"type":"test.begin","data":{}}`),
@@ -61,98 +62,159 @@ func TestRawMessageRepository_Insert(t *testing.T) {
 		Sequence:  42,
 	}
 
-	if err := repo.Insert(ctx, doc); err != nil {
-		t.Fatalf("Insert() error = %v", err)
+	if err := repo.AppendMessage(ctx, runID, msg); err != nil {
+		t.Fatalf("AppendMessage() error = %v", err)
 	}
 
-	// ID should have been auto-generated.
-	if doc.ID == "" {
-		t.Fatal("Insert() should set doc.ID when empty")
-	}
-
-	// ReceivedAt should be set.
-	if doc.ReceivedAt.IsZero() {
-		t.Fatal("Insert() should set doc.ReceivedAt when zero")
-	}
-
-	// Verify it's actually in the collection.
-	var stored m.RawMessageDocument
-	if err := repo.collection.FindOne(ctx, bson.M{"_id": doc.ID}).Decode(&stored); err != nil {
+	// Verify document was created with the run_id as _id.
+	var stored m.RawMessagesRunDocument
+	if err := repo.collection.FindOne(ctx, bson.M{"_id": runID}).Decode(&stored); err != nil {
 		t.Fatalf("FindOne() error = %v", err)
 	}
 
-	if stored.Subject != doc.Subject {
-		t.Errorf("Subject = %q, want %q", stored.Subject, doc.Subject)
+	if stored.RunID != runID {
+		t.Errorf("RunID = %q, want %q", stored.RunID, runID)
 	}
-	if stored.EventType != doc.EventType {
-		t.Errorf("EventType = %q, want %q", stored.EventType, doc.EventType)
+	if len(stored.Messages) != 1 {
+		t.Fatalf("Messages count = %d, want 1", len(stored.Messages))
 	}
-	if stored.Sequence != doc.Sequence {
-		t.Errorf("Sequence = %d, want %d", stored.Sequence, doc.Sequence)
+	if stored.Messages[0].Subject != msg.Subject {
+		t.Errorf("Subject = %q, want %q", stored.Messages[0].Subject, msg.Subject)
 	}
-	if string(stored.Payload) != string(doc.Payload) {
-		t.Errorf("Payload = %q, want %q", stored.Payload, doc.Payload)
+	if stored.Messages[0].EventType != msg.EventType {
+		t.Errorf("EventType = %q, want %q", stored.Messages[0].EventType, msg.EventType)
+	}
+	if stored.Messages[0].Sequence != msg.Sequence {
+		t.Errorf("Sequence = %d, want %d", stored.Messages[0].Sequence, msg.Sequence)
+	}
+	if string(stored.Messages[0].Payload) != string(msg.Payload) {
+		t.Errorf("Payload = %q, want %q", stored.Messages[0].Payload, msg.Payload)
+	}
+	if stored.CreatedAt.IsZero() {
+		t.Error("CreatedAt should be set")
+	}
+	if stored.UpdatedAt.IsZero() {
+		t.Error("UpdatedAt should be set")
 	}
 }
 
-func TestRawMessageRepository_Insert_PreservesExplicitID(t *testing.T) {
+func TestRawMessageRepository_AppendMessage_GroupsByRunID(t *testing.T) {
+	repo, cleanup := setupRawMessageTestRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	runID := "run-grouping-test"
+
+	msgs := []m.RetainedMessage{
+		{Subject: "tests.events.v1.suite.begin", EventType: "suite.begin", Payload: []byte(`{}`)},
+		{Subject: "tests.events.v1.test.begin", EventType: "test.begin", Payload: []byte(`{}`)},
+		{Subject: "tests.events.v1.test.end", EventType: "test.end", Payload: []byte(`{}`)},
+	}
+
+	for _, msg := range msgs {
+		if err := repo.AppendMessage(ctx, runID, msg); err != nil {
+			t.Fatalf("AppendMessage() error = %v", err)
+		}
+	}
+
+	// All three messages should be in ONE document.
+	count, err := repo.collection.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		t.Fatalf("CountDocuments() error = %v", err)
+	}
+	if count != 1 {
+		t.Errorf("document count = %d, want 1 (all messages for a run in one doc)", count)
+	}
+
+	var stored m.RawMessagesRunDocument
+	if err := repo.collection.FindOne(ctx, bson.M{"_id": runID}).Decode(&stored); err != nil {
+		t.Fatalf("FindOne() error = %v", err)
+	}
+	if len(stored.Messages) != len(msgs) {
+		t.Errorf("Messages count = %d, want %d", len(stored.Messages), len(msgs))
+	}
+}
+
+func TestRawMessageRepository_AppendMessage_SeparateRunsSeparateDocuments(t *testing.T) {
 	repo, cleanup := setupRawMessageTestRepo(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
-	doc := &m.RawMessageDocument{
-		ID:        "explicit-id-123",
-		Subject:   "tests.events.v1.suite.begin",
-		EventType: "suite.begin",
-		Payload:   []byte(`{}`),
+	runIDs := []string{"run-A", "run-B", "run-C"}
+	for _, runID := range runIDs {
+		msg := m.RetainedMessage{
+			Subject:   "tests.events.v1.test.begin",
+			EventType: "test.begin",
+			Payload:   []byte(`{}`),
+		}
+		if err := repo.AppendMessage(ctx, runID, msg); err != nil {
+			t.Fatalf("AppendMessage(%q) error = %v", runID, err)
+		}
 	}
 
-	if err := repo.Insert(ctx, doc); err != nil {
-		t.Fatalf("Insert() error = %v", err)
+	count, err := repo.collection.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		t.Fatalf("CountDocuments() error = %v", err)
 	}
-
-	if doc.ID != "explicit-id-123" {
-		t.Errorf("ID changed from explicit value; got %q", doc.ID)
-	}
-
-	var stored m.RawMessageDocument
-	if err := repo.collection.FindOne(ctx, bson.M{"_id": "explicit-id-123"}).Decode(&stored); err != nil {
-		t.Fatalf("FindOne() error = %v", err)
+	if int(count) != len(runIDs) {
+		t.Errorf("document count = %d, want %d (one per run)", count, len(runIDs))
 	}
 }
 
-func TestRawMessageRepository_Insert_SetsReceivedAt(t *testing.T) {
+func TestRawMessageRepository_AppendMessage_SetsReceivedAt(t *testing.T) {
 	repo, cleanup := setupRawMessageTestRepo(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
-	before := time.Now()
-	doc := &m.RawMessageDocument{
+	// MongoDB stores times with millisecond precision; truncate before comparison.
+	before := time.Now().Truncate(time.Millisecond)
+	msg := m.RetainedMessage{
 		Subject:   "tests.events.v1.test.end",
 		EventType: "test.end",
 		Payload:   []byte(`{}`),
+		// ReceivedAt deliberately zero; should be auto-populated.
 	}
 
-	if err := repo.Insert(ctx, doc); err != nil {
-		t.Fatalf("Insert() error = %v", err)
+	if err := repo.AppendMessage(ctx, "run-time-test", msg); err != nil {
+		t.Fatalf("AppendMessage() error = %v", err)
 	}
 	after := time.Now()
 
-	if doc.ReceivedAt.Before(before) || doc.ReceivedAt.After(after) {
-		t.Errorf("ReceivedAt = %v, want in [%v, %v]", doc.ReceivedAt, before, after)
+	var stored m.RawMessagesRunDocument
+	if err := repo.collection.FindOne(ctx, bson.M{"_id": "run-time-test"}).Decode(&stored); err != nil {
+		t.Fatalf("FindOne() error = %v", err)
+	}
+	if len(stored.Messages) == 0 {
+		t.Fatal("expected at least one message")
+	}
+	got := stored.Messages[0].ReceivedAt
+	if got.Before(before) || got.After(after) {
+		t.Errorf("ReceivedAt = %v, want in [%v, %v]", got, before, after)
 	}
 }
 
-func TestRawMessageRepository_Insert_NilDocument(t *testing.T) {
+func TestRawMessageRepository_AppendMessage_EmptyRunID(t *testing.T) {
 	repo, cleanup := setupRawMessageTestRepo(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
-	if err := repo.Insert(ctx, nil); err == nil {
-		t.Fatal("Insert(nil) should return an error")
+	msg := m.RetainedMessage{EventType: "test.begin", Payload: []byte(`{}`)}
+	if err := repo.AppendMessage(ctx, "", msg); err == nil {
+		t.Fatal("AppendMessage with empty runID should return an error")
 	}
 }
 
+func TestRawMessageRepository_Accessors(t *testing.T) {
+	repo, cleanup := setupRawMessageTestRepo(t)
+	defer cleanup()
+
+	if repo.CollectionName() != "raw_messages" {
+		t.Errorf("CollectionName() = %q, want %q", repo.CollectionName(), "raw_messages")
+	}
+	if repo.DatabaseName() == "" {
+		t.Error("DatabaseName() should not be empty")
+	}
+}

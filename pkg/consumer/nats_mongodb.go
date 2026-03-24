@@ -309,9 +309,19 @@ func (c *MongoNATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMe
 	return nil
 }
 
-// retainRawMessage persists the raw NATS message to the raw_messages collection.
+// retainRawMessage persists the raw NATS message into the per-run retention document.
+// The run_id is extracted from the event data and used as the document identifier so
+// that all messages belonging to the same run are stored in a single document.
 func (c *MongoNATSConsumer) retainRawMessage(ctx context.Context, msg jetstream.Msg, event publisher.Event) error {
-	doc := &m.RawMessageDocument{
+	runID := extractRunID(event.Data)
+	if runID == "" {
+		c.logger.Warn("could not extract run_id from message, skipping retention",
+			"event_type", event.Type,
+			"subject", msg.Subject())
+		return nil
+	}
+
+	retained := m.RetainedMessage{
 		Subject:    msg.Subject(),
 		EventType:  string(event.Type),
 		Payload:    msg.Data(),
@@ -321,10 +331,69 @@ func (c *MongoNATSConsumer) retainRawMessage(ctx context.Context, msg jetstream.
 
 	// Attach JetStream sequence number when available.
 	if meta, err := msg.Metadata(); err == nil {
-		doc.Sequence = meta.Sequence.Stream
+		retained.Sequence = meta.Sequence.Stream
 	}
 
-	return c.rawMessageRepo.Insert(ctx, doc)
+	return c.rawMessageRepo.AppendMessage(ctx, runID, retained)
+}
+
+// extractRunID extracts the run_id from a JSON-encoded event data payload.
+// It handles the different nesting structures used by each event type:
+//   - run.start / run.end / test.failure / test.error / stdout / stderr → top-level "run_id"
+//   - suite.begin / suite.end → nested under "suite.run_id"
+//   - test.begin / test.end → nested under "test_case.run_id"
+//   - step.begin / step.end → nested under "step.run_id"
+func extractRunID(data json.RawMessage) string {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return ""
+	}
+
+	// Events with run_id at top level
+	if v, ok := raw["run_id"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err == nil && s != "" {
+			return s
+		}
+	}
+
+	// Suite events: { "suite": { "run_id": "..." } }
+	if suite, ok := raw["suite"]; ok {
+		if runID := nestedRunID(suite); runID != "" {
+			return runID
+		}
+	}
+
+	// Test events: { "test_case": { "run_id": "..." } }
+	if testCase, ok := raw["test_case"]; ok {
+		if runID := nestedRunID(testCase); runID != "" {
+			return runID
+		}
+	}
+
+	// Step events: { "step": { "run_id": "..." } }
+	if step, ok := raw["step"]; ok {
+		if runID := nestedRunID(step); runID != "" {
+			return runID
+		}
+	}
+
+	return ""
+}
+
+// nestedRunID extracts the "run_id" string from a JSON object.
+func nestedRunID(data json.RawMessage) string {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return ""
+	}
+	if v, ok := obj["run_id"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err == nil {
+			return s
+		}
+	}
+	return ""
 }
 
 // mongoStatusToString converts protobuf status to string

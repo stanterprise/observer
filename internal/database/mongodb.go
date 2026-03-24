@@ -163,6 +163,11 @@ func (m *MongoDBConnection) Collection(name string) *mongo.Collection {
 	return m.Database.Collection(name)
 }
 
+// DatabaseName returns the name of the connected database.
+func (m *MongoDBConnection) DatabaseName() string {
+	return m.Database.Name()
+}
+
 // TestRunsCollection returns the test_runs collection handle
 func (m *MongoDBConnection) TestRunsCollection() *mongo.Collection {
 	return m.Collection("test_runs")

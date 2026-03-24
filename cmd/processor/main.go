@@ -16,12 +16,13 @@ import (
 
 func main() {
 	var (
-		natsURL        = flag.String("nats-url", envOr("NATS_URL", "nats://localhost:4222"), "NATS server URL")
-		streamName     = flag.String("stream", envOr("NATS_STREAM", "tests_events"), "NATS stream name")
-		consumerName   = flag.String("consumer", envOr("NATS_CONSUMER", "processor"), "NATS consumer name")
-		batchSize      = flag.Int("batch-size", 10, "Number of messages to fetch per batch")
-		maxWait        = flag.Duration("max-wait", 5*time.Second, "Maximum wait time for messages")
-		retainMessages = flag.Bool("retain-messages", envOr("RETAIN_MESSAGES", "") == "true", "Retain all raw messages in MongoDB (overrides RETAIN_MESSAGES env var)")
+		natsURL          = flag.String("nats-url", envOr("NATS_URL", "nats://localhost:4222"), "NATS server URL")
+		streamName       = flag.String("stream", envOr("NATS_STREAM", "tests_events"), "NATS stream name")
+		consumerName     = flag.String("consumer", envOr("NATS_CONSUMER", "processor"), "NATS consumer name")
+		batchSize        = flag.Int("batch-size", 10, "Number of messages to fetch per batch")
+		maxWait          = flag.Duration("max-wait", 5*time.Second, "Maximum wait time for messages")
+		retainMessages   = flag.Bool("retain-messages", envOr("RETAIN_MESSAGES", "") == "true", "Retain all raw NATS messages grouped by run_id in MongoDB (overrides RETAIN_MESSAGES env var)")
+		rawMsgCollection = flag.String("raw-messages-collection", envOr("RAW_MESSAGES_COLLECTION", "raw_messages"), "MongoDB collection for retained raw messages (overrides RAW_MESSAGES_COLLECTION env var)")
 	)
 	flag.Parse()
 
@@ -49,8 +50,10 @@ func main() {
 	// Optionally create the raw message repository when retention is enabled.
 	var rawMsgRepo *repository.RawMessageRepository
 	if *retainMessages {
-		rawMsgRepo = repository.NewRawMessageRepository(mongoDB.RawMessagesCollection(), logger)
-		logger.Info("raw message retention enabled", "collection", "raw_messages")
+		rawMsgRepo = repository.NewRawMessageRepository(mongoDB.Collection(*rawMsgCollection), logger)
+		logger.Info("raw message retention enabled",
+			"database", mongoDB.DatabaseName(),
+			"collection", rawMsgRepo.CollectionName())
 	}
 
 	cfg := consumer.MongoNATSConsumerConfig{
@@ -123,4 +126,3 @@ func envOr(key, def string) string {
 	}
 	return def
 }
-

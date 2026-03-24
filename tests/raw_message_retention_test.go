@@ -22,9 +22,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// TestRawMessageRetention validates that the consumer stores raw messages in the
-// raw_messages collection when retention is enabled and leaves the collection empty
-// when retention is disabled.
+// TestRawMessageRetention validates that the consumer stores all messages for a
+// test run in a single document identified by the run_id when retention is enabled.
 func TestRawMessageRetention(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -87,20 +86,51 @@ func TestRawMessageRetention(t *testing.T) {
 	}
 	defer pub.Close()
 
-	// Publish a test.begin event
+	// Publish several events – all for the same run_id.
 	runID := "run-retention-test-1"
 	suiteID := "suite-retention-1"
 
-	// Use the publisher to emit events that the consumer will process
-	if err := pub.Publish(ctx, publisher.EventTypeSuiteBegin, map[string]interface{}{
-		"suite": map[string]interface{}{
-			"id":     suiteID,
-			"run_id": runID,
-			"name":   "Retention Test Suite",
-			"status": "RUNNING",
+	events := []struct {
+		typ  publisher.EventType
+		data interface{}
+	}{
+		{
+			publisher.EventTypeSuiteBegin, map[string]interface{}{
+				"suite": map[string]interface{}{
+					"id": suiteID, "run_id": runID,
+					"name": "Retention Test Suite", "status": "RUNNING",
+				},
+			},
 		},
-	}); err != nil {
-		t.Fatalf("Publish suite begin: %v", err)
+		{
+			publisher.EventTypeTestBegin, map[string]interface{}{
+				"test_case": map[string]interface{}{
+					"id": "test-1", "run_id": runID,
+					"test_suite_id": suiteID, "name": "test one", "status": "RUNNING",
+				},
+			},
+		},
+		{
+			publisher.EventTypeTestEnd, map[string]interface{}{
+				"test_case": map[string]interface{}{
+					"id": "test-1", "run_id": runID,
+					"test_suite_id": suiteID, "status": "PASSED",
+				},
+			},
+		},
+		{
+			publisher.EventTypeSuiteEnd, map[string]interface{}{
+				"suite": map[string]interface{}{
+					"id": suiteID, "run_id": runID, "status": "PASSED",
+				},
+			},
+		},
+	}
+
+	for _, ev := range events {
+		if err := pub.Publish(ctx, ev.typ, ev.data); err != nil {
+			t.Fatalf("Publish %s: %v", ev.typ, err)
+		}
 	}
 
 	cfg := consumer.MongoNATSConsumerConfig{
@@ -118,57 +148,72 @@ func TestRawMessageRetention(t *testing.T) {
 	}
 	defer natsConsumer.Close()
 
-	// Drain one batch of messages
-	consumerCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	// Run the consumer until messages are drained.
+	consumerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	go func() {
-		_ = natsConsumer.Start(consumerCtx, cfg)
-	}()
+	go func() { _ = natsConsumer.Start(consumerCtx, cfg) }()
 
-	// Wait for the consumer to process the published event
-	time.Sleep(3 * time.Second)
+	// Wait for the consumer to process all published events.
+	time.Sleep(5 * time.Second)
 	cancel()
 
-	// Verify that a raw message document was stored
-	count, err := rawMsgCol.CountDocuments(ctx, bson.M{})
+	// There should be exactly ONE document in raw_messages (all events share the same run_id).
+	docCount, err := rawMsgCol.CountDocuments(ctx, bson.M{})
 	if err != nil {
 		t.Fatalf("CountDocuments() error = %v", err)
 	}
-	if count == 0 {
-		t.Fatal("Expected at least one raw message document when retention is enabled")
+	if docCount != 1 {
+		t.Errorf("Expected 1 raw_messages document (all events for run grouped), got %d", docCount)
 	}
 
-	// Verify structure of the stored document
-	var rawDoc m.RawMessageDocument
-	if err := rawMsgCol.FindOne(ctx, bson.M{}).Decode(&rawDoc); err != nil {
-		t.Fatalf("FindOne() error = %v", err)
-	}
-	if rawDoc.Subject == "" {
-		t.Error("RawMessageDocument.Subject should not be empty")
-	}
-	if rawDoc.EventType == "" {
-		t.Error("RawMessageDocument.EventType should not be empty")
-	}
-	if len(rawDoc.Payload) == 0 {
-		t.Error("RawMessageDocument.Payload should not be empty")
-	}
-	if rawDoc.ReceivedAt.IsZero() {
-		t.Error("RawMessageDocument.ReceivedAt should not be zero")
-	}
-	if rawDoc.Stream != streamName {
-		t.Errorf("RawMessageDocument.Stream = %q, want %q", rawDoc.Stream, streamName)
+	// Verify the document structure.
+	var runDoc m.RawMessagesRunDocument
+	if err := rawMsgCol.FindOne(ctx, bson.M{"_id": runID}).Decode(&runDoc); err != nil {
+		t.Fatalf("FindOne(_id=%q) error = %v", runID, err)
 	}
 
-	// Payload should be valid JSON containing an event envelope
-	var envelope map[string]json.RawMessage
-	if err := json.Unmarshal(rawDoc.Payload, &envelope); err != nil {
-		t.Errorf("Payload is not valid JSON: %v", err)
+	if runDoc.RunID != runID {
+		t.Errorf("RunID = %q, want %q", runDoc.RunID, runID)
 	}
-	if _, ok := envelope["type"]; !ok {
-		t.Error("Payload JSON should contain 'type' field")
+	if len(runDoc.Messages) != len(events) {
+		t.Errorf("Messages count = %d, want %d", len(runDoc.Messages), len(events))
 	}
 
-	t.Logf("✅ Raw message retention: %d document(s) stored in raw_messages collection", count)
+	for i, msg := range runDoc.Messages {
+		if msg.Subject == "" {
+			t.Errorf("Messages[%d].Subject should not be empty", i)
+		}
+		if msg.EventType == "" {
+			t.Errorf("Messages[%d].EventType should not be empty", i)
+		}
+		if len(msg.Payload) == 0 {
+			t.Errorf("Messages[%d].Payload should not be empty", i)
+		}
+		if msg.ReceivedAt.IsZero() {
+			t.Errorf("Messages[%d].ReceivedAt should not be zero", i)
+		}
+		if msg.Stream != streamName {
+			t.Errorf("Messages[%d].Stream = %q, want %q", i, msg.Stream, streamName)
+		}
+		// Payload should be a valid JSON event envelope with a "type" field.
+		var envelope map[string]json.RawMessage
+		if err := json.Unmarshal(msg.Payload, &envelope); err != nil {
+			t.Errorf("Messages[%d].Payload is not valid JSON: %v", i, err)
+		}
+		if _, ok := envelope["type"]; !ok {
+			t.Errorf("Messages[%d].Payload JSON should contain 'type' field", i)
+		}
+	}
+
+	if runDoc.CreatedAt.IsZero() {
+		t.Error("CreatedAt should be set")
+	}
+	if runDoc.UpdatedAt.IsZero() {
+		t.Error("UpdatedAt should be set")
+	}
+
+	t.Logf("✅ Raw message retention: %d message(s) stored in ONE document (run_id=%q)",
+		len(runDoc.Messages), runID)
 
 	// Cleanup NATS stream
 	nc, err := nats.Connect(natsURL)
@@ -268,9 +313,7 @@ func TestRawMessageRetention_Disabled(t *testing.T) {
 
 	consumerCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	go func() {
-		_ = natsConsumer.Start(consumerCtx, cfg)
-	}()
+	go func() { _ = natsConsumer.Start(consumerCtx, cfg) }()
 
 	time.Sleep(3 * time.Second)
 	cancel()
@@ -287,6 +330,134 @@ func TestRawMessageRetention_Disabled(t *testing.T) {
 	t.Logf("✅ Raw message retention disabled: 0 documents in raw_messages collection")
 
 	// Cleanup
+	nc, err := nats.Connect(natsURL)
+	if err == nil {
+		js, err := jetstream.New(nc)
+		if err == nil {
+			js.DeleteStream(ctx, streamName)
+		}
+		nc.Close()
+	}
+}
+
+// TestRawMessageRetention_MultipleRuns verifies that events from different runs
+// land in separate documents.
+func TestRawMessageRetention_MultipleRuns(t *testing.T) {
+	ctx := context.Background()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	mongoContainer, err := mongodb.RunContainer(ctx, testcontainers.WithImage("mongo:7.0"))
+	if err != nil {
+		t.Fatalf("Failed to start MongoDB container: %v", err)
+	}
+	defer mongoContainer.Terminate(ctx)
+
+	mongoURI, err := mongoContainer.ConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get MongoDB connection string: %v", err)
+	}
+
+	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		t.Fatalf("Failed to connect to MongoDB: %v", err)
+	}
+	defer mongoClient.Disconnect(ctx)
+
+	db := mongoClient.Database("observer_retention_multi_test")
+	testRunsCol := db.Collection("test_runs")
+	rawMsgCol := db.Collection("raw_messages")
+
+	repo := repository.NewMongoRepository(testRunsCol, logger)
+	rawMsgRepo := repository.NewRawMessageRepository(rawMsgCol, logger)
+
+	natsContainer, err := natsmodule.Run(ctx, "nats:latest")
+	if err != nil {
+		t.Fatalf("Failed to start NATS container: %v", err)
+	}
+	defer natsContainer.Terminate(ctx)
+
+	natsURL, err := natsContainer.ConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get NATS connection string: %v", err)
+	}
+
+	streamName := "retention_multi_test_" + time.Now().Format("20060102150405")
+	subjectPrefix := "retention.multi.test"
+
+	var pub *publisher.NATSPublisher
+	for i := 0; i < 5; i++ {
+		pub, err = publisher.NewNATSPublisher(publisher.NATSConfig{
+			URL:           natsURL,
+			StreamName:    streamName,
+			SubjectPrefix: subjectPrefix,
+		}, logger)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Duration(i+1) * time.Second)
+	}
+	if err != nil {
+		t.Fatalf("Failed to create publisher: %v", err)
+	}
+	defer pub.Close()
+
+	// Publish events for two different runs.
+	runIDs := []string{"run-multi-A", "run-multi-B"}
+	for _, runID := range runIDs {
+		if err := pub.Publish(ctx, publisher.EventTypeSuiteBegin, map[string]interface{}{
+			"suite": map[string]interface{}{
+				"id": "suite-" + runID, "run_id": runID,
+				"name": "Suite " + runID, "status": "RUNNING",
+			},
+		}); err != nil {
+			t.Fatalf("Publish for run %s: %v", runID, err)
+		}
+	}
+
+	cfg := consumer.MongoNATSConsumerConfig{
+		URL:            natsURL,
+		StreamName:     streamName,
+		ConsumerName:   "retention-multi-consumer",
+		BatchSize:      10,
+		MaxWait:        1 * time.Second,
+		RetainMessages: true,
+	}
+
+	natsConsumer, err := consumer.NewMongoNATSConsumer(cfg, logger, repo, rawMsgRepo)
+	if err != nil {
+		t.Fatalf("Failed to create consumer: %v", err)
+	}
+	defer natsConsumer.Close()
+
+	consumerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	go func() { _ = natsConsumer.Start(consumerCtx, cfg) }()
+
+	time.Sleep(5 * time.Second)
+	cancel()
+
+	// Expect one document per run_id.
+	docCount, err := rawMsgCol.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		t.Fatalf("CountDocuments() error = %v", err)
+	}
+	if int(docCount) != len(runIDs) {
+		t.Errorf("document count = %d, want %d (one per run)", docCount, len(runIDs))
+	}
+
+	for _, runID := range runIDs {
+		var runDoc m.RawMessagesRunDocument
+		if err := rawMsgCol.FindOne(ctx, bson.M{"_id": runID}).Decode(&runDoc); err != nil {
+			t.Errorf("FindOne(_id=%q) error = %v", runID, err)
+			continue
+		}
+		if len(runDoc.Messages) == 0 {
+			t.Errorf("run %q: expected at least one message", runID)
+		}
+	}
+
+	t.Logf("✅ Multiple runs: %d documents in raw_messages (one per run)", docCount)
+
 	nc, err := nats.Connect(natsURL)
 	if err == nil {
 		js, err := jetstream.New(nc)
