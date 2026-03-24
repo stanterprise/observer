@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -77,4 +78,23 @@ func (r *RawMessageRepository) AppendMessage(ctx context.Context, runID string, 
 		"sequence", msg.Sequence)
 
 	return nil
+}
+
+// GetByRunID retrieves the full raw messages document for the given run ID.
+// Returns nil, nil if no document exists for that run (retention not enabled or
+// run predates retention being turned on).
+func (r *RawMessageRepository) GetByRunID(ctx context.Context, runID string) (*m.RawMessagesRunDocument, error) {
+	if runID == "" {
+		return nil, fmt.Errorf("runID is required")
+	}
+
+	var doc m.RawMessagesRunDocument
+	if err := r.collection.FindOne(ctx, bson.M{"_id": runID}).Decode(&doc); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find raw messages for run %q: %w", runID, err)
+	}
+
+	return &doc, nil
 }

@@ -9,6 +9,7 @@ import {
   MarkerStatsPage,
   MarkerBrowsePage,
   TestMapPage,
+  RawMessagesPage,
 } from "./pages";
 import DashboardPage from "./components/DashboardPage";
 
@@ -23,6 +24,7 @@ function App() {
             <Route path=":runId" element={<TestRunDetailPage />} />
             <Route path=":runId/map" element={<TestMapPage />} />
             <Route path=":runId/tests/:testId" element={<TestDetailPage />} />
+            <Route path=":runId/raw-messages" element={<RawMessagesPage />} />
           </Route>
           <Route path="tests/:testId/trends" element={<TestTrendsPage />} />
           <Route path="markers" element={<MarkerBrowsePage />} />

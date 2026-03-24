@@ -186,8 +186,8 @@ func TestRawMessageRetention(t *testing.T) {
 		if msg.EventType == "" {
 			t.Errorf("Messages[%d].EventType should not be empty", i)
 		}
-		if len(msg.Payload) == 0 {
-			t.Errorf("Messages[%d].Payload should not be empty", i)
+		if msg.Payload == nil {
+			t.Errorf("Messages[%d].Payload should not be nil", i)
 		}
 		if msg.ReceivedAt.IsZero() {
 			t.Errorf("Messages[%d].ReceivedAt should not be zero", i)
@@ -195,10 +195,17 @@ func TestRawMessageRetention(t *testing.T) {
 		if msg.Stream != streamName {
 			t.Errorf("Messages[%d].Stream = %q, want %q", i, msg.Stream, streamName)
 		}
-		// Payload should be a valid JSON event envelope with a "type" field.
+		// Payload is stored as a parsed JSON map.  Re-encode to JSON to verify
+		// it contains the full event envelope (type, timestamp, data).
+		payloadJSON, err := json.Marshal(msg.Payload)
+		if err != nil {
+			t.Errorf("Messages[%d].Payload cannot be JSON-marshaled: %v", i, err)
+			continue
+		}
 		var envelope map[string]json.RawMessage
-		if err := json.Unmarshal(msg.Payload, &envelope); err != nil {
-			t.Errorf("Messages[%d].Payload is not valid JSON: %v", i, err)
+		if err := json.Unmarshal(payloadJSON, &envelope); err != nil {
+			t.Errorf("Messages[%d].Payload is not a valid JSON object: %v", i, err)
+			continue
 		}
 		if _, ok := envelope["type"]; !ok {
 			t.Errorf("Messages[%d].Payload JSON should contain 'type' field", i)
