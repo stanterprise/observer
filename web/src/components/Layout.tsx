@@ -54,6 +54,17 @@ export function Layout() {
                 Test Runs
               </Link>
               <Link
+                to="/suite_runs/raw-messages"
+                className={cn(
+                  "px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  isActive("/suite_runs/raw-messages")
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50",
+                )}
+              >
+                Raw Messages
+              </Link>
+              <Link
                 to="/markers"
                 className={cn(
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",

@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Tag,
   X,
+  FileText,
 } from "lucide-react";
 
 import type { TestRun } from "@/types/testRun";
@@ -243,6 +244,13 @@ export function TestSuiteRunsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Test Suite Runs</h1>
         <div className="flex gap-2">
+          <Link
+            to="/suite_runs/raw-messages"
+            className="px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors flex items-center gap-2"
+          >
+            <FileText className="h-4 w-4" />
+            Raw Messages
+          </Link>
           {selectedRuns.size > 0 && (
             <>
               <button

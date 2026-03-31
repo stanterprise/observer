@@ -74,6 +74,7 @@ services:
     profiles: ["dist", "web-dev"]
     restart: unless-stopped
     environment:
+      RETAIN_MESSAGES: "true"
       NATS_URL: nats://nats:4222
       NATS_STREAM: tests_events
       NATS_CONSUMER: processor
