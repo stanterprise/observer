@@ -16,3 +16,20 @@ export interface RawMessagesRunDocument {
   createdAt: string;
   updatedAt: string;
 }
+
+// RawMessagesRunSummary is a lightweight row for the raw-message run directory.
+export interface RawMessagesRunSummary {
+  runId: string;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RawMessagesRunListResponse {
+  runs: RawMessagesRunSummary[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}

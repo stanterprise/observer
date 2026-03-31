@@ -2,30 +2,43 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
-import { ArrowLeft, FileText, Search, X, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  FileText,
+  Search,
+  X,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { RawMessagesRunDocument, RetainedMessage } from "@/types/rawMessages";
+import type {
+  RawMessagesRunDocument,
+  RetainedMessage,
+} from "@/types/rawMessages";
 
 // ─── Event-type badge colours ────────────────────────────────────────────────
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
-  "run.start":    "bg-blue-100 text-blue-800 border-blue-200",
-  "run.end":      "bg-blue-100 text-blue-800 border-blue-200",
-  "suite.begin":  "bg-purple-100 text-purple-800 border-purple-200",
-  "suite.end":    "bg-purple-100 text-purple-800 border-purple-200",
-  "test.begin":   "bg-green-100 text-green-800 border-green-200",
-  "test.end":     "bg-green-100 text-green-800 border-green-200",
+  "run.start": "bg-blue-100 text-blue-800 border-blue-200",
+  "run.end": "bg-blue-100 text-blue-800 border-blue-200",
+  "suite.begin": "bg-purple-100 text-purple-800 border-purple-200",
+  "suite.end": "bg-purple-100 text-purple-800 border-purple-200",
+  "test.begin": "bg-green-100 text-green-800 border-green-200",
+  "test.end": "bg-green-100 text-green-800 border-green-200",
   "test.failure": "bg-red-100 text-red-800 border-red-200",
-  "test.error":   "bg-red-100 text-red-800 border-red-200",
-  "step.begin":   "bg-yellow-100 text-yellow-800 border-yellow-200",
-  "step.end":     "bg-yellow-100 text-yellow-800 border-yellow-200",
-  "stdout":       "bg-gray-100 text-gray-800 border-gray-200",
-  "stderr":       "bg-orange-100 text-orange-800 border-orange-200",
-  "heartbeat":    "bg-teal-100 text-teal-800 border-teal-200",
+  "test.error": "bg-red-100 text-red-800 border-red-200",
+  "step.begin": "bg-yellow-100 text-yellow-800 border-yellow-200",
+  "step.end": "bg-yellow-100 text-yellow-800 border-yellow-200",
+  stdout: "bg-gray-100 text-gray-800 border-gray-200",
+  stderr: "bg-orange-100 text-orange-800 border-orange-200",
+  heartbeat: "bg-teal-100 text-teal-800 border-teal-200",
 };
 
 function eventTypeColor(eventType: string): string {
-  return EVENT_TYPE_COLORS[eventType] ?? "bg-gray-100 text-gray-700 border-gray-200";
+  return (
+    EVENT_TYPE_COLORS[eventType] ?? "bg-gray-100 text-gray-700 border-gray-200"
+  );
 }
 
 // ─── Collapsible JSON payload viewer ─────────────────────────────────────────
@@ -140,35 +153,34 @@ export function RawMessagesPage() {
     new Set(),
   );
 
-  const fetchMessages = useCallback(
-    async (id: string) => {
-      try {
-        setLoading(true);
-        const response = await fetch(apiUrl(`/runs/${id}/raw-messages`));
-        if (response.status === 404) {
-          const body = await response.text();
-          if (body.includes("retention")) {
-            setNotEnabled(true);
-          } else {
-            setError("No retained messages found for this run.");
-          }
-          return;
+  const fetchMessages = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch(apiUrl(`/runs/${id}/raw-messages`));
+      if (response.status === 404) {
+        const body = await response.text();
+        if (body.includes("retention")) {
+          setNotEnabled(true);
+        } else {
+          setError("No retained messages found for this run.");
         }
-        if (!response.ok) {
-          throw new Error(`Failed to fetch raw messages: ${response.statusText}`);
-        }
-        const data: RawMessagesRunDocument = await response.json();
-        setDoc(data);
-        setError(null);
-        setNotEnabled(false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch raw messages");
-      } finally {
-        setLoading(false);
+        return;
       }
-    },
-    [],
-  );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch raw messages: ${response.statusText}`);
+      }
+      const data: RawMessagesRunDocument = await response.json();
+      setDoc(data);
+      setError(null);
+      setNotEnabled(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch raw messages",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (runId) {
@@ -188,24 +200,27 @@ export function RawMessagesPage() {
 
   // Filtered messages with their original indices preserved for display
   const filteredMessages = useMemo(() => {
-    if (!doc) return [] as Array<{ msg: RetainedMessage; originalIndex: number }>;
-    return doc.messages.reduce<Array<{ msg: RetainedMessage; originalIndex: number }>>(
-      (acc, msg, i) => {
-        if (selectedEventTypes.size > 0 && !selectedEventTypes.has(msg.eventType)) {
-          return acc;
-        }
-        if (searchText.trim() !== "") {
-          const q = searchText.toLowerCase();
-          const inType = msg.eventType.toLowerCase().includes(q);
-          const inSubject = msg.subject.toLowerCase().includes(q);
-          const inPayload = JSON.stringify(msg.payload).toLowerCase().includes(q);
-          if (!inType && !inSubject && !inPayload) return acc;
-        }
-        acc.push({ msg, originalIndex: i });
+    if (!doc)
+      return [] as Array<{ msg: RetainedMessage; originalIndex: number }>;
+    return doc.messages.reduce<
+      Array<{ msg: RetainedMessage; originalIndex: number }>
+    >((acc, msg, i) => {
+      if (
+        selectedEventTypes.size > 0 &&
+        !selectedEventTypes.has(msg.eventType)
+      ) {
         return acc;
-      },
-      [],
-    );
+      }
+      if (searchText.trim() !== "") {
+        const q = searchText.toLowerCase();
+        const inType = msg.eventType.toLowerCase().includes(q);
+        const inSubject = msg.subject.toLowerCase().includes(q);
+        const inPayload = JSON.stringify(msg.payload).toLowerCase().includes(q);
+        if (!inType && !inSubject && !inPayload) return acc;
+      }
+      acc.push({ msg, originalIndex: i });
+      return acc;
+    }, []);
   }, [doc, selectedEventTypes, searchText]);
 
   // Message counts by event type (for unfiltered totals in filter pills)
@@ -234,7 +249,30 @@ export function RawMessagesPage() {
     setSelectedEventTypes(new Set());
   };
 
-  const hasActiveFilters = searchText.trim() !== "" || selectedEventTypes.size > 0;
+  const exportJsonLines = () => {
+    if (!doc || !runId) return;
+
+    const lines = filteredMessages.map(({ msg }) => JSON.stringify(msg));
+    const content = lines.join("\n") + (lines.length > 0 ? "\n" : "");
+    const blob = new Blob([content], {
+      type: "application/x-ndjson;charset=utf-8",
+    });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `raw-messages-${runId}-${timestamp}.jsonl`;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const hasActiveFilters =
+    searchText.trim() !== "" || selectedEventTypes.size > 0;
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (loading) {
@@ -246,7 +284,10 @@ export function RawMessagesPage() {
         </div>
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+            <div
+              key={i}
+              className="h-16 bg-gray-100 rounded-lg animate-pulse"
+            />
           ))}
         </div>
       </div>
@@ -339,12 +380,27 @@ export function RawMessagesPage() {
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
               Raw Message Audit
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5 font-mono">{doc.runId}</p>
+            <p className="text-sm text-gray-500 mt-0.5 font-mono">
+              {doc.runId}
+            </p>
           </div>
         </div>
 
-        {/* Stats badges */}
+        {/* Header actions */}
         <div className="flex items-center gap-3">
+          <Link
+            to="/suite_runs/raw-messages"
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-colors"
+          >
+            Directory
+          </Link>
+          <button
+            onClick={exportJsonLines}
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-blue-700 transition-colors"
+          >
+            <Download className="h-4 w-4" />
+            Export JSONL
+          </button>
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm">
             <FileText className="h-4 w-4 text-gray-400" />
             {doc.messages.length} message{doc.messages.length !== 1 ? "s" : ""}
@@ -380,7 +436,13 @@ export function RawMessagesPage() {
                 {doc.messages.length > 0
                   ? new Date(doc.messages[0].receivedAt).toLocaleString(
                       undefined,
-                      { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" },
+                      {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      },
                     )
                   : "—"}
               </p>
@@ -443,12 +505,15 @@ export function RawMessagesPage() {
                   className={cn(
                     "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
                     active
-                      ? eventTypeColor(eventType) + " ring-2 ring-offset-1 ring-blue-400"
+                      ? eventTypeColor(eventType) +
+                          " ring-2 ring-offset-1 ring-blue-400"
                       : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50",
                   )}
                 >
                   {eventType}
-                  <span className="opacity-60">{countsByEventType[eventType] ?? 0}</span>
+                  <span className="opacity-60">
+                    {countsByEventType[eventType] ?? 0}
+                  </span>
                 </button>
               );
             })}
@@ -484,7 +549,11 @@ export function RawMessagesPage() {
       ) : (
         <div className="space-y-2">
           {filteredMessages.map(({ msg, originalIndex }) => (
-            <MessageRow key={`${msg.subject}-${originalIndex}`} msg={msg} index={originalIndex} />
+            <MessageRow
+              key={`${msg.subject}-${originalIndex}`}
+              msg={msg}
+              index={originalIndex}
+            />
           ))}
         </div>
       )}

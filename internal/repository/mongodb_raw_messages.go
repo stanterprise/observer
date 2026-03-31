@@ -98,3 +98,56 @@ func (r *RawMessageRepository) GetByRunID(ctx context.Context, runID string) (*m
 
 	return &doc, nil
 }
+
+// ListRunSummaries returns paginated summaries for all runs that have retained
+// raw messages, newest first by updated_at.
+func (r *RawMessageRepository) ListRunSummaries(ctx context.Context, limit, offset int64) ([]m.RawMessagesRunSummary, int64, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	total, err := r.collection.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return nil, 0, fmt.Errorf("count raw message runs: %w", err)
+	}
+
+	pipeline := mongo.Pipeline{
+		{{Key: "$project", Value: bson.M{
+			"_id":        1,
+			"created_at": 1,
+			"updated_at": 1,
+			"message_count": bson.M{
+				"$size": bson.M{
+					"$ifNull": bson.A{"$messages", bson.A{}},
+				},
+			},
+		}}},
+		{{Key: "$sort", Value: bson.M{"updated_at": -1}}},
+		{{Key: "$skip", Value: offset}},
+		{{Key: "$limit", Value: limit}},
+	}
+
+	cur, err := r.collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, 0, fmt.Errorf("aggregate raw message run summaries: %w", err)
+	}
+	defer cur.Close(ctx)
+
+	out := make([]m.RawMessagesRunSummary, 0)
+	for cur.Next(ctx) {
+		var row m.RawMessagesRunSummary
+		if err := cur.Decode(&row); err != nil {
+			return nil, 0, fmt.Errorf("decode raw message run summary: %w", err)
+		}
+		out = append(out, row)
+	}
+
+	if err := cur.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate raw message run summaries: %w", err)
+	}
+
+	return out, total, nil
+}

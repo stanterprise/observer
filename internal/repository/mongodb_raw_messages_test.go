@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -57,9 +58,12 @@ func TestRawMessageRepository_AppendMessage_CreatesDocument(t *testing.T) {
 	msg := m.RetainedMessage{
 		Subject:   "tests.events.v1.test.begin",
 		EventType: "test.begin",
-		Payload:   []byte(`{"type":"test.begin","data":{}}`),
-		Stream:    "tests_events",
-		Sequence:  42,
+		Payload: map[string]interface{}{
+			"type": "test.begin",
+			"data": map[string]interface{}{},
+		},
+		Stream:   "tests_events",
+		Sequence: 42,
 	}
 
 	if err := repo.AppendMessage(ctx, runID, msg); err != nil {
@@ -87,8 +91,8 @@ func TestRawMessageRepository_AppendMessage_CreatesDocument(t *testing.T) {
 	if stored.Messages[0].Sequence != msg.Sequence {
 		t.Errorf("Sequence = %d, want %d", stored.Messages[0].Sequence, msg.Sequence)
 	}
-	if string(stored.Messages[0].Payload) != string(msg.Payload) {
-		t.Errorf("Payload = %q, want %q", stored.Messages[0].Payload, msg.Payload)
+	if !reflect.DeepEqual(stored.Messages[0].Payload, msg.Payload) {
+		t.Errorf("Payload = %#v, want %#v", stored.Messages[0].Payload, msg.Payload)
 	}
 	if stored.CreatedAt.IsZero() {
 		t.Error("CreatedAt should be set")
@@ -106,9 +110,9 @@ func TestRawMessageRepository_AppendMessage_GroupsByRunID(t *testing.T) {
 	runID := "run-grouping-test"
 
 	msgs := []m.RetainedMessage{
-		{Subject: "tests.events.v1.suite.begin", EventType: "suite.begin", Payload: []byte(`{}`)},
-		{Subject: "tests.events.v1.test.begin", EventType: "test.begin", Payload: []byte(`{}`)},
-		{Subject: "tests.events.v1.test.end", EventType: "test.end", Payload: []byte(`{}`)},
+		{Subject: "tests.events.v1.suite.begin", EventType: "suite.begin", Payload: map[string]interface{}{}},
+		{Subject: "tests.events.v1.test.begin", EventType: "test.begin", Payload: map[string]interface{}{}},
+		{Subject: "tests.events.v1.test.end", EventType: "test.end", Payload: map[string]interface{}{}},
 	}
 
 	for _, msg := range msgs {
@@ -146,7 +150,7 @@ func TestRawMessageRepository_AppendMessage_SeparateRunsSeparateDocuments(t *tes
 		msg := m.RetainedMessage{
 			Subject:   "tests.events.v1.test.begin",
 			EventType: "test.begin",
-			Payload:   []byte(`{}`),
+			Payload:   map[string]interface{}{},
 		}
 		if err := repo.AppendMessage(ctx, runID, msg); err != nil {
 			t.Fatalf("AppendMessage(%q) error = %v", runID, err)
@@ -173,7 +177,7 @@ func TestRawMessageRepository_AppendMessage_SetsReceivedAt(t *testing.T) {
 	msg := m.RetainedMessage{
 		Subject:   "tests.events.v1.test.end",
 		EventType: "test.end",
-		Payload:   []byte(`{}`),
+		Payload:   map[string]interface{}{},
 		// ReceivedAt deliberately zero; should be auto-populated.
 	}
 
@@ -201,7 +205,7 @@ func TestRawMessageRepository_AppendMessage_EmptyRunID(t *testing.T) {
 
 	ctx := context.Background()
 
-	msg := m.RetainedMessage{EventType: "test.begin", Payload: []byte(`{}`)}
+	msg := m.RetainedMessage{EventType: "test.begin", Payload: map[string]interface{}{}}
 	if err := repo.AppendMessage(ctx, "", msg); err == nil {
 		t.Fatal("AppendMessage with empty runID should return an error")
 	}
@@ -216,5 +220,54 @@ func TestRawMessageRepository_Accessors(t *testing.T) {
 	}
 	if repo.DatabaseName() == "" {
 		t.Error("DatabaseName() should not be empty")
+	}
+}
+
+func TestRawMessageRepository_ListRunSummaries(t *testing.T) {
+	repo, cleanup := setupRawMessageTestRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Two runs with different message counts.
+	for i := 0; i < 2; i++ {
+		if err := repo.AppendMessage(ctx, "run-A", m.RetainedMessage{
+			Subject:   "tests.events.v1.test.begin",
+			EventType: "test.begin",
+			Payload:   map[string]interface{}{"idx": i},
+		}); err != nil {
+			t.Fatalf("AppendMessage(run-A) error = %v", err)
+		}
+	}
+
+	if err := repo.AppendMessage(ctx, "run-B", m.RetainedMessage{
+		Subject:   "tests.events.v1.test.end",
+		EventType: "test.end",
+		Payload:   map[string]interface{}{"ok": true},
+	}); err != nil {
+		t.Fatalf("AppendMessage(run-B) error = %v", err)
+	}
+
+	summaries, total, err := repo.ListRunSummaries(ctx, 10, 0)
+	if err != nil {
+		t.Fatalf("ListRunSummaries() error = %v", err)
+	}
+
+	if total != 2 {
+		t.Fatalf("total = %d, want 2", total)
+	}
+	if len(summaries) != 2 {
+		t.Fatalf("len(summaries) = %d, want 2", len(summaries))
+	}
+
+	counts := map[string]int{}
+	for _, s := range summaries {
+		counts[s.RunID] = s.MessageCount
+	}
+	if counts["run-A"] != 2 {
+		t.Errorf("run-A message count = %d, want 2", counts["run-A"])
+	}
+	if counts["run-B"] != 1 {
+		t.Errorf("run-B message count = %d, want 1", counts["run-B"])
 	}
 }

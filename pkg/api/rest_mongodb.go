@@ -42,12 +42,59 @@ func (h *MongoHandler) SetRawMessageRepo(r *repository.RawMessageRepository) {
 func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/tests/", h.handleTestsWithTrends) // Handles both /api/tests and /api/tests/{testId}/trends
 	mux.HandleFunc("/api/runs", h.handleRuns)
+	mux.HandleFunc("/api/raw-messages/runs", h.handleRawMessageRuns)
 	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
 	mux.HandleFunc("/api/runs/", h.handleRunDetail)
 	mux.HandleFunc("/api/runs/delete", h.handleDeleteRuns)   // Handles DELETE /api/runs/delete - delete multiple runs
 	mux.HandleFunc("/api/runs/marker", h.handleUpdateMarker) // Handles PUT /api/runs/marker - update marker for runs
 	mux.HandleFunc("/api/markers", h.handleMarkers)          // Handles GET /api/markers - list all unique markers
 	mux.HandleFunc("/api/marker/", h.handleMarkerStats)      // Handles /api/marker/{markerValue}/stats
+}
+
+// handleRawMessageRuns handles GET /api/raw-messages/runs.
+// Returns paginated run summaries for runs that have retained raw messages.
+func (h *MongoHandler) handleRawMessageRuns(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if h.rawMessageRepo == nil {
+		http.Error(w, "Message retention is not enabled", http.StatusNotFound)
+		return
+	}
+
+	limit := int64(50)
+	offset := int64(0)
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsedLimit, err := strconv.ParseInt(l, 10, 64); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if parsedOffset, err := strconv.ParseInt(o, 10, 64); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	runs, total, err := h.rawMessageRepo.ListRunSummaries(r.Context(), limit, offset)
+	if err != nil {
+		h.logger.Error("failed to list raw message runs", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"runs": runs,
+		"pagination": map[string]interface{}{
+			"total":  total,
+			"limit":  limit,
+			"offset": offset,
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // handleTestsWithTrends handles both /api/tests and /api/tests/{testId}/trends
@@ -428,7 +475,7 @@ func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 		} else {
 			// Merge testCaseIds from duplicate suites
 			existing := seenSuites[suite.ID]
-			if suite.TestCaseIds != nil && len(suite.TestCaseIds) > 0 {
+			if len(suite.TestCaseIds) > 0 {
 				if existing.TestCaseIds == nil {
 					existing.TestCaseIds = suite.TestCaseIds
 				} else {
@@ -838,33 +885,33 @@ func (h *MongoHandler) handleUpdateMarker(w http.ResponseWriter, r *http.Request
 // Returns the retained NATS messages for a run grouped in one document.
 // Returns 404 when retention was not enabled or no messages exist for the run.
 func (h *MongoHandler) handleRawMessages(w http.ResponseWriter, r *http.Request, runID string) {
-if r.Method != http.MethodGet {
-http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-return
-}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-if runID == "" {
-http.Error(w, "Run ID required", http.StatusBadRequest)
-return
-}
+	if runID == "" {
+		http.Error(w, "Run ID required", http.StatusBadRequest)
+		return
+	}
 
-if h.rawMessageRepo == nil {
-http.Error(w, "Message retention is not enabled", http.StatusNotFound)
-return
-}
+	if h.rawMessageRepo == nil {
+		http.Error(w, "Message retention is not enabled", http.StatusNotFound)
+		return
+	}
 
-doc, err := h.rawMessageRepo.GetByRunID(r.Context(), runID)
-if err != nil {
-h.logger.Error("failed to fetch raw messages", "run_id", runID, "error", err)
-http.Error(w, "Internal server error", http.StatusInternalServerError)
-return
-}
+	doc, err := h.rawMessageRepo.GetByRunID(r.Context(), runID)
+	if err != nil {
+		h.logger.Error("failed to fetch raw messages", "run_id", runID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 
-if doc == nil {
-http.Error(w, "No retained messages found for run", http.StatusNotFound)
-return
-}
+	if doc == nil {
+		http.Error(w, "No retained messages found for run", http.StatusNotFound)
+		return
+	}
 
-w.Header().Set("Content-Type", "application/json")
-json.NewEncoder(w).Encode(doc)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(doc)
 }

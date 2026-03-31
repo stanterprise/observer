@@ -6,5 +6,16 @@ import { MarkerStatsPage } from "./MarkerStatsPage";
 import { MarkerBrowsePage } from "./MarkerBrowsePage";
 import { TestMapPage } from "./TestMapPage";
 import { RawMessagesPage } from "./RawMessagesPage";
+import { RawMessagesRunsPage } from "./RawMessagesRunsPage";
 
-export { TestDetailPage, TestSuiteRunsPage, TestRunDetailPage, TestTrendsPage, MarkerStatsPage, MarkerBrowsePage, TestMapPage, RawMessagesPage };
+export {
+  TestDetailPage,
+  TestSuiteRunsPage,
+  TestRunDetailPage,
+  TestTrendsPage,
+  MarkerStatsPage,
+  MarkerBrowsePage,
+  TestMapPage,
+  RawMessagesPage,
+  RawMessagesRunsPage,
+};

@@ -40,3 +40,19 @@ type RawMessagesRunDocument struct {
 	// UpdatedAt is the time the last message was appended to this document.
 	UpdatedAt time.Time `bson:"updated_at" json:"updatedAt"`
 }
+
+// RawMessagesRunSummary is a lightweight listing item for runs that have
+// retained raw messages.
+type RawMessagesRunSummary struct {
+	// RunID is the retained run identifier (_id in MongoDB).
+	RunID string `bson:"_id" json:"runId"`
+
+	// MessageCount is the number of retained messages for this run.
+	MessageCount int `bson:"message_count" json:"messageCount"`
+
+	// CreatedAt is when the retention document was first created.
+	CreatedAt time.Time `bson:"created_at" json:"createdAt"`
+
+	// UpdatedAt is when the retention document was last appended to.
+	UpdatedAt time.Time `bson:"updated_at" json:"updatedAt"`
+}
