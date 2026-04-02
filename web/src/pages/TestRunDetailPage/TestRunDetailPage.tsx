@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
-import { ArrowLeft, Play, Eye, EyeOff, Search, X, Filter, Map } from "lucide-react";
+import { ArrowLeft, Play, Eye, EyeOff, Search, X, Filter, Map, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { SuiteTitleCard } from "./SuiteTitleCard";
@@ -384,13 +384,22 @@ export function TestRunDetailPage() {
             </p>
           </div>
         </div>
-        <Link
-          to={`/suite_runs/${runId}/map`}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm hover:shadow"
-        >
-          <Map className="h-5 w-5" />
-          <span className="font-medium">View Test Map</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/suite_runs/${runId}/raw-messages`}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm hover:shadow"
+          >
+            <FileText className="h-5 w-5" />
+            <span className="font-medium">Raw Messages</span>
+          </Link>
+          <Link
+            to={`/suite_runs/${runId}/map`}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm hover:shadow"
+          >
+            <Map className="h-5 w-5" />
+            <span className="font-medium">View Test Map</span>
+          </Link>
+        </div>
       </div>
 
       {/* Run Summary Card with improved spacing */}

@@ -20,6 +20,7 @@ import (
 
 func main() {
 	port := flag.String("port", envOr("PORT", "8080"), "HTTP port to listen on")
+	rawMsgCollection := flag.String("raw-messages-collection", envOr("RAW_MESSAGES_COLLECTION", "raw_messages"), "MongoDB collection for retained raw messages (overrides RAW_MESSAGES_COLLECTION env var)")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -47,6 +48,15 @@ func main() {
 	// Create MongoDB repository and handler
 	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
 	mongoHandler := api.NewMongoHandler(repo, logger)
+
+	// Attach raw message repository if the collection is reachable.
+	// The collection is always attempted; if it's empty (no retention data) the
+	// endpoint simply returns 404 per-request rather than refusing to start.
+	rawMsgRepo := repository.NewRawMessageRepository(mongoDB.Collection(*rawMsgCollection), logger)
+	mongoHandler.SetRawMessageRepo(rawMsgRepo)
+	logger.Info("raw message audit endpoint enabled",
+		"collection", rawMsgRepo.CollectionName(),
+		"database", rawMsgRepo.DatabaseName())
 
 	// Initialize storage driver (optional)
 	storageDriver, err := storage.NewDriverFromEnv(logger)
