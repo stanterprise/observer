@@ -1,0 +1,336 @@
+name: Deploy to DigitalOcean Droplet
+
+# On-demand deployment of Observer to a DigitalOcean droplet.
+#
+# Required secrets (configure in repo Settings → Secrets or in a "digitalocean"
+# GitHub Environment):
+#   DO_SSH_PRIVATE_KEY  – private SSH key whose public key is on the droplet
+#   DO_DROPLET_HOST     – droplet IP address or hostname
+#   JWT_SECRET          – JWT secret for the Observer API
+#
+# Optional secrets:
+#   LE_EMAIL            – Let's Encrypt account email (can also be supplied as input)
+#
+# Optional variables (repo/environment level):
+#   DO_DROPLET_USER     – SSH login user (default: root)
+#   DO_REPO_DIR         – path on the droplet to clone the repo into (default: /opt/observer)
+
+on:
+  workflow_dispatch:
+    inputs:
+      observer_version:
+        description: "Observer image version (e.g. latest, v0.3.0)"
+        required: false
+        default: "latest"
+        type: string
+      domain_name:
+        description: "Domain name or IP address for the droplet (required)"
+        required: true
+        type: string
+      domain_aliases:
+        description: "Additional domain aliases, space-separated (e.g. www.example.com)"
+        required: false
+        default: ""
+        type: string
+      ssl_type:
+        description: "SSL/TLS mode"
+        required: false
+        default: "none"
+        type: choice
+        options:
+          - none
+          - letsencrypt
+          - self-signed
+      le_email:
+        description: "Email for Let's Encrypt (required when ssl_type=letsencrypt; overrides LE_EMAIL secret)"
+        required: false
+        default: ""
+        type: string
+      backup_enabled:
+        description: "Enable automated daily backups"
+        required: false
+        default: false
+        type: boolean
+      deploy_ref:
+        description: "Git ref to deploy (branch, tag, or SHA)"
+        required: false
+        default: "master"
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.observer_version }} → ${{ inputs.domain_name }}
+    runs-on: ubuntu-latest
+
+    # Scope secrets to the "digitalocean" environment when it exists.
+    # Remove the environment block if you store secrets at the repo level.
+    environment:
+      name: digitalocean
+      url: ${{ inputs.ssl_type != 'none' && format('https://{0}', inputs.domain_name) || format('http://{0}', inputs.domain_name) }}
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Validate inputs before touching the droplet
+      # -----------------------------------------------------------------------
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+
+          DOMAIN="${{ inputs.domain_name }}"
+          if [[ -z "$DOMAIN" ]]; then
+            echo "::error::domain_name is required"
+            exit 1
+          fi
+
+          SSL="${{ inputs.ssl_type }}"
+          if [[ "$SSL" == "letsencrypt" ]]; then
+            # Email must come from the input or the LE_EMAIL secret
+            LE="${{ inputs.le_email }}"
+            LE_SECRET="${{ secrets.LE_EMAIL }}"
+            if [[ -z "$LE" && -z "$LE_SECRET" ]]; then
+              echo "::error::le_email input or LE_EMAIL secret is required when ssl_type=letsencrypt"
+              exit 1
+            fi
+            # Let's Encrypt cannot issue certs for bare IPv4 addresses
+            if [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Let's Encrypt cannot issue certificates for IP addresses. Use a domain name or choose ssl_type=self-signed."
+              exit 1
+            fi
+          fi
+
+          echo "✓ Inputs validated"
+          echo "  domain:  $DOMAIN"
+          echo "  version: ${{ inputs.observer_version }}"
+          echo "  ssl:     $SSL"
+          echo "  ref:     ${{ inputs.deploy_ref }}"
+
+      # -----------------------------------------------------------------------
+      # 2. Set up SSH access to the droplet
+      # -----------------------------------------------------------------------
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+          # Add the droplet to known_hosts so we don't need interactive approval
+          ssh-keyscan -H "${{ secrets.DO_DROPLET_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      # -----------------------------------------------------------------------
+      # 3. Install Docker and Docker Compose plugin if missing (fresh droplets)
+      # -----------------------------------------------------------------------
+      - name: Install Docker prerequisites on droplet
+        env:
+          SSH_HOST: ${{ secrets.DO_DROPLET_HOST }}
+          SSH_USER: ${{ vars.DO_DROPLET_USER || 'root' }}
+        run: |
+          ssh -i ~/.ssh/id_deploy "$SSH_USER@$SSH_HOST" bash << 'REMOTE'
+          set -euo pipefail
+
+          need_install=false
+
+          if ! command -v docker &>/dev/null; then
+            need_install=true
+          fi
+
+          if ! docker compose version &>/dev/null 2>&1; then
+            need_install=true
+          fi
+
+          if [[ "$need_install" == "true" ]]; then
+            echo "Installing Docker and docker-compose-plugin..."
+            apt-get update -qq
+            apt-get install -y -qq ca-certificates curl gnupg lsb-release
+
+            install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+              | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+            chmod a+r /etc/apt/keyrings/docker.gpg
+
+            echo \
+              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+              https://download.docker.com/linux/ubuntu \
+              $(lsb_release -cs) stable" \
+              > /etc/apt/sources.list.d/docker.list
+
+            apt-get update -qq
+            apt-get install -y -qq docker-ce docker-ce-cli containerd.io \
+              docker-buildx-plugin docker-compose-plugin
+
+            echo "Docker installed: $(docker --version)"
+            echo "Docker Compose installed: $(docker compose version)"
+          else
+            echo "Docker already installed: $(docker --version)"
+            echo "Docker Compose already installed: $(docker compose version)"
+          fi
+          REMOTE
+
+      # -----------------------------------------------------------------------
+      # 4. Clone or update the repository on the droplet
+      # -----------------------------------------------------------------------
+      - name: Sync repository on droplet
+        env:
+          SSH_HOST: ${{ secrets.DO_DROPLET_HOST }}
+          SSH_USER: ${{ vars.DO_DROPLET_USER || 'root' }}
+          REPO_DIR: ${{ vars.DO_REPO_DIR || '/opt/observer' }}
+          DEPLOY_REF: ${{ inputs.deploy_ref }}
+          REPO_URL: https://github.com/${{ github.repository }}.git
+        run: |
+          ssh -i ~/.ssh/id_deploy "$SSH_USER@$SSH_HOST" bash << REMOTE
+          set -euo pipefail
+
+          REPO_DIR="${REPO_DIR}"
+          DEPLOY_REF="${DEPLOY_REF}"
+
+          if [[ -d "\$REPO_DIR/.git" ]]; then
+            echo "Updating existing repo at \$REPO_DIR ..."
+            cd "\$REPO_DIR"
+            git fetch --tags origin
+            git checkout "\$DEPLOY_REF" 2>/dev/null \
+              || git checkout -B "\$DEPLOY_REF" "origin/\$DEPLOY_REF" 2>/dev/null \
+              || true
+            git reset --hard "origin/\$DEPLOY_REF" 2>/dev/null \
+              || git reset --hard "\$DEPLOY_REF"
+          else
+            echo "Cloning repo into \$REPO_DIR ..."
+            git clone "${REPO_URL}" "\$REPO_DIR"
+            cd "\$REPO_DIR"
+            git checkout "\$DEPLOY_REF" 2>/dev/null \
+              || git reset --hard "\$DEPLOY_REF"
+          fi
+
+          echo "Deployed ref: \$(git rev-parse --short HEAD) (\$DEPLOY_REF)"
+          REMOTE
+
+      # -----------------------------------------------------------------------
+      # 5. Run the deploy script
+      #    Secrets are base64-encoded then decoded on the remote side to avoid
+      #    special characters in command arguments (never visible in ps/proc).
+      # -----------------------------------------------------------------------
+      - name: Run deploy script
+        env:
+          SSH_HOST: ${{ secrets.DO_DROPLET_HOST }}
+          SSH_USER: ${{ vars.DO_DROPLET_USER || 'root' }}
+          REPO_DIR: ${{ vars.DO_REPO_DIR || '/opt/observer' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          LE_EMAIL: ${{ inputs.le_email || secrets.LE_EMAIL }}
+        run: |
+          # Encode secrets to safely embed them in the remote heredoc
+          JWT_B64=$(printf '%s' "$JWT_SECRET" | base64 -w0)
+          LE_B64=$(printf '%s' "$LE_EMAIL" | base64 -w0)
+
+          # Build the argument list for the deploy script
+          DEPLOY_ARGS="--domain '${{ inputs.domain_name }}'"
+          DEPLOY_ARGS="$DEPLOY_ARGS --ssl '${{ inputs.ssl_type }}'"
+          DEPLOY_ARGS="$DEPLOY_ARGS --version '${{ inputs.observer_version }}'"
+
+          ALIASES="${{ inputs.domain_aliases }}"
+          if [[ -n "$ALIASES" ]]; then
+            for alias in $ALIASES; do
+              DEPLOY_ARGS="$DEPLOY_ARGS --domain-alias '$alias'"
+            done
+          fi
+
+          if [[ "${{ inputs.backup_enabled }}" == "true" ]]; then
+            DEPLOY_ARGS="$DEPLOY_ARGS --backup-enabled"
+          fi
+
+          ssh -i ~/.ssh/id_deploy "$SSH_USER@$SSH_HOST" bash << REMOTE
+          set -euo pipefail
+
+          # Decode secrets on the remote side (never in any process argument list)
+          JWT_SECRET=\$(printf '%s' "${JWT_B64}" | base64 -d)
+          LE_EMAIL=\$(printf '%s' "${LE_B64}" | base64 -d)
+
+          DEPLOY_ARGS="${DEPLOY_ARGS}"
+
+          if [[ "\$LE_EMAIL" != "" && '${{ inputs.ssl_type }}' == "letsencrypt" ]]; then
+            DEPLOY_ARGS="\$DEPLOY_ARGS --email \"\$LE_EMAIL\""
+          fi
+
+          cd "${REPO_DIR}"
+          # Export JWT_SECRET as an environment variable so the deploy script can
+          # inherit it without ever passing it as a visible command-line argument.
+          export JWT_SECRET
+          bash scripts/deploy-digitalocean.sh \$DEPLOY_ARGS
+          REMOTE
+
+      # -----------------------------------------------------------------------
+      # 6. Post-deploy health check (run from the droplet itself)
+      # -----------------------------------------------------------------------
+      - name: Health check
+        env:
+          SSH_HOST: ${{ secrets.DO_DROPLET_HOST }}
+          SSH_USER: ${{ vars.DO_DROPLET_USER || 'root' }}
+          REPO_DIR: ${{ vars.DO_REPO_DIR || '/opt/observer' }}
+        run: |
+          echo "Waiting 15 s for services to stabilize..."
+          sleep 15
+
+          ssh -i ~/.ssh/id_deploy "$SSH_USER@$SSH_HOST" bash << REMOTE
+          set -euo pipefail
+
+          max=20
+          i=0
+          until curl -sf http://localhost/health > /dev/null 2>&1; do
+            i=\$((i+1))
+            if [[ \$i -ge \$max ]]; then
+              echo "::error::Health check timed out after \$((max*5 + 15))s (including initial wait)"
+              docker compose -f "${REPO_DIR}/docker-compose.digitalocean.yml" ps
+              docker compose -f "${REPO_DIR}/docker-compose.digitalocean.yml" logs --tail=50
+              exit 1
+            fi
+            echo "Waiting for /health... (\$i/\$max)"
+            sleep 5
+          done
+          echo "✓ Health check passed"
+          REMOTE
+
+      # -----------------------------------------------------------------------
+      # 7. Deployment summary
+      # -----------------------------------------------------------------------
+      - name: Deployment summary
+        if: always()
+        env:
+          DEPLOY_STATUS: ${{ job.status }}
+          REPO_DIR: ${{ vars.DO_REPO_DIR || '/opt/observer' }}
+        run: |
+          WEB_SCHEME="http"
+          if [[ "${{ inputs.ssl_type }}" != "none" ]]; then
+            WEB_SCHEME="https"
+          fi
+
+          STATUS_ICON="✅"
+          if [[ "$DEPLOY_STATUS" != "success" ]]; then
+            STATUS_ICON="❌"
+          fi
+
+          {
+            echo "## ${STATUS_ICON} DigitalOcean Deployment — ${{ inputs.domain_name }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **Status** | ${DEPLOY_STATUS} |"
+            echo "| **Domain** | \`${{ inputs.domain_name }}\` |"
+            echo "| **Version** | \`${{ inputs.observer_version }}\` |"
+            echo "| **SSL** | \`${{ inputs.ssl_type }}\` |"
+            echo "| **Git ref** | \`${{ inputs.deploy_ref }}\` |"
+            echo "| **Triggered by** | @${{ github.actor }} |"
+            echo ""
+            echo "### Access"
+            echo "| Endpoint | URL |"
+            echo "|---|---|"
+            echo "| Web UI | ${WEB_SCHEME}://${{ inputs.domain_name }} |"
+            echo "| API | ${WEB_SCHEME}://${{ inputs.domain_name }}/api |"
+            echo "| gRPC | \`${{ inputs.domain_name }}:50051\` |"
+            echo ""
+            echo "### Management (on droplet)"
+            echo "\`\`\`bash"
+            echo "# Status"
+            echo "docker compose -f ${REPO_DIR}/docker-compose.digitalocean.yml ps"
+            echo "# Logs"
+            echo "docker compose -f ${REPO_DIR}/docker-compose.digitalocean.yml logs -f"
+            echo "# Restart"
+            echo "docker compose -f ${REPO_DIR}/docker-compose.digitalocean.yml restart"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
