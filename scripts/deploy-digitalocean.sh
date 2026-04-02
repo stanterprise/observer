@@ -11,6 +11,7 @@
 # OPTIONS:
 #   --domain <domain>          Domain name (required)
 #   --domain-alias <domain>    Additional domain/SAN (repeatable)
+#   --version <tag>            Observer image version to deploy (default: latest)
 #   --jwt-secret <secret>      JWT secret (optional, will be generated)
 #   --ssl <type>              SSL type: letsencrypt, self-signed, none (default: none)
 #   --backup-enabled           Enable automated backups
@@ -48,7 +49,8 @@ NC='\033[0m' # No Color
 DOMAIN_NAME=""
 DOMAIN_ALIASES=""
 TLS_SERVER_NAMES=""
-JWT_SECRET=""
+JWT_SECRET="${JWT_SECRET:-}"   # preserve env var if already exported
+OBSERVER_VERSION="latest"
 SSL_TYPE="none"
 BACKUP_ENABLED=false
 LE_EMAIL=""
@@ -241,6 +243,9 @@ SSL_ENABLED=$ssl_enabled
 SSL_CERT_PATH=$ssl_cert_path
 TLS_CERT_FILE=$tls_cert_file
 TLS_CERT_KEY_FILE=$tls_cert_key_file
+
+# Observer Image Version
+OBSERVER_VERSION=$OBSERVER_VERSION
 
 # Security Configuration
 JWT_SECRET=$JWT_SECRET
@@ -537,6 +542,10 @@ main() {
                 ;;
             --jwt-secret)
                 JWT_SECRET="$2"
+                shift 2
+                ;;
+            --version)
+                OBSERVER_VERSION="$2"
                 shift 2
                 ;;
             --ssl)
