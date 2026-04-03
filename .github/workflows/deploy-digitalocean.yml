@@ -52,9 +52,9 @@ on:
         default: false
         type: boolean
       deploy_ref:
-        description: "Git ref to deploy (branch, tag, or SHA)"
+        description: "Git ref to deploy (branch, tag, or SHA). Leave empty to deploy the workflow's current ref."
         required: false
-        default: "master"
+        default: ""
         type: string
 
 jobs:
@@ -102,7 +102,7 @@ jobs:
           echo "  domain:  $DOMAIN"
           echo "  version: ${{ inputs.observer_version }}"
           echo "  ssl:     $SSL"
-          echo "  ref:     ${{ inputs.deploy_ref }}"
+          echo "  ref:     ${{ inputs.deploy_ref || github.ref_name }}"
 
       # -----------------------------------------------------------------------
       # 2. Set up SSH access to the droplet
@@ -173,14 +173,18 @@ jobs:
           SSH_HOST: ${{ secrets.DO_DROPLET_HOST }}
           SSH_USER: ${{ vars.DO_DROPLET_USER || 'root' }}
           REPO_DIR: ${{ vars.DO_REPO_DIR || '/opt/observer' }}
-          DEPLOY_REF: ${{ inputs.deploy_ref }}
+          DEPLOY_REF: ${{ inputs.deploy_ref || github.ref_name }}
           REPO_URL: https://github.com/${{ github.repository }}.git
         run: |
+          # Base64-encode the user-supplied ref to safely embed it in the remote heredoc.
+          # Base64 output only contains [A-Za-z0-9+/=] so it cannot inject shell code.
+          REF_B64=$(printf '%s' "$DEPLOY_REF" | base64 -w0)
+
           ssh -i ~/.ssh/id_deploy "$SSH_USER@$SSH_HOST" bash << REMOTE
           set -euo pipefail
 
           REPO_DIR="${REPO_DIR}"
-          DEPLOY_REF="${DEPLOY_REF}"
+          DEPLOY_REF=\$(printf '%s' "${REF_B64}" | base64 -d)
 
           if [[ -d "\$REPO_DIR/.git" ]]; then
             echo "Updating existing repo at \$REPO_DIR ..."
@@ -214,45 +218,65 @@ jobs:
           REPO_DIR: ${{ vars.DO_REPO_DIR || '/opt/observer' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           LE_EMAIL: ${{ inputs.le_email || secrets.LE_EMAIL }}
+          OBSERVER_VERSION: ${{ inputs.observer_version }}
+          DOMAIN_NAME: ${{ inputs.domain_name }}
+          DOMAIN_ALIASES: ${{ inputs.domain_aliases }}
+          SSL_TYPE: ${{ inputs.ssl_type }}
+          BACKUP_ENABLED: ${{ inputs.backup_enabled }}
         run: |
-          # Encode secrets to safely embed them in the remote heredoc
+          # Encode secrets and all user-supplied inputs to safely embed them in the remote
+          # heredoc. Base64 output only contains [A-Za-z0-9+/=] so it cannot inject code.
           JWT_B64=$(printf '%s' "$JWT_SECRET" | base64 -w0)
           LE_B64=$(printf '%s' "$LE_EMAIL" | base64 -w0)
-
-          # Build the argument list for the deploy script
-          DEPLOY_ARGS="--domain '${{ inputs.domain_name }}'"
-          DEPLOY_ARGS="$DEPLOY_ARGS --ssl '${{ inputs.ssl_type }}'"
-          DEPLOY_ARGS="$DEPLOY_ARGS --version '${{ inputs.observer_version }}'"
-
-          ALIASES="${{ inputs.domain_aliases }}"
-          if [[ -n "$ALIASES" ]]; then
-            for alias in $ALIASES; do
-              DEPLOY_ARGS="$DEPLOY_ARGS --domain-alias '$alias'"
-            done
-          fi
-
-          if [[ "${{ inputs.backup_enabled }}" == "true" ]]; then
-            DEPLOY_ARGS="$DEPLOY_ARGS --backup-enabled"
-          fi
+          VERSION_B64=$(printf '%s' "$OBSERVER_VERSION" | base64 -w0)
+          DOMAIN_B64=$(printf '%s' "$DOMAIN_NAME" | base64 -w0)
+          ALIASES_B64=$(printf '%s' "$DOMAIN_ALIASES" | base64 -w0)
+          SSL_B64=$(printf '%s' "$SSL_TYPE" | base64 -w0)
+          BACKUP_B64=$(printf '%s' "$BACKUP_ENABLED" | base64 -w0)
 
           ssh -i ~/.ssh/id_deploy "$SSH_USER@$SSH_HOST" bash << REMOTE
           set -euo pipefail
 
-          # Decode secrets on the remote side (never in any process argument list)
+          # Decode secrets and inputs on the remote side (never in any process argument list)
           JWT_SECRET=\$(printf '%s' "${JWT_B64}" | base64 -d)
           LE_EMAIL=\$(printf '%s' "${LE_B64}" | base64 -d)
+          OBSERVER_VERSION=\$(printf '%s' "${VERSION_B64}" | base64 -d)
+          DOMAIN_NAME=\$(printf '%s' "${DOMAIN_B64}" | base64 -d)
+          DOMAIN_ALIASES=\$(printf '%s' "${ALIASES_B64}" | base64 -d)
+          SSL_TYPE=\$(printf '%s' "${SSL_B64}" | base64 -d)
+          BACKUP_ENABLED=\$(printf '%s' "${BACKUP_B64}" | base64 -d)
 
-          DEPLOY_ARGS="${DEPLOY_ARGS}"
+          # Build deploy args as an array so values are passed without shell re-parsing.
+          DEPLOY_ARGS=(
+            --domain "\$DOMAIN_NAME"
+            --ssl "\$SSL_TYPE"
+            --version "\$OBSERVER_VERSION"
+          )
 
-          if [[ "\$LE_EMAIL" != "" && '${{ inputs.ssl_type }}' == "letsencrypt" ]]; then
-            DEPLOY_ARGS="\$DEPLOY_ARGS --email \"\$LE_EMAIL\""
+          if [[ -n "\$DOMAIN_ALIASES" ]]; then
+            for alias in \$DOMAIN_ALIASES; do
+              DEPLOY_ARGS+=(--domain-alias "\$alias")
+            done
+          fi
+
+          if [[ "\$BACKUP_ENABLED" == "true" ]]; then
+            DEPLOY_ARGS+=(--backup-enabled)
+          fi
+
+          if [[ -n "\$LE_EMAIL" && "\$SSL_TYPE" == "letsencrypt" ]]; then
+            DEPLOY_ARGS+=(--email "\$LE_EMAIL")
           fi
 
           cd "${REPO_DIR}"
           # Export JWT_SECRET as an environment variable so the deploy script can
           # inherit it without ever passing it as a visible command-line argument.
           export JWT_SECRET
-          bash scripts/deploy-digitalocean.sh \$DEPLOY_ARGS
+          if ! bash scripts/deploy-digitalocean.sh "\${DEPLOY_ARGS[@]}"; then
+            echo "::error::Remote deploy script failed. Dumping docker compose status and logs..."
+            docker compose -f "${REPO_DIR}/docker-compose.digitalocean.yml" ps || true
+            docker compose -f "${REPO_DIR}/docker-compose.digitalocean.yml" logs --tail=200 || true
+            exit 1
+          fi
           REMOTE
 
       # -----------------------------------------------------------------------
@@ -314,7 +338,7 @@ jobs:
             echo "| **Domain** | \`${{ inputs.domain_name }}\` |"
             echo "| **Version** | \`${{ inputs.observer_version }}\` |"
             echo "| **SSL** | \`${{ inputs.ssl_type }}\` |"
-            echo "| **Git ref** | \`${{ inputs.deploy_ref }}\` |"
+            echo "| **Git ref** | \`${{ inputs.deploy_ref || github.ref_name }}\` |"
             echo "| **Triggered by** | @${{ github.actor }} |"
             echo ""
             echo "### Access"
