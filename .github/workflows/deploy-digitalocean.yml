@@ -252,7 +252,12 @@ jobs:
           # Export JWT_SECRET as an environment variable so the deploy script can
           # inherit it without ever passing it as a visible command-line argument.
           export JWT_SECRET
-          bash scripts/deploy-digitalocean.sh "\${DEPLOY_ARGS[@]}"
+          if ! bash scripts/deploy-digitalocean.sh "\${DEPLOY_ARGS[@]}"; then
+            echo "::error::Remote deploy script failed. Dumping docker compose status and logs..."
+            docker compose -f "${REPO_DIR}/docker-compose.digitalocean.yml" ps || true
+            docker compose -f "${REPO_DIR}/docker-compose.digitalocean.yml" logs --tail=200 || true
+            exit 1
+          fi
           REMOTE
 
       # -----------------------------------------------------------------------
