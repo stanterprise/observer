@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ============================================================================
 # Observer Deployment for DigitalOcean Droplet
 # ============================================================================
@@ -125,6 +123,8 @@ services:
 
       # SSL certificates (Let's Encrypt or self-signed) - mount full tree (live/* uses symlinks).
       - ${SSL_CERT_PATH:-/etc/letsencrypt}:/etc/letsencrypt:ro
+      # Self-signed certificate path used by deploy-digitalocean.sh with --ssl self-signed.
+      - /etc/ssl/observer:/etc/ssl/observer:ro
 
       # Let's Encrypt challenge directory
       - /var/www/certbot:/var/www/certbot:ro
