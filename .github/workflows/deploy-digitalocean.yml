@@ -219,22 +219,6 @@ jobs:
           JWT_B64=$(printf '%s' "$JWT_SECRET" | base64 -w0)
           LE_B64=$(printf '%s' "$LE_EMAIL" | base64 -w0)
 
-          # Build the argument list for the deploy script
-          DEPLOY_ARGS="--domain '${{ inputs.domain_name }}'"
-          DEPLOY_ARGS="$DEPLOY_ARGS --ssl '${{ inputs.ssl_type }}'"
-          DEPLOY_ARGS="$DEPLOY_ARGS --version '${{ inputs.observer_version }}'"
-
-          ALIASES="${{ inputs.domain_aliases }}"
-          if [[ -n "$ALIASES" ]]; then
-            for alias in $ALIASES; do
-              DEPLOY_ARGS="$DEPLOY_ARGS --domain-alias '$alias'"
-            done
-          fi
-
-          if [[ "${{ inputs.backup_enabled }}" == "true" ]]; then
-            DEPLOY_ARGS="$DEPLOY_ARGS --backup-enabled"
-          fi
-
           ssh -i ~/.ssh/id_deploy "$SSH_USER@$SSH_HOST" bash << REMOTE
           set -euo pipefail
 
@@ -242,17 +226,33 @@ jobs:
           JWT_SECRET=\$(printf '%s' "${JWT_B64}" | base64 -d)
           LE_EMAIL=\$(printf '%s' "${LE_B64}" | base64 -d)
 
-          DEPLOY_ARGS="${DEPLOY_ARGS}"
+          # Build deploy args as an array so values are passed without shell re-parsing.
+          DEPLOY_ARGS=(
+            --domain "${{ inputs.domain_name }}"
+            --ssl "${{ inputs.ssl_type }}"
+            --version "${{ inputs.observer_version }}"
+          )
 
-          if [[ "\$LE_EMAIL" != "" && '${{ inputs.ssl_type }}' == "letsencrypt" ]]; then
-            DEPLOY_ARGS="\$DEPLOY_ARGS --email \"\$LE_EMAIL\""
+          ALIASES="${{ inputs.domain_aliases }}"
+          if [[ -n "\$ALIASES" ]]; then
+            for alias in \$ALIASES; do
+              DEPLOY_ARGS+=(--domain-alias "\$alias")
+            done
+          fi
+
+          if [[ "${{ inputs.backup_enabled }}" == "true" ]]; then
+            DEPLOY_ARGS+=(--backup-enabled)
+          fi
+
+          if [[ -n "\$LE_EMAIL" && "${{ inputs.ssl_type }}" == "letsencrypt" ]]; then
+            DEPLOY_ARGS+=(--email "\$LE_EMAIL")
           fi
 
           cd "${REPO_DIR}"
           # Export JWT_SECRET as an environment variable so the deploy script can
           # inherit it without ever passing it as a visible command-line argument.
           export JWT_SECRET
-          bash scripts/deploy-digitalocean.sh \$DEPLOY_ARGS
+          bash scripts/deploy-digitalocean.sh "\${DEPLOY_ARGS[@]}"
           REMOTE
 
       # -----------------------------------------------------------------------
