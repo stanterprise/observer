@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -57,6 +60,17 @@ type MongoNATSConsumer struct {
 	storageDriver  storage.Driver
 	stream         string
 	consumer       jetstream.Consumer
+	prefix         string
+	maxDeliver     int
+	ackWait        time.Duration
+	dlqSubject     string
+
+	deferCfg   deferQueueConfig
+	deferQueue map[string][]deferredStepEvent
+	deferMu    sync.Mutex
+
+	integrityMu      sync.Mutex
+	runIntegrityByID map[string]*runIntegrity
 }
 
 // MongoNATSConsumerConfig holds configuration for MongoDB NATS consumer
@@ -66,10 +80,46 @@ type MongoNATSConsumerConfig struct {
 	ConsumerName string
 	BatchSize    int
 	MaxWait      time.Duration
+	MaxDeliver   int
+	AckWait      time.Duration
+	DLQSubject   string
+
+	DeferQueueMaxAttempts int
+	DeferQueueTTL         time.Duration
 	// RetainMessages enables storing every raw NATS message payload in a dedicated
 	// MongoDB collection ("raw_messages") for auditing and debugging purposes.
 	// Set via the RETAIN_MESSAGES environment variable.
 	RetainMessages bool
+}
+
+type deferredStepEvent struct {
+	eventType   publisher.EventType
+	data        json.RawMessage
+	runID       string
+	testID      string
+	retryIndex  int32
+	queuedAt    time.Time
+	attempts    int
+	lastFailure string
+}
+
+type deferQueueConfig struct {
+	maxAttempts int
+	ttl         time.Duration
+}
+
+type runIntegrity struct {
+	RunID           string
+	ExpectedTests   int32
+	Received        int64
+	Processed       int64
+	Deferred        int64
+	Replayed        int64
+	Failed          int64
+	DLQ             int64
+	PendingDeferred int64
+	StartedAt       time.Time
+	LastUpdatedAt   time.Time
 }
 
 // NewMongoNATSConsumer creates a new NATS JetStream consumer with MongoDB backend.
@@ -102,6 +152,26 @@ func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo
 
 	if cfg.MaxWait <= 0 {
 		cfg.MaxWait = 5 * time.Second
+	}
+
+	if cfg.MaxDeliver <= 0 {
+		cfg.MaxDeliver = 5
+	}
+
+	if cfg.AckWait <= 0 {
+		cfg.AckWait = 30 * time.Second
+	}
+
+	if cfg.DLQSubject == "" {
+		cfg.DLQSubject = publisher.DefaultSubjectPrefix + ".dlq"
+	}
+
+	if cfg.DeferQueueMaxAttempts <= 0 {
+		cfg.DeferQueueMaxAttempts = cfg.MaxDeliver
+	}
+
+	if cfg.DeferQueueTTL <= 0 {
+		cfg.DeferQueueTTL = 5 * time.Minute
 	}
 
 	// Initialize storage driver (optional)
@@ -142,10 +212,20 @@ func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo
 		rawMessageRepo: rawMessageRepo,
 		storageDriver:  storageDriver,
 		stream:         cfg.StreamName,
+		prefix:         publisher.DefaultSubjectPrefix,
+		maxDeliver:     cfg.MaxDeliver,
+		ackWait:        cfg.AckWait,
+		dlqSubject:     cfg.DLQSubject,
+		deferCfg: deferQueueConfig{
+			maxAttempts: cfg.DeferQueueMaxAttempts,
+			ttl:         cfg.DeferQueueTTL,
+		},
+		deferQueue:       make(map[string][]deferredStepEvent),
+		runIntegrityByID: make(map[string]*runIntegrity),
 	}
 
 	// Ensure consumer exists
-	consumer, err := c.ensureConsumer(context.Background(), cfg.ConsumerName)
+	consumer, err := c.ensureConsumer(context.Background(), cfg.ConsumerName, cfg.MaxDeliver, cfg.AckWait)
 	if err != nil {
 		nc.Close()
 		if storageDriver != nil {
@@ -162,13 +242,18 @@ func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo
 		"consumer", cfg.ConsumerName,
 		"batch_size", cfg.BatchSize,
 		"max_wait", cfg.MaxWait,
+		"max_deliver", cfg.MaxDeliver,
+		"ack_wait", cfg.AckWait,
+		"dlq_subject", cfg.DLQSubject,
+		"defer_queue_max_attempts", cfg.DeferQueueMaxAttempts,
+		"defer_queue_ttl", cfg.DeferQueueTTL,
 		"retain_messages", retainMsg)
 
 	return c, nil
 }
 
 // ensureConsumer creates the JetStream consumer if it doesn't exist
-func (c *MongoNATSConsumer) ensureConsumer(ctx context.Context, consumerName string) (jetstream.Consumer, error) {
+func (c *MongoNATSConsumer) ensureConsumer(ctx context.Context, consumerName string, maxDeliver int, ackWait time.Duration) (jetstream.Consumer, error) {
 	// Check if stream exists first
 	_, err := c.js.Stream(ctx, c.stream)
 	if err != nil {
@@ -187,8 +272,8 @@ func (c *MongoNATSConsumer) ensureConsumer(ctx context.Context, consumerName str
 		Durable:       consumerName,
 		AckPolicy:     jetstream.AckExplicitPolicy,
 		DeliverPolicy: jetstream.DeliverAllPolicy,
-		MaxDeliver:    5,
-		AckWait:       30 * time.Second,
+		MaxDeliver:    maxDeliver,
+		AckWait:       ackWait,
 		Description:   "MongoDB test event processor consumer",
 	}
 
@@ -222,14 +307,44 @@ func (c *MongoNATSConsumer) Start(ctx context.Context, cfg MongoNATSConsumerConf
 			}
 
 			for msg := range msgs.Messages() {
-				if err := c.processMessage(ctx, msg); err != nil {
+				event, err := c.processMessage(ctx, msg)
+				if err != nil {
+					runID := extractRunID(event.Data)
+					c.incrementIntegrity(runID, func(ri *runIntegrity) {
+						ri.Failed++
+					})
 					c.logger.Error("process message failed",
 						"subject", msg.Subject(),
+						"type", event.Type,
 						"error", err)
+
+					meta, metaErr := msg.Metadata()
+					numDelivered := uint64(1)
+					if metaErr == nil {
+						numDelivered = meta.NumDelivered
+					}
+
+					if int(numDelivered) >= c.maxDeliver {
+						if dlqErr := c.publishDLQ(ctx, msg, event, err, numDelivered); dlqErr != nil {
+							c.logger.Error("failed to publish DLQ message", "error", dlqErr)
+						}
+						c.incrementIntegrity(runID, func(ri *runIntegrity) {
+							ri.DLQ++
+						})
+						if ackErr := msg.Ack(); ackErr != nil {
+							c.logger.Error("failed to ack message after DLQ", "error", ackErr)
+						}
+						continue
+					}
+
 					if nakErr := msg.Nak(); nakErr != nil {
 						c.logger.Error("failed to nak message", "error", nakErr)
 					}
 				} else {
+					runID := extractRunID(event.Data)
+					c.incrementIntegrity(runID, func(ri *runIntegrity) {
+						ri.Processed++
+					})
 					if ackErr := msg.Ack(); ackErr != nil {
 						c.logger.Error("failed to ack message", "error", ackErr)
 					}
@@ -240,11 +355,16 @@ func (c *MongoNATSConsumer) Start(ctx context.Context, cfg MongoNATSConsumerConf
 }
 
 // processMessage handles a single NATS message
-func (c *MongoNATSConsumer) processMessage(ctx context.Context, msg jetstream.Msg) error {
+func (c *MongoNATSConsumer) processMessage(ctx context.Context, msg jetstream.Msg) (publisher.Event, error) {
 	var event publisher.Event
 	if err := json.Unmarshal(msg.Data(), &event); err != nil {
-		return fmt.Errorf("unmarshal event: %w", err)
+		return event, fmt.Errorf("unmarshal event: %w", err)
 	}
+
+	runID := extractRunID(event.Data)
+	c.incrementIntegrity(runID, func(ri *runIntegrity) {
+		ri.Received++
+	})
 
 	c.logger.Debug("processing event",
 		"type", event.Type,
@@ -264,35 +384,298 @@ func (c *MongoNATSConsumer) processMessage(ctx context.Context, msg jetstream.Ms
 
 	switch event.Type {
 	case publisher.EventTypeSuiteBegin:
-		return c.handleSuiteBegin(ctx, event.Data)
+		return event, c.handleSuiteBegin(ctx, event.Data)
 	case publisher.EventTypeSuiteEnd:
-		return c.handleSuiteEnd(ctx, event.Data)
+		return event, c.handleSuiteEnd(ctx, event.Data)
 	case publisher.EventTypeTestBegin:
-		return c.handleTestBegin(ctx, event.Data)
+		return event, c.handleTestBegin(ctx, event.Data)
 	case publisher.EventTypeTestEnd:
-		return c.handleTestEnd(ctx, event.Data)
+		return event, c.handleTestEnd(ctx, event.Data)
 	case publisher.EventTypeStepBegin:
-		return c.handleStepBegin(ctx, event.Data)
+		err := c.handleStepBegin(ctx, event.Data)
+		if err != nil && c.shouldDeferStepEvent(err) {
+			if deferErr := c.deferStepEvent(event, err); deferErr == nil {
+				c.incrementIntegrity(runID, func(ri *runIntegrity) {
+					ri.Deferred++
+				})
+				return event, nil
+			}
+		}
+		return event, err
 	case publisher.EventTypeStepEnd:
-		return c.handleStepEnd(ctx, event.Data)
+		err := c.handleStepEnd(ctx, event.Data)
+		if err != nil && c.shouldDeferStepEvent(err) {
+			if deferErr := c.deferStepEvent(event, err); deferErr == nil {
+				c.incrementIntegrity(runID, func(ri *runIntegrity) {
+					ri.Deferred++
+				})
+				return event, nil
+			}
+		}
+		return event, err
 	case publisher.EventTypeTestFailure:
-		return c.handleTestFailure(ctx, event.Data)
+		return event, c.handleTestFailure(ctx, event.Data)
 	case publisher.EventTypeTestError:
-		return c.handleTestError(ctx, event.Data)
+		return event, c.handleTestError(ctx, event.Data)
 	case publisher.EventTypeStdOutput:
-		return c.handleStdOutput(ctx, event.Data)
+		return event, c.handleStdOutput(ctx, event.Data)
 	case publisher.EventTypeStdError:
-		return c.handleStdError(ctx, event.Data)
+		return event, c.handleStdError(ctx, event.Data)
 	case publisher.EventTypeHeartbeat:
-		return c.handleHeartbeat(ctx, event.Data)
+		return event, c.handleHeartbeat(ctx, event.Data)
 	case publisher.EventTypeRunEnd:
-		return c.handleRunEnd(ctx, event.Data)
+		return event, c.handleRunEnd(ctx, event.Data)
 	case publisher.EventTypeRunStart:
-		return c.handleRunStart(ctx, event.Data)
+		return event, c.handleRunStart(ctx, event.Data)
 	default:
 		c.logger.Warn("unknown event type", "type", event.Type)
-		return nil
+		return event, nil
 	}
+}
+
+func (c *MongoNATSConsumer) shouldDeferStepEvent(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "parent test not found") || strings.Contains(errMsg, "step not found")
+}
+
+func (c *MongoNATSConsumer) deferStepEvent(event publisher.Event, cause error) error {
+	runID, testID, retryIndex, err := extractStepIdentity(event)
+	if err != nil {
+		return err
+	}
+
+	key := deferredQueueKey(runID, testID, retryIndex)
+	c.deferMu.Lock()
+	deferred := deferredStepEvent{
+		eventType:   event.Type,
+		data:        event.Data,
+		runID:       runID,
+		testID:      testID,
+		retryIndex:  retryIndex,
+		queuedAt:    time.Now(),
+		attempts:    1,
+		lastFailure: cause.Error(),
+	}
+	c.deferQueue[key] = append(c.deferQueue[key], deferred)
+	pendingCount := len(c.deferQueue[key])
+	c.deferMu.Unlock()
+
+	c.incrementIntegrity(runID, func(ri *runIntegrity) {
+		ri.PendingDeferred++
+	})
+
+	c.logger.Warn("deferred orphan step event",
+		"type", event.Type,
+		"run_id", runID,
+		"test_id", testID,
+		"retry_index", retryIndex,
+		"pending_for_key", pendingCount,
+		"error", cause)
+
+	return nil
+}
+
+func (c *MongoNATSConsumer) replayDeferredStepsForTest(ctx context.Context, runID, testID string, retryIndex int32) {
+	key := deferredQueueKey(runID, testID, retryIndex)
+
+	c.deferMu.Lock()
+	events := c.deferQueue[key]
+	delete(c.deferQueue, key)
+	c.deferMu.Unlock()
+
+	if len(events) == 0 {
+		return
+	}
+
+	c.logger.Info("replaying deferred step events",
+		"run_id", runID,
+		"test_id", testID,
+		"retry_index", retryIndex,
+		"count", len(events))
+
+	now := time.Now()
+	requeue := make([]deferredStepEvent, 0)
+	replayed := int64(0)
+
+	for _, deferred := range events {
+		if now.Sub(deferred.queuedAt) > c.deferCfg.ttl {
+			c.logger.Warn("dropping deferred step event after TTL",
+				"run_id", deferred.runID,
+				"test_id", deferred.testID,
+				"retry_index", deferred.retryIndex,
+				"type", deferred.eventType,
+				"ttl", c.deferCfg.ttl)
+			continue
+		}
+
+		var err error
+		switch deferred.eventType {
+		case publisher.EventTypeStepBegin:
+			err = c.handleStepBegin(ctx, deferred.data)
+		case publisher.EventTypeStepEnd:
+			err = c.handleStepEnd(ctx, deferred.data)
+		default:
+			continue
+		}
+
+		if err == nil {
+			replayed++
+			continue
+		}
+
+		deferred.attempts++
+		deferred.lastFailure = err.Error()
+		if deferred.attempts >= c.deferCfg.maxAttempts {
+			c.logger.Error("deferred step event exceeded max attempts",
+				"run_id", deferred.runID,
+				"test_id", deferred.testID,
+				"retry_index", deferred.retryIndex,
+				"type", deferred.eventType,
+				"attempts", deferred.attempts,
+				"error", err)
+			continue
+		}
+
+		requeue = append(requeue, deferred)
+	}
+
+	if len(requeue) > 0 {
+		c.deferMu.Lock()
+		c.deferQueue[key] = append(c.deferQueue[key], requeue...)
+		c.deferMu.Unlock()
+	}
+
+	c.incrementIntegrity(runID, func(ri *runIntegrity) {
+		ri.Replayed += replayed
+		if len(events) > 0 {
+			if ri.PendingDeferred >= int64(len(events)) {
+				ri.PendingDeferred -= int64(len(events))
+			} else {
+				ri.PendingDeferred = 0
+			}
+		}
+		ri.PendingDeferred += int64(len(requeue))
+	})
+}
+
+func extractStepIdentity(event publisher.Event) (runID string, testID string, retryIndex int32, err error) {
+	switch event.Type {
+	case publisher.EventTypeStepBegin:
+		var req events.StepBeginEventRequest
+		if unmarshalErr := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(event.Data, &req); unmarshalErr != nil {
+			return "", "", 0, fmt.Errorf("parse step begin for defer queue: %w", unmarshalErr)
+		}
+		if req.Step == nil {
+			return "", "", 0, fmt.Errorf("parse step begin for defer queue: step is nil")
+		}
+		return req.Step.RunId, extractTestID(req.Step.TestCaseId, req.Step.RunId), req.Step.RetryIndex, nil
+	case publisher.EventTypeStepEnd:
+		var req events.StepEndEventRequest
+		if unmarshalErr := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(event.Data, &req); unmarshalErr != nil {
+			return "", "", 0, fmt.Errorf("parse step end for defer queue: %w", unmarshalErr)
+		}
+		if req.Step == nil {
+			return "", "", 0, fmt.Errorf("parse step end for defer queue: step is nil")
+		}
+		return req.Step.RunId, extractTestID(req.Step.TestCaseId, req.Step.RunId), req.Step.RetryIndex, nil
+	default:
+		return "", "", 0, fmt.Errorf("not a step event: %s", event.Type)
+	}
+}
+
+func deferredQueueKey(runID, testID string, retryIndex int32) string {
+	return runID + "::" + testID + "::" + strconv.Itoa(int(retryIndex))
+}
+
+func (c *MongoNATSConsumer) incrementIntegrity(runID string, mutate func(ri *runIntegrity)) {
+	if runID == "" {
+		return
+	}
+	c.integrityMu.Lock()
+	defer c.integrityMu.Unlock()
+	ri, exists := c.runIntegrityByID[runID]
+	if !exists {
+		ri = &runIntegrity{RunID: runID, StartedAt: time.Now(), LastUpdatedAt: time.Now()}
+		c.runIntegrityByID[runID] = ri
+	}
+	mutate(ri)
+	ri.LastUpdatedAt = time.Now()
+}
+
+func (c *MongoNATSConsumer) markRunStart(runID string, expectedTests int32) {
+	c.incrementIntegrity(runID, func(ri *runIntegrity) {
+		if ri.StartedAt.IsZero() {
+			ri.StartedAt = time.Now()
+		}
+		ri.ExpectedTests = expectedTests
+	})
+}
+
+func (c *MongoNATSConsumer) emitRunCompletenessSummary(runID string, finalStatus string) {
+	c.integrityMu.Lock()
+	ri, exists := c.runIntegrityByID[runID]
+	if !exists {
+		c.integrityMu.Unlock()
+		return
+	}
+	snapshot := *ri
+	c.integrityMu.Unlock()
+
+	completeness := 0.0
+	if snapshot.Received > 0 {
+		completeness = float64(snapshot.Processed+snapshot.DLQ) / float64(snapshot.Received)
+	}
+
+	c.logger.Info("run completeness summary",
+		"run_id", runID,
+		"final_status", finalStatus,
+		"expected_tests", snapshot.ExpectedTests,
+		"received", snapshot.Received,
+		"processed", snapshot.Processed,
+		"deferred", snapshot.Deferred,
+		"replayed", snapshot.Replayed,
+		"failed", snapshot.Failed,
+		"dlq", snapshot.DLQ,
+		"pending_deferred", snapshot.PendingDeferred,
+		"completeness_ratio", completeness,
+		"started_at", snapshot.StartedAt,
+		"last_updated_at", snapshot.LastUpdatedAt)
+}
+
+func (c *MongoNATSConsumer) publishDLQ(ctx context.Context, msg jetstream.Msg, event publisher.Event, processingErr error, deliveries uint64) error {
+	runID := extractRunID(event.Data)
+	payload := map[string]interface{}{
+		"reason":            processingErr.Error(),
+		"run_id":            runID,
+		"stream":            c.stream,
+		"original_subject":  msg.Subject(),
+		"num_delivered":     deliveries,
+		"max_deliver":       c.maxDeliver,
+		"failed_at":         time.Now().UTC(),
+		"event_type":        event.Type,
+		"original_envelope": json.RawMessage(msg.Data()),
+	}
+
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal dlq payload: %w", err)
+	}
+
+	if _, err := c.js.Publish(ctx, c.dlqSubject, b); err != nil {
+		return fmt.Errorf("publish dlq payload: %w", err)
+	}
+
+	c.logger.Error("message sent to DLQ",
+		"run_id", runID,
+		"subject", msg.Subject(),
+		"dlq_subject", c.dlqSubject,
+		"num_delivered", deliveries,
+		"error", processingErr)
+
+	return nil
 }
 
 // handleHeartbeat processes a heartbeat event

@@ -46,6 +46,8 @@ func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessa
 		return fmt.Errorf("mark running tests as timed out: %w", err)
 	}
 
+	c.emitRunCompletenessSummary(req.RunId, req.FinalStatus.String())
+
 	return nil
 }
 
@@ -63,6 +65,8 @@ func (c *MongoNATSConsumer) handleRunStart(ctx context.Context, data json.RawMes
 		"name", req.Name,
 		"total_tests", req.TotalTests,
 		"suite_count", len(req.TestSuites))
+
+	c.markRunStart(req.RunId, req.TotalTests)
 
 	// Convert run-level metadata
 	runMetadata := make(map[string]interface{})

@@ -98,7 +98,12 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 		suiteID = runID
 	}
 
-	return c.repo.UpsertTestBegin(ctx, runID, test, suiteID)
+	if err := c.repo.UpsertTestBegin(ctx, runID, test, suiteID); err != nil {
+		return err
+	}
+
+	c.replayDeferredStepsForTest(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex)
+	return nil
 }
 
 // handleTestEnd processes a test end event
