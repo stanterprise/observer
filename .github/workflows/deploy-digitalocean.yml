@@ -51,6 +51,11 @@ on:
         required: false
         default: false
         type: boolean
+      retain_messages:
+        description: "Retain raw NATS messages in MongoDB for troubleshooting"
+        required: false
+        default: false
+        type: boolean
       deploy_ref:
         description: "Git ref to deploy (branch, tag, or SHA). Leave empty to deploy the workflow's current ref."
         required: false
@@ -223,6 +228,7 @@ jobs:
           DOMAIN_ALIASES: ${{ inputs.domain_aliases }}
           SSL_TYPE: ${{ inputs.ssl_type }}
           BACKUP_ENABLED: ${{ inputs.backup_enabled }}
+          RETAIN_MESSAGES: ${{ inputs.retain_messages }}
         run: |
           # Encode secrets and all user-supplied inputs to safely embed them in the remote
           # heredoc. Base64 output only contains [A-Za-z0-9+/=] so it cannot inject code.
@@ -233,6 +239,7 @@ jobs:
           ALIASES_B64=$(printf '%s' "$DOMAIN_ALIASES" | base64 -w0)
           SSL_B64=$(printf '%s' "$SSL_TYPE" | base64 -w0)
           BACKUP_B64=$(printf '%s' "$BACKUP_ENABLED" | base64 -w0)
+          RETAIN_B64=$(printf '%s' "$RETAIN_MESSAGES" | base64 -w0)
 
           ssh -i ~/.ssh/id_deploy "$SSH_USER@$SSH_HOST" bash << REMOTE
           set -euo pipefail
@@ -245,6 +252,7 @@ jobs:
           DOMAIN_ALIASES=\$(printf '%s' "${ALIASES_B64}" | base64 -d)
           SSL_TYPE=\$(printf '%s' "${SSL_B64}" | base64 -d)
           BACKUP_ENABLED=\$(printf '%s' "${BACKUP_B64}" | base64 -d)
+          RETAIN_MESSAGES=\$(printf '%s' "${RETAIN_B64}" | base64 -d)
 
           # Build deploy args as an array so values are passed without shell re-parsing.
           DEPLOY_ARGS=(
@@ -261,6 +269,10 @@ jobs:
 
           if [[ "\$BACKUP_ENABLED" == "true" ]]; then
             DEPLOY_ARGS+=(--backup-enabled)
+          fi
+
+          if [[ "\$RETAIN_MESSAGES" == "true" ]]; then
+            DEPLOY_ARGS+=(--retain-messages)
           fi
 
           if [[ -n "\$LE_EMAIL" && "\$SSL_TYPE" == "letsencrypt" ]]; then
@@ -338,6 +350,7 @@ jobs:
             echo "| **Domain** | \`${{ inputs.domain_name }}\` |"
             echo "| **Version** | \`${{ inputs.observer_version }}\` |"
             echo "| **SSL** | \`${{ inputs.ssl_type }}\` |"
+            echo "| **Retain messages** | \`${{ inputs.retain_messages }}\` |"
             echo "| **Git ref** | \`${{ inputs.deploy_ref || github.ref_name }}\` |"
             echo "| **Triggered by** | @${{ github.actor }} |"
             echo ""

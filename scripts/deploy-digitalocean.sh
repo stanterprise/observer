@@ -15,6 +15,7 @@
 #   --jwt-secret <secret>      JWT secret (optional, will be generated)
 #   --ssl <type>              SSL type: letsencrypt, self-signed, none (default: none)
 #   --backup-enabled           Enable automated backups
+#   --retain-messages          Enable raw NATS message retention for troubleshooting
 #   --email <email>            Email for Let's Encrypt (required if using letsencrypt)
 #   --help                     Show this help message
 #
@@ -53,6 +54,7 @@ JWT_SECRET="${JWT_SECRET:-}"   # preserve env var if already exported
 OBSERVER_VERSION="latest"
 SSL_TYPE="none"
 BACKUP_ENABLED=false
+RETAIN_MESSAGES=false
 LE_EMAIL=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -261,6 +263,7 @@ LOG_LEVEL=info
 MONGODB_DATABASE=observer
 NATS_STREAM=tests_events
 NATS_SUBJECT_PREFIX=tests.events.v1
+RETAIN_MESSAGES=$RETAIN_MESSAGES
 
 # Storage Configuration
 STORAGE_DRIVER=local
@@ -558,6 +561,10 @@ main() {
                 ;;
             --backup-enabled)
                 BACKUP_ENABLED=true
+                shift
+                ;;
+            --retain-messages)
+                RETAIN_MESSAGES=true
                 shift
                 ;;
             --help)
