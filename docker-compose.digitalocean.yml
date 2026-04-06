@@ -51,6 +51,10 @@ services:
       # Logging
       LOG_LEVEL: info
 
+      # Raw message retention for troubleshooting (processed by processor service)
+      # Set RETAIN_MESSAGES=true in .env to store all raw NATS messages in MongoDB.
+      RETAIN_MESSAGES: ${RETAIN_MESSAGES:-false}
+
       # Security: JWT token for API (generate with: openssl rand -base64 32)
       JWT_SECRET: ${JWT_SECRET}
 

@@ -74,7 +74,17 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 	}
 
 	runID := req.Step.RunId
-	return c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseId, req.Step.RetryIndex)
+	testID := extractTestID(req.Step.TestCaseId, req.Step.RunId)
+	retryIndex := req.Step.RetryIndex
+	if err := c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseId, retryIndex); err != nil {
+		return err
+	}
+
+	// After the step is created, schedule deferred replay sweeps so any
+	// step.end events that arrived out-of-order (deferred while waiting for
+	// this step to exist) are applied promptly.
+	c.scheduleDeferredStepReplaySweep(runID, testID, retryIndex)
+	return nil
 }
 
 // handleStepEnd processes a step end event

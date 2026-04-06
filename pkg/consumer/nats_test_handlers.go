@@ -98,7 +98,23 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 		suiteID = runID
 	}
 
-	return c.repo.UpsertTestBegin(ctx, runID, test, suiteID)
+	if err := c.repo.UpsertTestBegin(ctx, runID, test, suiteID); err != nil {
+		return err
+	}
+
+	// Replay deferred steps asynchronously so test.begin processing is not
+	// blocked by a large backlog and can be acked within JetStream AckWait.
+	testID := req.TestCase.Id
+	retryIndex := req.TestCase.RetryIndex
+	go func(runID, testID string, retryIndex int32) {
+		replayCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		c.replayDeferredStepsForTest(replayCtx, runID, testID, retryIndex)
+	}(runID, testID, retryIndex)
+	// Schedule additional delayed sweeps to catch step.end events that arrive
+	// out-of-order after test.begin but before step.begin creates the step.
+	c.scheduleDeferredStepReplaySweep(runID, req.TestCase.Id, req.TestCase.RetryIndex)
+	return nil
 }
 
 // handleTestEnd processes a test end event
@@ -343,4 +359,27 @@ func (c *MongoNATSConsumer) processAttachment(ctx context.Context, att *common.A
 	}
 
 	return attMap, nil
+}
+
+// scheduleDeferredStepReplaySweep performs a small number of delayed replay
+// attempts after test or step creation succeeds. This resolves the common
+// out-of-order case where step.end arrives after test.begin but before
+// step.begin has created the step: the step.end is deferred, but no further
+// test.begin will arrive to trigger another replay after step.begin runs.
+func (c *MongoNATSConsumer) scheduleDeferredStepReplaySweep(runID, testID string, retryIndex int32) {
+	delays := []time.Duration{
+		100 * time.Millisecond,
+		250 * time.Millisecond,
+		500 * time.Millisecond,
+	}
+
+	go func() {
+		for _, delay := range delays {
+			<-time.After(delay)
+
+			attemptCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			c.replayDeferredStepsForTest(attemptCtx, runID, testID, retryIndex)
+			cancel()
+		}
+	}()
 }
