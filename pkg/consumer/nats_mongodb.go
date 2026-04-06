@@ -252,7 +252,11 @@ func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo
 	return c, nil
 }
 
-// ensureConsumer creates the JetStream consumer if it doesn't exist
+// ensureConsumer creates or updates the JetStream consumer, applying the given
+// MaxDeliver and AckWait values even when the durable consumer already exists.
+// Using CreateOrUpdateConsumer ensures that config changes (e.g. retry count,
+// ack timeout) take effect at startup rather than being silently ignored when
+// a durable consumer with the same name is already registered in the stream.
 func (c *MongoNATSConsumer) ensureConsumer(ctx context.Context, consumerName string, maxDeliver int, ackWait time.Duration) (jetstream.Consumer, error) {
 	// Check if stream exists first
 	_, err := c.js.Stream(ctx, c.stream)
@@ -260,14 +264,8 @@ func (c *MongoNATSConsumer) ensureConsumer(ctx context.Context, consumerName str
 		return nil, fmt.Errorf("stream %s not found: %w", c.stream, err)
 	}
 
-	// Try to get existing consumer
-	consumer, err := c.js.Consumer(ctx, c.stream, consumerName)
-	if err == nil {
-		c.logger.Info("consumer already exists", "consumer", consumerName)
-		return consumer, nil
-	}
-
-	// Create consumer with durable name and work queue policy
+	// Always create-or-update so that MaxDeliver/AckWait changes take effect
+	// even when the durable consumer already exists.
 	consumerCfg := jetstream.ConsumerConfig{
 		Durable:       consumerName,
 		AckPolicy:     jetstream.AckExplicitPolicy,
@@ -277,12 +275,12 @@ func (c *MongoNATSConsumer) ensureConsumer(ctx context.Context, consumerName str
 		Description:   "MongoDB test event processor consumer",
 	}
 
-	consumer, err = c.js.CreateOrUpdateConsumer(ctx, c.stream, consumerCfg)
+	consumer, err := c.js.CreateOrUpdateConsumer(ctx, c.stream, consumerCfg)
 	if err != nil {
-		return nil, fmt.Errorf("create consumer: %w", err)
+		return nil, fmt.Errorf("create or update consumer: %w", err)
 	}
 
-	c.logger.Info("consumer created", "consumer", consumerName)
+	c.logger.Info("consumer ready", "consumer", consumerName, "max_deliver", maxDeliver, "ack_wait", ackWait)
 	return consumer, nil
 }
 
@@ -622,7 +620,13 @@ func (c *MongoNATSConsumer) emitRunCompletenessSummary(runID string, finalStatus
 		return
 	}
 	snapshot := *ri
+	// Remove the entry so a long-running processor does not accumulate one
+	// struct per completed run indefinitely.
+	delete(c.runIntegrityByID, runID)
 	c.integrityMu.Unlock()
+
+	// Purge any leftover deferred-queue entries for this run.
+	c.purgeDeferQueueForRun(runID)
 
 	completeness := 0.0
 	if snapshot.Received > 0 {
@@ -643,6 +647,20 @@ func (c *MongoNATSConsumer) emitRunCompletenessSummary(runID string, finalStatus
 		"completeness_ratio", completeness,
 		"started_at", snapshot.StartedAt,
 		"last_updated_at", snapshot.LastUpdatedAt)
+}
+
+// purgeDeferQueueForRun removes all deferred step event entries whose runID
+// matches the given run. This is called when a run ends to bound memory usage
+// and prevent stale entries from accumulating in long-running processors.
+func (c *MongoNATSConsumer) purgeDeferQueueForRun(runID string) {
+	prefix := runID + "::"
+	c.deferMu.Lock()
+	for key := range c.deferQueue {
+		if strings.HasPrefix(key, prefix) {
+			delete(c.deferQueue, key)
+		}
+	}
+	c.deferMu.Unlock()
 }
 
 func (c *MongoNATSConsumer) publishDLQ(ctx context.Context, msg jetstream.Msg, event publisher.Event, processingErr error, deliveries uint64) error {

@@ -94,7 +94,7 @@ func main() {
 	var outPrefix string
 
 	flag.StringVar(&sentPath, "sent", "stanterprise-debug.jsonl", "Path to sent raw JSONL file")
-	flag.StringVar(&receivedPath, "received", "raw-messages-03CA3D78-41CD-435B-8C67-EAE0EF364DA8-2026-04-06T03-03-15-847Z.jsonl", "Path to received raw JSONL file")
+	flag.StringVar(&receivedPath, "received", "raw-messages.jsonl", "Path to received raw JSONL file")
 	flag.IntVar(&top, "top", 20, "How many unmatched keys to print per side")
 	flag.BoolVar(&saveRecords, "save-records", true, "Write reconciled/missing/unexpected records to JSONL files")
 	flag.StringVar(&outPrefix, "out-prefix", "reconcile-raw", "Prefix for output JSONL files")
