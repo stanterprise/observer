@@ -84,9 +84,13 @@ jobs:
         if: github.event_name != 'pull_request'
         id: check_sha
         run: |
-          SHA_IMAGE=$(echo "${{ steps.meta.outputs.tags }}" | grep ':sha-' | head -1)
+          SHA_IMAGE=$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | grep -m1 ':sha-' || true)
           echo "sha_image=${SHA_IMAGE}" >> "$GITHUB_OUTPUT"
-          if INSPECT_OUT=$(docker buildx imagetools inspect "${SHA_IMAGE}" 2>&1); then
+
+          if [ -z "${SHA_IMAGE}" ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ No SHA image tag found in metadata output — skipping inspect and building from scratch"
+          elif INSPECT_OUT=$(docker buildx imagetools inspect "${SHA_IMAGE}" 2>&1); then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "✅ SHA image already exists: ${SHA_IMAGE} — will retag instead of rebuild"
           else
@@ -120,8 +124,13 @@ jobs:
           TAG_ARGS=()
           while IFS= read -r tag; do
             [ -z "$tag" ] && continue
+            [ "$tag" = "$SHA_IMAGE" ] && continue
             TAG_ARGS+=(-t "$tag")
           done <<< "$TAGS"
+          if [ "${#TAG_ARGS[@]}" -eq 0 ]; then
+            echo "No destination tags to apply after excluding source image ${SHA_IMAGE}"
+            exit 1
+          fi
           echo "Retagging ${SHA_IMAGE} with: ${TAG_ARGS[*]}"
           docker buildx imagetools create "${TAG_ARGS[@]}" "$SHA_IMAGE"
 
