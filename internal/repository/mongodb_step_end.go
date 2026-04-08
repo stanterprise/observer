@@ -71,10 +71,23 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepI
 		setFields["tests.$[test].attempts.$[attempt].steps.$[step].duration"] = *duration
 	}
 
-	// Update step in attempts[retry_index].steps array
+	// Tighten the filter to the exact attempt+step so MatchedCount==0 reliably means "not found".
+	// This avoids false negatives from ModifiedCount==0 (e.g. no-op $set when all values are unchanged).
 	filter := bson.M{
-		"_id":      runID,
-		"tests.id": testID,
+		"_id": runID,
+		"tests": bson.M{
+			"$elemMatch": bson.M{
+				"id": testID,
+				"attempts": bson.M{
+					"$elemMatch": bson.M{
+						"retry_index": retry_index,
+						"steps": bson.M{
+							"$elemMatch": bson.M{"id": stepID},
+						},
+					},
+				},
+			},
+		},
 	}
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
@@ -97,6 +110,15 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepI
 			"retryIndex", retry_index,
 			"filter", filter)
 		return fmt.Errorf("step not found: runID=%s, stepID=%s, testID=%s, retryIndex=%d", runID, stepID, testID, retry_index)
+	}
+
+	if result.ModifiedCount == 0 {
+		// No-op update (e.g. duplicate StepEnd event or values already match). Safe to ignore.
+		r.logger.Warn("step end was a no-op (duplicate event or values unchanged)",
+			"runID", runID,
+			"stepID", stepID,
+			"testID", testID,
+			"retryIndex", retry_index)
 	}
 
 	r.logger.Info("step end",
