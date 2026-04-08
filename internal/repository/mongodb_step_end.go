@@ -99,6 +99,17 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepI
 		return fmt.Errorf("step not found: runID=%s, stepID=%s, testID=%s, retryIndex=%d", runID, stepID, testID, retry_index)
 	}
 
+	if result.ModifiedCount == 0 {
+		r.logger.Warn("step end matched test but did not update step",
+			"runID", runID,
+			"stepID", stepID,
+			"testID", testID,
+			"retryIndex", retry_index,
+			"matchedCount", result.MatchedCount,
+			"modifiedCount", result.ModifiedCount)
+		return fmt.Errorf("step not found in attempt: runID=%s, stepID=%s, testID=%s, retryIndex=%d", runID, stepID, testID, retry_index)
+	}
+
 	r.logger.Info("step end",
 		"runID", runID,
 		"stepID", stepID,

@@ -87,6 +87,26 @@ func (r *MongoRepository) upsertStepInTestAttempt(ctx context.Context, runID str
 		return fmt.Errorf("parent test not found: runID=%s, testID=%s, retryIndex=%d", runID, testID, retry_index)
 	}
 
+	if result.ModifiedCount == 0 {
+		r.logger.Warn("attempt missing for step begin, creating attempt from step context",
+			"runID", runID,
+			"testID", testID,
+			"retryIndex", retry_index,
+			"stepID", step.ID)
+
+		if err := r.ensureAttemptExists(ctx, runID, testID, retry_index, step.StartTime, now); err != nil {
+			return fmt.Errorf("ensure attempt exists for step begin: %w", err)
+		}
+
+		result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
+		if err != nil {
+			return fmt.Errorf("retry insert step into test attempt: %w", err)
+		}
+		if result.ModifiedCount == 0 {
+			return fmt.Errorf("step insert did not modify document: runID=%s, testID=%s, retryIndex=%d, stepID=%s", runID, testID, retry_index, step.ID)
+		}
+	}
+
 	r.logger.Info("step begin (inserted)",
 		"runID", runID,
 		"stepID", step.ID,
@@ -94,5 +114,45 @@ func (r *MongoRepository) upsertStepInTestAttempt(ctx context.Context, runID str
 		"retryIndex", retry_index,
 		"matchedCount", result.MatchedCount,
 		"modifiedCount", result.ModifiedCount)
+	return nil
+}
+
+func (r *MongoRepository) ensureAttemptExists(ctx context.Context, runID, testID string, retryIndex int32, startTime *time.Time, now time.Time) error {
+	attempt := &m.AttemptDocument{
+		RetryIndex: retryIndex,
+		Steps:      []*m.StepDocument{},
+		Status:     "RUNNING",
+		StartTime:  startTime,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+
+	filter := bson.M{
+		"_id": runID,
+		"tests": bson.M{
+			"$elemMatch": bson.M{
+				"id": testID,
+				"attempts": bson.M{
+					"$not": bson.M{
+						"$elemMatch": bson.M{"retry_index": retryIndex},
+					},
+				},
+			},
+		},
+	}
+
+	update := bson.M{
+		"$push": bson.M{"tests.$.attempts": attempt},
+		"$set": bson.M{
+			"tests.$.retry_index": retryIndex,
+			"tests.$.updated_at":  now,
+			"updated_at":          now,
+		},
+	}
+
+	if _, err := r.collection.UpdateOne(ctx, filter, update); err != nil {
+		return err
+	}
+
 	return nil
 }
