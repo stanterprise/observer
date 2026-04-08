@@ -70,10 +70,19 @@ func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.T
 	}
 
 	// Try to update existing attempt in test's attempts array
+	retryIndex := *test.RetryIndex
 	filter := bson.M{
-		"_id":                        runID,
-		"tests.id":                   test.ID,
-		"tests.attempts.retry_index": test.RetryIndex,
+		"_id": runID,
+		"tests": bson.M{
+			"$elemMatch": bson.M{
+				"id": test.ID,
+				"attempts": bson.M{
+					"$elemMatch": bson.M{
+						"retry_index": retryIndex,
+					},
+				},
+			},
+		},
 	}
 
 	update := bson.M{
@@ -98,7 +107,7 @@ func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.T
 	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
 		Filters: []interface{}{
 			bson.M{"test.id": test.ID},
-			bson.M{"attempt.retry_index": test.RetryIndex},
+			bson.M{"attempt.retry_index": retryIndex},
 		},
 	})
 
