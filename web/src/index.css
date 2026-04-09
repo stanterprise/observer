@@ -119,15 +119,9 @@ body {
   color: var(--stitch-on-surface);
 }
 
-.border,
-.border-t,
-.border-r,
-.border-b,
-.border-l,
-.border-x,
-.border-y,
-.divide-x > :not([hidden]) ~ :not([hidden]),
-.divide-y > :not([hidden]) ~ :not([hidden]) {
+*,
+::before,
+::after {
   border-color: var(--stitch-outline);
 }
 

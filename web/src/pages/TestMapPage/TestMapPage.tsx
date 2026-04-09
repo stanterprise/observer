@@ -218,7 +218,7 @@ export function TestMapPage() {
               </p>
               <Link
                 to={`/suite_runs/${runId}`}
-                className="inline-flex items-center px-4 py-2 bg-[var(--stitch-primary-soft)] text-white rounded-lg hover:bg-[var(--stitch-primary-soft)] transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-[var(--stitch-primary-soft)] text-[var(--stitch-on-surface)] rounded-lg hover:bg-[var(--stitch-primary-soft)] transition-colors"
               >
                 Back to Test Run
               </Link>

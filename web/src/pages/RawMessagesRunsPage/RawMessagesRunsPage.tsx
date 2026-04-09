@@ -71,7 +71,7 @@ export function RawMessagesRunsPage() {
 
   if (notEnabled) {
     return (
-      <Card className="border-(--status-warning-border) bg-(--status-warning-soft)/50">
+      <Card className="border border-(--status-warning-border) bg-(--status-warning-soft)/50">
         <CardContent className="py-10 text-center">
           <h2 className="text-lg font-semibold text-(--stitch-on-surface) mb-2">
             Message Retention Not Enabled
@@ -105,7 +105,7 @@ export function RawMessagesRunsPage() {
       </div>
 
       {error && (
-        <Card className="border-(--status-failure-border) bg-(--status-failure-soft)/50">
+        <Card className="border border-(--status-failure-border) bg-(--status-failure-soft)/50">
           <CardContent className="py-4 text-(--status-failure)">{error}</CardContent>
         </Card>
       )}

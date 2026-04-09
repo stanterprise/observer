@@ -1,12 +1,17 @@
 import { cn } from "../lib/utils";
 
-interface CardProps {
+interface CardContainerProps {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
 }
 
-export function Card({ children, className, style }: CardProps) {
+interface CardSectionProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export function Card({ children, className, style }: CardContainerProps) {
   return (
     <div
       className={cn("rounded-lg bg-(--stitch-surface-card)", className)}
@@ -17,11 +22,11 @@ export function Card({ children, className, style }: CardProps) {
   );
 }
 
-export function CardHeader({ children, className }: CardProps) {
+export function CardHeader({ children, className }: CardSectionProps) {
   return <div className={cn("px-6 py-4", className)}>{children}</div>;
 }
 
-export function CardTitle({ children, className }: CardProps) {
+export function CardTitle({ children, className }: CardSectionProps) {
   return (
     <h3
       className={cn(
@@ -34,6 +39,6 @@ export function CardTitle({ children, className }: CardProps) {
   );
 }
 
-export function CardContent({ children, className }: CardProps) {
+export function CardContent({ children, className }: CardSectionProps) {
   return <div className={cn("px-6 py-4", className)}>{children}</div>;
 }

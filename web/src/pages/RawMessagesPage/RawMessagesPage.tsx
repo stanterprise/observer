@@ -415,7 +415,7 @@ export function RawMessagesPage() {
           </Link>
           <button
             onClick={exportJsonLines}
-            className="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--stitch-primary-soft)] text-white rounded-lg text-sm font-medium shadow-sm hover:bg-[var(--stitch-primary-soft)] transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--stitch-primary-soft)] text-[var(--stitch-on-surface)] rounded-lg text-sm font-medium shadow-sm hover:bg-[var(--stitch-primary-soft)] transition-colors"
           >
             <Download className="h-4 w-4" />
             Export JSONL

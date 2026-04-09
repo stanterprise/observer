@@ -121,7 +121,7 @@ export function StyleGuidePage() {
                 onClick={() => setVariant(item)}
                 className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                   selected
-                    ? "border-[var(--status-running-border)] bg-[var(--stitch-primary-soft)] text-white"
+                    ? "border-[var(--status-running-border)] bg-[var(--stitch-primary-soft)] text-[var(--stitch-primary)]"
                     : "border-[var(--stitch-outline)] bg-[var(--stitch-surface-card)] text-[var(--stitch-on-surface)] hover:bg-[var(--stitch-surface-card)]"
                 }`}
               >

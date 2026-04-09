@@ -299,7 +299,7 @@ export function TestSuiteRunsPage() {
       </div>
 
       {error && (
-        <Card className="border-[var(--status-failure-border)] bg-[var(--status-failure-soft)]">
+        <Card className="border border-[var(--status-failure-border)] bg-[var(--status-failure-soft)]">
           <CardContent className="py-4">
             <div className="flex items-center gap-2 text-[var(--status-failure)]">
               <AlertCircle className="h-5 w-5" />

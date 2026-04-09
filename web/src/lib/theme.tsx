@@ -226,9 +226,11 @@ function getInitialVariant(): StitchGuideVariant {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [variant, setVariantState] = useState<StitchGuideVariant>(() =>
-    getInitialVariant(),
-  );
+  const [variant, setVariantState] = useState<StitchGuideVariant>(() => {
+    const initial = getInitialVariant();
+    applyThemeToDocument(initial);
+    return initial;
+  });
 
   useEffect(() => {
     applyThemeToDocument(variant);
