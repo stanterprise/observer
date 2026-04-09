@@ -223,19 +223,19 @@ export function TestRunDetailPage() {
       <div className="space-y-6 animate-in fade-in duration-300">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className="h-10 w-10 bg-gray-200 rounded-lg animate-pulse" />
-            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+            <div className="h-10 w-10 bg-(--stitch-surface-highest) rounded-lg animate-pulse" />
+            <div className="h-8 w-48 bg-(--stitch-surface-highest) rounded animate-pulse" />
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-          <div className="h-8 bg-gray-200 animate-pulse" />
+        <div className="bg-(--stitch-surface-card) rounded-lg shadow-md border border-(--stitch-outline) overflow-hidden">
+          <div className="h-8 bg-(--stitch-surface-highest) animate-pulse" />
           <div className="p-6 space-y-4">
-            <div className="h-6 bg-gray-200 rounded w-3/4 animate-pulse" />
+            <div className="h-6 bg-(--stitch-surface-highest) rounded w-3/4 animate-pulse" />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {[1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
-                  className="h-32 bg-gray-100 rounded-lg animate-pulse"
+                  className="h-32 bg-(--stitch-surface-low) rounded-lg animate-pulse"
                 />
               ))}
             </div>
@@ -245,7 +245,7 @@ export function TestRunDetailPage() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-24 bg-gray-100 rounded-lg animate-pulse"
+              className="h-24 bg-(--stitch-surface-low) rounded-lg animate-pulse"
             />
           ))}
         </div>
@@ -258,7 +258,7 @@ export function TestRunDetailPage() {
       <div className="space-y-6 animate-in fade-in duration-300">
         <Link
           to="/suite_runs"
-          className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors group"
+          className="inline-flex items-center gap-2 text-(--stitch-primary) hover:text-(--stitch-primary) transition-colors group"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
           <span className="font-medium">Back to Test Runs</span>
@@ -281,16 +281,20 @@ export function TestRunDetailPage() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-(--stitch-on-surface) mb-2">
                 {error ? "Failed to Load Test Run" : "Test Run Not Found"}
               </h3>
-              <p className="text-sm text-gray-600 mb-6">
+              <p className="text-sm text-(--stitch-on-surface-muted) mb-6">
                 {error ||
                   "The test run you're looking for doesn't exist or has been deleted."}
               </p>
               <Link
                 to="/suite_runs"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--stitch-primary), var(--stitch-primary-end))",
+                }}
               >
                 View All Test Runs
               </Link>
@@ -370,16 +374,16 @@ export function TestRunDetailPage() {
         <div className="flex items-center gap-4">
           <Link
             to="/suite_runs"
-            className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm hover:shadow group"
+            className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-(--stitch-surface-card) border border-(--stitch-outline) text-(--stitch-on-surface-muted) hover:bg-(--stitch-surface-low) hover:border-(--stitch-outline) transition-all shadow-sm hover:shadow group"
             aria-label="Back to test runs"
           >
             <ArrowLeft className="h-5 w-5 group-hover:-translate-x-0.5 transition-transform" />
           </Link>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
+            <h1 className="text-2xl md:text-3xl font-bold text-(--stitch-on-surface) tracking-tight">
               Test Suite Run
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-(--stitch-on-surface-subtle) mt-1">
               {runDetail.name || runDetail.id}
             </p>
           </div>
@@ -387,14 +391,18 @@ export function TestRunDetailPage() {
         <div className="flex items-center gap-2">
           <Link
             to={`/suite_runs/${runId}/raw-messages`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm hover:shadow"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-(--stitch-surface-card) text-(--stitch-on-surface-muted) border border-(--stitch-outline) rounded-lg hover:bg-(--stitch-surface-low) hover:border-(--stitch-outline) transition-colors shadow-sm hover:shadow"
           >
             <FileText className="h-5 w-5" />
             <span className="font-medium">Raw Messages</span>
           </Link>
           <Link
             to={`/suite_runs/${runId}/map`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm hover:shadow"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-white shadow-sm transition-opacity hover:opacity-90"
+            style={{
+              background:
+                "linear-gradient(135deg, var(--stitch-primary), var(--stitch-primary-end))",
+            }}
           >
             <Map className="h-5 w-5" />
             <span className="font-medium">View Test Map</span>
@@ -410,17 +418,17 @@ export function TestRunDetailPage() {
       {/* Test Cases List with enhanced design */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold text-(--stitch-on-surface)">
             Test Cases
             {hasActiveFilters && (
-              <span className="ml-2 text-sm font-normal text-gray-500">
+              <span className="ml-2 text-sm font-normal text-(--stitch-on-surface-subtle)">
                 ({filteredTestCount} of {runDetail.statistics?.total || 0})
               </span>
             )}
           </h2>
           {availableSuiteTypes.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 font-medium">Suites:</span>
+              <span className="text-sm text-(--stitch-on-surface-muted) font-medium">Suites:</span>
               <div className="flex gap-2">
                 {availableSuiteTypes.map((type) => {
                   const isHidden = hiddenSuiteTypes.has(type);
@@ -431,8 +439,8 @@ export function TestRunDetailPage() {
                       className={cn(
                         "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all border",
                         isHidden
-                          ? "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200"
-                          : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100",
+                          ? "bg-(--stitch-surface-low) text-(--stitch-on-surface-subtle) border-(--stitch-outline) hover:bg-(--stitch-surface-highest)"
+                          : "bg-blue-50 text-(--stitch-primary) border-blue-200 hover:bg-blue-100",
                       )}
                       aria-label={`${
                         isHidden ? "Show" : "Hide"
@@ -453,23 +461,23 @@ export function TestRunDetailPage() {
         </div>
 
         {/* Filter Panel */}
-        <Card className="border-gray-200 bg-gray-50/50">
+        <Card className="border-(--stitch-outline) bg-(--stitch-surface-low)/50">
           <CardContent className="py-4">
             <div className="space-y-4">
               {/* Search Bar */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-(--stitch-on-surface-subtle)" />
                 <input
                   type="text"
                   placeholder="Search test cases by name or ID..."
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  className="w-full pl-10 pr-10 py-2.5 border border-(--stitch-outline) rounded-lg focus:ring-2 focus:ring-(--stitch-primary) focus:border-(--stitch-primary) transition-all"
                 />
                 {searchText && (
                   <button
                     onClick={() => setSearchText("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-(--stitch-on-surface-subtle) hover:text-(--stitch-on-surface-muted) transition-colors"
                     aria-label="Clear search"
                   >
                     <X className="h-5 w-5" />
@@ -480,14 +488,14 @@ export function TestRunDetailPage() {
               {/* Status Filters */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <label className="text-sm font-medium text-(--stitch-on-surface-muted) flex items-center gap-2">
                     <Filter className="h-4 w-4" />
                     Filter by Status
                   </label>
                   {hasActiveFilters && (
                     <button
                       onClick={clearFilters}
-                      className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                      className="text-sm text-(--stitch-primary) hover:text-(--stitch-primary) font-medium transition-colors"
                     >
                       Clear All Filters
                     </button>
@@ -511,35 +519,35 @@ export function TestRunDetailPage() {
                     const isSelected = selectedStatuses.has(status);
                     const statusColors: Record<string, string> = {
                       PASSED: isSelected
-                        ? "bg-green-100 border-green-300 text-green-800"
-                        : "bg-white border-green-200 text-green-600 hover:bg-green-50",
+                        ? "bg-(--status-success-soft) border-(--status-success-border) text-(--status-success)"
+                        : "bg-(--stitch-surface-card) border-(--status-success-border) text-(--status-success) hover:bg-(--status-success-soft)",
                       FAILED: isSelected
-                        ? "bg-red-100 border-red-300 text-red-800"
-                        : "bg-white border-red-200 text-red-600 hover:bg-red-50",
+                        ? "bg-(--status-failure-soft) border-(--status-failure-border) text-(--status-failure)"
+                        : "bg-(--stitch-surface-card) border-(--status-failure-border) text-(--status-failure) hover:bg-(--status-failure-soft)",
                       RUNNING: isSelected
-                        ? "bg-blue-100 border-blue-300 text-blue-800"
-                        : "bg-white border-blue-200 text-blue-600 hover:bg-blue-50",
+                        ? "bg-(--status-running-soft) border-(--status-running-border) text-(--status-running)"
+                        : "bg-(--stitch-surface-card) border-(--status-running-border) text-(--status-running) hover:bg-(--status-running-soft)",
                       SKIPPED: isSelected
-                        ? "bg-gray-100 border-gray-300 text-gray-800"
-                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50",
+                        ? "bg-(--status-neutral-soft) border-(--status-neutral-border) text-(--status-neutral)"
+                        : "bg-(--stitch-surface-card) border-(--stitch-outline) text-(--stitch-on-surface-muted) hover:bg-(--stitch-surface-low)",
                       BROKEN: isSelected
-                        ? "bg-orange-100 border-orange-300 text-orange-800"
-                        : "bg-white border-orange-200 text-orange-600 hover:bg-orange-50",
+                        ? "bg-(--status-broken-soft) border-(--status-broken-border) text-(--status-broken)"
+                        : "bg-(--stitch-surface-card) border-(--status-broken-border) text-(--status-broken) hover:bg-(--status-broken-soft)",
                       TIMEDOUT: isSelected
-                        ? "bg-purple-100 border-purple-300 text-purple-800"
-                        : "bg-white border-purple-200 text-purple-600 hover:bg-purple-50",
+                        ? "bg-(--status-timedout-soft) border-(--status-timedout-border) text-(--status-timedout)"
+                        : "bg-(--stitch-surface-card) border-(--status-timedout-border) text-(--status-timedout) hover:bg-(--status-timedout-soft)",
                       INTERRUPTED: isSelected
-                        ? "bg-yellow-100 border-yellow-300 text-yellow-800"
-                        : "bg-white border-yellow-200 text-yellow-600 hover:bg-yellow-50",
+                        ? "bg-(--status-interrupted-soft) border-(--status-interrupted-border) text-(--status-interrupted)"
+                        : "bg-(--stitch-surface-card) border-(--status-interrupted-border) text-(--status-interrupted) hover:bg-(--status-interrupted-soft)",
                       PENDING: isSelected
-                        ? "bg-amber-100 border-amber-300 text-amber-800"
-                        : "bg-white border-amber-200 text-amber-600 hover:bg-amber-50",
+                        ? "bg-(--status-warning-soft) border-(--status-warning-border) text-(--status-warning)"
+                        : "bg-(--stitch-surface-card) border-(--status-warning-border) text-(--status-warning) hover:bg-(--status-warning-soft)",
                       UNKNOWN: isSelected
-                        ? "bg-slate-100 border-slate-300 text-slate-800"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50",
+                        ? "bg-(--status-neutral-soft) border-(--status-neutral-border) text-(--status-neutral)"
+                        : "bg-(--stitch-surface-card) border-(--status-neutral-border) text-(--status-neutral) hover:bg-(--status-neutral-soft)",
                       NOT_RUN: isSelected
-                        ? "bg-zinc-100 border-zinc-300 text-zinc-800"
-                        : "bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50",
+                        ? "bg-(--status-neutral-soft) border-(--status-neutral-border) text-(--status-neutral)"
+                        : "bg-(--stitch-surface-card) border-(--status-neutral-border) text-(--status-neutral) hover:bg-(--status-neutral-soft)",
                     };
                     return (
                       <button
@@ -548,7 +556,7 @@ export function TestRunDetailPage() {
                         className={cn(
                           "px-3 py-1.5 rounded-md text-sm font-medium transition-all border-2",
                           statusColors[status] ||
-                            "bg-white border-gray-200 text-gray-600",
+                            "bg-(--stitch-surface-card) border-(--stitch-outline) text-(--stitch-on-surface-muted)",
                         )}
                       >
                         {status}
@@ -561,7 +569,7 @@ export function TestRunDetailPage() {
               {/* Tag Filters */}
               {allTags.length > 0 && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-(--stitch-on-surface-muted)">
                     Filter by Tags
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -574,8 +582,8 @@ export function TestRunDetailPage() {
                           className={cn(
                             "px-3 py-1.5 rounded-md text-sm font-medium transition-all border",
                             isSelected
-                              ? "bg-indigo-100 border-indigo-300 text-indigo-800"
-                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50",
+                              ? "bg-(--stitch-primary-soft) border-(--status-running-border) text-(--stitch-primary)"
+                              : "bg-(--stitch-surface-card) border-(--stitch-outline) text-(--stitch-on-surface-muted) hover:bg-(--stitch-surface-low)",
                           )}
                         >
                           {tag}
@@ -593,13 +601,13 @@ export function TestRunDetailPage() {
           <Card className="border-dashed">
             <CardContent className="py-16">
               <div className="text-center max-w-sm mx-auto">
-                <div className="mx-auto h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                  <Play className="h-8 w-8 text-gray-400" />
+                <div className="mx-auto h-16 w-16 rounded-full bg-(--stitch-surface-low) flex items-center justify-center mb-4">
+                  <Play className="h-8 w-8 text-(--stitch-on-surface-subtle)" />
                 </div>
-                <h3 className="text-base font-semibold text-gray-900 mb-2">
+                <h3 className="text-base font-semibold text-(--stitch-on-surface) mb-2">
                   No Test Cases Yet
                 </h3>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-(--stitch-on-surface-subtle)">
                   This test run doesn't have any test cases yet. They will
                   appear here as tests are executed.
                 </p>
@@ -610,19 +618,23 @@ export function TestRunDetailPage() {
           <Card className="border-dashed">
             <CardContent className="py-16">
               <div className="text-center max-w-sm mx-auto">
-                <div className="mx-auto h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                  <Filter className="h-8 w-8 text-gray-400" />
+                <div className="mx-auto h-16 w-16 rounded-full bg-(--stitch-surface-low) flex items-center justify-center mb-4">
+                  <Filter className="h-8 w-8 text-(--stitch-on-surface-subtle)" />
                 </div>
-                <h3 className="text-base font-semibold text-gray-900 mb-2">
+                <h3 className="text-base font-semibold text-(--stitch-on-surface) mb-2">
                   No Matching Tests
                 </h3>
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-sm text-(--stitch-on-surface-subtle) mb-4">
                   No test cases match your current filters. Try adjusting your
                   search criteria.
                 </p>
                 <button
                   onClick={clearFilters}
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, var(--stitch-primary), var(--stitch-primary-end))",
+                  }}
                 >
                   Clear All Filters
                 </button>

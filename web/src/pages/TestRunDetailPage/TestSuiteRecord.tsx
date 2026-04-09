@@ -37,9 +37,9 @@ const TestSuiteRecord = ({ suite, hiddenSuiteTypes }: TestSuiteRecordProps) => {
 
   // Normal rendering when suite is visible
   return (
-    <div className="border border-gray-200 rounded-xl p-6 mb-4 bg-white shadow-sm hover:shadow-md transition-all duration-200">
-      <div className="mb-4 pb-3 border-b border-gray-200">
-        <div className="text-base font-semibold text-gray-900 mb-2">
+    <div className="mb-4 rounded-xl border border-(--stitch-outline) bg-(--stitch-surface-card) p-6 transition-colors hover:bg-(--stitch-surface-low)">
+      <div className="mb-4 border-b border-(--stitch-outline) pb-3">
+        <div className="mb-2 text-base font-semibold text-(--stitch-on-surface)">
           {suite.name}
         </div>
         {suite.tags && suite.tags.length > 0 && (

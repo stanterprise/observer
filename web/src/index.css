@@ -117,6 +117,190 @@ body {
   color: var(--stitch-on-surface);
 }
 
+/*
+ * Stitch compatibility layer for legacy Tailwind color utilities.
+ * This keeps existing components theme-aware while they are migrated to token-native classes.
+ */
+.text-gray-900,
+.text-gray-800,
+.text-gray-700,
+.text-slate-900,
+.text-slate-800,
+.text-slate-700 {
+  color: var(--stitch-on-surface);
+}
+
+.text-gray-600,
+.text-gray-500,
+.text-gray-400,
+.text-slate-600,
+.text-slate-500,
+.text-slate-400 {
+  color: var(--stitch-on-surface-muted);
+}
+
+.text-blue-900,
+.text-blue-800,
+.text-blue-700,
+.text-blue-600,
+.text-blue-500,
+.text-sky-300 {
+  color: var(--stitch-primary);
+}
+
+.text-green-900,
+.text-green-800,
+.text-green-700,
+.text-green-600,
+.text-green-500 {
+  color: var(--status-success);
+}
+
+.text-red-900,
+.text-red-800,
+.text-red-700,
+.text-red-600,
+.text-red-500 {
+  color: var(--status-failure);
+}
+
+.text-yellow-800,
+.text-yellow-700,
+.text-yellow-600,
+.text-amber-800,
+.text-amber-700,
+.text-orange-800,
+.text-orange-700,
+.text-orange-600 {
+  color: var(--status-warning);
+}
+
+.text-purple-800,
+.text-purple-700,
+.text-purple-600 {
+  color: var(--status-timedout);
+}
+
+.text-pink-800,
+.text-pink-700,
+.text-pink-600 {
+  color: var(--status-interrupted);
+}
+
+.bg-white,
+.bg-gray-50 {
+  background-color: var(--stitch-surface-card);
+}
+
+.bg-gray-100,
+.bg-slate-100,
+.bg-slate-900 {
+  background-color: var(--stitch-surface-low);
+}
+
+.bg-blue-600,
+.bg-blue-700,
+.bg-blue-100 {
+  background-color: var(--stitch-primary-soft);
+}
+
+.bg-red-100,
+.bg-red-50 {
+  background-color: var(--status-failure-soft);
+}
+
+.bg-green-100,
+.bg-green-50 {
+  background-color: var(--status-success-soft);
+}
+
+.bg-yellow-100,
+.bg-amber-100,
+.bg-orange-100 {
+  background-color: var(--status-warning-soft);
+}
+
+.bg-purple-100 {
+  background-color: var(--status-timedout-soft);
+}
+
+.bg-pink-100 {
+  background-color: var(--status-interrupted-soft);
+}
+
+.border-gray-300,
+.border-gray-200,
+.border-slate-700,
+.border-slate-600,
+.border-slate-500 {
+  border-color: var(--stitch-outline);
+}
+
+.border-blue-300,
+.border-blue-200,
+.border-blue-600,
+.border-blue-700 {
+  border-color: var(--status-running-border);
+}
+
+.border-red-300,
+.border-red-200 {
+  border-color: var(--status-failure-border);
+}
+
+.border-green-300,
+.border-green-200 {
+  border-color: var(--status-success-border);
+}
+
+.border-yellow-300,
+.border-yellow-200,
+.border-orange-200 {
+  border-color: var(--status-warning-border);
+}
+
+.border-purple-200 {
+  border-color: var(--status-timedout-border);
+}
+
+.border-pink-200 {
+  border-color: var(--status-interrupted-border);
+}
+
+.divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--stitch-outline);
+}
+
+.hover\:text-blue-700:hover,
+.hover\:text-blue-800:hover,
+.group:hover .group-hover\:text-blue-700,
+.group:hover .group-hover\:text-blue-600 {
+  color: var(--stitch-primary);
+}
+
+.hover\:bg-gray-50:hover,
+.hover\:bg-gray-100:hover,
+.group:hover .group-hover\:bg-gray-50 {
+  background-color: var(--stitch-surface-low);
+}
+
+.hover\:bg-blue-700:hover,
+.hover\:bg-blue-600:hover,
+.hover\:bg-blue-50:hover,
+.group:hover .group-hover\:bg-blue-50 {
+  background-color: var(--stitch-primary-soft);
+}
+
+.hover\:border-blue-500:hover,
+.hover\:border-blue-600:hover {
+  border-color: var(--status-running-border);
+}
+
+.focus\:ring-blue-500:focus,
+.focus-visible\:ring-blue-500:focus-visible {
+  --tw-ring-color: var(--stitch-primary);
+}
+
 /* Custom animation utilities */
 @keyframes fade-in {
   from {
