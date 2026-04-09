@@ -83,7 +83,9 @@ export function TestDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600">Loading test details...</div>
+        <div className="text-(--stitch-on-surface-muted)">
+          Loading test details...
+        </div>
       </div>
     );
   }
@@ -93,7 +95,7 @@ export function TestDetailPage() {
       <div className="space-y-4">
         <Link
           to="/suite_runs"
-          className="inline-flex items-center text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-2 py-1"
+          className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md px-2 py-1"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Test Runs
@@ -101,8 +103,8 @@ export function TestDetailPage() {
         <Card>
           <CardContent className="py-12">
             <div className="flex flex-col items-center justify-center space-y-4">
-              <AlertCircle className="h-16 w-16 text-red-500" />
-              <div className="text-red-600 text-center">
+              <AlertCircle className="h-16 w-16 text-(--status-failure)" />
+              <div className="text-(--status-failure) text-center">
                 <p className="font-semibold">
                   Error: {error || "Test not found"}
                 </p>
@@ -139,7 +141,7 @@ export function TestDetailPage() {
       <div className="space-y-4">
         <Link
           to="/suite_runs"
-          className="inline-flex items-center text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-2 py-1"
+          className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md px-2 py-1"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Test Runs
@@ -147,8 +149,8 @@ export function TestDetailPage() {
         <Card>
           <CardContent className="py-12">
             <div className="flex flex-col items-center justify-center space-y-4">
-              <AlertCircle className="h-16 w-16 text-red-500" />
-              <div className="text-red-600 text-center">
+              <AlertCircle className="h-16 w-16 text-(--status-failure)" />
+              <div className="text-(--status-failure) text-center">
                 <p className="font-semibold">Test data not found</p>
                 <p className="text-sm mt-1">
                   The test case data is missing or invalid.
@@ -185,21 +187,27 @@ export function TestDetailPage() {
         <div className="flex items-center space-x-4">
           <Link
             to={`/suite_runs/${test.runId}`}
-            className="inline-flex items-center text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md p-1"
+            className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md p-1"
             aria-label="Back to test run"
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Test Case</h1>
-            <p className="text-sm text-gray-600 mt-1">
+            <h1 className="text-3xl font-bold text-(--stitch-on-surface)">
+              Test Case
+            </h1>
+            <p className="text-sm text-(--stitch-on-surface-muted) mt-1">
               Detailed view of test execution and steps
             </p>
           </div>
         </div>
         <Link
           to={`/tests/${test.id}/trends`}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+          className="inline-flex items-center rounded-md px-4 py-2 text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2"
+          style={{
+            background:
+              "linear-gradient(135deg, var(--stitch-primary), var(--stitch-primary-end))",
+          }}
         >
           <TrendingUp className="h-4 w-4 mr-2" />
           View Trends
@@ -248,7 +256,7 @@ export function TestDetailPage() {
               )}
             {activeAttachment.isAudio &&
               (activeAttachment.url || activeAttachment.inlineUrl) && (
-                <div className="bg-white rounded-lg p-6">
+                <div className="bg-(--stitch-surface-card) rounded-lg p-6">
                   <audio
                     src={activeAttachment.url || activeAttachment.inlineUrl}
                     controls
@@ -259,16 +267,16 @@ export function TestDetailPage() {
             {!activeAttachment.isImage &&
               !activeAttachment.isVideo &&
               !activeAttachment.isAudio && (
-                <div className="bg-white rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                <div className="bg-(--stitch-surface-card) rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-(--stitch-on-surface) mb-3">
                     {activeAttachment.attachment.name || "Attachment"}
                   </h3>
                   {activeAttachment.contentText ? (
-                    <pre className="text-sm text-gray-700 whitespace-pre-wrap wrap-break-word max-h-[70vh] overflow-auto">
+                    <pre className="text-sm text-(--stitch-on-surface-muted) whitespace-pre-wrap wrap-break-word max-h-[70vh] overflow-auto">
                       {activeAttachment.contentText}
                     </pre>
                   ) : (
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-(--stitch-on-surface-muted)">
                       Preview not available.
                     </p>
                   )}

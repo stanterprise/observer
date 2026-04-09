@@ -172,11 +172,11 @@ export function TestTrendsPage() {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="font-semibold text-gray-900">{data.name}</p>
-          <p className="text-sm text-gray-600">Duration: {data.duration}ms</p>
-          <p className="text-sm text-gray-600">Status: {data.status}</p>
-          <p className="text-xs text-gray-500 mt-1">{data.fullDate}</p>
+        <div className="bg-(--stitch-surface-card) p-3 border border-(--stitch-outline) rounded-lg shadow-lg">
+          <p className="font-semibold text-(--stitch-on-surface)">{data.name}</p>
+          <p className="text-sm text-(--stitch-on-surface-muted)">Duration: {data.duration}ms</p>
+          <p className="text-sm text-(--stitch-on-surface-muted)">Status: {data.status}</p>
+          <p className="text-xs text-(--stitch-on-surface-subtle) mt-1">{data.fullDate}</p>
         </div>
       );
     }
@@ -186,7 +186,7 @@ export function TestTrendsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600">Loading test trends...</div>
+        <div className="text-(--stitch-on-surface-muted)">Loading test trends...</div>
       </div>
     );
   }
@@ -196,7 +196,7 @@ export function TestTrendsPage() {
       <div className="space-y-4">
         <Link
           to="/suite_runs"
-          className="inline-flex items-center text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-2 py-1"
+          className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md px-2 py-1"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Test Runs
@@ -204,8 +204,8 @@ export function TestTrendsPage() {
         <Card>
           <CardContent className="py-12">
             <div className="flex flex-col items-center justify-center space-y-4">
-              <AlertCircle className="h-16 w-16 text-red-500" />
-              <div className="text-red-600 text-center">
+              <AlertCircle className="h-16 w-16 text-(--status-failure)" />
+              <div className="text-(--status-failure) text-center">
                 <p className="font-semibold">
                   Error: {error || "Test trends not found"}
                 </p>
@@ -232,17 +232,17 @@ export function TestTrendsPage() {
         <div className="flex items-center space-x-4">
           <Link
             to="/suite_runs"
-            className="inline-flex items-center text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md p-1"
+            className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md p-1"
             aria-label="Back to test runs"
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
             <div className="flex items-center space-x-2">
-              <TrendingUp className="h-6 w-6 text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-900">Test Trends</h1>
+              <TrendingUp className="h-6 w-6 text-(--stitch-primary)" />
+              <h1 className="text-3xl font-bold text-(--stitch-on-surface)">Test Trends</h1>
             </div>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-(--stitch-on-surface-muted) mt-1">
               Historical performance data across multiple runs
             </p>
           </div>
@@ -255,7 +255,7 @@ export function TestTrendsPage() {
           <CardTitle className="text-lg">Test ID</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="font-mono text-sm text-gray-700 break-all">{testId}</p>
+          <p className="font-mono text-sm text-(--stitch-on-surface-muted) break-all">{testId}</p>
         </CardContent>
       </Card>
 
@@ -264,24 +264,24 @@ export function TestTrendsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Total Runs</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
+              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">Total Runs</p>
+              <p className="text-3xl font-bold text-(--stitch-on-surface)">{stats.total}</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Pass Rate</p>
-              <p className="text-3xl font-bold text-green-600">{passRate}%</p>
+              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">Pass Rate</p>
+              <p className="text-3xl font-bold text-(--status-success)">{passRate}%</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Passed</p>
-              <p className="text-3xl font-bold text-green-600">
+              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">Passed</p>
+              <p className="text-3xl font-bold text-(--status-success)">
                 {stats.passed}
               </p>
             </div>
@@ -290,8 +290,8 @@ export function TestTrendsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Failed</p>
-              <p className="text-3xl font-bold text-red-600">{stats.failed}</p>
+              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">Failed</p>
+              <p className="text-3xl font-bold text-(--status-failure)">{stats.failed}</p>
             </div>
           </CardContent>
         </Card>
@@ -302,10 +302,10 @@ export function TestTrendsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="flex items-center justify-center space-x-3">
-              <Clock className="h-5 w-5 text-blue-600" />
+              <Clock className="h-5 w-5 text-(--stitch-primary)" />
               <div className="text-center">
-                <p className="text-sm text-gray-600">Average Duration</p>
-                <p className="text-xl font-semibold text-gray-900">
+                <p className="text-sm text-(--stitch-on-surface-muted)">Average Duration</p>
+                <p className="text-xl font-semibold text-(--stitch-on-surface)">
                   {formatDuration(avgDuration)}
                 </p>
               </div>
@@ -331,7 +331,7 @@ export function TestTrendsPage() {
                   <XAxis
                     dataKey="name"
                     tick={{ fontSize: 12 }}
-                    className="text-gray-600"
+                    className="text-(--stitch-on-surface-muted)"
                   />
                   <YAxis
                     label={{
@@ -341,7 +341,7 @@ export function TestTrendsPage() {
                       style: { fontSize: 12 },
                     }}
                     tick={{ fontSize: 12 }}
-                    className="text-gray-600"
+                    className="text-(--stitch-on-surface-muted)"
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
@@ -368,38 +368,38 @@ export function TestTrendsPage() {
         </CardHeader>
         <CardContent>
           {trends.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-(--stitch-on-surface-subtle)">
               No test execution history found for this test.
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-(--stitch-outline)">
+                <thead className="bg-(--stitch-surface-low)">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-subtle) uppercase tracking-wider">
                       Run ID
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-subtle) uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-subtle) uppercase tracking-wider">
                       Duration
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-subtle) uppercase tracking-wider">
                       Executed At
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-subtle) uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-(--stitch-surface-card) divide-y divide-(--stitch-outline)">
                   {trends.map((trend, index) => (
-                    <tr key={`${trend.runId}-${trend.testId}-${index}`} className="hover:bg-gray-50">
+                    <tr key={`${trend.runId}-${trend.testId}-${index}`} className="hover:bg-(--stitch-surface-low)">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link
                           to={`/suite_runs/${trend.runId}`}
-                          className="font-mono text-sm text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
+                          className="font-mono text-sm text-(--stitch-primary) hover:underline focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded"
                         >
                           {trend.runId.substring(0, 12)}...
                         </Link>
@@ -407,16 +407,16 @@ export function TestTrendsPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge status={getTestStatus(trend.status)} />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-(--stitch-on-surface)">
                         {formatDuration(trend.duration)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-(--stitch-on-surface-subtle)">
                         {formatDate(trend.createdAt)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <Link
                           to={`/suite_runs/${trend.runId}/tests/${trend.testId}`}
-                          className="text-blue-600 hover:text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded px-2 py-1"
+                          className="text-(--stitch-primary) hover:text-(--stitch-primary) hover:underline focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded px-2 py-1"
                         >
                           View Details
                         </Link>

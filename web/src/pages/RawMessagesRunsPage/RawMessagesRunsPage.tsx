@@ -56,12 +56,12 @@ export function RawMessagesRunsPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <h1 className="text-3xl font-bold text-gray-900">Raw Message Runs</h1>
+        <h1 className="text-3xl font-bold text-(--stitch-on-surface)">Raw Message Runs</h1>
         <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="h-16 bg-gray-100 rounded-lg animate-pulse"
+              className="h-16 bg-(--stitch-surface-low) rounded-lg animate-pulse"
             />
           ))}
         </div>
@@ -71,12 +71,12 @@ export function RawMessagesRunsPage() {
 
   if (notEnabled) {
     return (
-      <Card className="border-yellow-200 bg-yellow-50/50">
+      <Card className="border-(--status-warning-border) bg-(--status-warning-soft)/50">
         <CardContent className="py-10 text-center">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">
+          <h2 className="text-lg font-semibold text-(--stitch-on-surface) mb-2">
             Message Retention Not Enabled
           </h2>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-(--stitch-on-surface-muted)">
             Start the processor with{" "}
             <span className="font-mono">RETAIN_MESSAGES=true</span> to populate
             this directory.
@@ -90,14 +90,14 @@ export function RawMessagesRunsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Raw Message Runs</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-3xl font-bold text-(--stitch-on-surface)">Raw Message Runs</h1>
+          <p className="text-sm text-(--stitch-on-surface-subtle) mt-1">
             Directory of runs with retained NATS messages
           </p>
         </div>
         <button
           onClick={fetchRuns}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-(--stitch-surface-card) text-(--stitch-on-surface-muted) border border-(--stitch-outline) rounded-lg hover:bg-(--stitch-surface-low) hover:border-(--stitch-outline) transition-colors shadow-sm"
         >
           <RefreshCw className="h-4 w-4" />
           Refresh
@@ -105,14 +105,14 @@ export function RawMessagesRunsPage() {
       </div>
 
       {error && (
-        <Card className="border-red-200 bg-red-50/50">
-          <CardContent className="py-4 text-red-700">{error}</CardContent>
+        <Card className="border-(--status-failure-border) bg-(--status-failure-soft)/50">
+          <CardContent className="py-4 text-(--status-failure)">{error}</CardContent>
         </Card>
       )}
 
       {runs.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-gray-500">
+          <CardContent className="py-12 text-center text-(--stitch-on-surface-subtle)">
             No runs with retained messages yet.
           </CardContent>
         </Card>
@@ -124,24 +124,24 @@ export function RawMessagesRunsPage() {
               to={`/suite_runs/${run.runId}/raw-messages`}
               className="block"
             >
-              <Card className="hover:border-blue-300 hover:shadow-md transition-all">
+              <Card className="hover:border-(--status-running-border) hover:shadow-md transition-all">
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="font-mono text-sm text-gray-900 truncate">
+                      <p className="font-mono text-sm text-(--stitch-on-surface) truncate">
                         {run.runId}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-(--stitch-on-surface-subtle) mt-1">
                         Updated {new Date(run.updatedAt).toLocaleString()}
                       </p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700">
-                        <FileText className="h-4 w-4 text-gray-400" />
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-(--stitch-surface-card) border border-(--stitch-outline) rounded-lg text-sm font-medium text-(--stitch-on-surface-muted)">
+                        <FileText className="h-4 w-4 text-(--stitch-on-surface-subtle)" />
                         {run.messageCount} message
                         {run.messageCount !== 1 ? "s" : ""}
                       </span>
-                      <ArrowRight className="h-4 w-4 text-gray-400" />
+                      <ArrowRight className="h-4 w-4 text-(--stitch-on-surface-subtle)" />
                     </div>
                   </div>
                 </CardContent>

@@ -273,7 +273,10 @@ export function TestRunDetailPage() {
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
           <span className="font-medium">Back to Test Runs</span>
         </Link>
-        <Card className="border-(--status-failure-border)" style={{ backgroundColor: "var(--status-failure-soft)" }}>
+        <Card
+          className="border-(--status-failure-border)"
+          style={{ backgroundColor: "var(--status-failure-soft)" }}
+        >
           <CardContent className="py-12">
             <div className="text-center max-w-md mx-auto">
               <div
