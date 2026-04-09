@@ -19,7 +19,7 @@ export default function AttachmentsCard({
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Attachments</CardTitle>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-sm text-(--stitch-on-surface-muted) mt-1">
           {attachments.length} attachment
           {attachments.length > 1 ? "s" : ""} associated with this test
         </p>
@@ -60,14 +60,14 @@ export default function AttachmentsCard({
             return (
               <div
                 key={`${attachment.storage_key || attachment.uri || attachment.name || "attachment"}-${index}`}
-                className="border border-gray-200 rounded-lg p-4 bg-white"
+                className="border border-(--stitch-outline) rounded-lg p-4 bg-(--stitch-surface-card)"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900 truncate">
+                    <p className="font-medium text-(--stitch-on-surface) truncate">
                       {attachment.name || "Attachment"}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-(--stitch-on-surface-subtle) mt-1">
                       {attachment.mime_type || "unknown"} •{" "}
                       {formatBytes(attachment.size)} • {storageType}
                     </p>
@@ -78,7 +78,7 @@ export default function AttachmentsCard({
                         href={url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-200 rounded-md hover:bg-blue-50 transition-colors"
+                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-(--stitch-primary) border border-(--status-running-border) rounded-md hover:bg-(--stitch-primary-soft) transition-colors"
                       >
                         Open
                       </a>
@@ -87,7 +87,7 @@ export default function AttachmentsCard({
                       <button
                         type="button"
                         onClick={handleAttachmentClick}
-                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-900 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-(--stitch-on-surface) border border-(--stitch-outline) rounded-md hover:bg-(--stitch-surface-low) transition-colors"
                       >
                         View
                       </button>
@@ -103,17 +103,17 @@ export default function AttachmentsCard({
                     <img
                       src={mediaUrl}
                       alt={attachment.name || "Attachment"}
-                      className="max-h-64 rounded-md border border-gray-200 bg-gray-50"
+                      className="max-h-64 rounded-md border border-(--stitch-outline) bg-(--stitch-surface-low)"
                     />
                   </button>
                 )}
                 {storageType === "inline" && !isImage && preview && (
-                  <div className="mt-3 bg-gray-50 border border-gray-200 rounded-md p-3">
-                    <pre className="text-xs text-gray-700 whitespace-pre-wrap wrap-break-word">
+                  <div className="mt-3 bg-(--stitch-surface-low) border border-(--stitch-outline) rounded-md p-3">
+                    <pre className="text-xs text-(--stitch-on-surface-muted) whitespace-pre-wrap wrap-break-word">
                       {preview}
                     </pre>
                     {content.length > previewLimit && (
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-(--stitch-on-surface-subtle) mt-2">
                         Preview truncated
                       </p>
                     )}

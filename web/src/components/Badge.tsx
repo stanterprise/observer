@@ -20,60 +20,112 @@ interface BadgeProps {
 export function Badge({ status, className, showIcon = true }: BadgeProps) {
   const statusConfig: Record<
     TestStatus | "COMPLETED",
-    { color: string; icon: typeof CheckCircle; label: string }
+    {
+      colors: {
+        backgroundColor: string;
+        borderColor: string;
+        color: string;
+      };
+      icon: typeof CheckCircle;
+      label: string;
+    }
   > = {
     PASSED: {
-      color: "bg-green-100 text-green-800 border-green-200",
+      colors: {
+        backgroundColor: "var(--status-success-soft)",
+        borderColor: "var(--status-success-border)",
+        color: "var(--status-success)",
+      },
       icon: CheckCircle,
       label: "passed",
     },
     FAILED: {
-      color: "bg-red-100 text-red-800 border-red-200",
+      colors: {
+        backgroundColor: "var(--status-failure-soft)",
+        borderColor: "var(--status-failure-border)",
+        color: "var(--status-failure)",
+      },
       icon: XCircle,
       label: "failed",
     },
     SKIPPED: {
-      color: "bg-gray-100 text-gray-800 border-gray-200",
+      colors: {
+        backgroundColor: "var(--status-neutral-soft)",
+        borderColor: "var(--status-neutral-border)",
+        color: "var(--status-neutral)",
+      },
       icon: MinusCircle,
       label: "skipped",
     },
     RUNNING: {
-      color: "bg-blue-100 text-blue-800 border-blue-200",
+      colors: {
+        backgroundColor: "var(--status-running-soft)",
+        borderColor: "var(--status-running-border)",
+        color: "var(--status-running)",
+      },
       icon: Play,
       label: "running",
     },
     PENDING: {
-      color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      colors: {
+        backgroundColor: "var(--status-warning-soft)",
+        borderColor: "var(--status-warning-border)",
+        color: "var(--status-warning)",
+      },
       icon: Clock,
       label: "pending",
     },
     UNKNOWN: {
-      color: "bg-gray-100 text-gray-800 border-gray-200",
+      colors: {
+        backgroundColor: "var(--status-neutral-soft)",
+        borderColor: "var(--status-neutral-border)",
+        color: "var(--status-neutral)",
+      },
       icon: Circle,
       label: "unknown",
     },
     BROKEN: {
-      color: "bg-orange-100 text-orange-800 border-orange-200",
+      colors: {
+        backgroundColor: "var(--status-broken-soft)",
+        borderColor: "var(--status-broken-border)",
+        color: "var(--status-broken)",
+      },
       icon: AlertTriangle,
       label: "broken",
     },
     TIMEDOUT: {
-      color: "bg-purple-100 text-purple-800 border-purple-200",
+      colors: {
+        backgroundColor: "var(--status-timedout-soft)",
+        borderColor: "var(--status-timedout-border)",
+        color: "var(--status-timedout)",
+      },
       icon: Clock,
       label: "timed out",
     },
     INTERRUPTED: {
-      color: "bg-pink-100 text-pink-800 border-pink-200",
+      colors: {
+        backgroundColor: "var(--status-interrupted-soft)",
+        borderColor: "var(--status-interrupted-border)",
+        color: "var(--status-interrupted)",
+      },
       icon: Ban,
       label: "interrupted",
     },
     NOT_RUN: {
-      color: "bg-gray-100 text-gray-800 border-gray-200",
+      colors: {
+        backgroundColor: "var(--status-neutral-soft)",
+        borderColor: "var(--status-neutral-border)",
+        color: "var(--status-neutral)",
+      },
       icon: MinusCircle,
       label: "not run",
     },
     COMPLETED: {
-      color: "bg-green-100 text-green-800 border-green-200",
+      colors: {
+        backgroundColor: "var(--status-success-soft)",
+        borderColor: "var(--status-success-border)",
+        color: "var(--status-success)",
+      },
       icon: CheckCircle,
       label: "completed",
     },
@@ -86,9 +138,9 @@ export function Badge({ status, className, showIcon = true }: BadgeProps) {
     <span
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border",
-        config.color,
         className,
       )}
+      style={config.colors}
       role="status"
       aria-label={`Test status: ${config.label}`}
     >

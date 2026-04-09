@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .headline-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        /* Custom scrollbar for technical look */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cfdce3;
+            border-radius: 10px;
+        }
+        
+        /* New technical backgrounds and glass effects */
+        .tech-grid {
+            background-image: radial-gradient(circle at 2px 2px, rgba(0, 83, 219, 0.05) 1px, transparent 0);
+            background-size: 32px 32px;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        
+        .glow-blue {
+            filter: drop-shadow(0 0 15px rgba(0, 110, 255, 0.15));
+        }
+        
+        .glow-purple {
+            filter: drop-shadow(0 0 15px rgba(131, 66, 244, 0.15));
+        }
+
+        .corner-accent {
+            position: relative;
+        }
+        .corner-accent::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 8px;
+            height: 8px;
+            border-top: 2px solid currentColor;
+            border-left: 2px solid currentColor;
+            opacity: 0.4;
+        }
+        
+        .segmented-bar {
+            background-image: linear-gradient(90deg, transparent 95%, rgba(0,0,0,0.1) 95%);
+            background-size: 12px 100%;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#d3e4fe",
+                    "on-error-container": "#752121",
+                    "surface-variant": "#d9e4ea",
+                    "primary-fixed": "#dbe1ff",
+                    "inverse-on-surface": "#9a9d9f",
+                    "on-primary-fixed": "#003798",
+                    "outline-variant": "#a9b4b9",
+                    "error": "#d32f2f",
+                    "primary-fixed-dim": "#c7d3ff",
+                    "tertiary-fixed": "#8342f4",
+                    "on-tertiary": "#fdf7ff",
+                    "on-secondary-fixed": "#314055",
+                    "inverse-surface": "#0b0f10",
+                    "error-container": "#fe8983",
+                    "primary-container": "#dbe1ff",
+                    "on-secondary-container": "#435368",
+                    "tertiary-dim": "#681ad9",
+                    "on-tertiary-fixed": "#ffffff",
+                    "primary-dim": "#004ed1",
+                    "tertiary-container": "#8342f4",
+                    "background": "#f7f9fb",
+                    "on-surface": "#2a3439",
+                    "inverse-primary": "#618bff",
+                    "surface-bright": "#f7f9fb",
+                    "surface-tint": "#2962ff",
+                    "tertiary": "#7c22ff",
+                    "on-tertiary-container": "#ffffff",
+                    "surface-container-low": "#f0f4f7",
+                    "on-primary-fixed-variant": "#0050d4",
+                    "secondary-fixed": "#d3e4fe",
+                    "surface-container-high": "#e1e9ee",
+                    "on-error": "#fff7f6",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-highest": "#d9e4ea",
+                    "outline": "#717c82",
+                    "primary": "#2962ff",
+                    "on-primary": "#f8f7ff",
+                    "surface-dim": "#cfdce3",
+                    "surface-container": "#e8eff3",
+                    "secondary-dim": "#44546a",
+                    "error-dim": "#4e0309",
+                    "on-background": "#2a3439",
+                    "on-primary-container": "#0048bf",
+                    "on-secondary": "#f7f9ff",
+                    "surface": "#f7f9fb",
+                    "on-surface-variant": "#566166",
+                    "secondary": "#506076",
+                    "on-secondary-fixed-variant": "#4d5d73",
+                    "on-tertiary-fixed-variant": "#e5d5ff",
+                    "secondary-fixed-dim": "#c5d6f0",
+                    "tertiary-fixed-dim": "#7632e7"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "1rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-background text-on-background selection:bg-primary-container selection:text-on-primary-container tech-grid">
+<!-- SideNavBar -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-slate-100 dark:bg-slate-900 flex flex-col py-6 z-50 border-r border-slate-200/50">
+<div class="px-6 mb-8">
+<h1 class="text-xl font-bold tracking-tighter text-slate-900 dark:text-slate-50 headline-font">TestReport+</h1>
+<p class="text-[10px] font-['Space_Grotesk'] text-slate-500 uppercase tracking-[0.2em] mt-1">Precision Lab V1.2</p>
+</div>
+<nav class="flex-1 space-y-1 px-3">
+<a class="flex items-center gap-3 px-3 py-2 rounded transition-colors text-blue-700 dark:text-blue-400 font-bold border-r-2 border-blue-700 dark:border-blue-400 bg-slate-200/50 dark:bg-slate-800/50 font-['Space_Grotesk'] text-sm tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+            Executive Dashboard
+        </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors font-['Space_Grotesk'] text-sm tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+            Analytics
+        </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors font-['Space_Grotesk'] text-sm tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="fact_check">fact_check</span>
+            Test List
+        </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors font-['Space_Grotesk'] text-sm tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+            Settings
+        </a>
+</nav>
+<div class="mt-auto px-3 pt-6 border-t border-slate-200/10 space-y-1">
+<div class="flex items-center gap-3 px-3 py-4 mb-4">
+<div class="w-8 h-8 rounded-full bg-slate-300 overflow-hidden ring-2 ring-primary/20">
+<img alt="User Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9PGNKQonlsKhGVjw6WGOcdZXoOqGmDxL2gpH_YVyOK4IiN5Q70HXcnor1NL9xA49KO3HS0Nc7ldk0JxovAYcERLSVBOcqnk15MHLbHJJZlvYzDHa_JcFlK294eFNUr9Eoj9juZ13-aM0uSbQ926LCu-KXth402vETqUxcyRu1D1lot7d-mUDB8x7MFZGJaoq5XjJqMdXFcqNgP0RZjTbWQofzm1a5wki48GeJaEe_XlcKzfBCVkEkvHz5AR16vxr3EPwa_cfCc6c"/>
+</div>
+<div class="flex flex-col">
+<span class="text-xs font-bold text-slate-900 dark:text-slate-50">Lead Architect</span>
+<span class="text-[10px] text-slate-500 uppercase tracking-tighter">Status: Active</span>
+</div>
+</div>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors font-['Space_Grotesk'] text-sm tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+            Support
+        </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors font-['Space_Grotesk'] text-sm tracking-tight" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+            Sign Out
+        </a>
+</div>
+</aside>
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 z-40 bg-white/60 dark:bg-slate-950/60 backdrop-blur-2xl border-b border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center px-8">
+<div class="flex items-center gap-8">
+<div class="flex gap-6 items-center">
+<span class="font-['Space_Grotesk'] text-xs font-medium uppercase tracking-widest text-slate-900 dark:text-slate-50 flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Project: Orion
+            </span>
+<span class="font-['Space_Grotesk'] text-xs font-medium uppercase tracking-widest text-slate-500 dark:text-slate-400">Env: Production</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+<input class="bg-surface-container-low/50 border-none rounded-lg pl-9 pr-4 py-1.5 text-[10px] font-['Space_Grotesk'] tracking-widest focus:ring-1 focus:ring-primary/20 w-64 transition-all" placeholder="QUERY METRICS..." type="text"/>
+</div>
+<button class="p-2 text-slate-500 hover:text-primary transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full border-2 border-white"></span>
+</button>
+<button class="p-2 text-slate-500 hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-24 px-8 pb-12 min-h-screen">
+<!-- Header Section -->
+<header class="mb-12 flex justify-between items-end relative">
+<div class="absolute -left-4 top-0 w-1 h-full bg-primary/20 rounded-full"></div>
+<div>
+<span class="block text-primary text-[10px] font-bold uppercase tracking-[0.3em] mb-2 font-headline">Engineering Intelligence</span>
+<h2 class="text-4xl font-bold tracking-tighter headline-font text-on-surface">Suite Performance &amp; Analytics</h2>
+</div>
+<div class="text-right">
+<span class="text-[10px] uppercase text-outline tracking-widest block mb-1">Last Sync Cycle</span>
+<span class="font-mono text-sm font-medium bg-surface-container p-1.5 rounded border border-outline-variant/20 shadow-inner">2023.10.27 — 14:02:44 UTC</span>
+</div>
+</header>
+<!-- KPI Bento Grid -->
+<section class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+<!-- Avg Duration -->
+<div class="glass-card p-6 rounded-xl group transition-all hover:translate-y-[-2px] hover:shadow-xl relative overflow-hidden glow-blue">
+<div class="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-bl-full pointer-events-none"></div>
+<div class="flex justify-between items-start mb-4">
+<span class="text-[10px] uppercase text-outline tracking-[0.15em] font-medium">Avg Duration</span>
+<span class="material-symbols-outlined text-primary text-lg" data-icon="timer">timer</span>
+</div>
+<div class="flex items-baseline gap-2 relative z-10">
+<span class="text-3xl font-bold headline-font">14:22</span>
+<span class="text-xs text-emerald-600 font-medium bg-emerald-50 px-1.5 py-0.5 rounded">-12% <span class="material-symbols-outlined text-[10px]">south_east</span></span>
+</div>
+<div class="mt-4 h-1.5 bg-surface-container-low rounded-full overflow-hidden">
+<div class="h-full bg-primary w-2/3 shadow-[0_0_8px_rgba(41,98,255,0.4)]"></div>
+</div>
+</div>
+<!-- Resource Cost -->
+<div class="glass-card p-6 rounded-xl group transition-all hover:translate-y-[-2px] hover:shadow-xl relative overflow-hidden glow-purple">
+<div class="absolute top-0 right-0 w-16 h-16 bg-tertiary/5 rounded-bl-full pointer-events-none"></div>
+<div class="flex justify-between items-start mb-4">
+<span class="text-[10px] uppercase text-outline tracking-[0.15em] font-medium">Resource Cost</span>
+<span class="material-symbols-outlined text-tertiary text-lg" data-icon="memory">memory</span>
+</div>
+<div class="flex items-baseline gap-2 relative z-10">
+<span class="text-3xl font-bold headline-font">84.2</span>
+<span class="text-[10px] text-outline font-medium uppercase tracking-tighter">G-Cycles</span>
+</div>
+<div class="mt-4 flex gap-1.5">
+<div class="h-1.5 flex-1 bg-tertiary rounded-full shadow-[0_0_8px_rgba(124,34,255,0.3)]"></div>
+<div class="h-1.5 flex-1 bg-tertiary/60 rounded-full"></div>
+<div class="h-1.5 flex-1 bg-tertiary/20 rounded-full"></div>
+<div class="h-1.5 flex-1 bg-surface-container-low rounded-full"></div>
+</div>
+</div>
+<!-- Flakiest Suite -->
+<div class="glass-card p-6 rounded-xl group transition-all hover:translate-y-[-2px] hover:shadow-xl border-l-4 border-error/60 corner-accent text-error">
+<div class="flex justify-between items-start mb-4">
+<span class="text-[10px] uppercase text-outline tracking-[0.15em] font-medium">Flakiest Suite</span>
+<span class="material-symbols-outlined text-error text-lg" data-icon="warning">warning</span>
+</div>
+<div class="flex flex-col">
+<span class="text-sm font-bold headline-font truncate mb-1 text-on-surface">auth-service-v4</span>
+<span class="text-xs font-semibold">14.2% failure rate</span>
+</div>
+<div class="mt-4 flex items-center gap-2">
+<span class="text-[10px] px-2 py-0.5 rounded bg-error/10 text-error font-bold uppercase tracking-tighter border border-error/20">Critical Alert</span>
+<span class="text-[10px] text-outline">Action Required</span>
+</div>
+</div>
+<!-- Parallelization Efficiency -->
+<div class="glass-card p-6 rounded-xl group transition-all hover:translate-y-[-2px] hover:shadow-xl corner-accent text-secondary">
+<div class="flex justify-between items-start mb-4">
+<span class="text-[10px] uppercase text-outline tracking-[0.15em] font-medium">Efficiency</span>
+<span class="material-symbols-outlined text-on-secondary-fixed-variant text-lg" data-icon="alt_route">alt_route</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-bold headline-font text-on-surface">98.4%</span>
+<span class="material-symbols-outlined text-emerald-600 text-xs bg-emerald-50 p-1 rounded-full">auto_graph</span>
+</div>
+<p class="text-[10px] text-outline mt-2 leading-relaxed italic">Optimal node utilization detected across 24 active workers.</p>
+</div>
+</section>
+<!-- Charts Layout: Asymmetric Editorial -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Left Column: Primary Chart -->
+<div class="col-span-12 lg:col-span-8 space-y-8">
+<!-- Test Duration Trend -->
+<div class="glass-card p-8 rounded-2xl relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-5">
+<span class="material-symbols-outlined text-9xl">show_chart</span>
+</div>
+<div class="flex justify-between items-center mb-10 relative z-10">
+<div>
+<h3 class="text-lg font-bold headline-font">Test Duration Trend</h3>
+<p class="text-xs text-outline">Mean execution time (minutes) — Last 30 Days</p>
+</div>
+<div class="flex gap-2 p-1 bg-surface-container rounded-lg border border-outline-variant/10">
+<button class="px-4 py-1.5 bg-white text-[10px] font-bold rounded-md shadow-sm uppercase tracking-tighter transition-all">Daily</button>
+<button class="px-4 py-1.5 text-[10px] font-bold rounded-md uppercase tracking-tighter text-outline hover:text-on-surface transition-colors">Weekly</button>
+</div>
+</div>
+<!-- Line Chart Visual Simulation -->
+<div class="relative h-72 flex items-end gap-[2%] px-2">
+<!-- Background Grid -->
+<div class="absolute inset-0 flex flex-col justify-between opacity-[0.03] pointer-events-none">
+<div class="border-b-2 border-primary"></div>
+<div class="border-b-2 border-primary"></div>
+<div class="border-b-2 border-primary"></div>
+<div class="border-b-2 border-primary"></div>
+<div class="border-b-2 border-primary"></div>
+</div>
+<!-- Simple SVG Graph Simulation -->
+<svg class="absolute inset-0 h-full w-full" preserveaspectratio="none" viewbox="0 0 100 100">
+<defs>
+<lineargradient id="chart-area-gradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="rgba(41, 98, 255, 0.2)"></stop>
+<stop offset="100%" stop-color="rgba(41, 98, 255, 0)"></stop>
+</lineargradient>
+<lineargradient id="line-glow" x1="0" x2="1" y1="0" y2="0">
+<stop offset="0%" stop-color="#2962ff"></stop>
+<stop offset="100%" stop-color="#7c22ff"></stop>
+</lineargradient>
+</defs>
+<path class="drop-shadow-lg" d="M0 60 L10 55 L20 65 L30 40 L40 45 L50 30 L60 35 L70 20 L80 25 L90 15 L100 10" fill="none" stroke="url(#line-glow)" stroke-width="2.5" vector-effect="non-scaling-stroke"></path>
+<path d="M0 60 L10 55 L20 65 L30 40 L40 45 L50 30 L60 35 L70 20 L80 25 L90 15 L100 10 V100 H0 Z" fill="url(#chart-area-gradient)"></path>
+</svg>
+<!-- Hover Glow Point Example -->
+<div class="absolute left-[70%] top-[20%] w-4 h-4 bg-white border-2 border-primary rounded-full -translate-x-1/2 -translate-y-1/2 shadow-[0_0_15px_rgba(41,98,255,0.8)] z-20"></div>
+<!-- X-Axis Labels -->
+<div class="absolute -bottom-10 w-full flex justify-between text-[9px] font-bold text-outline uppercase tracking-widest">
+<span>01 Oct — Start</span>
+<span>15 Oct — Median</span>
+<span>30 Oct — Latest</span>
+</div>
+</div>
+</div>
+<!-- Resource Utilization: Bar Chart -->
+<div class="glass-card p-8 rounded-2xl">
+<div class="flex justify-between items-center mb-10">
+<div>
+<h3 class="text-lg font-bold headline-font">Resource Utilization</h3>
+<p class="text-xs text-outline">CPU / RAM Allocation by Environment Cluster</p>
+</div>
+<button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-outline" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+<div class="space-y-8">
+<!-- Bar Item 1 -->
+<div class="space-y-3">
+<div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
+<span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-primary"></span>Staging-East-Cluster</span>
+<span class="text-primary bg-primary/5 px-2 py-0.5 rounded">78% Load</span>
+</div>
+<div class="h-8 bg-surface-container-highest/40 rounded flex gap-0.5 overflow-hidden border border-outline-variant/10 p-1">
+<div class="h-full bg-primary w-[45%] rounded-sm segmented-bar shadow-sm"></div>
+<div class="h-full bg-primary-dim w-[33%] rounded-sm segmented-bar"></div>
+<div class="h-full bg-surface-dim/20 flex-1 rounded-sm"></div>
+</div>
+</div>
+<!-- Bar Item 2 -->
+<div class="space-y-3">
+<div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
+<span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-tertiary"></span>Production-Mirror-V2</span>
+<span class="text-tertiary bg-tertiary/5 px-2 py-0.5 rounded">92% Load</span>
+</div>
+<div class="h-8 bg-surface-container-highest/40 rounded flex gap-0.5 overflow-hidden border border-outline-variant/10 p-1">
+<div class="h-full bg-tertiary w-[60%] rounded-sm segmented-bar shadow-sm"></div>
+<div class="h-full bg-tertiary-dim w-[32%] rounded-sm segmented-bar"></div>
+<div class="h-full bg-surface-dim/20 flex-1 rounded-sm"></div>
+</div>
+</div>
+<!-- Bar Item 3 -->
+<div class="space-y-3">
+<div class="flex justify-between text-[10px] font-bold tracking-widest uppercase">
+<span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-secondary"></span>Regression-Sand-04</span>
+<span class="text-secondary bg-secondary/5 px-2 py-0.5 rounded">31% Load</span>
+</div>
+<div class="h-8 bg-surface-container-highest/40 rounded flex gap-0.5 overflow-hidden border border-outline-variant/10 p-1">
+<div class="h-full bg-secondary w-[15%] rounded-sm segmented-bar shadow-sm"></div>
+<div class="h-full bg-secondary-dim w-[16%] rounded-sm segmented-bar"></div>
+<div class="h-full bg-surface-dim/20 flex-1 rounded-sm"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Contextual Data -->
+<div class="col-span-12 lg:col-span-4 space-y-8">
+<!-- Failure Distribution: Donut Chart -->
+<div class="glass-card p-8 rounded-2xl flex flex-col items-center relative overflow-hidden">
+<div class="absolute -top-10 -right-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
+<h3 class="text-lg font-bold headline-font w-full mb-1">Failure Distribution</h3>
+<p class="text-xs text-outline w-full mb-10">Primary failure root causes</p>
+<!-- Donut SVG Simulation -->
+<div class="relative w-52 h-52 mb-10 group cursor-default">
+<svg class="w-full h-full transform -rotate-90 transition-transform duration-700 group-hover:rotate-0" viewbox="0 0 36 36">
+<circle cx="18" cy="18" fill="transparent" r="16" stroke="#f0f4f7" stroke-width="3.5"></circle>
+<circle class="transition-all duration-1000" cx="18" cy="18" fill="transparent" r="16" stroke="#d32f2f" stroke-dasharray="40 100" stroke-dashoffset="0" stroke-width="3.5"></circle>
+<circle cx="18" cy="18" fill="transparent" r="16" stroke="#2962ff" stroke-dasharray="25 100" stroke-dashoffset="-40" stroke-width="3.5"></circle>
+<circle cx="18" cy="18" fill="transparent" r="16" stroke="#7c22ff" stroke-dasharray="15 100" stroke-dashoffset="-65" stroke-width="3.5"></circle>
+<circle cx="18" cy="18" fill="transparent" r="16" stroke="#506076" stroke-dasharray="20 100" stroke-dashoffset="-80" stroke-width="3.5"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-4xl font-bold headline-font text-on-surface">1,402</span>
+<span class="text-[9px] uppercase tracking-widest text-outline font-bold">Total Events</span>
+</div>
+</div>
+<!-- Legend -->
+<div class="w-full space-y-3.5">
+<div class="flex items-center justify-between group">
+<div class="flex items-center gap-3">
+<div class="w-2.5 h-2.5 rounded-sm bg-error shadow-[0_0_5px_rgba(211,47,47,0.3)]"></div>
+<span class="text-xs font-semibold text-on-surface-variant group-hover:text-error transition-colors">Infrastructure</span>
+</div>
+<span class="text-xs font-bold font-mono px-2 py-0.5 bg-surface-container-low rounded">40%</span>
+</div>
+<div class="flex items-center justify-between group">
+<div class="flex items-center gap-3">
+<div class="w-2.5 h-2.5 rounded-sm bg-primary shadow-[0_0_5px_rgba(41,98,255,0.3)]"></div>
+<span class="text-xs font-semibold text-on-surface-variant group-hover:text-primary transition-colors">Timeout</span>
+</div>
+<span class="text-xs font-bold font-mono px-2 py-0.5 bg-surface-container-low rounded">25%</span>
+</div>
+<div class="flex items-center justify-between group">
+<div class="flex items-center gap-3">
+<div class="w-2.5 h-2.5 rounded-sm bg-tertiary shadow-[0_0_5px_rgba(124,34,255,0.3)]"></div>
+<span class="text-xs font-semibold text-on-surface-variant group-hover:text-tertiary transition-colors">Logic Error</span>
+</div>
+<span class="text-xs font-bold font-mono px-2 py-0.5 bg-surface-container-low rounded">15%</span>
+</div>
+<div class="flex items-center justify-between group">
+<div class="flex items-center gap-3">
+<div class="w-2.5 h-2.5 rounded-sm bg-secondary shadow-[0_0_5px_rgba(80,96,118,0.3)]"></div>
+<span class="text-xs font-semibold text-on-surface-variant group-hover:text-on-surface transition-colors">Network</span>
+</div>
+<span class="text-xs font-bold font-mono px-2 py-0.5 bg-surface-container-low rounded">20%</span>
+</div>
+</div>
+</div>
+<!-- Recent Anomalies -->
+<div class="glass-card p-8 rounded-2xl relative border-t-2 border-primary/10">
+<h3 class="text-xs font-bold uppercase tracking-[0.2em] mb-8 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+                    Recent Anomalies
+                </h3>
+<div class="space-y-8">
+<div class="flex gap-4 group cursor-pointer border-b border-outline-variant/5 pb-4 last:border-0 last:pb-0">
+<div class="pt-1">
+<div class="w-2 h-2 rounded-full bg-error ring-4 ring-error/5 animate-pulse"></div>
+</div>
+<div>
+<p class="text-xs font-bold mb-1 group-hover:text-primary transition-colors flex items-center gap-2">
+                                Cluster-A Memory Leak 
+                                <span class="material-symbols-outlined text-[12px] opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</p>
+<p class="text-[11px] text-on-surface-variant leading-relaxed">Execution halted after 12m due to OOM exception in production-mirror.</p>
+<div class="flex items-center gap-3 mt-3">
+<span class="text-[9px] font-mono font-bold text-outline uppercase">24 mins ago</span>
+<span class="text-[9px] font-mono font-bold bg-surface-container-high px-1.5 py-0.5 rounded text-on-surface">Event #9812</span>
+</div>
+</div>
+</div>
+<div class="flex gap-4 group cursor-pointer border-b border-outline-variant/5 pb-4 last:border-0 last:pb-0">
+<div class="pt-1">
+<div class="w-2 h-2 rounded-full bg-tertiary ring-4 ring-tertiary/5"></div>
+</div>
+<div>
+<p class="text-xs font-bold mb-1 group-hover:text-primary transition-colors flex items-center gap-2">
+                                Dependency Timeout
+                                <span class="material-symbols-outlined text-[12px] opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</p>
+<p class="text-[11px] text-on-surface-variant leading-relaxed">Internal API response latency exceeded 5000ms threshold.</p>
+<div class="flex items-center gap-3 mt-3">
+<span class="text-[9px] font-mono font-bold text-outline uppercase">1 hour ago</span>
+<span class="text-[9px] font-mono font-bold bg-surface-container-high px-1.5 py-0.5 rounded text-on-surface">Event #9790</span>
+</div>
+</div>
+</div>
+<div class="flex gap-4 group cursor-pointer border-b border-outline-variant/5 pb-4 last:border-0 last:pb-0">
+<div class="pt-1">
+<div class="w-2 h-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/5"></div>
+</div>
+<div>
+<p class="text-xs font-bold mb-1 group-hover:text-primary transition-colors flex items-center gap-2">
+                                Efficiency Spike
+                                <span class="material-symbols-outlined text-[12px] opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</p>
+<p class="text-[11px] text-on-surface-variant leading-relaxed">Parallelization optimization reduced cost by 15% in build #221.</p>
+<div class="flex items-center gap-3 mt-3">
+<span class="text-[9px] font-mono font-bold text-outline uppercase">3 hours ago</span>
+<span class="text-[9px] font-mono font-bold bg-surface-container-high px-1.5 py-0.5 rounded text-on-surface">Build #221</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

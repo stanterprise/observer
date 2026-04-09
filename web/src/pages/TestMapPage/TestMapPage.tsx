@@ -178,16 +178,16 @@ export function TestMapPage() {
       <div className="space-y-6 animate-in fade-in duration-300">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className="h-10 w-10 bg-gray-200 rounded-lg animate-pulse" />
-            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+            <div className="h-10 w-10 bg-[var(--stitch-surface-low)] rounded-lg animate-pulse" />
+            <div className="h-8 w-48 bg-[var(--stitch-surface-low)] rounded animate-pulse" />
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">
-            <div className="h-96 bg-gray-200 rounded-lg animate-pulse" />
+            <div className="h-96 bg-[var(--stitch-surface-low)] rounded-lg animate-pulse" />
           </div>
           <div className="lg:col-span-1">
-            <div className="h-96 bg-gray-200 rounded-lg animate-pulse" />
+            <div className="h-96 bg-[var(--stitch-surface-low)] rounded-lg animate-pulse" />
           </div>
         </div>
       </div>
@@ -199,26 +199,26 @@ export function TestMapPage() {
       <div className="space-y-6 animate-in fade-in duration-300">
         <Link
           to={`/suite_runs/${runId}`}
-          className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors group"
+          className="inline-flex items-center gap-2 text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] transition-colors group"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
           <span className="font-medium">Back to Test Run</span>
         </Link>
-        <Card className="border-red-200 bg-red-50/50">
+        <Card className="border-[var(--status-failure-border)] bg-[var(--status-failure-soft)]/50">
           <CardContent className="py-12">
             <div className="text-center max-w-md mx-auto">
-              <div className="mx-auto h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
-                <Info className="h-8 w-8 text-red-600" />
+              <div className="mx-auto h-16 w-16 rounded-full bg-[var(--status-failure-soft)] flex items-center justify-center mb-4">
+                <Info className="h-8 w-8 text-[var(--status-failure)]" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-[var(--stitch-on-surface)] mb-2">
                 Failed to Load Test Map
               </h3>
-              <p className="text-sm text-gray-600 mb-6">
+              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-6">
                 {error || "Unknown error"}
               </p>
               <Link
                 to={`/suite_runs/${runId}`}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-[var(--stitch-primary-soft)] text-[var(--stitch-on-surface)] rounded-lg hover:bg-[var(--stitch-primary-soft)] transition-colors"
               >
                 Back to Test Run
               </Link>
@@ -236,17 +236,17 @@ export function TestMapPage() {
         <div className="flex items-center gap-4">
           <Link
             to={`/suite_runs/${runId}`}
-            className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm hover:shadow group"
+            className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-[var(--stitch-surface-card)] border border-[var(--stitch-outline)] text-[var(--stitch-on-surface)] hover:bg-[var(--stitch-surface-card)] hover:border-[var(--stitch-outline)] transition-all shadow-sm hover:shadow group"
             aria-label="Back to test run"
           >
             <ArrowLeft className="h-5 w-5 group-hover:-translate-x-0.5 transition-transform" />
           </Link>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-              <Map className="h-7 w-7 text-blue-600" />
+            <h1 className="text-2xl md:text-3xl font-bold text-[var(--stitch-on-surface)] tracking-tight flex items-center gap-2">
+              <Map className="h-7 w-7 text-[var(--stitch-primary)]" />
               Test Map
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-[var(--stitch-on-surface-muted)] mt-1">
               {runDetail.name || runDetail.id}
             </p>
           </div>
@@ -260,32 +260,32 @@ export function TestMapPage() {
           <Card>
             <CardContent className="p-6">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="text-lg font-semibold text-[var(--stitch-on-surface)]">
                   Test Map
                 </h2>
                 <div className="flex items-center gap-4 text-xs">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-green-500 border border-green-600" />
+                    <div className="w-3 h-3 rounded bg-[var(--status-success-soft)] border border-[var(--status-success-border)]" />
                     <span>Passed</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-amber-400 border border-amber-500" />
+                    <div className="w-3 h-3 rounded bg-[var(--status-warning-soft)] border border-[var(--status-warning-border)]" />
                     <span>Flaky</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-red-500 border border-red-600" />
+                    <div className="w-3 h-3 rounded bg-[var(--status-failure-soft)] border border-[var(--status-failure-border)]" />
                     <span>Failed</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-gray-400 border border-gray-500" />
+                    <div className="w-3 h-3 rounded bg-[var(--status-neutral-soft)] border border-[var(--status-neutral-border)]" />
                     <span>Other</span>
                   </div>
                 </div>
               </div>
 
               {!runDetail.tests || runDetail.tests.length === 0 ? (
-                <div className="text-center py-16 text-gray-500">
-                  <Map className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                <div className="text-center py-16 text-[var(--stitch-on-surface-muted)]">
+                  <Map className="h-16 w-16 mx-auto mb-4 text-[var(--stitch-on-surface-subtle)]" />
                   <p>No tests available</p>
                 </div>
               ) : (
@@ -325,17 +325,17 @@ export function TestMapPage() {
         <div className="lg:col-span-1">
           <Card className="sticky top-6">
             <CardContent className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <h2 className="text-lg font-semibold text-[var(--stitch-on-surface)] mb-4">
                 Filter by Tags
               </h2>
 
               {sortedTags.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-8">
+                <p className="text-sm text-[var(--stitch-on-surface-muted)] text-center py-8">
                   No tags available
                 </p>
               ) : (
                 <>
-                  <div className="mb-4 text-xs text-gray-500">
+                  <div className="mb-4 text-xs text-[var(--stitch-on-surface-muted)]">
                     {selectedTags.size > 0
                       ? `${highlightedTestIds.size} test${highlightedTestIds.size !== 1 ? "s" : ""} highlighted`
                       : "Select tags to highlight tests"}
@@ -352,8 +352,8 @@ export function TestMapPage() {
                           className={cn(
                             "w-full text-left px-3 py-2 rounded-lg border transition-all text-sm",
                             isSelected
-                              ? "bg-blue-100 border-blue-300 text-blue-900 font-medium"
-                              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300",
+                              ? "bg-[var(--stitch-primary-soft)] border-[var(--status-running-border)] text-[var(--stitch-primary)] font-medium"
+                              : "bg-[var(--stitch-surface-card)] border-[var(--stitch-outline)] text-[var(--stitch-on-surface)] hover:bg-[var(--stitch-surface-card)] hover:border-[var(--stitch-outline)]",
                           )}
                         >
                           <div className="flex items-center justify-between">
@@ -362,8 +362,8 @@ export function TestMapPage() {
                               className={cn(
                                 "ml-2 px-2 py-0.5 rounded text-xs font-medium",
                                 isSelected
-                                  ? "bg-blue-200 text-blue-800"
-                                  : "bg-gray-100 text-gray-600",
+                                  ? "bg-[var(--stitch-primary-soft)] text-[var(--stitch-primary)]"
+                                  : "bg-[var(--stitch-surface-low)] text-[var(--stitch-on-surface-muted)]",
                               )}
                             >
                               {count}
@@ -377,7 +377,7 @@ export function TestMapPage() {
                   {selectedTags.size > 0 && (
                     <button
                       onClick={() => setSelectedTags(new Set())}
-                      className="w-full mt-4 px-3 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                      className="w-full mt-4 px-3 py-2 text-sm text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] font-medium transition-colors"
                     >
                       Clear Selection
                     </button>

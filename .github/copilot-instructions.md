@@ -450,6 +450,44 @@ make mongo-clear
 
 ## Code Style & Patterns
 
+## Frontend Implementation Guardrails (Stitch)
+
+When implementing or editing UI under `web/src/**`, treat the Stitch system as mandatory, not advisory.
+
+### Source of Truth
+
+- Design tokens and usage guidance: `web/src/lib/styleGuide.ts`
+- Human-readable frontend policy: `web/STYLE_GUIDE.md`
+- Font loading and font variables: `web/src/index.css`
+
+### Required Visual Rules
+
+- Use tonal layering for separation. Do not rely on visible borders for card structure.
+- Card depth should come from background tier contrast (`surface` tokens), not drop shadows.
+- Use ghost borders only when explicitly required for accessibility or when demonstrating ghost-border behavior.
+- Light mode typography: Space Grotesk for display/headlines, Inter for body/labels.
+- Dark mode typography: Space Grotesk for display/headlines/body/labels unless a page explicitly overrides by spec.
+- Primary actions must use the Stitch gradient direction and token pairing for the selected variant.
+- Status chips and component examples must use Stitch token mappings (success/error/flaky) for the active variant.
+
+### Required Validation for Frontend Changes
+
+For any UI-affecting change in `web/src/**`, run:
+
+```bash
+cd web && npm run build
+```
+
+and verify:
+
+1. No TypeScript errors.
+2. No unintended fallback fonts.
+3. Visible tonal contrast between page background, section cards, and nested cards in both light and dark variants when applicable.
+
+### Implementation Priority
+
+When there is a conflict between legacy component defaults and Stitch guidance, prefer Stitch guidance for new or modified frontend work.
+
 ### Import Aliases
 
 Consistent alias for document models: `import m "github.com/stanterprise/observer/internal/models"`

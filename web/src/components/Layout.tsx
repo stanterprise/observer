@@ -1,9 +1,11 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { Activity } from "lucide-react";
+import { Activity, Moon, Sun } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useTheme } from "@/lib/theme";
 
 export function Layout() {
   const location = useLocation();
+  const { isDark, toggleVariant } = useTheme();
 
   const isActive = (path: string) => {
     if (path === "/") {
@@ -13,8 +15,8 @@ export function Layout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+    <div className="min-h-screen flex flex-col bg-(--stitch-background) text-(--stitch-on-surface)">
+      <nav className="sticky top-0 z-50 border-b border-(--stitch-outline) bg-(--stitch-surface-card)/95 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -23,8 +25,8 @@ export function Layout() {
                 className="flex items-center group"
                 aria-label="Observer Home"
               >
-                <Activity className="h-8 w-8 text-blue-600 mr-3 group-hover:text-blue-700 transition-colors" />
-                <span className="text-xl font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
+                <Activity className="mr-3 h-8 w-8 text-(--stitch-primary) transition-colors" />
+                <span className="text-xl font-bold font-headline text-(--stitch-on-surface) transition-colors group-hover:text-(--stitch-primary)">
                   Observer
                 </span>
               </Link>
@@ -35,8 +37,8 @@ export function Layout() {
                 className={cn(
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive("/") && location.pathname === "/"
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50",
+                    ? "bg-(--stitch-primary-soft) text-(--stitch-primary)"
+                    : "text-(--stitch-on-surface-muted) hover:text-(--stitch-on-surface) hover:bg-(--stitch-surface-low)",
                 )}
               >
                 <span className="hidden sm:inline">Dashboard</span>
@@ -47,8 +49,8 @@ export function Layout() {
                 className={cn(
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive("/suite_runs")
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50",
+                    ? "bg-(--stitch-primary-soft) text-(--stitch-primary)"
+                    : "text-(--stitch-on-surface-muted) hover:text-(--stitch-on-surface) hover:bg-(--stitch-surface-low)",
                 )}
               >
                 Test Runs
@@ -58,8 +60,8 @@ export function Layout() {
                 className={cn(
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive("/suite_runs/raw-messages")
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50",
+                    ? "bg-(--stitch-primary-soft) text-(--stitch-primary)"
+                    : "text-(--stitch-on-surface-muted) hover:text-(--stitch-on-surface) hover:bg-(--stitch-surface-low)",
                 )}
               >
                 Raw Messages
@@ -69,12 +71,52 @@ export function Layout() {
                 className={cn(
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive("/markers") || isActive("/marker/")
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50",
+                    ? "bg-(--stitch-primary-soft) text-(--stitch-primary)"
+                    : "text-(--stitch-on-surface-muted) hover:text-(--stitch-on-surface) hover:bg-(--stitch-surface-low)",
                 )}
               >
                 Markers
               </Link>
+              <Link
+                to="/style-guide"
+                className={cn(
+                  "px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  isActive("/style-guide")
+                    ? "bg-(--stitch-primary-soft) text-(--stitch-primary)"
+                    : "text-(--stitch-on-surface-muted) hover:text-(--stitch-on-surface) hover:bg-(--stitch-surface-low)",
+                )}
+              >
+                Style Guide
+              </Link>
+              <button
+                type="button"
+                onClick={toggleVariant}
+                role="switch"
+                aria-checked={isDark}
+                className="group inline-flex h-8 w-14 items-center rounded-full border border-(--stitch-outline) bg-(--stitch-surface-low) px-1 transition-colors hover:bg-(--stitch-surface-highest)"
+                aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+                title={`Switch to ${isDark ? "light" : "dark"} mode`}
+              >
+                <span
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded-full bg-(--stitch-surface-card) text-(--stitch-on-surface-muted) shadow-sm transition-transform duration-200",
+                    isDark ? "translate-x-6" : "translate-x-0",
+                  )}
+                >
+                  {isDark ? (
+                    <Moon
+                      className="h-3.5 w-3.5 text-(--stitch-primary)"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Sun
+                      className="h-3.5 w-3.5 text-(--stitch-primary)"
+                      aria-hidden="true"
+                    />
+                  )}
+                </span>
+                <span className="sr-only">Toggle appearance mode</span>
+              </button>
             </div>
           </div>
         </div>
@@ -82,11 +124,14 @@ export function Layout() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         <Outlet />
       </main>
-      <footer className="bg-white border-t border-gray-200 mt-auto">
+      <footer className="mt-auto border-t border-(--stitch-outline) bg-(--stitch-surface-card)">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <Activity className="h-4 w-4 text-blue-600" aria-hidden="true" />
+            <div className="flex items-center space-x-2 text-sm text-(--stitch-on-surface-muted)">
+              <Activity
+                className="h-4 w-4 text-(--stitch-primary)"
+                aria-hidden="true"
+              />
               <span>Observer - Test Observability Platform</span>
             </div>
             <div className="flex items-center space-x-6 text-sm">
@@ -94,7 +139,7 @@ export function Layout() {
                 href="https://github.com/stanterprise/observer"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-600 hover:text-blue-600 transition-colors"
+                className="text-(--stitch-on-surface-muted) hover:text-(--stitch-primary) transition-colors"
               >
                 Documentation
               </a>
@@ -102,11 +147,11 @@ export function Layout() {
                 href="https://github.com/stanterprise/observer/issues"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-600 hover:text-blue-600 transition-colors"
+                className="text-(--stitch-on-surface-muted) hover:text-(--stitch-primary) transition-colors"
               >
                 Support
               </a>
-              <span className="text-gray-400">v0.0.11</span>
+              <span className="text-(--stitch-on-surface-subtle)">v0.0.11</span>
             </div>
           </div>
         </div>

@@ -28,12 +28,12 @@ export const SuiteTitleCard = ({
     stats.failed + stats.broken! + stats.timedout! + stats.interrupted!;
 
   return (
-    <Card className="overflow-hidden shadow-lg border-gray-200">
+    <Card className="overflow-hidden border-(--stitch-outline)">
       {/* Enhanced Progress Bar */}
-      <div className="h-8 bg-gray-100 flex relative group">
+      <div className="relative flex h-8 bg-(--stitch-surface-low)">
         {stats.passed > 0 && (
           <div
-            className="bg-linear-to-r from-green-500 to-green-600 transition-all duration-500 ease-out relative overflow-hidden"
+            className="relative overflow-hidden bg-(--status-success) transition-all duration-500 ease-out"
             style={{
               width: `${(stats.passed / runDetail.totalTests!) * 100}%`,
             }}
@@ -46,7 +46,7 @@ export const SuiteTitleCard = ({
         )}
         {totalFailedTestsCounts > 0 && (
           <div
-            className="bg-linear-to-r from-red-500 to-red-600 transition-all duration-500 ease-out"
+            className="bg-(--status-failure) transition-all duration-500 ease-out"
             style={{
               width: `${(totalFailedTestsCounts / runDetail.totalTests!) * 100}%`,
             }}
@@ -57,7 +57,7 @@ export const SuiteTitleCard = ({
         )}
         {stats.skipped > 0 && (
           <div
-            className="bg-linear-to-r from-gray-400 to-gray-500 transition-all duration-500 ease-out"
+            className="bg-(--status-neutral) transition-all duration-500 ease-out"
             style={{
               width: `${(stats.skipped / runDetail.totalTests!) * 100}%`,
             }}
@@ -68,7 +68,7 @@ export const SuiteTitleCard = ({
         )}
         {stats.total > 0 && runningPendingCount > 0 && (
           <div
-            className="bg-linear-to-r from-blue-400 to-blue-500 transition-all duration-500 ease-out animate-pulse"
+            className="animate-pulse bg-(--status-running) transition-all duration-500 ease-out"
             style={{
               width: `${(runningPendingCount / runDetail.totalTests!) * 100}%`,
             }}
@@ -78,21 +78,21 @@ export const SuiteTitleCard = ({
           />
         )}
       </div>
-      <CardHeader className="bg-linear-to-r from-gray-50 to-white">
+      <CardHeader className="bg-(--stitch-surface-low)">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex-1 min-w-0">
             <CardTitle className="text-xl md:text-2xl mb-2 truncate">
               {runDetail.name ?? runDetail.id}
             </CardTitle>
-            <div className="flex items-center gap-4 text-sm text-gray-600">
+            <div className="flex items-center gap-4 text-sm text-(--stitch-on-surface-muted)">
               <span className="font-medium">Total Tests:</span>
-              <span className="font-bold text-gray-900">
+              <span className="font-bold text-(--stitch-on-surface)">
                 {runDetail.totalTests}
               </span>
               {runDetail.createdAt && (
                 <>
-                  <span className="text-gray-300">•</span>
-                  <span className="text-gray-500">
+                  <span className="text-(--stitch-on-surface-subtle)">•</span>
+                  <span className="text-(--stitch-on-surface-muted)">
                     {new Date(runDetail.createdAt).toLocaleDateString(
                       undefined,
                       {
@@ -114,60 +114,84 @@ export const SuiteTitleCard = ({
           />
         </div>
       </CardHeader>
-      <CardContent className="bg-white">
+      <CardContent className="bg-(--stitch-surface-card)">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-          <div className="group flex flex-col items-center p-4 md:p-6 bg-linear-to-br from-green-50 to-green-100/50 rounded-xl border border-green-200 transition-all duration-200 hover:shadow-md hover:scale-105 cursor-default">
-            <CheckCircle className="h-8 w-8 md:h-10 md:w-10 text-green-600 mb-3 group-hover:scale-110 transition-transform" />
-            <div className="text-3xl md:text-4xl font-bold text-green-700 mb-1">
+          <div
+            className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-[1.02] md:p-6"
+            style={{
+              backgroundColor: "var(--status-success-soft)",
+              borderColor: "var(--status-success-border)",
+            }}
+          >
+            <CheckCircle className="mb-3 h-8 w-8 text-(--status-success) transition-transform group-hover:scale-110 md:h-10 md:w-10" />
+            <div className="mb-1 text-3xl font-bold text-(--status-success) md:text-4xl">
               {runDetail.statistics!.passed}
             </div>
-            <div className="text-xs md:text-sm text-gray-700 font-medium uppercase tracking-wide">
+            <div className="text-xs font-medium uppercase tracking-wide text-(--stitch-on-surface) md:text-sm">
               Passed
             </div>
             {stats.total > 0 && (
-              <div className="text-xs text-green-600 font-semibold mt-1">
+              <div className="mt-1 text-xs font-semibold text-(--status-success)">
                 {Math.round((stats.passed / stats.total) * 100)}%
               </div>
             )}
           </div>
-          <div className="group flex flex-col items-center p-4 md:p-6 bg-linear-to-br from-red-50 to-red-100/50 rounded-xl border border-red-200 transition-all duration-200 hover:shadow-md hover:scale-105 cursor-default">
-            <XCircle className="h-8 w-8 md:h-10 md:w-10 text-red-600 mb-3 group-hover:scale-110 transition-transform" />
-            <div className="text-3xl md:text-4xl font-bold text-red-700 mb-1">
+          <div
+            className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-[1.02] md:p-6"
+            style={{
+              backgroundColor: "var(--status-failure-soft)",
+              borderColor: "var(--status-failure-border)",
+            }}
+          >
+            <XCircle className="mb-3 h-8 w-8 text-(--status-failure) transition-transform group-hover:scale-110 md:h-10 md:w-10" />
+            <div className="mb-1 text-3xl font-bold text-(--status-failure) md:text-4xl">
               {totalFailedTestsCounts}
             </div>
-            <div className="text-xs md:text-sm text-gray-700 font-medium uppercase tracking-wide">
+            <div className="text-xs font-medium uppercase tracking-wide text-(--stitch-on-surface) md:text-sm">
               Failed
             </div>
             {stats.total > 0 && (
-              <div className="text-xs text-red-600 font-semibold mt-1">
+              <div className="mt-1 text-xs font-semibold text-(--status-failure)">
                 {Math.round((totalFailedTestsCounts / stats.total) * 100)}%
               </div>
             )}
           </div>
-          <div className="group flex flex-col items-center p-4 md:p-6 bg-linear-to-br from-gray-50 to-gray-100/50 rounded-xl border border-gray-200 transition-all duration-200 hover:shadow-md hover:scale-105 cursor-default">
-            <CircleDashed className="h-8 w-8 md:h-10 md:w-10 text-gray-600 mb-3 group-hover:scale-110 transition-transform" />
-            <div className="text-3xl md:text-4xl font-bold text-gray-700 mb-1">
+          <div
+            className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-[1.02] md:p-6"
+            style={{
+              backgroundColor: "var(--status-neutral-soft)",
+              borderColor: "var(--status-neutral-border)",
+            }}
+          >
+            <CircleDashed className="mb-3 h-8 w-8 text-(--status-neutral) transition-transform group-hover:scale-110 md:h-10 md:w-10" />
+            <div className="mb-1 text-3xl font-bold text-(--status-neutral) md:text-4xl">
               {runDetail.statistics!.skipped}
             </div>
-            <div className="text-xs md:text-sm text-gray-700 font-medium uppercase tracking-wide">
+            <div className="text-xs font-medium uppercase tracking-wide text-(--stitch-on-surface) md:text-sm">
               Skipped
             </div>
             {stats.total > 0 && (
-              <div className="text-xs text-gray-600 font-semibold mt-1">
+              <div className="mt-1 text-xs font-semibold text-(--status-neutral)">
                 {Math.round((stats.skipped / stats.total) * 100)}%
               </div>
             )}
           </div>
-          <div className="group flex flex-col items-center p-4 md:p-6 bg-linear-to-br from-gray-50 to-gray-100/50 rounded-xl border border-gray-200 transition-all duration-200 hover:shadow-md hover:scale-105 cursor-default">
-            <CircleOff className="h-8 w-8 md:h-10 md:w-10 text-gray-600 mb-3 group-hover:scale-110 transition-transform" />
-            <div className="text-3xl md:text-4xl font-bold text-gray-700 mb-1">
+          <div
+            className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-[1.02] md:p-6"
+            style={{
+              backgroundColor: "var(--status-running-soft)",
+              borderColor: "var(--status-running-border)",
+            }}
+          >
+            <CircleOff className="mb-3 h-8 w-8 text-(--status-running) transition-transform group-hover:scale-110 md:h-10 md:w-10" />
+            <div className="mb-1 text-3xl font-bold text-(--status-running) md:text-4xl">
               {runningPendingCount}
             </div>
-            <div className="text-xs md:text-sm text-gray-700 font-medium uppercase tracking-wide">
+            <div className="text-xs font-medium uppercase tracking-wide text-(--stitch-on-surface) md:text-sm">
               Pending
             </div>
             {stats.total > 0 && (
-              <div className="text-xs text-gray-600 font-semibold mt-1">
+              <div className="mt-1 text-xs font-semibold text-(--status-running)">
                 {Math.round((runningPendingCount / stats.total) * 100)}%
               </div>
             )}

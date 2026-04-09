@@ -1,39 +1,44 @@
 import { cn } from "../lib/utils";
 
-interface CardProps {
+interface CardContainerProps {
+  children: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+interface CardSectionProps {
   children: React.ReactNode;
   className?: string;
 }
 
-export function Card({ children, className }: CardProps) {
+export function Card({ children, className, style }: CardContainerProps) {
   return (
     <div
-      className={cn(
-        "bg-white rounded-lg shadow-md border border-gray-200",
-        className
-      )}
+      className={cn("rounded-lg bg-(--stitch-surface-card)", className)}
+      style={style}
     >
       {children}
     </div>
   );
 }
 
-export function CardHeader({ children, className }: CardProps) {
-  return (
-    <div className={cn("px-6 py-4 border-b border-gray-200", className)}>
-      {children}
-    </div>
-  );
+export function CardHeader({ children, className }: CardSectionProps) {
+  return <div className={cn("px-6 py-4", className)}>{children}</div>;
 }
 
-export function CardTitle({ children, className }: CardProps) {
+export function CardTitle({ children, className }: CardSectionProps) {
   return (
-    <h3 className={cn("text-lg font-semibold text-gray-900", className)}>
+    <h3
+      className={cn(
+        "text-lg font-semibold text-(--stitch-on-surface)",
+        className,
+      )}
+    >
       {children}
     </h3>
   );
 }
 
-export function CardContent({ children, className }: CardProps) {
+export function CardContent({ children, className }: CardSectionProps) {
   return <div className={cn("px-6 py-4", className)}>{children}</div>;
 }

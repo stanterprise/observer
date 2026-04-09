@@ -46,7 +46,7 @@ export function MarkerBrowsePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600">Loading markers...</div>
+        <div className="text-[var(--stitch-on-surface-muted)]">Loading markers...</div>
       </div>
     );
   }
@@ -57,8 +57,8 @@ export function MarkerBrowsePage() {
         <Card>
           <CardContent className="py-12">
             <div className="flex flex-col items-center justify-center space-y-4">
-              <AlertCircle className="h-16 w-16 text-red-500" />
-              <div className="text-red-600 text-center">
+              <AlertCircle className="h-16 w-16 text-[var(--status-failure)]" />
+              <div className="text-[var(--status-failure)] text-center">
                 <p className="font-semibold">Error: {error}</p>
                 <p className="text-sm mt-1">
                   Unable to fetch markers. Please try again later.
@@ -76,12 +76,12 @@ export function MarkerBrowsePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <Tag className="h-6 w-6 text-blue-600" />
-          <h1 className="text-3xl font-bold text-gray-900">Test Markers</h1>
+          <Tag className="h-6 w-6 text-[var(--stitch-primary)]" />
+          <h1 className="text-3xl font-bold text-[var(--stitch-on-surface)]">Test Markers</h1>
         </div>
       </div>
 
-      <p className="text-gray-600">
+      <p className="text-[var(--stitch-on-surface-muted)]">
         Browse test runs organized by marker values. Markers are used to group
         and track test runs across different environments, releases, or builds.
       </p>
@@ -90,13 +90,13 @@ export function MarkerBrowsePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <TrendingUp className="h-5 w-5 text-blue-600" />
+            <TrendingUp className="h-5 w-5 text-[var(--stitch-primary)]" />
             <span>Available Markers</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           {markers.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-[var(--stitch-on-surface-muted)]">
               <p className="mb-2">No markers found.</p>
               <p className="text-sm">
                 Markers are created when test runs include a MARKER field in
@@ -111,17 +111,17 @@ export function MarkerBrowsePage() {
                   to={`/marker/${encodeURIComponent(markerInfo.marker)}/stats`}
                   className="group"
                 >
-                  <Card className="hover:shadow-lg transition-shadow duration-200 border-2 border-transparent group-hover:border-blue-500">
+                  <Card className="hover:shadow-lg transition-shadow duration-200 border-2 border-transparent group-hover:border-[var(--status-running-border)]">
                     <CardContent className="py-4">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3">
-                            <Tag className="h-5 w-5 text-blue-600 group-hover:text-blue-700" />
+                            <Tag className="h-5 w-5 text-[var(--stitch-primary)] group-hover:text-[var(--stitch-primary)]" />
                             <div>
-                              <h3 className="font-mono text-lg font-semibold text-gray-900 group-hover:text-blue-600 break-all">
+                              <h3 className="font-mono text-lg font-semibold text-[var(--stitch-on-surface)] group-hover:text-[var(--stitch-primary)] break-all">
                                 {markerInfo.marker}
                               </h3>
-                              <p className="text-sm text-gray-600 mt-1">
+                              <p className="text-sm text-[var(--stitch-on-surface-muted)] mt-1">
                                 {markerInfo.count} test run
                                 {markerInfo.count !== 1 ? "s" : ""}
                               </p>
@@ -129,10 +129,10 @@ export function MarkerBrowsePage() {
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm text-blue-600 group-hover:text-blue-700 font-medium">
+                          <span className="text-sm text-[var(--stitch-primary)] group-hover:text-[var(--stitch-primary)] font-medium">
                             View Statistics
                           </span>
-                          <ArrowRight className="h-5 w-5 text-blue-600 group-hover:text-blue-700 group-hover:translate-x-1 transition-transform" />
+                          <ArrowRight className="h-5 w-5 text-[var(--stitch-primary)] group-hover:text-[var(--stitch-primary)] group-hover:translate-x-1 transition-transform" />
                         </div>
                       </div>
                     </CardContent>
