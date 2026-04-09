@@ -75,6 +75,17 @@ export function Layout() {
               >
                 Markers
               </Link>
+              <Link
+                to="/style-guide"
+                className={cn(
+                  "px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  isActive("/style-guide")
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-50",
+                )}
+              >
+                Style Guide
+              </Link>
             </div>
           </div>
         </div>

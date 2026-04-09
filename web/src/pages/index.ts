@@ -7,6 +7,7 @@ import { MarkerBrowsePage } from "./MarkerBrowsePage";
 import { TestMapPage } from "./TestMapPage";
 import { RawMessagesPage } from "./RawMessagesPage";
 import { RawMessagesRunsPage } from "./RawMessagesRunsPage";
+import { StyleGuidePage } from "./StyleGuidePage";
 
 export {
   TestDetailPage,
@@ -18,4 +19,5 @@ export {
   TestMapPage,
   RawMessagesPage,
   RawMessagesRunsPage,
+  StyleGuidePage,
 };

@@ -3,15 +3,17 @@ import { cn } from "../lib/utils";
 interface CardProps {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export function Card({ children, className }: CardProps) {
+export function Card({ children, className, style }: CardProps) {
   return (
     <div
       className={cn(
         "bg-white rounded-lg shadow-md border border-gray-200",
-        className
+        className,
       )}
+      style={style}
     >
       {children}
     </div>
