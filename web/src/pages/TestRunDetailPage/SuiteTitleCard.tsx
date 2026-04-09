@@ -116,8 +116,13 @@ export const SuiteTitleCard = ({
       </CardHeader>
       <CardContent className="bg-(--stitch-surface-card)">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-          <div className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-105 md:p-6"
-            style={{ backgroundColor: "var(--status-success-soft)", borderColor: "var(--status-success-border)" }}>
+          <div
+            className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-[1.02] md:p-6"
+            style={{
+              backgroundColor: "var(--status-success-soft)",
+              borderColor: "var(--status-success-border)",
+            }}
+          >
             <CheckCircle className="mb-3 h-8 w-8 text-(--status-success) transition-transform group-hover:scale-110 md:h-10 md:w-10" />
             <div className="mb-1 text-3xl font-bold text-(--status-success) md:text-4xl">
               {runDetail.statistics!.passed}
@@ -131,8 +136,13 @@ export const SuiteTitleCard = ({
               </div>
             )}
           </div>
-          <div className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-105 md:p-6"
-            style={{ backgroundColor: "var(--status-failure-soft)", borderColor: "var(--status-failure-border)" }}>
+          <div
+            className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-[1.02] md:p-6"
+            style={{
+              backgroundColor: "var(--status-failure-soft)",
+              borderColor: "var(--status-failure-border)",
+            }}
+          >
             <XCircle className="mb-3 h-8 w-8 text-(--status-failure) transition-transform group-hover:scale-110 md:h-10 md:w-10" />
             <div className="mb-1 text-3xl font-bold text-(--status-failure) md:text-4xl">
               {totalFailedTestsCounts}
@@ -146,8 +156,13 @@ export const SuiteTitleCard = ({
               </div>
             )}
           </div>
-          <div className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-105 md:p-6"
-            style={{ backgroundColor: "var(--status-neutral-soft)", borderColor: "var(--status-neutral-border)" }}>
+          <div
+            className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-[1.02] md:p-6"
+            style={{
+              backgroundColor: "var(--status-neutral-soft)",
+              borderColor: "var(--status-neutral-border)",
+            }}
+          >
             <CircleDashed className="mb-3 h-8 w-8 text-(--status-neutral) transition-transform group-hover:scale-110 md:h-10 md:w-10" />
             <div className="mb-1 text-3xl font-bold text-(--status-neutral) md:text-4xl">
               {runDetail.statistics!.skipped}
@@ -161,8 +176,13 @@ export const SuiteTitleCard = ({
               </div>
             )}
           </div>
-          <div className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-105 md:p-6"
-            style={{ backgroundColor: "var(--status-running-soft)", borderColor: "var(--status-running-border)" }}>
+          <div
+            className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-[1.02] md:p-6"
+            style={{
+              backgroundColor: "var(--status-running-soft)",
+              borderColor: "var(--status-running-border)",
+            }}
+          >
             <CircleOff className="mb-3 h-8 w-8 text-(--status-running) transition-transform group-hover:scale-110 md:h-10 md:w-10" />
             <div className="mb-1 text-3xl font-bold text-(--status-running) md:text-4xl">
               {runningPendingCount}

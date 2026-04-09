@@ -42,9 +42,7 @@ const TestSuiteRecord = ({ suite, hiddenSuiteTypes }: TestSuiteRecordProps) => {
         <div className="mb-2 text-base font-semibold text-(--stitch-on-surface)">
           {suite.name}
         </div>
-        {suite.tags && suite.tags.length > 0 && (
-          <TagList tags={suite.tags} />
-        )}
+        {suite.tags && suite.tags.length > 0 && <TagList tags={suite.tags} />}
       </div>
       <div className="space-y-3">
         {suite.tests?.map((test) => (

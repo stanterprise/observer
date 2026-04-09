@@ -14,8 +14,12 @@ type TestRecordProps = {
 
 export default ({ test, runId }: TestRecordProps) => {
   return (
-    <Link key={test.id} to={`/suite_runs/${runId}/tests/${test.id}`}>
-      <Card className="group cursor-pointer transition-all duration-200 hover:scale-[1.01] hover:border-(--status-running-border) hover:bg-(--stitch-surface-low)">
+    <Link
+      key={test.id}
+      to={`/suite_runs/${runId}/tests/${test.id}`}
+      className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
+    >
+      <Card className="group cursor-pointer transition-colors duration-200 hover:border-(--status-running-border) hover:bg-(--stitch-surface-low)">
         <CardContent className="py-4">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">

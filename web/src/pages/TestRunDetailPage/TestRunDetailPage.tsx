@@ -2,7 +2,17 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
-import { ArrowLeft, Play, Eye, EyeOff, Search, X, Filter, Map, FileText } from "lucide-react";
+import {
+  ArrowLeft,
+  Play,
+  Eye,
+  EyeOff,
+  Search,
+  X,
+  Filter,
+  Map,
+  FileText,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { SuiteTitleCard } from "./SuiteTitleCard";
@@ -258,17 +268,20 @@ export function TestRunDetailPage() {
       <div className="space-y-6 animate-in fade-in duration-300">
         <Link
           to="/suite_runs"
-          className="inline-flex items-center gap-2 text-(--stitch-primary) hover:text-(--stitch-primary) transition-colors group"
+          className="group inline-flex items-center gap-2 rounded-md px-2 py-1 text-(--stitch-primary) transition-colors hover:bg-(--stitch-primary-soft) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
           <span className="font-medium">Back to Test Runs</span>
         </Link>
-        <Card className="border-red-200 bg-red-50/50">
+        <Card className="border-(--status-failure-border)" style={{ backgroundColor: "var(--status-failure-soft)" }}>
           <CardContent className="py-12">
             <div className="text-center max-w-md mx-auto">
-              <div className="mx-auto h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+              <div
+                className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full"
+                style={{ backgroundColor: "var(--status-failure-soft)" }}
+              >
                 <svg
-                  className="h-8 w-8 text-red-600"
+                  className="h-8 w-8 text-(--status-failure)"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -290,7 +303,7 @@ export function TestRunDetailPage() {
               </p>
               <Link
                 to="/suite_runs"
-                className="inline-flex items-center rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90"
+                className="inline-flex items-center rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
                 style={{
                   background:
                     "linear-gradient(135deg, var(--stitch-primary), var(--stitch-primary-end))",
@@ -374,7 +387,7 @@ export function TestRunDetailPage() {
         <div className="flex items-center gap-4">
           <Link
             to="/suite_runs"
-            className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-(--stitch-surface-card) border border-(--stitch-outline) text-(--stitch-on-surface-muted) hover:bg-(--stitch-surface-low) hover:border-(--stitch-outline) transition-all shadow-sm hover:shadow group"
+            className="group inline-flex h-10 w-10 items-center justify-center rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-card) text-(--stitch-on-surface-muted) transition-colors hover:bg-(--stitch-surface-low) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
             aria-label="Back to test runs"
           >
             <ArrowLeft className="h-5 w-5 group-hover:-translate-x-0.5 transition-transform" />
@@ -391,14 +404,14 @@ export function TestRunDetailPage() {
         <div className="flex items-center gap-2">
           <Link
             to={`/suite_runs/${runId}/raw-messages`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-(--stitch-surface-card) text-(--stitch-on-surface-muted) border border-(--stitch-outline) rounded-lg hover:bg-(--stitch-surface-low) hover:border-(--stitch-outline) transition-colors shadow-sm hover:shadow"
+            className="inline-flex items-center gap-2 rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-card) px-4 py-2 text-(--stitch-on-surface-muted) transition-colors hover:bg-(--stitch-surface-low) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
           >
             <FileText className="h-5 w-5" />
             <span className="font-medium">Raw Messages</span>
           </Link>
           <Link
             to={`/suite_runs/${runId}/map`}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-white shadow-sm transition-opacity hover:opacity-90"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
             style={{
               background:
                 "linear-gradient(135deg, var(--stitch-primary), var(--stitch-primary-end))",
@@ -428,7 +441,9 @@ export function TestRunDetailPage() {
           </h2>
           {availableSuiteTypes.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-(--stitch-on-surface-muted) font-medium">Suites:</span>
+              <span className="text-sm text-(--stitch-on-surface-muted) font-medium">
+                Suites:
+              </span>
               <div className="flex gap-2">
                 {availableSuiteTypes.map((type) => {
                   const isHidden = hiddenSuiteTypes.has(type);
@@ -437,7 +452,7 @@ export function TestRunDetailPage() {
                       key={type}
                       onClick={() => toggleSuiteType(type)}
                       className={cn(
-                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all border",
+                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary)",
                         isHidden
                           ? "bg-(--stitch-surface-low) text-(--stitch-on-surface-subtle) border-(--stitch-outline) hover:bg-(--stitch-surface-highest)"
                           : "bg-blue-50 text-(--stitch-primary) border-blue-200 hover:bg-blue-100",
@@ -472,7 +487,7 @@ export function TestRunDetailPage() {
                   placeholder="Search test cases by name or ID..."
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 border border-(--stitch-outline) rounded-lg focus:ring-2 focus:ring-(--stitch-primary) focus:border-(--stitch-primary) transition-all"
+                  className="w-full rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-card) py-2.5 pl-10 pr-10 text-(--stitch-on-surface) placeholder:text-(--stitch-on-surface-subtle) transition-colors focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 focus:ring-offset-(--stitch-background)"
                 />
                 {searchText && (
                   <button
@@ -495,7 +510,7 @@ export function TestRunDetailPage() {
                   {hasActiveFilters && (
                     <button
                       onClick={clearFilters}
-                      className="text-sm text-(--stitch-primary) hover:text-(--stitch-primary) font-medium transition-colors"
+                      className="rounded-md px-2 py-1 text-sm font-medium text-(--stitch-primary) transition-colors hover:bg-(--stitch-primary-soft) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary)"
                     >
                       Clear All Filters
                     </button>
@@ -554,7 +569,7 @@ export function TestRunDetailPage() {
                         key={status}
                         onClick={() => toggleStatus(status)}
                         className={cn(
-                          "px-3 py-1.5 rounded-md text-sm font-medium transition-all border-2",
+                          "rounded-md border-2 px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary)",
                           statusColors[status] ||
                             "bg-(--stitch-surface-card) border-(--stitch-outline) text-(--stitch-on-surface-muted)",
                         )}
@@ -580,7 +595,7 @@ export function TestRunDetailPage() {
                           key={tag}
                           onClick={() => toggleTag(tag)}
                           className={cn(
-                            "px-3 py-1.5 rounded-md text-sm font-medium transition-all border",
+                            "rounded-md border px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary)",
                             isSelected
                               ? "bg-(--stitch-primary-soft) border-(--status-running-border) text-(--stitch-primary)"
                               : "bg-(--stitch-surface-card) border-(--stitch-outline) text-(--stitch-on-surface-muted) hover:bg-(--stitch-surface-low)",
@@ -630,7 +645,7 @@ export function TestRunDetailPage() {
                 </p>
                 <button
                   onClick={clearFilters}
-                  className="inline-flex items-center rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90"
+                  className="inline-flex items-center rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
                   style={{
                     background:
                       "linear-gradient(135deg, var(--stitch-primary), var(--stitch-primary-end))",
