@@ -10,7 +10,7 @@ export function Card({ children, className, style }: CardProps) {
   return (
     <div
       className={cn(
-        "bg-white rounded-lg shadow-md border border-gray-200",
+        "rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-card)",
         className,
       )}
       style={style}
@@ -22,7 +22,9 @@ export function Card({ children, className, style }: CardProps) {
 
 export function CardHeader({ children, className }: CardProps) {
   return (
-    <div className={cn("px-6 py-4 border-b border-gray-200", className)}>
+    <div
+      className={cn("px-6 py-4 border-b border-(--stitch-outline)", className)}
+    >
       {children}
     </div>
   );
@@ -30,7 +32,12 @@ export function CardHeader({ children, className }: CardProps) {
 
 export function CardTitle({ children, className }: CardProps) {
   return (
-    <h3 className={cn("text-lg font-semibold text-gray-900", className)}>
+    <h3
+      className={cn(
+        "text-lg font-semibold text-(--stitch-on-surface)",
+        className,
+      )}
+    >
       {children}
     </h3>
   );

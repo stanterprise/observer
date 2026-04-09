@@ -1,12 +1,8 @@
-import { useState } from "react";
 import { CheckCircle2, ExternalLink, Moon, Sun } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/Card";
-import {
-  stitchStyleGuide,
-  stitchGuideVariants,
-  type StitchGuideVariant,
-} from "@/lib/styleGuide";
+import { useTheme } from "@/lib/theme";
+import { stitchStyleGuide, stitchGuideVariants } from "@/lib/styleGuide";
 
 function hexToRgba(hex: string, alpha: number): string {
   const clean = hex.replace("#", "");
@@ -18,7 +14,7 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 export function StyleGuidePage() {
-  const [variant, setVariant] = useState<StitchGuideVariant>("light");
+  const { variant, setVariant } = useTheme();
   const guide = stitchStyleGuide[variant];
   const isDark = guide.colorMode === "DARK";
 

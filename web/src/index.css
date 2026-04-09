@@ -2,6 +2,47 @@
 @import "tailwindcss";
 
 :root {
+  --stitch-background: #f7f9fb;
+  --stitch-surface: #f7f9fb;
+  --stitch-surface-low: #f0f4f7;
+  --stitch-surface-card: #ffffff;
+  --stitch-surface-highest: #d9e4ea;
+  --stitch-outline: #a9b4b9;
+  --stitch-primary: #0053db;
+  --stitch-primary-end: #0048c1;
+  --stitch-primary-soft: rgba(0, 83, 219, 0.12);
+  --stitch-tertiary: #742fe5;
+  --stitch-error: #9f403d;
+  --stitch-error-container: #fe8983;
+  --stitch-on-surface: #2a3439;
+  --stitch-on-surface-muted: rgba(42, 52, 57, 0.78);
+  --stitch-on-surface-subtle: rgba(42, 52, 57, 0.58);
+
+  --status-success: #16a34a;
+  --status-success-soft: rgba(22, 163, 74, 0.12);
+  --status-success-border: rgba(22, 163, 74, 0.32);
+  --status-failure: #9f403d;
+  --status-failure-soft: rgba(159, 64, 61, 0.12);
+  --status-failure-border: rgba(159, 64, 61, 0.32);
+  --status-warning: #b45309;
+  --status-warning-soft: rgba(245, 158, 11, 0.12);
+  --status-warning-border: rgba(245, 158, 11, 0.32);
+  --status-neutral: #475569;
+  --status-neutral-soft: rgba(148, 163, 184, 0.18);
+  --status-neutral-border: rgba(100, 116, 139, 0.28);
+  --status-running: #0053db;
+  --status-running-soft: rgba(0, 83, 219, 0.12);
+  --status-running-border: rgba(0, 83, 219, 0.28);
+  --status-broken: #c2410c;
+  --status-broken-soft: rgba(234, 88, 12, 0.12);
+  --status-broken-border: rgba(234, 88, 12, 0.32);
+  --status-interrupted: #be185d;
+  --status-interrupted-soft: rgba(219, 39, 119, 0.12);
+  --status-interrupted-border: rgba(219, 39, 119, 0.32);
+  --status-timedout: #742fe5;
+  --status-timedout-soft: rgba(116, 47, 229, 0.12);
+  --status-timedout-border: rgba(116, 47, 229, 0.28);
+
   --font-body:
     Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -12,6 +53,49 @@
 
   font-family: var(--font-body);
   line-height: 1.5;
+}
+
+:root[data-theme="dark"] {
+  --stitch-background: #060e20;
+  --stitch-surface: #060e20;
+  --stitch-surface-low: #091328;
+  --stitch-surface-card: #141f38;
+  --stitch-surface-highest: #192540;
+  --stitch-outline: #40485d;
+  --stitch-primary: #39b8fd;
+  --stitch-primary-end: #1faaef;
+  --stitch-primary-soft: rgba(57, 184, 253, 0.2);
+  --stitch-tertiary: #a9a0ff;
+  --stitch-error: #ff716c;
+  --stitch-error-container: #9f0519;
+  --stitch-on-surface: #dee5ff;
+  --stitch-on-surface-muted: rgba(222, 229, 255, 0.82);
+  --stitch-on-surface-subtle: rgba(222, 229, 255, 0.64);
+
+  --status-success: #4ade80;
+  --status-success-soft: rgba(22, 163, 74, 0.24);
+  --status-success-border: rgba(74, 222, 128, 0.45);
+  --status-failure: #ff716c;
+  --status-failure-soft: rgba(159, 5, 25, 0.48);
+  --status-failure-border: rgba(255, 113, 108, 0.48);
+  --status-warning: #fbbf24;
+  --status-warning-soft: rgba(251, 191, 36, 0.2);
+  --status-warning-border: rgba(251, 191, 36, 0.42);
+  --status-neutral: #94a3b8;
+  --status-neutral-soft: rgba(71, 85, 105, 0.38);
+  --status-neutral-border: rgba(148, 163, 184, 0.45);
+  --status-running: #39b8fd;
+  --status-running-soft: rgba(31, 170, 239, 0.3);
+  --status-running-border: rgba(57, 184, 253, 0.5);
+  --status-broken: #fb923c;
+  --status-broken-soft: rgba(249, 115, 22, 0.24);
+  --status-broken-border: rgba(251, 146, 60, 0.45);
+  --status-interrupted: #f472b6;
+  --status-interrupted-soft: rgba(236, 72, 153, 0.24);
+  --status-interrupted-border: rgba(244, 114, 182, 0.45);
+  --status-timedout: #a9a0ff;
+  --status-timedout-soft: rgba(169, 160, 255, 0.28);
+  --status-timedout-border: rgba(169, 160, 255, 0.5);
 }
 
 .font-body {
@@ -29,7 +113,8 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #f9fafb;
+  background-color: var(--stitch-background);
+  color: var(--stitch-on-surface);
 }
 
 /* Custom animation utilities */
@@ -55,15 +140,15 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--stitch-surface-low);
   border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #888;
+  background: var(--stitch-outline);
   border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: var(--stitch-primary);
 }
