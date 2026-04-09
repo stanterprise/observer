@@ -20,24 +20,37 @@ import type {
 // ─── Event-type badge colours ────────────────────────────────────────────────
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
-  "run.start": "bg-blue-100 text-blue-800 border-blue-200",
-  "run.end": "bg-blue-100 text-blue-800 border-blue-200",
-  "suite.begin": "bg-purple-100 text-purple-800 border-purple-200",
-  "suite.end": "bg-purple-100 text-purple-800 border-purple-200",
-  "test.begin": "bg-green-100 text-green-800 border-green-200",
-  "test.end": "bg-green-100 text-green-800 border-green-200",
-  "test.failure": "bg-red-100 text-red-800 border-red-200",
-  "test.error": "bg-red-100 text-red-800 border-red-200",
-  "step.begin": "bg-yellow-100 text-yellow-800 border-yellow-200",
-  "step.end": "bg-yellow-100 text-yellow-800 border-yellow-200",
-  stdout: "bg-gray-100 text-gray-800 border-gray-200",
-  stderr: "bg-orange-100 text-orange-800 border-orange-200",
+  "run.start":
+    "bg-[var(--stitch-primary-soft)] text-[var(--stitch-primary)] border-[var(--status-running-border)]",
+  "run.end":
+    "bg-[var(--stitch-primary-soft)] text-[var(--stitch-primary)] border-[var(--status-running-border)]",
+  "suite.begin":
+    "bg-[var(--status-timedout-soft)] text-[var(--status-timedout)] border-[var(--status-timedout-border)]",
+  "suite.end":
+    "bg-[var(--status-timedout-soft)] text-[var(--status-timedout)] border-[var(--status-timedout-border)]",
+  "test.begin":
+    "bg-[var(--status-success-soft)] text-[var(--status-success)] border-[var(--status-success-border)]",
+  "test.end":
+    "bg-[var(--status-success-soft)] text-[var(--status-success)] border-[var(--status-success-border)]",
+  "test.failure":
+    "bg-[var(--status-failure-soft)] text-[var(--status-failure)] border-[var(--status-failure-border)]",
+  "test.error":
+    "bg-[var(--status-failure-soft)] text-[var(--status-failure)] border-[var(--status-failure-border)]",
+  "step.begin":
+    "bg-[var(--status-warning-soft)] text-[var(--status-warning)] border-[var(--status-warning-border)]",
+  "step.end":
+    "bg-[var(--status-warning-soft)] text-[var(--status-warning)] border-[var(--status-warning-border)]",
+  stdout:
+    "bg-[var(--stitch-surface-low)] text-[var(--stitch-on-surface)] border-[var(--stitch-outline)]",
+  stderr:
+    "bg-[var(--status-warning-soft)] text-[var(--status-warning)] border-[var(--status-warning-border)]",
   heartbeat: "bg-teal-100 text-teal-800 border-teal-200",
 };
 
 function eventTypeColor(eventType: string): string {
   return (
-    EVENT_TYPE_COLORS[eventType] ?? "bg-gray-100 text-gray-700 border-gray-200"
+    EVENT_TYPE_COLORS[eventType] ??
+    "bg-[var(--stitch-surface-low)] text-[var(--stitch-on-surface)] border-[var(--stitch-outline)]"
   );
 }
 
@@ -55,14 +68,18 @@ function PayloadViewer({ payload }: { payload: unknown }) {
   }, [payload]);
 
   if (payload === null || payload === undefined) {
-    return <span className="text-gray-400 italic text-xs">empty</span>;
+    return (
+      <span className="text-[var(--stitch-on-surface-muted)] italic text-xs">
+        empty
+      </span>
+    );
   }
 
   return (
     <div>
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+        className="inline-flex items-center gap-1 text-xs font-medium text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] transition-colors"
         aria-expanded={expanded}
       >
         {expanded ? (
@@ -73,7 +90,7 @@ function PayloadViewer({ payload }: { payload: unknown }) {
         {expanded ? "Collapse" : "Show payload"}
       </button>
       {expanded && (
-        <pre className="mt-2 p-3 rounded-md bg-gray-900 text-gray-100 text-xs overflow-x-auto whitespace-pre-wrap break-all max-h-96 leading-relaxed">
+        <pre className="mt-2 p-3 rounded-md bg-[var(--stitch-surface-highest)] text-[var(--stitch-on-surface)] text-xs overflow-x-auto whitespace-pre-wrap break-all max-h-96 leading-relaxed">
           {formatted}
         </pre>
       )}
@@ -101,11 +118,11 @@ function MessageRow({ msg, index }: { msg: RetainedMessage; index: number }) {
   }, [msg.receivedAt]);
 
   return (
-    <div className="border border-gray-200 rounded-lg bg-white hover:border-gray-300 transition-colors">
+    <div className="border border-[var(--stitch-outline)] rounded-lg bg-[var(--stitch-surface-card)] hover:border-[var(--stitch-outline)] transition-colors">
       <div className="p-4">
         {/* Header row */}
         <div className="flex flex-wrap items-start gap-3 mb-3">
-          <span className="text-xs text-gray-400 font-mono w-8 shrink-0 pt-0.5">
+          <span className="text-xs text-[var(--stitch-on-surface-muted)] font-mono w-8 shrink-0 pt-0.5">
             #{index + 1}
           </span>
           <span
@@ -116,16 +133,18 @@ function MessageRow({ msg, index }: { msg: RetainedMessage; index: number }) {
           >
             {msg.eventType}
           </span>
-          <span className="text-xs text-gray-500 font-mono truncate flex-1 min-w-0">
+          <span className="text-xs text-[var(--stitch-on-surface-muted)] font-mono truncate flex-1 min-w-0">
             {msg.subject}
           </span>
           <div className="flex items-center gap-3 shrink-0">
             {msg.sequence !== undefined && msg.sequence > 0 && (
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-[var(--stitch-on-surface-muted)]">
                 seq&nbsp;{msg.sequence}
               </span>
             )}
-            <span className="text-xs text-gray-500">{receivedAt}</span>
+            <span className="text-xs text-[var(--stitch-on-surface-muted)]">
+              {receivedAt}
+            </span>
           </div>
         </div>
         {/* Payload */}
@@ -279,14 +298,14 @@ export function RawMessagesPage() {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <div className="flex items-center gap-4">
-          <div className="h-10 w-10 bg-gray-200 rounded-lg animate-pulse" />
-          <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+          <div className="h-10 w-10 bg-[var(--stitch-surface-low)] rounded-lg animate-pulse" />
+          <div className="h-8 w-48 bg-[var(--stitch-surface-low)] rounded animate-pulse" />
         </div>
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
             <div
               key={i}
-              className="h-16 bg-gray-100 rounded-lg animate-pulse"
+              className="h-16 bg-[var(--stitch-surface-low)] rounded-lg animate-pulse"
             />
           ))}
         </div>
@@ -300,27 +319,27 @@ export function RawMessagesPage() {
       <div className="space-y-6 animate-in fade-in duration-300">
         <Link
           to={`/suite_runs/${runId}`}
-          className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors group"
+          className="inline-flex items-center gap-2 text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] transition-colors group"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
           <span className="font-medium">Back to Run Detail</span>
         </Link>
-        <Card className="border-yellow-200 bg-yellow-50/50">
+        <Card className="border-[var(--status-warning-border)] bg-[var(--status-warning-soft)]/50">
           <CardContent className="py-12">
             <div className="text-center max-w-md mx-auto">
-              <div className="mx-auto h-16 w-16 rounded-full bg-yellow-100 flex items-center justify-center mb-4">
-                <FileText className="h-8 w-8 text-yellow-600" />
+              <div className="mx-auto h-16 w-16 rounded-full bg-[var(--status-warning-soft)] flex items-center justify-center mb-4">
+                <FileText className="h-8 w-8 text-[var(--status-warning)]" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-[var(--stitch-on-surface)] mb-2">
                 Message Retention Not Enabled
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-[var(--stitch-on-surface-muted)]">
                 To retain raw NATS messages, start the processor with{" "}
-                <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">
+                <code className="bg-[var(--stitch-surface-low)] px-1 py-0.5 rounded text-xs font-mono">
                   --retain-messages
                 </code>{" "}
                 or set the{" "}
-                <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">
+                <code className="bg-[var(--stitch-surface-low)] px-1 py-0.5 rounded text-xs font-mono">
                   RETAIN_MESSAGES=true
                 </code>{" "}
                 environment variable.
@@ -338,20 +357,20 @@ export function RawMessagesPage() {
       <div className="space-y-6 animate-in fade-in duration-300">
         <Link
           to={`/suite_runs/${runId}`}
-          className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors group"
+          className="inline-flex items-center gap-2 text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] transition-colors group"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
           <span className="font-medium">Back to Run Detail</span>
         </Link>
-        <Card className="border-red-200 bg-red-50/50">
+        <Card className="border-[var(--status-failure-border)] bg-[var(--status-failure-soft)]/50">
           <CardContent className="py-12">
             <div className="text-center max-w-md mx-auto">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-[var(--stitch-on-surface)] mb-2">
                 {error ?? "No Messages Found"}
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-[var(--stitch-on-surface-muted)]">
                 No retained messages were found for run{" "}
-                <code className="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">
+                <code className="font-mono text-xs bg-[var(--stitch-surface-low)] px-1 py-0.5 rounded">
                   {runId}
                 </code>
                 .
@@ -371,16 +390,16 @@ export function RawMessagesPage() {
         <div className="flex items-center gap-4">
           <Link
             to={`/suite_runs/${runId}`}
-            className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm hover:shadow group"
+            className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-[var(--stitch-surface-card)] border border-[var(--stitch-outline)] text-[var(--stitch-on-surface)] hover:bg-[var(--stitch-surface-card)] hover:border-[var(--stitch-outline)] transition-all shadow-sm hover:shadow group"
             aria-label="Back to run detail"
           >
             <ArrowLeft className="h-5 w-5 group-hover:-translate-x-0.5 transition-transform" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+            <h1 className="text-2xl font-bold text-[var(--stitch-on-surface)] tracking-tight">
               Raw Message Audit
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5 font-mono">
+            <p className="text-sm text-[var(--stitch-on-surface-muted)] mt-0.5 font-mono">
               {doc.runId}
             </p>
           </div>
@@ -390,19 +409,19 @@ export function RawMessagesPage() {
         <div className="flex items-center gap-3">
           <Link
             to="/suite_runs/raw-messages"
-            className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--stitch-surface-card)] border border-[var(--stitch-outline)] rounded-lg text-sm font-medium text-[var(--stitch-on-surface)] shadow-sm hover:bg-[var(--stitch-surface-card)] hover:border-[var(--stitch-outline)] transition-colors"
           >
             Directory
           </Link>
           <button
             onClick={exportJsonLines}
-            className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--stitch-primary-soft)] text-white rounded-lg text-sm font-medium shadow-sm hover:bg-[var(--stitch-primary-soft)] transition-colors"
           >
             <Download className="h-4 w-4" />
             Export JSONL
           </button>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm">
-            <FileText className="h-4 w-4 text-gray-400" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--stitch-surface-card)] border border-[var(--stitch-outline)] rounded-lg text-sm font-medium text-[var(--stitch-on-surface)] shadow-sm">
+            <FileText className="h-4 w-4 text-[var(--stitch-on-surface-muted)]" />
             {doc.messages.length} message{doc.messages.length !== 1 ? "s" : ""}
           </span>
         </div>
@@ -413,26 +432,26 @@ export function RawMessagesPage() {
         <CardContent className="py-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+              <p className="text-xs text-[var(--stitch-on-surface-muted)] uppercase tracking-wide mb-1">
                 Total Messages
               </p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-2xl font-bold text-[var(--stitch-on-surface)]">
                 {doc.messages.length}
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+              <p className="text-xs text-[var(--stitch-on-surface-muted)] uppercase tracking-wide mb-1">
                 Event Types
               </p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-2xl font-bold text-[var(--stitch-on-surface)]">
                 {availableEventTypes.length}
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+              <p className="text-xs text-[var(--stitch-on-surface-muted)] uppercase tracking-wide mb-1">
                 First Received
               </p>
-              <p className="text-sm font-medium text-gray-700">
+              <p className="text-sm font-medium text-[var(--stitch-on-surface)]">
                 {doc.messages.length > 0
                   ? new Date(doc.messages[0].receivedAt).toLocaleString(
                       undefined,
@@ -448,10 +467,10 @@ export function RawMessagesPage() {
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+              <p className="text-xs text-[var(--stitch-on-surface-muted)] uppercase tracking-wide mb-1">
                 Last Received
               </p>
-              <p className="text-sm font-medium text-gray-700">
+              <p className="text-sm font-medium text-[var(--stitch-on-surface)]">
                 {doc.messages.length > 0
                   ? new Date(
                       doc.messages[doc.messages.length - 1].receivedAt,
@@ -473,18 +492,18 @@ export function RawMessagesPage() {
       <div className="space-y-3">
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--stitch-on-surface-muted)] pointer-events-none" />
           <input
             type="text"
             placeholder="Search by event type, subject, or payload content…"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            className="w-full pl-10 pr-10 py-2.5 border border-[var(--stitch-outline)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stitch-primary)] focus:border-transparent bg-[var(--stitch-surface-card)]"
           />
           {searchText && (
             <button
               onClick={() => setSearchText("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--stitch-on-surface-muted)] hover:text-[var(--stitch-on-surface-muted)] transition-colors"
               aria-label="Clear search"
             >
               <X className="h-4 w-4" />
@@ -495,7 +514,9 @@ export function RawMessagesPage() {
         {/* Event type filter pills */}
         {availableEventTypes.length > 0 && (
           <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-sm text-gray-500 font-medium">Type:</span>
+            <span className="text-sm text-[var(--stitch-on-surface-muted)] font-medium">
+              Type:
+            </span>
             {availableEventTypes.map((eventType) => {
               const active = selectedEventTypes.has(eventType);
               return (
@@ -507,7 +528,7 @@ export function RawMessagesPage() {
                     active
                       ? eventTypeColor(eventType) +
                           " ring-2 ring-offset-1 ring-blue-400"
-                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50",
+                      : "bg-[var(--stitch-surface-card)] text-[var(--stitch-on-surface-muted)] border-[var(--stitch-outline)] hover:bg-[var(--stitch-surface-card)]",
                   )}
                 >
                   {eventType}
@@ -520,7 +541,7 @@ export function RawMessagesPage() {
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors ml-1"
+                className="inline-flex items-center gap-1 text-xs text-[var(--stitch-on-surface-muted)] hover:text-[var(--stitch-on-surface)] transition-colors ml-1"
               >
                 <X className="h-3.5 w-3.5" />
                 Clear filters
@@ -532,7 +553,7 @@ export function RawMessagesPage() {
 
       {/* Filtered count */}
       {hasActiveFilters && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-[var(--stitch-on-surface-muted)]">
           Showing {filteredMessages.length} of {doc.messages.length} messages
         </p>
       )}
@@ -540,7 +561,7 @@ export function RawMessagesPage() {
       {/* Message list */}
       {filteredMessages.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-gray-500">
+          <CardContent className="py-12 text-center text-[var(--stitch-on-surface-muted)]">
             {hasActiveFilters
               ? "No messages match the current filters."
               : "No messages in this run."}

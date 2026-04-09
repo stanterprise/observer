@@ -9,10 +9,7 @@ interface CardProps {
 export function Card({ children, className, style }: CardProps) {
   return (
     <div
-      className={cn(
-        "rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-card)",
-        className,
-      )}
+      className={cn("rounded-lg bg-(--stitch-surface-card)", className)}
       style={style}
     >
       {children}
@@ -21,13 +18,7 @@ export function Card({ children, className, style }: CardProps) {
 }
 
 export function CardHeader({ children, className }: CardProps) {
-  return (
-    <div
-      className={cn("px-6 py-4 border-b border-(--stitch-outline)", className)}
-    >
-      {children}
-    </div>
-  );
+  return <div className={cn("px-6 py-4", className)}>{children}</div>;
 }
 
 export function CardTitle({ children, className }: CardProps) {

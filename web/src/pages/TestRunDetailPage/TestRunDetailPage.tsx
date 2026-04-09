@@ -458,7 +458,7 @@ export function TestRunDetailPage() {
                         "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary)",
                         isHidden
                           ? "bg-(--stitch-surface-low) text-(--stitch-on-surface-subtle) border-(--stitch-outline) hover:bg-(--stitch-surface-highest)"
-                          : "bg-blue-50 text-(--stitch-primary) border-blue-200 hover:bg-blue-100",
+                          : "bg-[var(--stitch-primary-soft)] text-(--stitch-primary) border-[var(--status-running-border)] hover:bg-[var(--stitch-primary-soft)]",
                       )}
                       aria-label={`${
                         isHidden ? "Show" : "Hide"

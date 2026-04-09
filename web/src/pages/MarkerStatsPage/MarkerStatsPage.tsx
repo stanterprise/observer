@@ -180,14 +180,14 @@ export function MarkerStatsPage() {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="font-semibold text-gray-900">{data.name}</p>
-          <p className="text-sm text-gray-600">Run ID: {data.runId}</p>
-          <p className="text-sm text-gray-600">Passed: {data.passed}</p>
-          <p className="text-sm text-gray-600">Failed: {data.failed}</p>
-          <p className="text-sm text-gray-600">Total: {data.total}</p>
-          <p className="text-sm text-gray-600">Pass Rate: {data.passRate}%</p>
-          <p className="text-xs text-gray-500 mt-1">{data.fullDate}</p>
+        <div className="bg-[var(--stitch-surface-card)] p-3 border border-[var(--stitch-outline)] rounded-lg shadow-lg">
+          <p className="font-semibold text-[var(--stitch-on-surface)]">{data.name}</p>
+          <p className="text-sm text-[var(--stitch-on-surface-muted)]">Run ID: {data.runId}</p>
+          <p className="text-sm text-[var(--stitch-on-surface-muted)]">Passed: {data.passed}</p>
+          <p className="text-sm text-[var(--stitch-on-surface-muted)]">Failed: {data.failed}</p>
+          <p className="text-sm text-[var(--stitch-on-surface-muted)]">Total: {data.total}</p>
+          <p className="text-sm text-[var(--stitch-on-surface-muted)]">Pass Rate: {data.passRate}%</p>
+          <p className="text-xs text-[var(--stitch-on-surface-muted)] mt-1">{data.fullDate}</p>
         </div>
       );
     }
@@ -197,7 +197,7 @@ export function MarkerStatsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600">Loading marker statistics...</div>
+        <div className="text-[var(--stitch-on-surface-muted)]">Loading marker statistics...</div>
       </div>
     );
   }
@@ -207,7 +207,7 @@ export function MarkerStatsPage() {
       <div className="space-y-4">
         <Link
           to="/"
-          className="inline-flex items-center text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-2 py-1"
+          className="inline-flex items-center text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--stitch-primary)] focus:ring-offset-2 rounded-md px-2 py-1"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Dashboard
@@ -215,8 +215,8 @@ export function MarkerStatsPage() {
         <Card>
           <CardContent className="py-12">
             <div className="flex flex-col items-center justify-center space-y-4">
-              <AlertCircle className="h-16 w-16 text-red-500" />
-              <div className="text-red-600 text-center">
+              <AlertCircle className="h-16 w-16 text-[var(--status-failure)]" />
+              <div className="text-[var(--status-failure)] text-center">
                 <p className="font-semibold">
                   Error: {error || "Marker statistics not found"}
                 </p>
@@ -242,19 +242,19 @@ export function MarkerStatsPage() {
         <div className="flex items-center space-x-4">
           <Link
             to="/"
-            className="inline-flex items-center text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md p-1"
+            className="inline-flex items-center text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--stitch-primary)] focus:ring-offset-2 rounded-md p-1"
             aria-label="Back to dashboard"
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
             <div className="flex items-center space-x-2">
-              <BarChart3 className="h-6 w-6 text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-900">
+              <BarChart3 className="h-6 w-6 text-[var(--stitch-primary)]" />
+              <h1 className="text-3xl font-bold text-[var(--stitch-on-surface)]">
                 Marker Statistics
               </h1>
             </div>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-[var(--stitch-on-surface-muted)] mt-1">
               Historical performance data for runs with MARKER = "{markerValue}"
             </p>
           </div>
@@ -267,7 +267,7 @@ export function MarkerStatsPage() {
           <CardTitle className="text-lg">Marker Value</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="font-mono text-sm text-gray-700 break-all">
+          <p className="font-mono text-sm text-[var(--stitch-on-surface)] break-all">
             {markerValue}
           </p>
         </CardContent>
@@ -278,8 +278,8 @@ export function MarkerStatsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Total Runs</p>
-              <p className="text-3xl font-bold text-gray-900">
+              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">Total Runs</p>
+              <p className="text-3xl font-bold text-[var(--stitch-on-surface)]">
                 {aggregateStats.totalRuns}
               </p>
             </div>
@@ -288,8 +288,8 @@ export function MarkerStatsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Total Tests</p>
-              <p className="text-3xl font-bold text-gray-900">
+              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">Total Tests</p>
+              <p className="text-3xl font-bold text-[var(--stitch-on-surface)]">
                 {aggregateStats.totalTests}
               </p>
             </div>
@@ -298,16 +298,16 @@ export function MarkerStatsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Pass Rate</p>
-              <p className="text-3xl font-bold text-green-600">{passRate}%</p>
+              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">Pass Rate</p>
+              <p className="text-3xl font-bold text-[var(--status-success)]">{passRate}%</p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Passed</p>
-              <p className="text-3xl font-bold text-green-600">
+              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">Passed</p>
+              <p className="text-3xl font-bold text-[var(--status-success)]">
                 {aggregateStats.passed}
               </p>
             </div>
@@ -316,8 +316,8 @@ export function MarkerStatsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-1">Failed</p>
-              <p className="text-3xl font-bold text-red-600">
+              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">Failed</p>
+              <p className="text-3xl font-bold text-[var(--status-failure)]">
                 {aggregateStats.failed}
               </p>
             </div>
@@ -330,7 +330,7 @@ export function MarkerStatsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-blue-600" />
+              <TrendingUp className="h-5 w-5 text-[var(--stitch-primary)]" />
               <span>Pass Rate Over Time</span>
             </CardTitle>
           </CardHeader>
@@ -345,7 +345,7 @@ export function MarkerStatsPage() {
                   <XAxis
                     dataKey="name"
                     tick={{ fontSize: 12 }}
-                    className="text-gray-600"
+                    className="text-[var(--stitch-on-surface-muted)]"
                   />
                   <YAxis
                     label={{
@@ -356,7 +356,7 @@ export function MarkerStatsPage() {
                     }}
                     domain={[0, 100]}
                     tick={{ fontSize: 12 }}
-                    className="text-gray-600"
+                    className="text-[var(--stitch-on-surface-muted)]"
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
@@ -381,7 +381,7 @@ export function MarkerStatsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-purple-600" />
+              <TrendingUp className="h-5 w-5 text-[var(--status-timedout)]" />
               <span>Passes and Failures Over Time</span>
             </CardTitle>
           </CardHeader>
@@ -396,7 +396,7 @@ export function MarkerStatsPage() {
                   <XAxis
                     dataKey="name"
                     tick={{ fontSize: 12 }}
-                    className="text-gray-600"
+                    className="text-[var(--stitch-on-surface-muted)]"
                   />
                   <YAxis
                     label={{
@@ -406,7 +406,7 @@ export function MarkerStatsPage() {
                       style: { fontSize: 12 },
                     }}
                     tick={{ fontSize: 12 }}
-                    className="text-gray-600"
+                    className="text-[var(--stitch-on-surface-muted)]"
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
@@ -452,7 +452,7 @@ export function MarkerStatsPage() {
                   <XAxis
                     dataKey="name"
                     tick={{ fontSize: 12 }}
-                    className="text-gray-600"
+                    className="text-[var(--stitch-on-surface-muted)]"
                   />
                   <YAxis
                     label={{
@@ -462,7 +462,7 @@ export function MarkerStatsPage() {
                       style: { fontSize: 12 },
                     }}
                     tick={{ fontSize: 12 }}
-                    className="text-gray-600"
+                    className="text-[var(--stitch-on-surface-muted)]"
                   />
                   <Tooltip />
                   <Legend />
@@ -481,87 +481,87 @@ export function MarkerStatsPage() {
         </CardHeader>
         <CardContent>
           {runs.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-[var(--stitch-on-surface-muted)]">
               No runs found with MARKER = "{markerValue}"
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-[var(--stitch-outline)]">
+                <thead className="bg-[var(--stitch-surface-card)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider">
                       Run ID
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider">
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider">
                       Tests
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider">
                       Pass Rate
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider">
                       Duration
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider">
                       Created At
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-[var(--stitch-surface-card)] divide-y divide-[var(--stitch-outline)]">
                   {runs.map((run) => {
                     const runPassRate = run.total > 0 
                       ? ((run.passed / run.total) * 100).toFixed(1)
                       : "0.0";
                     return (
-                      <tr key={run.runId} className="hover:bg-gray-50">
+                      <tr key={run.runId} className="hover:bg-[var(--stitch-surface-card)]">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Link
                             to={`/suite_runs/${run.runId}`}
-                            className="font-mono text-sm text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
+                            className="font-mono text-sm text-[var(--stitch-primary)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--stitch-primary)] focus:ring-offset-2 rounded"
                           >
                             {run.runId.substring(0, 12)}...
                           </Link>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--stitch-on-surface)]">
                           {run.runName || "N/A"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Badge status={getRunStatus(run.status)} />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            <span className="text-green-600 font-semibold">
+                          <div className="text-sm text-[var(--stitch-on-surface)]">
+                            <span className="text-[var(--status-success)] font-semibold">
                               {run.passed}
                             </span>
                             {" / "}
-                            <span className="text-red-600 font-semibold">
+                            <span className="text-[var(--status-failure)] font-semibold">
                               {run.failed}
                             </span>
                             {" / "}
                             {run.total}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--stitch-on-surface)]">
                           {runPassRate}%
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--stitch-on-surface)]">
                           {formatDuration(run.duration)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--stitch-on-surface-muted)]">
                           {formatDate(run.createdAt)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <Link
                             to={`/suite_runs/${run.runId}`}
-                            className="text-blue-600 hover:text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded px-2 py-1"
+                            className="text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--stitch-primary)] focus:ring-offset-2 rounded px-2 py-1"
                           >
                             View Details
                           </Link>

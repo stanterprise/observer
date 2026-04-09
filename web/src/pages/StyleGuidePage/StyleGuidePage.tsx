@@ -18,14 +18,12 @@ export function StyleGuidePage() {
   const guide = stitchStyleGuide[variant];
   const isDark = guide.colorMode === "DARK";
 
-  const panelClass = isDark
-    ? "border-0 text-slate-100 shadow-none"
-    : "border-0 text-gray-900 shadow-none";
+  const panelClass = "border-0 text-[var(--stitch-on-surface)] shadow-none";
 
-  const subduedTextClass = isDark ? "text-slate-300" : "text-gray-700";
+  const subduedTextClass = "text-[var(--stitch-on-surface-muted)]";
   const tokenPillClass = isDark
-    ? "bg-slate-900 text-slate-300 border-slate-700"
-    : "bg-gray-100 text-gray-600 border-gray-200";
+    ? "bg-[var(--stitch-surface-low)] text-[var(--stitch-on-surface-muted)] border-[var(--stitch-outline)]"
+    : "bg-[var(--stitch-surface-low)] text-[var(--stitch-on-surface-muted)] border-[var(--stitch-outline)]";
 
   const bodyFontFamily = `${guide.bodyFont}, Inter, system-ui, sans-serif`;
   const headlineFontFamily = `${guide.headlineFont}, Inter, system-ui, sans-serif`;
@@ -84,14 +82,18 @@ export function StyleGuidePage() {
       >
         <p
           className={`text-sm font-semibold uppercase tracking-widest ${
-            isDark ? "text-sky-300" : "text-blue-700"
+            isDark
+              ? "text-[var(--stitch-primary)]"
+              : "text-[var(--stitch-primary)]"
           }`}
         >
           Imported Stitch Design System
         </p>
         <h1
           className={`mt-2 text-3xl font-bold tracking-tight ${
-            isDark ? "text-slate-100" : "text-gray-900"
+            isDark
+              ? "text-[var(--stitch-on-surface)]"
+              : "text-[var(--stitch-on-surface)]"
           }`}
           style={{ fontFamily: headlineFontFamily }}
         >
@@ -99,7 +101,9 @@ export function StyleGuidePage() {
         </h1>
         <p
           className={`mt-2 max-w-3xl text-sm ${
-            isDark ? "text-slate-300" : "text-gray-700"
+            isDark
+              ? "text-[var(--stitch-on-surface-muted)]"
+              : "text-[var(--stitch-on-surface)]"
           }`}
         >
           Creative North Star: <strong>{guide.creativeNorthStar}</strong>. This
@@ -117,8 +121,8 @@ export function StyleGuidePage() {
                 onClick={() => setVariant(item)}
                 className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                   selected
-                    ? "border-blue-700 bg-blue-700 text-white"
-                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    ? "border-[var(--status-running-border)] bg-[var(--stitch-primary-soft)] text-white"
+                    : "border-[var(--stitch-outline)] bg-[var(--stitch-surface-card)] text-[var(--stitch-on-surface)] hover:bg-[var(--stitch-surface-card)]"
                 }`}
               >
                 {item === "light" ? (
@@ -134,7 +138,7 @@ export function StyleGuidePage() {
         <div className="mt-5 flex flex-wrap gap-3">
           <Link
             to="/"
-            className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            className="inline-flex items-center rounded-md bg-[var(--stitch-primary-soft)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--stitch-primary-soft)]"
           >
             Return to dashboard
           </Link>
@@ -142,7 +146,7 @@ export function StyleGuidePage() {
             href="https://tailwindcss.com/docs/customizing-colors"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center rounded-md border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="inline-flex items-center rounded-md border-[var(--stitch-outline)] bg-[var(--stitch-surface-card)] px-4 py-2 text-sm font-medium text-[var(--stitch-on-surface)] transition-colors hover:bg-[var(--stitch-surface-card)]"
           >
             Stitch export reference
             <ExternalLink className="ml-2 h-4 w-4" />
@@ -152,16 +156,16 @@ export function StyleGuidePage() {
           className="mt-4 flex flex-wrap gap-2 text-xs"
           style={{ fontFamily: labelFontFamily }}
         >
-          <span className="rounded-md bg-white/80 px-2 py-1 text-gray-700">
+          <span className="rounded-md bg-[var(--stitch-surface-card)]/80 px-2 py-1 text-[var(--stitch-on-surface)]">
             Mode: {guide.colorMode}
           </span>
-          <span className="rounded-md bg-white/80 px-2 py-1 text-gray-700">
+          <span className="rounded-md bg-[var(--stitch-surface-card)]/80 px-2 py-1 text-[var(--stitch-on-surface)]">
             Headline Font: {guide.headlineFont}
           </span>
-          <span className="rounded-md bg-white/80 px-2 py-1 text-gray-700">
+          <span className="rounded-md bg-[var(--stitch-surface-card)]/80 px-2 py-1 text-[var(--stitch-on-surface)]">
             Body Font: {guide.bodyFont}
           </span>
-          <span className="rounded-md bg-white/80 px-2 py-1 text-gray-700">
+          <span className="rounded-md bg-[var(--stitch-surface-card)]/80 px-2 py-1 text-[var(--stitch-on-surface)]">
             Roundness: {guide.roundness}
           </span>
         </div>
@@ -562,7 +566,7 @@ export function StyleGuidePage() {
                   key={rule}
                   className={`flex items-start gap-2 text-sm ${subduedTextClass}`}
                 >
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-600" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-[var(--status-success)]" />
                   <span>{rule}</span>
                 </li>
               ))}
@@ -584,24 +588,28 @@ export function StyleGuidePage() {
                   key={rule}
                   className={`flex items-start gap-2 text-sm ${subduedTextClass}`}
                 >
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-600" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-[var(--status-success)]" />
                   <span>{rule}</span>
                 </li>
               ))}
             </ul>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded-lg border-green-300 bg-green-50 p-3">
-                <p className="text-sm font-semibold text-green-800">Do</p>
-                <ul className="mt-2 space-y-2 text-sm text-green-900">
+              <div className="rounded-lg border-[var(--status-success-border)] bg-[var(--status-success-soft)] p-3">
+                <p className="text-sm font-semibold text-[var(--status-success)]">
+                  Do
+                </p>
+                <ul className="mt-2 space-y-2 text-sm text-[var(--status-success)]">
                   {guide.doList.map((item) => (
                     <li key={item}>- {item}</li>
                   ))}
                 </ul>
               </div>
-              <div className="rounded-lg border-red-300 bg-red-50 p-3">
-                <p className="text-sm font-semibold text-red-800">Do Not</p>
-                <ul className="mt-2 space-y-2 text-sm text-red-900">
+              <div className="rounded-lg border-[var(--status-failure-border)] bg-[var(--status-failure-soft)] p-3">
+                <p className="text-sm font-semibold text-[var(--status-failure)]">
+                  Do Not
+                </p>
+                <ul className="mt-2 space-y-2 text-sm text-[var(--status-failure)]">
                   {guide.dontList.map((item) => (
                     <li key={item}>- {item}</li>
                   ))}

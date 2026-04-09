@@ -102,7 +102,11 @@ function applyThemeToDocument(variant: StitchGuideVariant): void {
   root.style.setProperty("--stitch-surface-low", surfaceLow);
   root.style.setProperty("--stitch-surface-card", surfaceCard);
   root.style.setProperty("--stitch-surface-highest", surfaceHighest);
-  root.style.setProperty("--stitch-outline", outline);
+  root.style.setProperty(
+    "--stitch-outline",
+    isDark ? "rgba(148, 163, 184, 0.22)" : "rgba(169, 180, 185, 0.28)",
+  );
+  root.style.setProperty("--stitch-outline-strong", outline);
   root.style.setProperty("--stitch-primary", primary);
   root.style.setProperty("--stitch-primary-end", primaryEnd);
   root.style.setProperty("--stitch-tertiary", tertiary);
