@@ -30,6 +30,20 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 
 - No backfill; new schema applies prospectively on branch cutover.
 
+## 0.1 Important Scope Clarification: PostgreSQL Schema Initialization ≠ Data Migration
+
+**This plan only applies to NEW runs ingested after the feature branch is deployed:**
+
+- PostgreSQL tables are created at startup (idempotent `CREATE TABLE IF NOT EXISTS`).
+- **No backfill or transformation of existing MongoDB runs occurs.**
+- Existing MongoDB run documents remain in the database as read-only historical records.
+- The API serves both data sources correctly:
+  - New runs: written to PostgreSQL, read from PostgreSQL (active) or PostgreSQL (terminal).
+  - Legacy runs: remain in MongoDB, served from MongoDB for backward compatibility.
+- Run isolation is enforced: PostgreSQL runs are independent logical entities.
+
+---
+
 ## 1. Foundation and Configuration
 
 ### 1.1 Configuration
@@ -62,15 +76,15 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 - [ ] Add graceful shutdown integration for PG clients.
 - [ ] Add configuration options for connection pool sizes and timeouts.
 
-### 2.2 Schema migrations
+### 2.2 Schema definition and initialization
 
-- [ ] Create migration for `runs` table.
-- [ ] Create migration for `run_shards` table.
-- [ ] Create migration for `suites` table.
-- [ ] Create migration for `tests` table.
-- [ ] Create migration for `test_attempts` table with unique constraint on `(test_id, attempt_index)`.
-- [ ] Create required indexes for query performance: (run_id), (suite_id), (test_id), (status, created_at).
-- [ ] Add migration rollback scripts for each.
+- [ ] Define `runs` table schema (DDL or Go structs).
+- [ ] Define `run_shards` table schema.
+- [ ] Define `suites` table schema.
+- [ ] Define `tests` table schema.
+- [ ] Define `test_attempts` table schema with unique constraint on `(test_id, attempt_index)`.
+- [ ] Implement idempotent schema initialization in PG connection module: `CREATE TABLE IF NOT EXISTS` (no backfill of legacy MongoDB data).
+- [ ] Add indexes for query optimization: (run_id), (suite_id), (test_id), (status, created_at).
 
 ### 2.3 Repository interfaces and implementations
 

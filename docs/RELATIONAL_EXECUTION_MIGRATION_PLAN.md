@@ -20,6 +20,18 @@ Out of scope for this phase:
 - Full historical analytics warehouse build-out.
 - Replacing NATS as ingestion backbone.
 - Full-text log search platform adoption (can be Phase 2+).
+- **Backfilling existing MongoDB runs into PostgreSQL.** PostgreSQL schema is for NEW runs only; legacy MongoDB documents remain read-only.
+
+---
+
+## 1.1 Data Processing Boundary
+
+**Important:** This is a **prospective schema change**, not a data migration:
+
+- PostgreSQL and the new live-step-buffer pattern apply **only to runs ingested after the feature branch is deployed**.
+- Existing MongoDB run documents remain in the database as read-only historical records.
+- The API continues to serve both sources: PostgreSQL (new runs), MongoDB (legacy runs).
+- No backfilling or data transformation of existing runs occurs.
 
 ---
 
@@ -387,11 +399,12 @@ Implementation occurs on a feature branch (`feature/relational-execution`) in se
 
 ### Phase 1: Foundation and PostgreSQL Connectivity
 
-- Add PG schema migrations and versioning.
-- Implement PostgreSQL connection module (`internal/database/postgres.go`) alongside MongoDB.
+- Define PostgreSQL schema for all tables (runs, shards, suites, tests, test_attempts) as DDL or Go structs.
+- Implement PostgreSQL connection module (`internal/database/postgres.go`) with idempotent schema initialization (**create tables if not exist; no backfill of legacy data**).
 - Add PG repository interface and base operations (create test_run, get test_run, etc.).
 - Verify PG connects in dev, staging, and AIO/distributed configs.
 - No write path changes yet; all writes still go to MongoDB.
+- Legacy MongoDB run documents remain untouched and read-only.
 
 ### Phase 2: PostgreSQL Schema and Repositories
 
@@ -491,21 +504,23 @@ Implementation occurs on a feature branch (`feature/relational-execution`) in se
 
 ## 13. Acceptance Criteria
 
-The migration is complete when all conditions are true:
+The implementation is complete when all conditions are true:
 
-- ✅ PostgreSQL schema deployed and tested (runs, suites, tests, test_attempts tables).
-- ✅ MongoDB `live_step_buffers` collection with TTL working correctly.
-- ✅ Dual-write parity validated: terminal data in PG and legacy Mongo match.
+- ✅ PostgreSQL schema initialized at startup (new tables created; no backfill of legacy MongoDB data).
+- ✅ **New runs** are written to PostgreSQL; **legacy MongoDB runs remain read-only**.
+- ✅ MongoDB `live_step_buffers` collection with TTL working correctly for new attempts.
+- ✅ Dual-write parity validated: terminal data in PG and legacy Mongo match (for new runs only).
 - ✅ Flush protocol successfully terminates active buffers and persists to PG.
 - ✅ Object storage offload works for payloads > ~4MB.
 - ✅ Reconciliation worker detects and recover stale flushes and orphans.
 - ✅ API read path correctly switches between Mongo (active) and PG (terminal) by status.
+- ✅ API serves both new runs (PG) and legacy runs (Mongo) correctly.
 - ✅ All end-to-end tests pass (begin → steps → end; crash scenarios; NATS redelivery).
-- ✅ Load tests pass: 50MB, 250MB, 1GB+ runs complete without size errors.
+- ✅ Load tests pass: 50MB, 250MB, 1GB+ new runs complete without size errors.
 - ✅ SLOs met: p95 latency < 200ms (active), < 300ms (terminal); flush success > 99.99%.
 - ✅ Orphan buffer rate < 0.1% in load tests.
 - ✅ Feature branch merged to master; deployed to production.
-- ✅ Post-deployment monitoring confirms SLOs and orphan rate in production.
+- ✅ Post-deployment monitoring confirms SLOs and orphan rate for new runs in production.
 
 ---
 
@@ -513,8 +528,8 @@ The migration is complete when all conditions are true:
 
 1. **Create feature branch**: `git checkout -b feature/relational-execution`
 2. **Phase 1 (Foundation)**:
-   - Create PostgreSQL migration scripts for all schema tables (runs, shards, suites, tests, test_attempts).
-   - Implement `internal/database/postgres.go` connection helper (paralleling `internal/database/mongodb.go`).
+   - Define PostgreSQL schema for all tables (runs, shards, suites, tests, test_attempts) as DDL or Go struct tags.
+   - Implement `internal/database/postgres.go` connection helper with idempotent schema initialization (paralleling `internal/database/mongodb.go`).
    - Add PostgreSQL connection configuration (embedded in AIO Dockerfile, external connection string in distributed mode).
    - Test in dev and Docker Compose configurations.
 3. **Phase 2 (Repositories)**:
@@ -524,6 +539,6 @@ The migration is complete when all conditions are true:
    - Build high-step run simulator (50MB, 250MB, 1GB profiles).
    - Use to validate both MongoDB and PostgreSQL paths independently.
 5. **Parallel workstreams**:
-   - Schema finalization and migration generation.
+   - Schema finalization and code implementation.
    - Docker/Helm updates for PostgreSQL embedding (AIO).
    - Monitoring dashboard scaffolding (pre-deployment readiness).
