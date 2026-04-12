@@ -48,17 +48,19 @@ func main() {
 	// Optionally connect to PostgreSQL (relational execution store).
 	pgConn, err := database.ConnectPostgresFromEnv(logger)
 	if err != nil {
-		logger.Error("postgres connect failed", "error", err)
-		os.Exit(1)
+		logger.Warn("postgres connect failed; relational execution features unavailable", "error", err)
+		pgConn = nil // ensure nil on error
 	}
 	if pgConn != nil {
-		defer pgConn.Close()
 		if err := pgConn.InitSchema(context.Background()); err != nil {
-			logger.Error("postgres schema init failed", "error", err)
-			os.Exit(1)
+			logger.Warn("postgres schema init failed; relational execution features unavailable", "error", err)
+			pgConn.Close()
+			pgConn = nil
+		} else {
+			defer pgConn.Close()
+			logger.Info("postgres available for relational execution",
+				"database", pgConn.DatabaseName())
 		}
-		logger.Info("postgres available for relational execution",
-			"database", pgConn.DatabaseName())
 	}
 
 	// Create MongoDB repository and handler
