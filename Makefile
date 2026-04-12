@@ -215,6 +215,12 @@ test-mongo-integration: ## Run MongoDB integration tests (requires MongoDB runni
 test-all-integration: ## Run all integration tests (requires NATS and MongoDB running)
 	NATS_TEST_URL=nats://localhost:4222 MONGODB_TEST_URI='$(MONGODB_URI)' go test ./tests/... -v
 
+test-pg-integration: ## Run PostgreSQL integration tests (requires PostgreSQL running)
+	POSTGRES_TEST_DSN='$(POSTGRES_DSN)' go test ./internal/repository/... -v -run TestPgRepository
+
+# Default PostgreSQL DSN for local dev (matches docker-compose)
+POSTGRES_DSN ?= postgres://observer:observer@localhost:5432/observer?sslmode=disable
+
 # Web UI targets
 web-install: ## Install Web UI dependencies
 	cd web && npm install

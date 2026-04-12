@@ -51,6 +51,22 @@ func main() {
 	defer cancel()
 	defer mongoDB.Close(ctx)
 
+	// Optionally connect to PostgreSQL (relational execution store).
+	pgConn, err := database.ConnectPostgresFromEnv(logger)
+	if err != nil {
+		logger.Error("postgres connect failed", "error", err)
+		os.Exit(1)
+	}
+	if pgConn != nil {
+		defer pgConn.Close()
+		if err := pgConn.InitSchema(ctx); err != nil {
+			logger.Error("postgres schema init failed", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("postgres available for relational execution",
+			"database", pgConn.DatabaseName())
+	}
+
 	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
 
 	// Optionally create the raw message repository when retention is enabled.
