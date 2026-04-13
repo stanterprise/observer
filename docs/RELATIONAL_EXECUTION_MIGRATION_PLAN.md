@@ -2,22 +2,36 @@
 
 ## 1. Purpose and Scope
 
-This plan defines a full migration path from the current MongoDB-centric run document model to a relational execution model centered on PostgreSQL, while retaining MongoDB as an ephemeral live-step cache for in-progress tests.
+This plan defines a full migration from the current MongoDB-centric run document model to a relational execution model centered on PostgreSQL, while retaining MongoDB as an ephemeral live-step cache for in-progress tests.
+
+**Implementation approach:** Feature branch with complete cutover. No feature flags or incremental rollout—this is a clean migration to a new architecture, merged to master once ready.
 
 The effort addresses these core goals:
 
 - Eliminate MongoDB 16MB document-limit failures for large runs.
 - Support runs with tens to hundreds of MB of step/log payload.
 - Preserve low-latency live step updates during test execution.
-- Keep run/suite/test hierarchy as the product’s core mental model.
+- Keep run/suite/test hierarchy as the product's core mental model.
 - Correctly handle retries, shard stitching, and catastrophic test termination.
-- Provide safe migration with minimal production risk.
+- Extend existing object storage support to step payloads and large JSONB blobs.
 
 Out of scope for this phase:
 
 - Full historical analytics warehouse build-out.
 - Replacing NATS as ingestion backbone.
 - Full-text log search platform adoption (can be Phase 2+).
+- **Backfilling existing MongoDB runs into PostgreSQL.** PostgreSQL schema is for NEW runs only; legacy MongoDB documents remain read-only.
+
+---
+
+## 1.1 Data Processing Boundary
+
+**Important:** This is a **prospective schema change**, not a data migration:
+
+- PostgreSQL and the new live-step-buffer pattern apply **only to runs ingested after the feature branch is deployed**.
+- Existing MongoDB run documents remain in the database as read-only historical records.
+- The API continues to serve both sources: PostgreSQL (new runs), MongoDB (legacy runs).
+- No backfilling or data transformation of existing runs occurs.
 
 ---
 
@@ -290,48 +304,6 @@ Handling:
 
 ---
 
-## 7. Migration Strategy
-
-## Phase 0: Preparation
-
-- Define SLOs and acceptance criteria.
-- Add feature flags:
-  - `PG_EXECUTION_ENABLED`
-  - `MONGO_LIVE_STEPS_ENABLED`
-  - `PG_FINALIZE_FROM_MONGO_ENABLED`
-  - `OBJECT_STORAGE_STEPS_ENABLED`
-- Add observability scaffolding before behavior changes.
-
-## Phase 1: Introduce PostgreSQL sidecar writes
-
-- Write runs/suites/tests/test_attempts in PG in parallel with existing flow.
-- Keep MongoDB current source of truth for production reads.
-- Validate parity with shadow checks.
-
-## Phase 2: Enable Mongo live-step buffer mode
-
-- Stop appending large raw message blobs to legacy run docs.
-- Start writing active steps into `live_step_buffers`.
-- Keep finalization disabled initially; compare behavior in dry-run mode.
-
-## Phase 3: Enable flush-to-PG finalization
-
-- On test end, flush Mongo buffer into PG attempt record.
-- Enable API read routing by attempt status.
-- Keep legacy reads as fallback behind feature flag.
-
-## Phase 4: Reconciliation hardening
-
-- Add periodic reconciliation worker.
-- Implement stale flush recovery and orphan cleanup.
-- Add run-end sweep for missed terminal events.
-
-## Phase 5: Cutover and cleanup
-
-- Switch primary reads to PG for terminal attempts.
-- Disable legacy large run document retention path.
-- Archive or remove obsolete code paths after stabilization window.
-
 ---
 
 ## 8. Performance and Capacity Planning
@@ -388,98 +360,185 @@ Handling:
 
 ## 10. Operational Plan
 
-## 10.1 Rollout
+## 10.1 Testing and Validation (Pre-merge)
 
-1. Dev environment with synthetic high-step workloads.
-2. Staging with canary pipelines.
-3. Production canary by project/reporter subset.
-4. Full rollout after error budget and SLO pass.
+All validation occurs on the feature branch before merge to master:
 
-## 10.2 Runtime dashboards
+1. **Dev environment** with synthetic high-step workloads.
+2. **Staging environment** with end-to-end test pipelines.
+3. **Load testing** with 50MB, 250MB, 1GB+ run profiles.
+4. **Chaos testing** covering failure scenarios (PG down, Mongo down, mid-flush crash, NATS redelivery).
+5. All SLOs must pass; error budget exhausted → fix before merge.
 
-Track at minimum:
+## 10.2 Runtime dashboards (for post-deployment)
+
+Once deployed to production after master merge, track at minimum:
 
 - Active Mongo buffer count.
-- Flush latency and failure rate.
+- Flush latency (p50, p95, p99) and failure rate.
 - Reconciliation actions/minute.
-- PG write TPS and lock waits.
+- PostgreSQL write TPS, lock waits, connection pool utilization.
 - NATS consumer lag.
-- API read path split (Mongo active vs PG terminal).
+- Orphan buffer detection and cleanup rate.
 
-## 10.3 Alerting
+## 10.3 Alerting (for production post-deployment)
 
-- Stale `flush_in_progress` older than threshold.
-- Orphan buffer growth.
-- PG transaction retry spike.
-- Reconciliation forced-finalization spike.
+Configure alerts for:
 
----
-
-## 11. Work Breakdown and Sequencing
-
-## Sprint 1: Foundations
-
-- Add PG schema migrations and repository interfaces.
-- Add feature flags and telemetry.
-- Implement base PG write path for runs/suites/tests/test_attempts.
-
-## Sprint 2: Live step buffer
-
-- Implement Mongo `live_step_buffers` repository.
-- Add active step mutation handlers.
-- Add API read routing scaffolding.
-
-## Sprint 3: Finalization and reconciliation
-
-- Implement flush protocol and state transitions.
-- Implement reconciliation worker and run-end sweep.
-- Add end-to-end failure recovery tests.
-
-## Sprint 4: Cutover and hardening
-
-- Enable PG terminal read path.
-- Disable legacy oversized retention path.
-- Run load tests, tune indexes, verify SLOs.
-
-## Sprint 5 (optional): Large payload offload
-
-- Add object storage `steps_ref` support.
-- Add compression, pointer dereference APIs.
-- Tune retention tiers and storage lifecycle rules.
+- Stale `flush_in_progress` older than timeout threshold.
+- Orphan buffer growth rate > threshold.
+- PostgreSQL transaction retry spike.
+- Reconciliation forced-finalization spike (indicates data quality issues).
+- Mongo buffer memory pressure (if tracking collection size).
 
 ---
 
-## 12. Open Decision Gates
+## 11. Implementation Sequence (Branch-based, Single Cutover)
 
-Before implementation starts, confirm:
+Implementation occurs on a feature branch (`feature/relational-execution`) in sequential phases. Each phase builds on the previous; they are **not** optional or feature-flagged. The full branch is merged to master once all phases pass testing.
 
-1. PostgreSQL hosting model:
-   - managed service vs self-hosted.
-2. Object storage in Phase 1 or Phase 2.
-3. Terminal status taxonomy and timeout defaults.
-4. Maximum expected test duration for TTL design.
-5. Backfill policy for old runs:
-   - none, partial, or full.
+### Phase 1: Foundation and PostgreSQL Connectivity
+
+- Define PostgreSQL schema for all tables (runs, shards, suites, tests, test_attempts) as DDL or Go structs.
+- Implement PostgreSQL connection module (`internal/database/postgres.go`) with idempotent schema initialization (**create tables if not exist; no backfill of legacy data**).
+- Add PG repository interface and base operations (create test_run, get test_run, etc.).
+- Verify PG connects in dev, staging, and AIO/distributed configs.
+- No write path changes yet; all writes still go to MongoDB.
+- Legacy MongoDB run documents remain untouched and read-only.
+
+### Phase 2: PostgreSQL Schema and Repositories
+
+- Implement idempotent upsert repositories for all PG tables (runs, shards, suites, tests, test_attempts).
+- Add integration tests for each repository method.
+- Verify schema handles duplicate begins, test_id collisions, resequenced attempt_indexes.
+- Prepare for Phase 3 (begins writing to PG in parallel).
+
+### Phase 3: MongoDB live_step_buffers and Shard Stitching
+
+- Implement MongoDB `live_step_buffers` repository with upsert, read, delete, TTL management.
+- Implement run-shard stitching logic (map multi-shard ingestion to canonical run).
+- Add tests for per-test buffer mutation and shard discovery.
+- Verify MongoDB TTL deletion and Mongo buffer consistency under replay.
+
+### Phase 4: Dual-write Testing (MongoDB ↔ PostgreSQL parity checks)
+
+- Begin dual-writing terminal events to both MongoDB (legacy) and PostgreSQL.
+- Add parity checks in tests: verify PG and Mongo states match for terminal data.
+- Run end-to-end test scenarios (begin → steps → end) and validate both stores.
+- Catch schema/mapping mismatches before Phase 5.
+
+### Phase 5: Flush Protocol and Two-phase Commit
+
+- Implement flush handler: read Mongo buffer → serialize → size check → write PG or object storage.
+- Implement state machine: active → flush_in_progress → (success: delete Mongo; failure: retry).
+- Add object storage integration for payloads > ~4MB (reuse existing `pkg/storage` drivers).
+- Add idempotency by flush ID and event key to handle retries safely.
+- Test crashes and partial failures during flush.
+
+### Phase 6: Reconciliation and Orphan Recovery
+
+- Implement reconciliation worker: scan for stale `flush_in_progress` and orphaned buffers.
+- Implement failed-flush recovery and forced-finalization for orphans.
+- Add run-end sweep: ensure no active buffers outlive their run_end event by reconciliation window.
+- Test recover scenarios (PG unavailable, mid-flush restart, duplicate run-ends).
+
+### Phase 7: API Read Path and Status-based Routing
+
+- Update API read handlers to route by attempt terminal status:
+  - Active (RUNNING, IN_PROGRESS) → read Mongo buffer.
+  - Terminal (others) → read PostgreSQL.
+- Update WebSocket handler to route events correctly.
+- Verify API backward compatibility for existing callers.
+- Test read consistency (active state transitions to terminal, verify read path switches).
+
+### Phase 8: Comprehensive Testing and Performance Validation
+
+- Run load tests with 50MB, 250MB, 1GB+ logical runs.
+- Run chaos tests (PG down, concurrent flushes, NATS redelivery storms).
+- Verify SLOs under load: p95 latency, flush throughput, error rate.
+- Verify orphan rate stays < threshold.
+- Run multi-day soak test for reliability.
+
+### Phase 9: Final Cutover to Master
+
+- All phases complete. All tests passing. SLOs validated.
+- Merge feature branch to master.
+- Deploy to production (no feature flags, full cutover to new system).
+- Monitor SLOs and orphan rate post-deployment.
+
+---
+
+## 12. Decision Gates (Confirmed)
+
+✅ **PostgreSQL deployment model (DECIDED):**
+
+- AIO image: PostgreSQL embedded alongside MongoDB (optional external connection override).
+- Distributed mode: PostgreSQL connection configured at startup.
+- Rationale: Simplifies AIO deployment; distributed mode users already manage connections.
+
+✅ **Object storage (DECIDED: Phase 1):**
+
+- Object storage is already implemented in `pkg/storage` for attachments (>= 100KB).
+- Extend same infrastructure to step payloads when flushing to PG.
+- Size threshold at flush: payload exceeds ~4MB → redirect to object storage, store pointer in `steps_ref`.
+- Supported backends: local (file), S3, extensible.
+
+✅ **Terminal status taxonomy (DECIDED):**
+
+- Terminal statuses: `PASSED`, `FAILED`, `TIMED_OUT`, `CANCELLED`, `ABORTED`, `SKIPPED`.
+- Non-terminal (active): `RUNNING`, `IN_PROGRESS`.
+- Rationale: Anything other than `RUNNING` or `IN_PROGRESS` is terminal.
+
+✅ **MongoDB live buffer TTL (DECIDED):**
+
+- Default: 15 minutes.
+- Configurable via `MONGO_STEP_BUFFER_TTL` env var.
+- Rationale: 15 min > typical test window; auto-cleanup for orphaned buffers.
+
+✅ **Backfill policy (DECIDED):**
+
+- No backfill of legacy run documents.
+- New schema applies prospectively on migration branch cutover.
 
 ---
 
 ## 13. Acceptance Criteria
 
-The migration is complete when all conditions are true:
+The implementation is complete when all conditions are true:
 
-- No production writes depend on oversized MongoDB run documents.
-- Active test steps are served from MongoDB buffer reliably.
-- Terminal attempt steps are persisted/read from PostgreSQL reliably.
-- Reconciliation resolves missed-end and stale-flush scenarios automatically.
-- Performance SLOs pass under representative high-volume workloads.
-- Legacy retention path is disabled behind a removed feature flag.
+- ✅ PostgreSQL schema initialized at startup (new tables created; no backfill of legacy MongoDB data).
+- ✅ **New runs** are written to PostgreSQL; **legacy MongoDB runs remain read-only**.
+- ✅ MongoDB `live_step_buffers` collection with TTL working correctly for new attempts.
+- ✅ Dual-write parity validated: terminal data in PG and legacy Mongo match (for new runs only).
+- ✅ Flush protocol successfully terminates active buffers and persists to PG.
+- ✅ Object storage offload works for payloads > ~4MB.
+- ✅ Reconciliation worker detects and recover stale flushes and orphans.
+- ✅ API read path correctly switches between Mongo (active) and PG (terminal) by status.
+- ✅ API serves both new runs (PG) and legacy runs (Mongo) correctly.
+- ✅ All end-to-end tests pass (begin → steps → end; crash scenarios; NATS redelivery).
+- ✅ Load tests pass: 50MB, 250MB, 1GB+ new runs complete without size errors.
+- ✅ SLOs met: p95 latency < 200ms (active), < 300ms (terminal); flush success > 99.99%.
+- ✅ Orphan buffer rate < 0.1% in load tests.
+- ✅ Feature branch merged to master; deployed to production.
+- ✅ Post-deployment monitoring confirms SLOs and orphan rate for new runs in production.
 
 ---
 
 ## 14. Suggested Immediate Next Actions
 
-1. Finalize decision gates in Section 12.
-2. Create PG migration scripts for Section 4 tables.
-3. Implement feature flags and telemetry scaffolding first.
-4. Build a synthetic load profile that reproduces recent high-step sharded runs.
-5. Start Sprint 1 with PG sidecar writes and parity checks.
+1. **Create feature branch**: `git checkout -b feature/relational-execution`
+2. **Phase 1 (Foundation)**:
+   - Define PostgreSQL schema for all tables (runs, shards, suites, tests, test_attempts) as DDL or Go struct tags.
+   - Implement `internal/database/postgres.go` connection helper with idempotent schema initialization (paralleling `internal/database/mongodb.go`).
+   - Add PostgreSQL connection configuration (embedded in AIO Dockerfile, external connection string in distributed mode).
+   - Test in dev and Docker Compose configurations.
+3. **Phase 2 (Repositories)**:
+   - Implement idempotent upsert repository methods for each table.
+   - Add comprehensive repository tests (duplicate keys, resequenced attempts, etc.).
+4. **Synthetic load profile**:
+   - Build high-step run simulator (50MB, 250MB, 1GB profiles).
+   - Use to validate both MongoDB and PostgreSQL paths independently.
+5. **Parallel workstreams**:
+   - Schema finalization and code implementation.
+   - Docker/Helm updates for PostgreSQL embedding (AIO).
+   - Monitoring dashboard scaffolding (pre-deployment readiness).

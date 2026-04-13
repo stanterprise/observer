@@ -41,6 +41,9 @@ services:
       # MongoDB configuration
       MONGODB_URI: mongodb://localhost:27017/observer
 
+      # PostgreSQL configuration for relational execution
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-observer}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-observer}?sslmode=disable
+
       # Storage configuration for artifacts
       STORAGE_DRIVER: local
       STORAGE_LOCAL_BASE_PATH: /data/artifacts
@@ -84,6 +87,10 @@ services:
 
     networks:
       - observer-network
+
+    depends_on:
+      postgres:
+        condition: service_healthy
 
     # Logging configuration
     logging:
@@ -182,11 +189,48 @@ services:
     networks:
       - observer-network
 
+  # ============================================================================
+  # PostgreSQL (Relational Execution Storage)
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: observer-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-observer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-observer}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-observer} -d ${POSTGRES_DB:-observer}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - observer-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=postgres"
+
 # ============================================================================
 # Volumes
 # ============================================================================
 volumes:
   observer-data:
+    driver: local
+  postgres-data:
     driver: local
 
 # ============================================================================
