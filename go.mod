@@ -19,6 +19,7 @@ require (
 	go.mongodb.org/mongo-driver v1.17.3
 	google.golang.org/grpc v1.75.1
 	google.golang.org/protobuf v1.36.10
+	gorm.io/gorm v1.31.1
 )
 
 require (
@@ -59,6 +60,8 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect

@@ -16,7 +16,7 @@ import (
 )
 
 // handleTestBegin processes a test begin event
-func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage) error {
 	var req events.TestBeginEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -118,7 +118,7 @@ func (c *MongoNATSConsumer) handleTestBegin(ctx context.Context, data json.RawMe
 }
 
 // handleTestEnd processes a test end event
-func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) error {
 	var req events.TestEndEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -165,7 +165,7 @@ func (c *MongoNATSConsumer) handleTestEnd(ctx context.Context, data json.RawMess
 }
 
 // handleTestFailure processes a test failure event
-func (c *MongoNATSConsumer) handleTestFailure(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleTestFailure(ctx context.Context, data json.RawMessage) error {
 	var req events.TestFailureEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -233,7 +233,7 @@ func (c *MongoNATSConsumer) handleTestFailure(ctx context.Context, data json.Raw
 }
 
 // handleTestError processes a test error event
-func (c *MongoNATSConsumer) handleTestError(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleTestError(ctx context.Context, data json.RawMessage) error {
 	var req events.TestErrorEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -305,7 +305,7 @@ func (c *MongoNATSConsumer) handleTestError(ctx context.Context, data json.RawMe
 // - < 100KB: Store inline as base64 content
 // - >= 100KB: Store in external storage (if configured)
 // Falls back to inline storage if external storage is not configured.
-func (c *MongoNATSConsumer) processAttachment(ctx context.Context, att *common.Attachment) (map[string]interface{}, error) {
+func (c *NATSConsumer) processAttachment(ctx context.Context, att *common.Attachment) (map[string]interface{}, error) {
 	attMap := make(map[string]interface{})
 	attMap["name"] = att.Name
 	attMap["mime_type"] = att.MimeType
@@ -366,7 +366,7 @@ func (c *MongoNATSConsumer) processAttachment(ctx context.Context, att *common.A
 // out-of-order case where step.end arrives after test.begin but before
 // step.begin has created the step: the step.end is deferred, but no further
 // test.begin will arrive to trigger another replay after step.begin runs.
-func (c *MongoNATSConsumer) scheduleDeferredStepReplaySweep(runID, testID string, retryIndex int32) {
+func (c *NATSConsumer) scheduleDeferredStepReplaySweep(runID, testID string, retryIndex int32) {
 	delays := []time.Duration{
 		100 * time.Millisecond,
 		250 * time.Millisecond,

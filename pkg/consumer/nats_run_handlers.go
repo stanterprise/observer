@@ -12,7 +12,7 @@ import (
 )
 
 // handleRunEnd processes a test run end event
-func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) error {
 	var req events.TestRunEndEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -51,7 +51,7 @@ func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessa
 	return nil
 }
 
-func (c *MongoNATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage) error {
 	var req events.ReportRunStartEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,

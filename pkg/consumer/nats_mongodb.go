@@ -40,7 +40,7 @@ func extractTestID(testCaseRunID, runID string) string {
 	return testCaseRunID
 }
 
-// MongoNATSConsumer wraps a NATS JetStream consumer for processing test events
+// NATSConsumer wraps a NATS JetStream consumer for processing test events
 // and persisting them to MongoDB using a document-based data model.
 //
 // Event Processing Flow:
@@ -51,11 +51,12 @@ func extractTestID(testCaseRunID, runID string) string {
 // - End Events: Find and update existing entities within the root document
 //
 // All operations follow an upsert pattern: update if entity exists, insert if not found.
-type MongoNATSConsumer struct {
+type NATSConsumer struct {
 	nc             *nats.Conn
 	js             jetstream.JetStream
 	logger         *slog.Logger
 	repo           *repository.MongoRepository
+	pgRepo         *repository.PostgresRepository
 	rawMessageRepo *repository.RawMessageRepository
 	storageDriver  storage.Driver
 	stream         string
@@ -122,10 +123,10 @@ type runIntegrity struct {
 	LastUpdatedAt   time.Time
 }
 
-// NewMongoNATSConsumer creates a new NATS JetStream consumer with MongoDB backend.
+// NewNATSConsumer creates a new NATS JetStream consumer with MongoDB and Postgres backend.
 // If rawMessageRepo is non-nil and cfg.RetainMessages is true, every received message
 // will be persisted to the raw_messages collection before processing.
-func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *repository.MongoRepository, rawMessageRepo *repository.RawMessageRepository) (*MongoNATSConsumer, error) {
+func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *repository.MongoRepository, rawMessageRepo *repository.RawMessageRepository) (*NATSConsumer, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}
@@ -204,7 +205,7 @@ func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo
 		return nil, fmt.Errorf("create jetstream context: %w", err)
 	}
 
-	c := &MongoNATSConsumer{
+	c := &NATSConsumer{
 		nc:             nc,
 		js:             js,
 		logger:         logger,
@@ -257,7 +258,7 @@ func NewMongoNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo
 // Using CreateOrUpdateConsumer ensures that config changes (e.g. retry count,
 // ack timeout) take effect at startup rather than being silently ignored when
 // a durable consumer with the same name is already registered in the stream.
-func (c *MongoNATSConsumer) ensureConsumer(ctx context.Context, consumerName string, maxDeliver int, ackWait time.Duration) (jetstream.Consumer, error) {
+func (c *NATSConsumer) ensureConsumer(ctx context.Context, consumerName string, maxDeliver int, ackWait time.Duration) (jetstream.Consumer, error) {
 	// Check if stream exists first
 	_, err := c.js.Stream(ctx, c.stream)
 	if err != nil {
@@ -285,7 +286,7 @@ func (c *MongoNATSConsumer) ensureConsumer(ctx context.Context, consumerName str
 }
 
 // Start begins consuming messages from NATS
-func (c *MongoNATSConsumer) Start(ctx context.Context, cfg MongoNATSConsumerConfig) error {
+func (c *NATSConsumer) Start(ctx context.Context, cfg MongoNATSConsumerConfig) error {
 	c.logger.Info("starting MongoDB consumer")
 
 	for {
@@ -353,7 +354,7 @@ func (c *MongoNATSConsumer) Start(ctx context.Context, cfg MongoNATSConsumerConf
 }
 
 // processMessage handles a single NATS message
-func (c *MongoNATSConsumer) processMessage(ctx context.Context, msg jetstream.Msg) (publisher.Event, error) {
+func (c *NATSConsumer) processMessage(ctx context.Context, msg jetstream.Msg) (publisher.Event, error) {
 	var event publisher.Event
 	if err := json.Unmarshal(msg.Data(), &event); err != nil {
 		return event, fmt.Errorf("unmarshal event: %w", err)
@@ -431,7 +432,7 @@ func (c *MongoNATSConsumer) processMessage(ctx context.Context, msg jetstream.Ms
 	}
 }
 
-func (c *MongoNATSConsumer) shouldDeferStepEvent(err error) bool {
+func (c *NATSConsumer) shouldDeferStepEvent(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -439,7 +440,7 @@ func (c *MongoNATSConsumer) shouldDeferStepEvent(err error) bool {
 	return strings.Contains(errMsg, "parent test not found") || strings.Contains(errMsg, "step not found")
 }
 
-func (c *MongoNATSConsumer) deferStepEvent(event publisher.Event, cause error) error {
+func (c *NATSConsumer) deferStepEvent(event publisher.Event, cause error) error {
 	runID, testID, retryIndex, err := extractStepIdentity(event)
 	if err != nil {
 		return err
@@ -476,7 +477,7 @@ func (c *MongoNATSConsumer) deferStepEvent(event publisher.Event, cause error) e
 	return nil
 }
 
-func (c *MongoNATSConsumer) replayDeferredStepsForTest(ctx context.Context, runID, testID string, retryIndex int32) {
+func (c *NATSConsumer) replayDeferredStepsForTest(ctx context.Context, runID, testID string, retryIndex int32) {
 	key := deferredQueueKey(runID, testID, retryIndex)
 
 	c.deferMu.Lock()
@@ -588,7 +589,7 @@ func deferredQueueKey(runID, testID string, retryIndex int32) string {
 	return runID + "::" + testID + "::" + strconv.Itoa(int(retryIndex))
 }
 
-func (c *MongoNATSConsumer) incrementIntegrity(runID string, mutate func(ri *runIntegrity)) {
+func (c *NATSConsumer) incrementIntegrity(runID string, mutate func(ri *runIntegrity)) {
 	if runID == "" {
 		return
 	}
@@ -603,7 +604,7 @@ func (c *MongoNATSConsumer) incrementIntegrity(runID string, mutate func(ri *run
 	ri.LastUpdatedAt = time.Now()
 }
 
-func (c *MongoNATSConsumer) markRunStart(runID string, expectedTests int32) {
+func (c *NATSConsumer) markRunStart(runID string, expectedTests int32) {
 	c.incrementIntegrity(runID, func(ri *runIntegrity) {
 		if ri.StartedAt.IsZero() {
 			ri.StartedAt = time.Now()
@@ -612,7 +613,7 @@ func (c *MongoNATSConsumer) markRunStart(runID string, expectedTests int32) {
 	})
 }
 
-func (c *MongoNATSConsumer) emitRunCompletenessSummary(runID string, finalStatus string) {
+func (c *NATSConsumer) emitRunCompletenessSummary(runID string, finalStatus string) {
 	c.integrityMu.Lock()
 	ri, exists := c.runIntegrityByID[runID]
 	if !exists {
@@ -652,7 +653,7 @@ func (c *MongoNATSConsumer) emitRunCompletenessSummary(runID string, finalStatus
 // purgeDeferQueueForRun removes all deferred step event entries whose runID
 // matches the given run. This is called when a run ends to bound memory usage
 // and prevent stale entries from accumulating in long-running processors.
-func (c *MongoNATSConsumer) purgeDeferQueueForRun(runID string) {
+func (c *NATSConsumer) purgeDeferQueueForRun(runID string) {
 	prefix := runID + "::"
 	c.deferMu.Lock()
 	for key := range c.deferQueue {
@@ -663,7 +664,7 @@ func (c *MongoNATSConsumer) purgeDeferQueueForRun(runID string) {
 	c.deferMu.Unlock()
 }
 
-func (c *MongoNATSConsumer) publishDLQ(ctx context.Context, msg jetstream.Msg, event publisher.Event, processingErr error, deliveries uint64) error {
+func (c *NATSConsumer) publishDLQ(ctx context.Context, msg jetstream.Msg, event publisher.Event, processingErr error, deliveries uint64) error {
 	runID := extractRunID(event.Data)
 	payload := map[string]interface{}{
 		"reason":            processingErr.Error(),
@@ -697,7 +698,7 @@ func (c *MongoNATSConsumer) publishDLQ(ctx context.Context, msg jetstream.Msg, e
 }
 
 // handleHeartbeat processes a heartbeat event
-func (c *MongoNATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMessage) error {
 	var req events.HeartbeatEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -713,7 +714,7 @@ func (c *MongoNATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMe
 // retainRawMessage persists the raw NATS message into the per-run retention document.
 // The run_id is extracted from the event data and used as the document identifier so
 // that all messages belonging to the same run are stored in a single document.
-func (c *MongoNATSConsumer) retainRawMessage(ctx context.Context, msg jetstream.Msg, event publisher.Event) error {
+func (c *NATSConsumer) retainRawMessage(ctx context.Context, msg jetstream.Msg, event publisher.Event) error {
 	runID := extractRunID(event.Data)
 	if runID == "" {
 		c.logger.Warn("could not extract run_id from message, skipping retention",
@@ -815,7 +816,7 @@ func mongoStatusToString(status common.TestStatus) string {
 }
 
 // Close closes the NATS connection
-func (c *MongoNATSConsumer) Close() error {
+func (c *NATSConsumer) Close() error {
 	if c.storageDriver != nil {
 		if err := c.storageDriver.Close(); err != nil {
 			c.logger.Warn("failed to close storage driver", "error", err)

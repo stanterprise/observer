@@ -13,7 +13,7 @@ import (
 )
 
 // handleSuiteBegin processes a suite begin event
-func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessage) error {
 	var req events.SuiteBeginEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -74,8 +74,8 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 		TestCaseIds:     req.Suite.TestCaseIds,
 		SubSuiteIds:     req.Suite.SubSuiteIds,
 		// Tags:            req.Suite.Tags, // TODO: Add when available in protobuf
-		StartTime:       startTime,
-		EndTime:         endTime,
+		StartTime: startTime,
+		EndTime:   endTime,
 	}
 
 	// Use ParentSuiteId directly from protobuf (already set in suite object)
@@ -87,7 +87,7 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 }
 
 // handleSuiteEnd processes a suite end event
-func (c *MongoNATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage) error {
 	var req events.SuiteEndEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,

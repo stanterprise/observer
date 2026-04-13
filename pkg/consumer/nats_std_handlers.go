@@ -12,7 +12,7 @@ import (
 )
 
 // handleStdOutput processes a stdout event
-func (c *MongoNATSConsumer) handleStdOutput(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleStdOutput(ctx context.Context, data json.RawMessage) error {
 	var req events.StdOutputEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -51,7 +51,7 @@ func (c *MongoNATSConsumer) handleStdOutput(ctx context.Context, data json.RawMe
 }
 
 // handleStdError processes a stderr event
-func (c *MongoNATSConsumer) handleStdError(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleStdError(ctx context.Context, data json.RawMessage) error {
 	var req events.StdErrorEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,

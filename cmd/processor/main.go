@@ -76,7 +76,7 @@ func main() {
 		RetainMessages:        *retainMessages,
 	}
 
-	natsConsumer, err := consumer.NewMongoNATSConsumer(cfg, logger, repo, rawMsgRepo)
+	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, repo, rawMsgRepo)
 	if err != nil {
 		logger.Error("failed to create MongoDB NATS consumer", "error", err)
 		os.Exit(1)

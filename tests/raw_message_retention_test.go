@@ -142,7 +142,7 @@ func TestRawMessageRetention(t *testing.T) {
 		RetainMessages: true,
 	}
 
-	natsConsumer, err := consumer.NewMongoNATSConsumer(cfg, logger, repo, rawMsgRepo)
+	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, repo, rawMsgRepo)
 	if err != nil {
 		t.Fatalf("Failed to create consumer: %v", err)
 	}
@@ -312,7 +312,7 @@ func TestRawMessageRetention_Disabled(t *testing.T) {
 	}
 
 	// nil rawMessageRepo → retention disabled
-	natsConsumer, err := consumer.NewMongoNATSConsumer(cfg, logger, repo, nil)
+	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, repo, nil)
 	if err != nil {
 		t.Fatalf("Failed to create consumer: %v", err)
 	}
@@ -430,7 +430,7 @@ func TestRawMessageRetention_MultipleRuns(t *testing.T) {
 		RetainMessages: true,
 	}
 
-	natsConsumer, err := consumer.NewMongoNATSConsumer(cfg, logger, repo, rawMsgRepo)
+	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, repo, rawMsgRepo)
 	if err != nil {
 		t.Fatalf("Failed to create consumer: %v", err)
 	}

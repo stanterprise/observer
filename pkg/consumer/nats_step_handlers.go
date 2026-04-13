@@ -15,7 +15,7 @@ import (
 )
 
 // handleStepBegin processes a step begin event
-func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleStepBegin(ctx context.Context, data json.RawMessage) error {
 	var req events.StepBeginEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -88,7 +88,7 @@ func (c *MongoNATSConsumer) handleStepBegin(ctx context.Context, data json.RawMe
 }
 
 // handleStepEnd processes a step end event
-func (c *MongoNATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) error {
 	var req events.StepEndEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -155,7 +155,7 @@ type stepAttachmentPayload struct {
 	URI         string `json:"uri"`
 }
 
-func (c *MongoNATSConsumer) extractStepAttachments(ctx context.Context, metadata map[string]string) []map[string]interface{} {
+func (c *NATSConsumer) extractStepAttachments(ctx context.Context, metadata map[string]string) []map[string]interface{} {
 	keys := []string{"attachments", "attachments_json", "step.attachments", "pw:attachments"}
 	var raw string
 	for _, key := range keys {
