@@ -122,9 +122,9 @@ type TestAttempt struct {
 	EndTime      *time.Time `gorm:"column:finished_at;index:idx_attempts_status_finished_at,priority:2" json:"endTime,omitempty"`
 	Duration     *int64     `gorm:"column:duration" json:"duration,omitempty"`
 
-	// Steps holds the full step tree serialized as jsonb.
+	// Steps holds the step array containing step trees serialized as jsonb.
 	// Go type is json.RawMessage (provisional — concrete typed decode at read time).
-	Steps json.RawMessage `gorm:"column:steps;type:jsonb" json:"steps,omitempty"`
+	Steps *json.RawMessage `gorm:"column:steps;type:jsonb" json:"steps,omitempty"`
 
 	Attachments  []map[string]interface{} `gorm:"column:attachments;type:jsonb;serializer:json" json:"attachments,omitempty"`
 	ErrorMessage string                   `gorm:"column:error_message;type:text" json:"errorMessage,omitempty"`
