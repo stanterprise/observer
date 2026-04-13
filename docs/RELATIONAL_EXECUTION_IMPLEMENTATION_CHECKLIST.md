@@ -48,16 +48,16 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 
 ### 1.1 Configuration
 
-- [x] Add PostgreSQL connection config (`POSTGRES_DSN`, pooling, timeouts).
-- [x] Add `MONGO_STEP_BUFFER_TTL` env var (default: 15 minutes).
+- [ ] Add PostgreSQL connection config (`POSTGRES_DSN`, pooling, timeouts).
+- [ ] Add `MONGO_STEP_BUFFER_TTL` env var (default: 15 minutes).
 - [ ] Add object storage size threshold for step payloads (default: ~4MB).
-- [x] Add boot-time validation that PG DSN is reachable (ping on connect).
-- [x] Add safe defaults for local/dev mode (POSTGRES_DSN optional; MongoDB-only fallback).
+- [ ] Add boot-time validation that PG DSN is reachable (ping on connect).
+- [ ] Add safe defaults for local/dev mode (POSTGRES_DSN optional; MongoDB-only fallback).
 
 ### 1.2 PostgreSQL integration
 
-- [x] Add PostgreSQL connection module with pooling and health checks (`internal/database/postgres.go`).
-- [x] Add graceful shutdown integration for PG clients (`defer pgDB.Close()` in processor).
+- [ ] Add PostgreSQL connection module with pooling and health checks (`internal/database/postgres.go`).
+- [ ] Add graceful shutdown integration for PG clients (`defer pgDB.Close()` in processor).
 - [ ] Integrate with existing observability for query performance.
 
 ### 1.3 Telemetry scaffolding
@@ -72,26 +72,26 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 
 ### 2.1 Connectivity and lifecycle
 
-- [x] Add PostgreSQL connection module with pooling and health checks.
-- [x] Add graceful shutdown integration for PG clients.
-- [x] Add configuration options for connection pool sizes and timeouts (via DSN + pgxpool config).
+- [ ] Add PostgreSQL connection module with pooling and health checks.
+- [ ] Add graceful shutdown integration for PG clients.
+- [ ] Add configuration options for connection pool sizes and timeouts (via DSN + pgxpool config).
 
 ### 2.2 Schema definition and initialization
 
-- [x] Define `runs` table schema (DDL or Go structs).
-- [x] Define `run_shards` table schema.
-- [x] Define `suites` table schema.
-- [x] Define `tests` table schema.
-- [x] Define `test_attempts` table schema with unique constraint on `(test_id, attempt_index)`.
-- [x] Implement idempotent schema initialization in PG connection module: `CREATE TABLE IF NOT EXISTS` (no backfill of legacy MongoDB data).
-- [x] Add indexes for query optimization: (run_id), (suite_id), (test_id), (status, created_at).
+- [ ] Define `runs` table schema (DDL or Go structs).
+- [ ] Define `run_shards` table schema.
+- [ ] Define `suites` table schema.
+- [ ] Define `tests` table schema.
+- [ ] Define `test_attempts` table schema with unique constraint on `(test_id, attempt_index)`.
+- [ ] Implement idempotent schema initialization in PG connection module: `CREATE TABLE IF NOT EXISTS` (no backfill of legacy MongoDB data).
+- [ ] Add indexes for query optimization: (run_id), (suite_id), (test_id), (status, created_at).
 
 ### 2.3 Repository interfaces and implementations
 
-- [x] Define PG repository interfaces for runs/suites/tests/test_attempts.
-- [x] Implement idempotent upsert semantics for event redelivery safety (ON CONFLICT DO UPDATE).
-- [x] Implement attempt begin/end transitions with explicit state machine checks (NOT IN terminal statuses guard).
-- [x] Implement read queries for dashboard and detail endpoints (GetRun, ListRuns, GetSuite, ListTestsBySuite, etc.).
+- [ ] Define PG repository interfaces for runs/suites/tests/test_attempts.
+- [ ] Implement idempotent upsert semantics for event redelivery safety (ON CONFLICT DO UPDATE).
+- [ ] Implement attempt begin/end transitions with explicit state machine checks (NOT IN terminal statuses guard).
+- [ ] Implement read queries for dashboard and detail endpoints (GetRun, ListRuns, GetSuite, ListTestsBySuite, etc.).
 
 ## 3. Shard Stitching and Logical Run Identity
 
@@ -106,21 +106,21 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 
 ### 4.1 Collection and indexes
 
-- [x] Create `live_step_buffers` collection initialization (`LiveStepBuffersCollection()` accessor).
-- [x] Add TTL index on `ttl_at` with `expireAfterSeconds` derived from `MONGO_STEP_BUFFER_TTL`.
-- [x] Add supporting index for run-end sweep (`run_id`).
+- [ ] Create `live_step_buffers` collection initialization (`LiveStepBuffersCollection()` accessor).
+- [ ] Add TTL index on `ttl_at` with `expireAfterSeconds` derived from `MONGO_STEP_BUFFER_TTL`.
+- [ ] Add supporting index for run-end sweep (`run_id`).
 
 ### 4.2 Document contract
 
-- [x] Implement document shape with `_id=test_id` (unique per active test).
-- [x] Add `attempt_index` as a regular attribute (not part of ID).
-- [x] Add `status` field (`active | flush_in_progress`).
-- [x] Add `first_event_at`, `last_event_at`, `flush_started_at` for tracking.
-- [x] Add `ttl_at` timestamp for TTL cleanup.
+- [ ] Implement document shape with `_id=test_id` (unique per active test).
+- [ ] Add `attempt_index` as a regular attribute (not part of ID).
+- [ ] Add `status` field (`active | flush_in_progress`).
+- [ ] Add `first_event_at`, `last_event_at`, `flush_started_at` for tracking.
+- [ ] Add `ttl_at` timestamp for TTL cleanup.
 
 ### 4.3 Write path
 
-- [x] Implement create/reset behavior at attempt start, setting `ttl_at = now() + MONGO_STEP_BUFFER_TTL`.
+- [ ] Implement create/reset behavior at attempt start, setting `ttl_at = now() + MONGO_STEP_BUFFER_TTL`.
 - [ ] Implement atomic step begin/step end mutations using MongoDB `$set` and `$push` (Phase 5).
 - [ ] Enforce invariants on attempt index progression in code (Phase 5).
 - [ ] Handle duplicate NATS event deliveries idempotently via event key (Phase 5).
