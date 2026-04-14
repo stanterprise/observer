@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/stanterprise/observer/internal/models"
 	m "github.com/stanterprise/observer/internal/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -45,6 +46,10 @@ func (c *NATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) e
 	if err := c.repo.MarkRunningTestsAsTimedOut(ctx, req.RunId); err != nil {
 		return fmt.Errorf("mark running tests as timed out: %w", err)
 	}
+
+	testRun := models.RunEndEventToTestRun(&req)
+
+	c.pgRepo.FinalizeRunEnd(ctx, testRun)
 
 	c.emitRunCompletenessSummary(req.RunId, req.FinalStatus.String())
 
@@ -128,6 +133,11 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 
 		suites = append(suites, suite)
 	}
+
+	testRun, _ := models.RunStartEventToTestRun(&req)
+
+	c.pgRepo.UpsertRunStart(ctx, testRun)
+	// TODO: upsert suites when this method is fully implemented.
 
 	return c.repo.MapSuites(ctx, req.RunId, req.Name, runMetadata, req.TotalTests, suites)
 }

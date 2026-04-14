@@ -38,6 +38,22 @@ func main() {
 
 	logger.Info("using MongoDB backend for API")
 
+	// Connect to PostgreSQL (optional — API continues without it).
+	pgDB, err := database.ConnectPostgresFromEnv(logger)
+	if err != nil {
+		logger.Error("postgres connect failed", "error", err)
+		os.Exit(1)
+	}
+	if pgDB == nil {
+		logger.Warn("POSTGRES_DSN / DATABASE_URL not set; PostgreSQL endpoints are disabled")
+	} else {
+		defer func() {
+			if closeErr := pgDB.Close(); closeErr != nil {
+				logger.Warn("failed to close postgres connection", "error", closeErr)
+			}
+		}()
+	}
+
 	// Ensure MongoDB connection cleanup
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

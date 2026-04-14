@@ -9,9 +9,9 @@ import (
 	"github.com/stanterprise/observer/internal/repository"
 )
 
-// UpdateTestRunEnd updates run terminal status and timing fields.
-func (r *PostgresRepository) UpdateTestRunEnd(ctx context.Context, runID string, status string, startTime *time.Time, duration *int64) error {
-	if err := repository.ValidateRunID(runID); err != nil {
+// FinalizeRunEnd applies terminal state from TestRun to the existing run row.
+func (r *PostgresRepository) FinalizeRunEnd(ctx context.Context, fields m.TestRun) error {
+	if err := repository.ValidateRunID(fields.ID); err != nil {
 		return err
 	}
 	if err := r.ensureDB(); err != nil {
@@ -20,30 +20,33 @@ func (r *PostgresRepository) UpdateTestRunEnd(ctx context.Context, runID string,
 
 	now := time.Now()
 	updates := map[string]interface{}{
-		"status":      status,
+		"status":      fields.Status,
 		"updated_at":  now,
 		"finished_at": now,
 	}
 
-	if startTime != nil {
-		updates["started_at"] = *startTime
+	if fields.StartTime != nil {
+		updates["started_at"] = *fields.StartTime
 	}
-	if duration != nil {
-		updates["duration"] = *duration
+	if fields.EndTime != nil {
+		updates["finished_at"] = *fields.EndTime
+	}
+	if fields.Duration != nil {
+		updates["duration"] = *fields.Duration
 	}
 
 	result := r.db.WithContext(ctx).
 		Model(&m.TestRun{}).
-		Where("id = ?", runID).
+		Where("id = ?", fields.ID).
 		Updates(updates)
 
 	if result.Error != nil {
-		return fmt.Errorf("update test run end: %w", result.Error)
+		return fmt.Errorf("finalize run end: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("test run not found: %s", runID)
+		return fmt.Errorf("test run not found: %s", fields.ID)
 	}
 
-	r.logger.Info("test run end updated", "run_id", runID, "status", status)
+	r.logger.Info("test run finalized", "run_id", fields.ID, "status", fields.Status)
 	return nil
 }

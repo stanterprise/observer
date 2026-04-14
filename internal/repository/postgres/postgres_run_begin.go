@@ -9,9 +9,13 @@ import (
 	"github.com/stanterprise/observer/internal/repository"
 )
 
-// MarkRunStarts updates an existing run to RUNNING and stamps start/update times.
-func (r *PostgresRepository) MarkRunStarts(ctx context.Context, runID string) error {
-	if err := repository.ValidateRunID(runID); err != nil {
+// UpsertRunStart upserts a TestRun row from a mapped run start event.
+// On conflict the mutable fields (name, status, metadata, timing) are updated.
+func (r *PostgresRepository) UpsertRunStart(ctx context.Context, run *m.TestRun) error {
+	if run == nil {
+		return fmt.Errorf("run is nil")
+	}
+	if err := repository.ValidateRunID(run.ID); err != nil {
 		return err
 	}
 	if err := r.ensureDB(); err != nil {
@@ -19,24 +23,29 @@ func (r *PostgresRepository) MarkRunStarts(ctx context.Context, runID string) er
 	}
 
 	now := time.Now()
-	updates := map[string]interface{}{
-		"status":     "RUNNING",
-		"started_at": now,
-		"updated_at": now,
-	}
+	run.CreatedAt = now
+	run.UpdatedAt = now
 
 	result := r.db.WithContext(ctx).
-		Model(&m.TestRun{}).
-		Where("id = ?", runID).
-		Updates(updates)
+		Where(m.TestRun{ID: run.ID}).
+		Assign(m.TestRun{
+			Name:        run.Name,
+			Status:      run.Status,
+			TotalTests:  run.TotalTests,
+			InitiatedBy: run.InitiatedBy,
+			ProjectName: run.ProjectName,
+			Metadata:    run.Metadata,
+			StartTime:   run.StartTime,
+			UpdatedAt:   now,
+			CreatedAt:   now,
+			Description: run.Description,
+		}).
+		FirstOrCreate(run)
 
 	if result.Error != nil {
-		return fmt.Errorf("mark run starts: %w", result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("test run not found: %s", runID)
+		return fmt.Errorf("upsert run start: %w", result.Error)
 	}
 
-	r.logger.Info("test run started", "run_id", runID)
+	r.logger.Info("test run upserted", "run_id", run.ID)
 	return nil
 }

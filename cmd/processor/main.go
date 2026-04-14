@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"gorm.io/gorm"
+
 	"github.com/stanterprise/observer/internal/database"
 	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/internal/repository/postgres"
@@ -48,12 +50,33 @@ func main() {
 
 	logger.Info("using MongoDB backend")
 
+	// Connect to PostgreSQL (optional — processor continues without it but PG writes will no-op).
+	pgDB, err := database.ConnectPostgresFromEnv(logger)
+	if err != nil {
+		logger.Error("postgres connect failed", "error", err)
+		os.Exit(1)
+	}
+	if pgDB == nil {
+		logger.Warn("POSTGRES_DSN / DATABASE_URL not set; PostgreSQL writes are disabled")
+	} else {
+		defer func() {
+			if closeErr := pgDB.Close(); closeErr != nil {
+				logger.Warn("failed to close postgres connection", "error", closeErr)
+			}
+		}()
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	defer mongoDB.Close(ctx)
 
 	repo := mongodb.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
-	pgRepo := postgres.NewPostgresRepository(nil, logger)
+
+	var pgGormDB *gorm.DB
+	if pgDB != nil {
+		pgGormDB = pgDB.DB
+	}
+	pgRepo := postgres.NewPostgresRepository(pgGormDB, logger)
 
 	// Optionally create the raw message repository when retention is enabled.
 	var rawMsgRepo *mongodb.RawMessageRepository
