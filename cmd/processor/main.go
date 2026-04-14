@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/stanterprise/observer/internal/database"
-	"github.com/stanterprise/observer/internal/repository"
+	"github.com/stanterprise/observer/internal/repository/mongodb"
+	"github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/consumer"
 )
 
@@ -51,13 +52,13 @@ func main() {
 	defer cancel()
 	defer mongoDB.Close(ctx)
 
-	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
-	pgRepo := repository.NewPostgresRepository(nil, logger)
+	repo := mongodb.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
+	pgRepo := postgres.NewPostgresRepository(nil, logger)
 
 	// Optionally create the raw message repository when retention is enabled.
-	var rawMsgRepo *repository.RawMessageRepository
+	var rawMsgRepo *mongodb.RawMessageRepository
 	if *retainMessages {
-		rawMsgRepo = repository.NewRawMessageRepository(mongoDB.Collection(*rawMsgCollection), logger)
+		rawMsgRepo = mongodb.NewRawMessageRepository(mongoDB.Collection(*rawMsgCollection), logger)
 		logger.Info("raw message retention enabled",
 			"database", mongoDB.DatabaseName(),
 			"collection", rawMsgRepo.CollectionName())

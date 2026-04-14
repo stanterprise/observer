@@ -1,4 +1,4 @@
-package repository
+package mongodb
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	// m "github.com/stanterprise/observer/internal/models"
+	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -21,7 +22,7 @@ import (
 // - attachments: Attachments for this attempt (optional).
 // Returns error if runID is empty or test not found.
 func (r *MongoRepository) UpsertTestEnd(ctx context.Context, runID string, testID string, status string, retryIndex int32, endTime *time.Time, duration *int64, attachments []map[string]interface{}) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 	if testID == "" {

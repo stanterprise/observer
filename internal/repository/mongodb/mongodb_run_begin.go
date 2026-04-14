@@ -1,15 +1,16 @@
-package repository
+package mongodb
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 func (r *MongoRepository) MarkRunStarts(ctx context.Context, runID string) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 

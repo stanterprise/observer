@@ -1,4 +1,4 @@
-package repository
+package mongodb
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
+	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -105,7 +106,7 @@ func (r *MongoRepository) GetTestFromRun(ctx context.Context, testID string) (*m
 
 // UpdateTestStatus updates the status of a test case run
 func (r *MongoRepository) UpdateTestStatus(ctx context.Context, runID string, testID string, status string) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 	if testID == "" {
@@ -365,7 +366,7 @@ func (r *MongoRepository) GetUniqueMarkers(ctx context.Context) ([]*MarkerInfo, 
 
 // DeleteTestRun deletes a test run document by ID
 func (r *MongoRepository) DeleteTestRun(ctx context.Context, runID string) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 
@@ -390,7 +391,7 @@ func (r *MongoRepository) DeleteTestRuns(ctx context.Context, runIDs []string) (
 
 	// Validate all run IDs
 	for _, runID := range runIDs {
-		if err := ValidateRunID(runID); err != nil {
+		if err := repository.ValidateRunID(runID); err != nil {
 			return 0, fmt.Errorf("invalid runID %s: %w", runID, err)
 		}
 	}
@@ -406,7 +407,7 @@ func (r *MongoRepository) DeleteTestRuns(ctx context.Context, runIDs []string) (
 
 // UpdateRunMarker updates or sets the MARKER metadata field for a test run
 func (r *MongoRepository) UpdateRunMarker(ctx context.Context, runID string, markerValue string) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 
@@ -438,7 +439,7 @@ func (r *MongoRepository) UpdateRunMarker(ctx context.Context, runID string, mar
 
 // RemoveRunMarker removes the MARKER metadata field from a test run
 func (r *MongoRepository) RemoveRunMarker(ctx context.Context, runID string) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 
@@ -478,7 +479,7 @@ func (r *MongoRepository) UpdateRunsMarker(ctx context.Context, runIDs []string,
 
 	// Validate all run IDs
 	for _, runID := range runIDs {
-		if err := ValidateRunID(runID); err != nil {
+		if err := repository.ValidateRunID(runID); err != nil {
 			return 0, fmt.Errorf("invalid runID %s: %w", runID, err)
 		}
 	}
@@ -509,7 +510,7 @@ func (r *MongoRepository) RemoveRunsMarker(ctx context.Context, runIDs []string)
 
 	// Validate all run IDs
 	for _, runID := range runIDs {
-		if err := ValidateRunID(runID); err != nil {
+		if err := repository.ValidateRunID(runID); err != nil {
 			return 0, fmt.Errorf("invalid runID %s: %w", runID, err)
 		}
 	}

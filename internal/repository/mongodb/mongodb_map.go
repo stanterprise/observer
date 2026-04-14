@@ -1,4 +1,4 @@
-package repository
+package mongodb
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
+	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -18,7 +19,7 @@ import (
 // - Metadata is replaced entirely
 // - total_tests is set directly
 func (r *MongoRepository) MapSuites(ctx context.Context, runID string, name string, metadata map[string]interface{}, totalTests int32, suites []m.SuiteDocument) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 	var errs []error

@@ -1,4 +1,4 @@
-package repository
+package mongodb
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
+	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -16,7 +17,7 @@ import (
 // - parentSuiteID: Empty for root-level suite, or ID of parent suite for nested suites.
 // Returns error if runID is empty or document not found.
 func (r *MongoRepository) UpsertSuiteBegin(ctx context.Context, runID string, suite *m.SuiteDocument, parentSuiteID string) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 

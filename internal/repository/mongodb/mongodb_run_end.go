@@ -1,4 +1,4 @@
-package repository
+package mongodb
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -13,7 +14,7 @@ import (
 
 // UpdateTestRunEnd updates a test run document with final status, times, and duration
 func (r *MongoRepository) UpdateTestRunEnd(ctx context.Context, runID string, status string, startTime *time.Time, duration *int64) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 
@@ -55,7 +56,7 @@ func (r *MongoRepository) UpdateTestRunEnd(ctx context.Context, runID string, st
 }
 
 func (r *MongoRepository) MarkRunningTestsAsTimedOut(ctx context.Context, runID string) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 

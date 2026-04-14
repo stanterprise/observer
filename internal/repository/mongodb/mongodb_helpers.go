@@ -1,21 +1,14 @@
-package repository
+package mongodb
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-// validateRunID checks if runID is provided and returns an error if not
-func ValidateRunID(runID string) error {
-	if runID == "" {
-		return fmt.Errorf("runID is required")
-	}
-	return nil
-}
 
 // ensureDocumentExists creates a document if it doesn't exist
 func (r *MongoRepository) ensureDocumentExists(ctx context.Context, runID string) error {
@@ -47,7 +40,7 @@ func buildStepEndUpdate(status string, now time.Time) bson.M {
 
 // AppendTestFailure adds a failure to a test document's attempt array
 func (r *MongoRepository) AppendTestFailure(ctx context.Context, runID, testID string, retryIndex int32, failure interface{}) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 
@@ -84,7 +77,7 @@ func (r *MongoRepository) AppendTestFailure(ctx context.Context, runID, testID s
 
 // AppendTestError adds an error to a test document's attempt array
 func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID string, retryIndex int32, errorDoc interface{}) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 
@@ -121,7 +114,7 @@ func (r *MongoRepository) AppendTestError(ctx context.Context, runID, testID str
 
 // AppendTestAttachments adds attachments to a test attempt and legacy test-level attachments array.
 func (r *MongoRepository) AppendTestAttachments(ctx context.Context, runID, testID string, retryIndex int32, attachments []map[string]interface{}) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 	if testID == "" {
@@ -163,7 +156,7 @@ func (r *MongoRepository) AppendTestAttachments(ctx context.Context, runID, test
 
 // AppendStdOutput adds stdout output to a test document
 func (r *MongoRepository) AppendStdOutput(ctx context.Context, runID, testID string, output interface{}) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 
@@ -197,7 +190,7 @@ func (r *MongoRepository) AppendStdOutput(ctx context.Context, runID, testID str
 
 // AppendStdError adds stderr output to a test document
 func (r *MongoRepository) AppendStdError(ctx context.Context, runID, testID string, output interface{}) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
-	"github.com/stanterprise/observer/internal/repository"
+	mongoRepo "github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mongodb"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -48,7 +48,7 @@ func setupTestHandler(t *testing.T) *testHandlerSetup {
 
 	dbName := "observer_api_test_" + time.Now().Format("20060102150405")
 	collection := client.Database(dbName).Collection("test_runs")
-	repo := repository.NewMongoRepository(collection, nil)
+	repo := mongoRepo.NewMongoRepository(collection, nil)
 	handler := NewMongoHandler(repo, nil)
 
 	cleanup := func() {
@@ -91,7 +91,7 @@ func TestHandleMarkers_EmptyDatabase(t *testing.T) {
 	if !exists {
 		t.Fatal("Response should have 'markers' field")
 	}
-	
+
 	// markers can be nil (null in JSON) or empty array
 	var markerCount int
 	if markersField == nil {
@@ -103,7 +103,7 @@ func TestHandleMarkers_EmptyDatabase(t *testing.T) {
 		}
 		markerCount = len(markers)
 	}
-	
+
 	if markerCount != 0 {
 		t.Errorf("Expected 0 markers in empty database, got %d", markerCount)
 	}

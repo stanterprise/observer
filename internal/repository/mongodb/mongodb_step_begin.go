@@ -1,4 +1,4 @@
-package repository
+package mongodb
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
+	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -18,7 +19,7 @@ import (
 // - retry_index: Required. Retry attempt index to target for step storage.
 // Returns error if runID is empty or parent test not found.
 func (r *MongoRepository) UpsertStepBegin(ctx context.Context, runID string, step *m.StepDocument, testID string, retry_index int32) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 	if testID == "" {

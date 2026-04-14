@@ -1,4 +1,4 @@
-package repository
+package postgres
 
 import (
 	"context"
@@ -6,11 +6,12 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
+	"github.com/stanterprise/observer/internal/repository"
 )
 
 // UpdateTestRunEnd updates run terminal status and timing fields.
 func (r *PostgresRepository) UpdateTestRunEnd(ctx context.Context, runID string, status string, startTime *time.Time, duration *int64) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 	if err := r.ensureDB(); err != nil {

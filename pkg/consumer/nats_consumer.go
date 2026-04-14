@@ -14,7 +14,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	m "github.com/stanterprise/observer/internal/models"
-	"github.com/stanterprise/observer/internal/repository"
+	"github.com/stanterprise/observer/internal/repository/mongodb"
+	"github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/stanterprise/observer/pkg/storage"
 	"github.com/stanterprise/proto-go/testsystem/v1/common"
@@ -55,9 +56,9 @@ type NATSConsumer struct {
 	nc             *nats.Conn
 	js             jetstream.JetStream
 	logger         *slog.Logger
-	repo           *repository.MongoRepository
-	pgRepo         *repository.PostgresRepository
-	rawMessageRepo *repository.RawMessageRepository
+	repo           *mongodb.MongoRepository
+	pgRepo         *postgres.PostgresRepository
+	rawMessageRepo *mongodb.RawMessageRepository
 	storageDriver  storage.Driver
 	stream         string
 	consumer       jetstream.Consumer
@@ -126,7 +127,7 @@ type runIntegrity struct {
 // NewNATSConsumer creates a new NATS JetStream consumer with MongoDB and Postgres backend.
 // If rawMessageRepo is non-nil and cfg.RetainMessages is true, every received message
 // will be persisted to the raw_messages collection before processing.
-func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *repository.MongoRepository, rawMessageRepo *repository.RawMessageRepository, pgRepo *repository.PostgresRepository) (*NATSConsumer, error) {
+func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *mongodb.MongoRepository, rawMessageRepo *mongodb.RawMessageRepository, pgRepo *postgres.PostgresRepository) (*NATSConsumer, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}

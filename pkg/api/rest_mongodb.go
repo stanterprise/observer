@@ -9,19 +9,19 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
-	"github.com/stanterprise/observer/internal/repository"
+	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 // MongoHandler provides REST API endpoints for the Observer service using MongoDB
 type MongoHandler struct {
-	repo           *repository.MongoRepository
-	rawMessageRepo *repository.RawMessageRepository // optional; nil when retention disabled
+	repo           *mongodb.MongoRepository
+	rawMessageRepo *mongodb.RawMessageRepository // optional; nil when retention disabled
 	logger         *slog.Logger
 }
 
 // NewMongoHandler creates a new MongoDB REST API handler
-func NewMongoHandler(repo *repository.MongoRepository, logger *slog.Logger) *MongoHandler {
+func NewMongoHandler(repo *mongodb.MongoRepository, logger *slog.Logger) *MongoHandler {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -34,7 +34,7 @@ func NewMongoHandler(repo *repository.MongoRepository, logger *slog.Logger) *Mon
 // SetRawMessageRepo attaches an optional raw message repository so that the
 // handler can serve GET /api/runs/{runId}/raw-messages requests.
 // When nil (default), the endpoint returns 404.
-func (h *MongoHandler) SetRawMessageRepo(r *repository.RawMessageRepository) {
+func (h *MongoHandler) SetRawMessageRepo(r *mongodb.RawMessageRepository) {
 	h.rawMessageRepo = r
 }
 
@@ -617,7 +617,7 @@ func (h *MongoHandler) handleTestTrends(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if trends == nil {
-		trends = []*repository.TestTrendItem{}
+		trends = []*mongodb.TestTrendItem{}
 	}
 
 	response := map[string]interface{}{

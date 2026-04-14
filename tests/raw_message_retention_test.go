@@ -11,7 +11,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	m "github.com/stanterprise/observer/internal/models"
-	"github.com/stanterprise/observer/internal/repository"
+	mongoRepository "github.com/stanterprise/observer/internal/repository/mongodb"
+	"github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/consumer"
 	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/testcontainers/testcontainers-go"
@@ -50,9 +51,9 @@ func TestRawMessageRetention(t *testing.T) {
 	testRunsCol := db.Collection("test_runs")
 	rawMsgCol := db.Collection("raw_messages")
 
-	repo := repository.NewMongoRepository(testRunsCol, logger)
-	rawMsgRepo := repository.NewRawMessageRepository(rawMsgCol, logger)
-	pgRepo := repository.NewPostgresRepository(nil, logger) // Postgres not used in this test but required by consumer
+	repo := mongoRepository.NewMongoRepository(testRunsCol, logger)
+	rawMsgRepo := mongoRepository.NewRawMessageRepository(rawMsgCol, logger)
+	pgRepo := postgres.NewPostgresRepository(nil, logger) // Postgres not used in this test but required by consumer
 	// Start NATS container
 	natsContainer, err := natsmodule.Run(ctx, "nats:latest")
 	if err != nil {
@@ -261,8 +262,8 @@ func TestRawMessageRetention_Disabled(t *testing.T) {
 	testRunsCol := db.Collection("test_runs")
 	rawMsgCol := db.Collection("raw_messages")
 
-	mongoRepo := repository.NewMongoRepository(testRunsCol, logger)
-	pgRepo := repository.NewPostgresRepository(nil, logger) // Postgres not used in this test but required by consumer
+	mongoRepo := mongoRepository.NewMongoRepository(testRunsCol, logger)
+	pgRepo := postgres.NewPostgresRepository(nil, logger) // Postgres not used in this test but required by consumer
 	// No raw message repo – retention disabled
 
 	// Start NATS container
@@ -375,9 +376,9 @@ func TestRawMessageRetention_MultipleRuns(t *testing.T) {
 	testRunsCol := db.Collection("test_runs")
 	rawMsgCol := db.Collection("raw_messages")
 
-	mongoRepo := repository.NewMongoRepository(testRunsCol, logger)
-	rawMsgRepo := repository.NewRawMessageRepository(rawMsgCol, logger)
-	pgRepo := repository.NewPostgresRepository(nil, logger) // Postgres not used in this test but required by consumer
+	mongoRepo := mongoRepository.NewMongoRepository(testRunsCol, logger)
+	rawMsgRepo := mongoRepository.NewRawMessageRepository(rawMsgCol, logger)
+	pgRepo := postgres.NewPostgresRepository(nil, logger) // Postgres not used in this test but required by consumer
 
 	natsContainer, err := natsmodule.Run(ctx, "nats:latest")
 	if err != nil {

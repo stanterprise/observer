@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/stanterprise/observer/internal/repository"
+	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/pkg/publisher"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 )
@@ -25,12 +25,12 @@ const (
 
 // Classifier determines if an event can be immediately processed or needs buffering
 type Classifier struct {
-	repo   *repository.MongoRepository
+	repo   *mongodb.MongoRepository
 	logger *slog.Logger
 }
 
 // NewClassifier creates a new event classifier
-func NewClassifier(repo *repository.MongoRepository, logger *slog.Logger) *Classifier {
+func NewClassifier(repo *mongodb.MongoRepository, logger *slog.Logger) *Classifier {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}

@@ -1,4 +1,4 @@
-package repository
+package postgres
 
 import (
 	"context"
@@ -6,11 +6,12 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
+	"github.com/stanterprise/observer/internal/repository"
 )
 
 // MarkRunStarts updates an existing run to RUNNING and stamps start/update times.
 func (r *PostgresRepository) MarkRunStarts(ctx context.Context, runID string) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 	if err := r.ensureDB(); err != nil {

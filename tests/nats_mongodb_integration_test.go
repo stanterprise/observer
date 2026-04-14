@@ -10,7 +10,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	m "github.com/stanterprise/observer/internal/models"
-	"github.com/stanterprise/observer/internal/repository"
+	mongoRepo "github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mongodb"
@@ -45,7 +45,7 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 	defer mongoClient.Disconnect(ctx)
 
 	collection := mongoClient.Database("observer_test").Collection("test_runs")
-	repo := repository.NewMongoRepository(collection, logger)
+	repo := mongoRepo.NewMongoRepository(collection, logger)
 
 	// Start NATS container
 	natsContainer, err := natsmodule.Run(ctx, "nats:latest")
@@ -257,7 +257,7 @@ func TestNATSToMongoDB_NestedSuites(t *testing.T) {
 	defer mongoClient.Disconnect(ctx)
 
 	collection := mongoClient.Database("observer_test").Collection("test_runs")
-	repo := repository.NewMongoRepository(collection, logger)
+	repo := mongoRepo.NewMongoRepository(collection, logger)
 
 	// Create root suite
 	runID := "run-nested-suite-test"

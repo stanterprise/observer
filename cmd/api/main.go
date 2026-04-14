@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/stanterprise/observer/internal/database"
-	"github.com/stanterprise/observer/internal/repository"
+	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/pkg/api"
 	"github.com/stanterprise/observer/pkg/storage"
 	"github.com/stanterprise/observer/pkg/websocket"
@@ -46,13 +46,13 @@ func main() {
 	}()
 
 	// Create MongoDB repository and handler
-	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
+	repo := mongodb.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
 	mongoHandler := api.NewMongoHandler(repo, logger)
 
 	// Attach raw message repository if the collection is reachable.
 	// The collection is always attempted; if it's empty (no retention data) the
 	// endpoint simply returns 404 per-request rather than refusing to start.
-	rawMsgRepo := repository.NewRawMessageRepository(mongoDB.Collection(*rawMsgCollection), logger)
+	rawMsgRepo := mongodb.NewRawMessageRepository(mongoDB.Collection(*rawMsgCollection), logger)
 	mongoHandler.SetRawMessageRepo(rawMsgRepo)
 	logger.Info("raw message audit endpoint enabled",
 		"collection", rawMsgRepo.CollectionName(),

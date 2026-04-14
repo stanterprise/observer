@@ -3,7 +3,7 @@ package graph
 import (
 	"log/slog"
 
-	"github.com/stanterprise/observer/internal/repository"
+	"github.com/stanterprise/observer/internal/repository/mongodb"
 )
 
 // This file will not be regenerated automatically.
@@ -14,12 +14,12 @@ import (
 // Currently, the API service uses MongoDB with REST endpoints, not GraphQL.
 // This resolver is maintained for potential future GraphQL support.
 type Resolver struct {
-	repo   *repository.MongoRepository
+	repo   *mongodb.MongoRepository
 	logger *slog.Logger
 }
 
 // NewResolver creates a new GraphQL resolver with MongoDB repository
-func NewResolver(repo *repository.MongoRepository, logger *slog.Logger) *Resolver {
+func NewResolver(repo *mongodb.MongoRepository, logger *slog.Logger) *Resolver {
 	if logger == nil {
 		logger = slog.Default()
 	}

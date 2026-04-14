@@ -1,10 +1,11 @@
-package repository
+package mongodb
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -22,7 +23,7 @@ import (
 // - duration: Step duration in nanoseconds.
 // Returns error if runID is empty or step not found.
 func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepID string, testID string, retry_index int32, status string, metadata map[string]interface{}, errorMsg string, errors []string, duration *int64) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 	if stepID == "" {
@@ -52,7 +53,7 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepI
 	}
 
 	// Update metadata (merge with existing metadata)
-	if metadata != nil && len(metadata) > 0 {
+	if len(metadata) > 0 {
 		for k, v := range metadata {
 			setFields[fmt.Sprintf("tests.$[test].attempts.$[attempt].steps.$[step].metadata.%s", k)] = v
 		}

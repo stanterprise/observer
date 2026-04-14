@@ -11,19 +11,19 @@ import (
 	"time"
 
 	"github.com/stanterprise/observer/internal/models"
-	"github.com/stanterprise/observer/internal/repository"
+	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/pkg/storage"
 )
 
 // AttachmentHandler handles attachment retrieval endpoints
 type AttachmentHandler struct {
-	repo          *repository.MongoRepository
+	repo          *mongodb.MongoRepository
 	storageDriver storage.Driver
 	logger        *slog.Logger
 }
 
 // NewAttachmentHandler creates a new attachment handler
-func NewAttachmentHandler(repo *repository.MongoRepository, storageDriver storage.Driver, logger *slog.Logger) *AttachmentHandler {
+func NewAttachmentHandler(repo *mongodb.MongoRepository, storageDriver storage.Driver, logger *slog.Logger) *AttachmentHandler {
 	if logger == nil {
 		logger = slog.Default()
 	}

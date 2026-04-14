@@ -1,4 +1,4 @@
-package repository
+package mongodb
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
+	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -54,7 +55,7 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 }
 
 func upsertTest(r *MongoRepository, ctx context.Context, runID string, test *m.TestDocument, suiteID string, now time.Time) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 	if suiteID == "" {

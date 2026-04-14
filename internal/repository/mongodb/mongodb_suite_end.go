@@ -1,10 +1,11 @@
-package repository
+package mongodb
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -14,7 +15,7 @@ import (
 // - suiteID: Required. Identifies the suite to update.
 // Returns error if runID is empty or suite not found.
 func (r *MongoRepository) UpsertSuiteEnd(ctx context.Context, runID string, suiteID string, status string, endTime *time.Time, duration *int64) error {
-	if err := ValidateRunID(runID); err != nil {
+	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
 	if suiteID == "" {
