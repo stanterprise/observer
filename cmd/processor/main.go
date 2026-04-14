@@ -52,6 +52,7 @@ func main() {
 	defer mongoDB.Close(ctx)
 
 	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
+	pgRepo := repository.NewPostgresRepository(nil, logger)
 
 	// Optionally create the raw message repository when retention is enabled.
 	var rawMsgRepo *repository.RawMessageRepository
@@ -76,7 +77,7 @@ func main() {
 		RetainMessages:        *retainMessages,
 	}
 
-	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, repo, rawMsgRepo)
+	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, repo, rawMsgRepo, pgRepo)
 	if err != nil {
 		logger.Error("failed to create MongoDB NATS consumer", "error", err)
 		os.Exit(1)

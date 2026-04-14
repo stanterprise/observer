@@ -22,7 +22,7 @@ PROTOC_GEN_GO_VERSION ?= v1.36.6
 PROTOC_GEN_GO_GRPC_VERSION ?= v1.5.1
 GOLANGCI_LINT_VERSION ?= v1.60.3
 
-.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache mongodb-up mongodb-down mongodb-logs mongodb-shell mongodb-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down docker-web-dev-down web-dev-mode helm-deps helm-lint helm-template helm-template-aio helm-template-prod helm-dry-run helm-dry-run-aio helm-dry-run-prod helm-test helm-validate
+.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache mongodb-up mongodb-down mongodb-logs mongodb-shell mongodb-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down docker-web-dev-down web-dev-mode helm-deps helm-lint helm-template helm-template-aio helm-template-prod helm-dry-run helm-dry-run-aio helm-dry-run-prod helm-test helm-validate FORCE
 
 .DEFAULT_GOAL := help
 
@@ -31,23 +31,19 @@ all: build-all ## Build all components
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"}; /^[a-zA-Z0-9_.-]+:.*##/ { printf "\033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-$(APP_BIN): ## Build the server binary (legacy)
-	@mkdir -p $(BIN_DIR)
-	go build -o $(APP_BIN) ./server
-
-$(INGESTION_BIN): ## Build the ingestion service binary
+$(INGESTION_BIN): FORCE ## Build the ingestion service binary
 	@mkdir -p $(BIN_DIR)
 	go build -o $(INGESTION_BIN) ./cmd/ingestion
 
-$(PROCESSOR_BIN): ## Build the processor service binary
+$(PROCESSOR_BIN): FORCE ## Build the processor service binary
 	@mkdir -p $(BIN_DIR)
 	go build -o $(PROCESSOR_BIN) ./cmd/processor
 
-$(API_BIN): ## Build the api service binary
+$(API_BIN): FORCE ## Build the api service binary
 	@mkdir -p $(BIN_DIR)
 	go build -o $(API_BIN) ./cmd/api
 
-build: $(APP_BIN) ## Build legacy server (shortcut)
+FORCE:
 
 build-ingestion: $(INGESTION_BIN) ## Build ingestion service
 

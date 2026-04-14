@@ -52,7 +52,7 @@ func TestRawMessageRetention(t *testing.T) {
 
 	repo := repository.NewMongoRepository(testRunsCol, logger)
 	rawMsgRepo := repository.NewRawMessageRepository(rawMsgCol, logger)
-
+	pgRepo := repository.NewPostgresRepository(nil, logger) // Postgres not used in this test but required by consumer
 	// Start NATS container
 	natsContainer, err := natsmodule.Run(ctx, "nats:latest")
 	if err != nil {
@@ -142,7 +142,7 @@ func TestRawMessageRetention(t *testing.T) {
 		RetainMessages: true,
 	}
 
-	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, repo, rawMsgRepo)
+	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, repo, rawMsgRepo, pgRepo)
 	if err != nil {
 		t.Fatalf("Failed to create consumer: %v", err)
 	}
@@ -261,7 +261,8 @@ func TestRawMessageRetention_Disabled(t *testing.T) {
 	testRunsCol := db.Collection("test_runs")
 	rawMsgCol := db.Collection("raw_messages")
 
-	repo := repository.NewMongoRepository(testRunsCol, logger)
+	mongoRepo := repository.NewMongoRepository(testRunsCol, logger)
+	pgRepo := repository.NewPostgresRepository(nil, logger) // Postgres not used in this test but required by consumer
 	// No raw message repo – retention disabled
 
 	// Start NATS container
@@ -312,7 +313,7 @@ func TestRawMessageRetention_Disabled(t *testing.T) {
 	}
 
 	// nil rawMessageRepo → retention disabled
-	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, repo, nil)
+	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, mongoRepo, nil, pgRepo)
 	if err != nil {
 		t.Fatalf("Failed to create consumer: %v", err)
 	}
@@ -374,8 +375,9 @@ func TestRawMessageRetention_MultipleRuns(t *testing.T) {
 	testRunsCol := db.Collection("test_runs")
 	rawMsgCol := db.Collection("raw_messages")
 
-	repo := repository.NewMongoRepository(testRunsCol, logger)
+	mongoRepo := repository.NewMongoRepository(testRunsCol, logger)
 	rawMsgRepo := repository.NewRawMessageRepository(rawMsgCol, logger)
+	pgRepo := repository.NewPostgresRepository(nil, logger) // Postgres not used in this test but required by consumer
 
 	natsContainer, err := natsmodule.Run(ctx, "nats:latest")
 	if err != nil {
@@ -430,7 +432,7 @@ func TestRawMessageRetention_MultipleRuns(t *testing.T) {
 		RetainMessages: true,
 	}
 
-	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, repo, rawMsgRepo)
+	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, mongoRepo, rawMsgRepo, pgRepo)
 	if err != nil {
 		t.Fatalf("Failed to create consumer: %v", err)
 	}

@@ -126,7 +126,7 @@ type runIntegrity struct {
 // NewNATSConsumer creates a new NATS JetStream consumer with MongoDB and Postgres backend.
 // If rawMessageRepo is non-nil and cfg.RetainMessages is true, every received message
 // will be persisted to the raw_messages collection before processing.
-func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *repository.MongoRepository, rawMessageRepo *repository.RawMessageRepository) (*NATSConsumer, error) {
+func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *repository.MongoRepository, rawMessageRepo *repository.RawMessageRepository, pgRepo *repository.PostgresRepository) (*NATSConsumer, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}
@@ -139,12 +139,16 @@ func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *rep
 		return nil, fmt.Errorf("MongoDB repository is required for processor")
 	}
 
+	if pgRepo == nil {
+		return nil, fmt.Errorf("Postgres repository is required for processor")
+	}
+
 	if cfg.StreamName == "" {
 		cfg.StreamName = publisher.DefaultStreamName
 	}
 
 	if cfg.ConsumerName == "" {
-		cfg.ConsumerName = "mongo-processor"
+		cfg.ConsumerName = "processor"
 	}
 
 	if cfg.BatchSize <= 0 {
@@ -211,6 +215,7 @@ func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *rep
 		logger:         logger,
 		repo:           repo,
 		rawMessageRepo: rawMessageRepo,
+		pgRepo:         pgRepo,
 		storageDriver:  storageDriver,
 		stream:         cfg.StreamName,
 		prefix:         publisher.DefaultSubjectPrefix,
