@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -138,6 +139,52 @@ func TestPostgresHandleRunDetail(t *testing.T) {
 	}
 }
 
+func TestPostgresHandleDeleteRuns(t *testing.T) {
+	handler, db := setupPostgresHandler(t)
+	now := time.Date(2026, 4, 19, 14, 0, 0, 0, time.UTC)
+	suiteID := "run-1:suite:root"
+	testID := "run-1:test:test-1"
+	attemptID := testID + ":0"
+
+	seedRuns(t, db,
+		m.TestRun{ID: "run-1", Name: "Delete Me", CreatedAt: now, UpdatedAt: now},
+		m.TestRun{ID: "run-keep", Name: "Keep Me", CreatedAt: now, UpdatedAt: now},
+	)
+	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", ExternalSuiteID: "root", Name: "Suite", CreatedAt: now, UpdatedAt: now})
+	seedTests(t, db, m.Test{ID: testID, RunID: "run-1", ExternalTestID: "test-1", SuiteID: &suiteID, Name: "Suite Test", Title: "Suite Test", CreatedAt: now, UpdatedAt: now})
+	seedAttempts(t, db, m.TestAttempt{ID: attemptID, RunID: "run-1", TestID: testID, AttemptIndex: 0, Status: "PASSED", CreatedAt: now, UpdatedAt: now})
+	seedAttachments(t, db, m.Attachment{ID: "attachment-1", RunID: "run-1", TestID: testID, TestAttemptID: attemptID, Name: "trace.zip", CreatedAt: now})
+
+	body := bytes.NewBufferString(`{"runIds":["run-1"]}`)
+	req := httptest.NewRequest(http.MethodDelete, "/api/runs/delete", body)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.handleDeleteRuns(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d with body %s", rec.Code, rec.Body.String())
+	}
+
+	var response struct {
+		Deleted   int64 `json:"deleted"`
+		Requested int   `json:"requested"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Deleted != 1 || response.Requested != 1 {
+		t.Fatalf("unexpected delete response: %+v", response)
+	}
+
+	assertRecordCount(t, db, &m.TestRun{}, "id", "run-1", 0)
+	assertRecordCount(t, db, &m.Suite{}, "run_id", "run-1", 0)
+	assertRecordCount(t, db, &m.Test{}, "run_id", "run-1", 0)
+	assertRecordCount(t, db, &m.TestAttempt{}, "run_id", "run-1", 0)
+	assertRecordCount(t, db, &m.Attachment{}, "run_id", "run-1", 0)
+	assertRecordCount(t, db, &m.TestRun{}, "id", "run-keep", 1)
+}
+
 func setupPostgresHandler(t *testing.T) (*PostgresHandler, *gorm.DB) {
 	t.Helper()
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
@@ -188,5 +235,23 @@ func seedAttempts(t *testing.T, db *gorm.DB, attempts ...m.TestAttempt) {
 	t.Helper()
 	if err := db.WithContext(context.Background()).Create(&attempts).Error; err != nil {
 		t.Fatalf("seed attempts: %v", err)
+	}
+}
+
+func seedAttachments(t *testing.T, db *gorm.DB, attachments ...m.Attachment) {
+	t.Helper()
+	if err := db.WithContext(context.Background()).Create(&attachments).Error; err != nil {
+		t.Fatalf("seed attachments: %v", err)
+	}
+}
+
+func assertRecordCount(t *testing.T, db *gorm.DB, model interface{}, column, value string, want int64) {
+	t.Helper()
+	var count int64
+	if err := db.WithContext(context.Background()).Model(model).Where(column+" = ?", value).Count(&count).Error; err != nil {
+		t.Fatalf("count %T for %s=%s: %v", model, column, value, err)
+	}
+	if count != want {
+		t.Fatalf("count %T for %s=%s = %d, want %d", model, column, value, count, want)
 	}
 }

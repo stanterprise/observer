@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stanterprise/observer/internal/database"
 	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/internal/repository/postgres"
@@ -152,21 +154,18 @@ func main() {
 	})
 
 	// Create HTTP server with endpoints
-	mux := http.NewServeMux()
+	router := chi.NewRouter()
+	router.Use(middleware.StripSlashes)
 
 	// Health check endpoint
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "OK\n")
 	})
-	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
 		hub.ServeWS(w, r)
 	})
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
+	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Observer API Service\n")
 		fmt.Fprintf(w, "Available endpoints:\n")
@@ -190,21 +189,21 @@ func main() {
 
 	// REST API endpoints
 	if postgresHandler != nil {
-		postgresHandler.RegisterRoutes(mux)
-		postgresAttachmentHandler.RegisterRoutes(mux)
+		postgresHandler.RegisterRoutes(router)
+		postgresAttachmentHandler.RegisterRoutes(router)
 	} else {
 		if mongoHandler == nil || attachmentHandler == nil {
 			logger.Error("MongoDB-backed API handlers are unavailable")
 			os.Exit(1)
 		}
-		mongoHandler.RegisterRoutes(mux)
-		attachmentHandler.RegisterRoutes(mux)
+		mongoHandler.RegisterRoutes(router)
+		attachmentHandler.RegisterRoutes(router)
 	}
 
 	addr := ":" + *port
 
 	// Wrap with CORS middleware for local development
-	handler := corsMiddleware(mux, logger)
+	handler := corsMiddleware(router, logger)
 
 	srv := &http.Server{
 		Addr:    addr,

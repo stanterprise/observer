@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	m "github.com/stanterprise/observer/internal/models"
 	mongoRepo "github.com/stanterprise/observer/internal/repository/mongodb"
 	pgRepo "github.com/stanterprise/observer/internal/repository/postgres"
@@ -30,16 +30,19 @@ func (h *PostgresHandler) SetRawMessageRepo(r *mongoRepo.RawMessageRepository) {
 	h.rawMessageRepo = r
 }
 
-func (h *PostgresHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/tests/", h.handleTestsWithTrends)
-	mux.HandleFunc("/api/runs", h.handleRuns)
-	mux.HandleFunc("/api/raw-messages/runs", h.handleRawMessageRuns)
-	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
-	mux.HandleFunc("/api/runs/", h.handleRunDetail)
-	mux.HandleFunc("/api/runs/delete", h.handleDeleteRuns)
-	mux.HandleFunc("/api/runs/marker", h.handleUpdateMarker)
-	mux.HandleFunc("/api/markers", h.handleMarkers)
-	mux.HandleFunc("/api/marker/", h.handleMarkerStats)
+func (h *PostgresHandler) RegisterRoutes(r chi.Router) {
+	r.Get("/api/tests", h.handleTests)
+	r.Get("/api/tests/{testId}/trends", h.handleTestTrends)
+	r.Get("/api/runs", h.handleRuns)
+	r.Get("/api/raw-messages/runs", h.handleRawMessageRuns)
+	r.Get("/api/runs/stats", h.handleRunsStats)
+	r.Get("/api/runs/{runId}", h.handleRunDetail)
+	r.Get("/api/runs/{runId}/tests/{testId}", h.handleTestDetailByRunAndTest)
+	r.Get("/api/runs/{runId}/raw-messages", h.handleRawMessagesForRun)
+	r.Delete("/api/runs/delete", h.handleDeleteRuns)
+	r.Put("/api/runs/marker", h.handleUpdateMarker)
+	r.Get("/api/markers", h.handleMarkers)
+	r.Get("/api/marker/{markerValue}/stats", h.handleMarkerStats)
 }
 
 func (h *PostgresHandler) handleRawMessageRuns(w http.ResponseWriter, r *http.Request) {
@@ -68,25 +71,6 @@ func (h *PostgresHandler) handleRawMessageRuns(w http.ResponseWriter, r *http.Re
 			"offset": offset,
 		},
 	})
-}
-
-func (h *PostgresHandler) handleTestsWithTrends(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		h.methodNotAllowed(w)
-		return
-	}
-
-	path := strings.TrimPrefix(r.URL.Path, "/api/tests")
-	if path != "" && path != "/" && strings.HasSuffix(path, "/trends") {
-		h.handleTestTrends(w, r)
-		return
-	}
-	if path == "" || path == "/" {
-		h.handleTests(w, r)
-		return
-	}
-
-	h.notFound(w, "Not found")
 }
 
 func (h *PostgresHandler) handleTests(w http.ResponseWriter, r *http.Request) {
@@ -199,23 +183,15 @@ func (h *PostgresHandler) handleRunDetail(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	path := strings.TrimPrefix(r.URL.Path, "/api/runs/")
-	if strings.Contains(path, "/tests/") {
-		h.handleTestDetailByRunAndTest(w, r, path)
-		return
-	}
-	if strings.HasSuffix(path, "/raw-messages") {
-		h.handleRawMessages(w, r, strings.TrimSuffix(path, "/raw-messages"))
-		return
-	}
-	if path == "" {
+	runID := routeParamOrPath(r, "runId", "/api/runs/", "")
+	if runID == "" {
 		h.badRequest(w, "Run ID required")
 		return
 	}
 
-	doc, err := h.repo.GetRunDocument(r.Context(), path)
+	doc, err := h.repo.GetRunDocument(r.Context(), runID)
 	if err != nil {
-		h.logger.Error("failed to fetch run from postgres", "run_id", path, "error", err)
+		h.logger.Error("failed to fetch run from postgres", "run_id", runID, "error", err)
 		h.internalError(w)
 		return
 	}
@@ -227,15 +203,13 @@ func (h *PostgresHandler) handleRunDetail(w http.ResponseWriter, r *http.Request
 	h.writeJSON(w, doc)
 }
 
-func (h *PostgresHandler) handleTestDetailByRunAndTest(w http.ResponseWriter, r *http.Request, path string) {
-	parts := strings.Split(path, "/tests/")
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+func (h *PostgresHandler) handleTestDetailByRunAndTest(w http.ResponseWriter, r *http.Request) {
+	runID, testID := runAndTestParams(r)
+	if runID == "" || testID == "" {
 		h.badRequest(w, "Run ID and Test ID required")
 		return
 	}
 
-	runID := parts[0]
-	testID := parts[1]
 	doc, err := h.repo.GetRunDocument(r.Context(), runID)
 	if err != nil {
 		h.logger.Error("failed to fetch run from postgres", "run_id", runID, "error", err)
@@ -265,12 +239,7 @@ func (h *PostgresHandler) handleTestTrends(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	path := strings.TrimPrefix(r.URL.Path, "/api/tests/")
-	if !strings.HasSuffix(path, "/trends") {
-		h.notFound(w, "Not found")
-		return
-	}
-	testID := strings.TrimSuffix(path, "/trends")
+	testID := routeParamOrPath(r, "testId", "/api/tests/", "/trends")
 	if testID == "" {
 		h.badRequest(w, "Test ID required")
 		return
@@ -325,12 +294,7 @@ func (h *PostgresHandler) handleMarkerStats(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	path := strings.TrimPrefix(r.URL.Path, "/api/marker/")
-	if !strings.HasSuffix(path, "/stats") {
-		h.notFound(w, "Not found")
-		return
-	}
-	markerValue := strings.TrimSuffix(path, "/stats")
+	markerValue := routeParamOrPath(r, "markerValue", "/api/marker/", "/stats")
 	if markerValue == "" {
 		h.badRequest(w, "Marker value required")
 		return
@@ -381,6 +345,15 @@ func (h *PostgresHandler) handleMarkerStats(w http.ResponseWriter, r *http.Reque
 		"total":  total,
 		"count":  len(runs),
 	})
+}
+
+func (h *PostgresHandler) handleRawMessagesForRun(w http.ResponseWriter, r *http.Request) {
+	runID := routeParamOrPath(r, "runId", "/api/runs/", "/raw-messages")
+	if runID == "" {
+		h.badRequest(w, "Run ID required")
+		return
+	}
+	h.handleRawMessages(w, r, runID)
 }
 
 func (h *PostgresHandler) handleDeleteRuns(w http.ResponseWriter, r *http.Request) {

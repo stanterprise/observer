@@ -7,9 +7,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/pkg/storage"
@@ -35,8 +35,8 @@ func NewAttachmentHandler(repo *mongodb.MongoRepository, storageDriver storage.D
 }
 
 // RegisterRoutes registers attachment-related routes
-func (h *AttachmentHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/attachments/", h.handleAttachment)
+func (h *AttachmentHandler) RegisterRoutes(r chi.Router) {
+	r.Get("/api/attachments/*", h.handleAttachment)
 }
 
 // handleAttachment handles GET /api/attachments/{storageKey}
@@ -52,14 +52,11 @@ func (h *AttachmentHandler) handleAttachment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Extract storage key from path: /api/attachments/{storageKey}
-	path := strings.TrimPrefix(r.URL.Path, "/api/attachments/")
-	if path == "" {
+	storageKey := routeParamOrPath(r, "*", "/api/attachments/", "")
+	if storageKey == "" {
 		http.Error(w, "Storage key is required", http.StatusBadRequest)
 		return
 	}
-
-	storageKey := path
 	ctx := r.Context()
 
 	// Find the attachment in MongoDB to get its storage metadata

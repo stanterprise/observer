@@ -207,11 +207,36 @@ func (r *PostgresRepository) DeleteRuns(ctx context.Context, runIDs []string) (i
 		}
 	}
 
-	result := r.db.WithContext(ctx).Where("id IN ?", runIDs).Delete(&m.TestRun{})
-	if result.Error != nil {
-		return 0, fmt.Errorf("delete runs: %w", result.Error)
+	var deletedRuns int64
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.Attachment{}).Error; err != nil {
+			return fmt.Errorf("delete run attachments: %w", err)
+		}
+		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.TestAttempt{}).Error; err != nil {
+			return fmt.Errorf("delete run attempts: %w", err)
+		}
+		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.Test{}).Error; err != nil {
+			return fmt.Errorf("delete run tests: %w", err)
+		}
+		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.Suite{}).Error; err != nil {
+			return fmt.Errorf("delete run suites: %w", err)
+		}
+		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.RunShard{}).Error; err != nil {
+			return fmt.Errorf("delete run shards: %w", err)
+		}
+
+		result := tx.Where("id IN ?", runIDs).Delete(&m.TestRun{})
+		if result.Error != nil {
+			return fmt.Errorf("delete runs: %w", result.Error)
+		}
+		deletedRuns = result.RowsAffected
+		return nil
+	})
+	if err != nil {
+		return 0, err
 	}
-	return result.RowsAffected, nil
+
+	return deletedRuns, nil
 }
 
 func (r *PostgresRepository) UpdateRunsMarker(ctx context.Context, runIDs []string, marker string) (int64, error) {

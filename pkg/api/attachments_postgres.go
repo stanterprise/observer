@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	pgRepo "github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/storage"
 )
@@ -24,8 +24,8 @@ func NewPostgresAttachmentHandler(repo *pgRepo.PostgresRepository, storageDriver
 	return &PostgresAttachmentHandler{repo: repo, storageDriver: storageDriver, logger: logger}
 }
 
-func (h *PostgresAttachmentHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/attachments/", h.handleAttachment)
+func (h *PostgresAttachmentHandler) RegisterRoutes(r chi.Router) {
+	r.Get("/api/attachments/*", h.handleAttachment)
 }
 
 func (h *PostgresAttachmentHandler) handleAttachment(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +34,7 @@ func (h *PostgresAttachmentHandler) handleAttachment(w http.ResponseWriter, r *h
 		return
 	}
 
-	storageKey := strings.TrimPrefix(r.URL.Path, "/api/attachments/")
+	storageKey := routeParamOrPath(r, "*", "/api/attachments/", "")
 	if storageKey == "" {
 		http.Error(w, "Storage key is required", http.StatusBadRequest)
 		return

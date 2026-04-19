@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"go.mongodb.org/mongo-driver/bson"
@@ -38,17 +38,20 @@ func (h *MongoHandler) SetRawMessageRepo(r *mongodb.RawMessageRepository) {
 	h.rawMessageRepo = r
 }
 
-// RegisterRoutes registers all REST API routes on the provided mux
-func (h *MongoHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/tests/", h.handleTestsWithTrends) // Handles both /api/tests and /api/tests/{testId}/trends
-	mux.HandleFunc("/api/runs", h.handleRuns)
-	mux.HandleFunc("/api/raw-messages/runs", h.handleRawMessageRuns)
-	mux.HandleFunc("/api/runs/stats", h.handleRunsStats)
-	mux.HandleFunc("/api/runs/", h.handleRunDetail)
-	mux.HandleFunc("/api/runs/delete", h.handleDeleteRuns)   // Handles DELETE /api/runs/delete - delete multiple runs
-	mux.HandleFunc("/api/runs/marker", h.handleUpdateMarker) // Handles PUT /api/runs/marker - update marker for runs
-	mux.HandleFunc("/api/markers", h.handleMarkers)          // Handles GET /api/markers - list all unique markers
-	mux.HandleFunc("/api/marker/", h.handleMarkerStats)      // Handles /api/marker/{markerValue}/stats
+// RegisterRoutes registers all REST API routes on the provided router.
+func (h *MongoHandler) RegisterRoutes(r chi.Router) {
+	r.Get("/api/tests", h.handleTests)
+	r.Get("/api/tests/{testId}/trends", h.handleTestTrends)
+	r.Get("/api/runs", h.handleRuns)
+	r.Get("/api/raw-messages/runs", h.handleRawMessageRuns)
+	r.Get("/api/runs/stats", h.handleRunsStats)
+	r.Get("/api/runs/{runId}", h.handleRunDetail)
+	r.Get("/api/runs/{runId}/tests/{testId}", h.handleTestDetailByRunAndTest)
+	r.Get("/api/runs/{runId}/raw-messages", h.handleRawMessagesForRun)
+	r.Delete("/api/runs/delete", h.handleDeleteRuns)
+	r.Put("/api/runs/marker", h.handleUpdateMarker)
+	r.Get("/api/markers", h.handleMarkers)
+	r.Get("/api/marker/{markerValue}/stats", h.handleMarkerStats)
 }
 
 // handleRawMessageRuns handles GET /api/raw-messages/runs.
@@ -95,31 +98,6 @@ func (h *MongoHandler) handleRawMessageRuns(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-}
-
-// handleTestsWithTrends handles both /api/tests and /api/tests/{testId}/trends
-func (h *MongoHandler) handleTestsWithTrends(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	path := strings.TrimPrefix(r.URL.Path, "/api/tests")
-
-	// Route to trends endpoint if path matches /{testId}/trends
-	if path != "" && path != "/" && strings.HasSuffix(path, "/trends") {
-		h.handleTestTrends(w, r)
-		return
-	}
-
-	// Route to list tests endpoint for /api/tests or /api/tests/
-	if path == "" || path == "/" {
-		h.handleTests(w, r)
-		return
-	}
-
-	// Unknown path pattern
-	http.Error(w, "Not found", http.StatusNotFound)
 }
 
 // handleTests handles GET /api/tests - list all test cases with optional filtering
@@ -187,17 +165,12 @@ func (h *MongoHandler) handleTests(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleTestDetailByRunAndTest handles GET /api/runs/{runId}/tests/{testId} - get a specific test case with steps
-func (h *MongoHandler) handleTestDetailByRunAndTest(w http.ResponseWriter, r *http.Request, path string) {
-	// path is already trimmed of "/api/runs/" prefix
-	// Extract runId and testId from path: {runId}/tests/{testId}
-	parts := strings.Split(path, "/tests/")
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+func (h *MongoHandler) handleTestDetailByRunAndTest(w http.ResponseWriter, r *http.Request) {
+	runID, testID := runAndTestParams(r)
+	if runID == "" || testID == "" {
 		http.Error(w, "Run ID and Test ID required", http.StatusBadRequest)
 		return
 	}
-
-	runID := parts[0]
-	testID := parts[1]
 
 	// Fetch the test run document
 	doc, err := h.repo.GetTestRun(r.Context(), runID)
@@ -431,22 +404,7 @@ func (h *MongoHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract run ID from URL path
-	path := strings.TrimPrefix(r.URL.Path, "/api/runs/")
-
-	// Check if this is a test detail request: /api/runs/{runId}/tests/{testId}
-	if strings.Contains(path, "/tests/") {
-		h.handleTestDetailByRunAndTest(w, r, path)
-		return
-	}
-
-	// Check if this is a raw messages request: /api/runs/{runId}/raw-messages
-	if strings.HasSuffix(path, "/raw-messages") {
-		h.handleRawMessages(w, r, strings.TrimSuffix(path, "/raw-messages"))
-		return
-	}
-
-	runID := path
+	runID := routeParamOrPath(r, "runId", "/api/runs/", "")
 	if runID == "" {
 		http.Error(w, "Run ID required", http.StatusBadRequest)
 		return
@@ -585,16 +543,7 @@ func (h *MongoHandler) handleTestTrends(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Extract test ID from URL path: /api/tests/{testId}/trends
-	path := strings.TrimPrefix(r.URL.Path, "/api/tests/")
-
-	// Check if this is a trends request
-	if !strings.HasSuffix(path, "/trends") {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
-	testID := strings.TrimSuffix(path, "/trends")
+	testID := routeParamOrPath(r, "testId", "/api/tests/", "/trends")
 	if testID == "" {
 		http.Error(w, "Test ID required", http.StatusBadRequest)
 		return
@@ -661,16 +610,7 @@ func (h *MongoHandler) handleMarkerStats(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Extract marker value and check for /stats suffix
-	path := strings.TrimPrefix(r.URL.Path, "/api/marker/")
-
-	// Check if this is a stats request
-	if !strings.HasSuffix(path, "/stats") {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
-	markerValue := strings.TrimSuffix(path, "/stats")
+	markerValue := routeParamOrPath(r, "markerValue", "/api/marker/", "/stats")
 	if markerValue == "" {
 		http.Error(w, "Marker value required", http.StatusBadRequest)
 		return
@@ -778,6 +718,15 @@ func (h *MongoHandler) handleMarkerStats(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func (h *MongoHandler) handleRawMessagesForRun(w http.ResponseWriter, r *http.Request) {
+	runID := routeParamOrPath(r, "runId", "/api/runs/", "/raw-messages")
+	if runID == "" {
+		http.Error(w, "Run ID required", http.StatusBadRequest)
+		return
+	}
+	h.handleRawMessages(w, r, runID)
 }
 
 // handleDeleteRuns handles DELETE /api/runs/delete - delete multiple test runs
