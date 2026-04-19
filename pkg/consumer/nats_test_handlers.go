@@ -99,7 +99,8 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 	}
 	relationalTest := m.TestCaseRunToRelationalTest(req.TestCase)
 	if relationalTest != nil && relationalTest.SuiteID == nil {
-		relationalTest.SuiteID = &suiteID
+		internalSuiteID := fmt.Sprintf("%s:suite:%s", runID, suiteID)
+		relationalTest.SuiteID = &internalSuiteID
 	}
 	relationalAttempt := m.TestCaseRunToRelationalAttempt(req.TestCase, attachments)
 	if err := c.pgRepo.UpsertTestBegin(ctx, relationalTest, relationalAttempt); err != nil {

@@ -93,6 +93,7 @@ func (r *PostgresRepository) UpsertRunStartSuites(ctx context.Context, suites []
 				Where(m.Suite{ID: suite.ID}).
 				Assign(m.Suite{
 					RunID:           suite.RunID,
+					ExternalSuiteID: suite.ExternalSuiteID,
 					ParentSuiteID:   suite.ParentSuiteID,
 					Name:            suite.Name,
 					Description:     suite.Description,
@@ -145,23 +146,24 @@ func (r *PostgresRepository) UpsertRunStartTests(ctx context.Context, tests []*m
 			result := tx.
 				Where(m.Test{ID: test.ID}).
 				Assign(m.Test{
-					RunID:       test.RunID,
-					SuiteID:     test.SuiteID,
-					Name:        test.Name,
-					Title:       test.Title,
-					Description: test.Description,
-					Status:      test.Status,
-					StartTime:   test.StartTime,
-					EndTime:     test.EndTime,
-					Duration:    test.Duration,
-					Metadata:    test.Metadata,
-					Tags:        test.Tags,
-					Location:    test.Location,
-					RetryCount:  test.RetryCount,
-					RetryIndex:  test.RetryIndex,
-					Timeout:     test.Timeout,
-					UpdatedAt:   now,
-					CreatedAt:   now,
+					RunID:          test.RunID,
+					ExternalTestID: test.ExternalTestID,
+					SuiteID:        test.SuiteID,
+					Name:           test.Name,
+					Title:          test.Title,
+					Description:    test.Description,
+					Status:         test.Status,
+					StartTime:      test.StartTime,
+					EndTime:        test.EndTime,
+					Duration:       test.Duration,
+					Metadata:       test.Metadata,
+					Tags:           test.Tags,
+					Location:       test.Location,
+					RetryCount:     test.RetryCount,
+					RetryIndex:     test.RetryIndex,
+					Timeout:        test.Timeout,
+					UpdatedAt:      now,
+					CreatedAt:      now,
 				}).
 				FirstOrCreate(test)
 			if result.Error != nil {

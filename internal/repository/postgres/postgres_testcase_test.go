@@ -11,26 +11,27 @@ import (
 func TestUpsertTestBeginCreatesTestAndAttempt(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
-	suiteID := "suite-123"
+	suiteID := "run-123:suite:suite-123"
 	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
 
 	test := &m.Test{
-		ID:         "test-123",
-		RunID:      "run-123",
-		SuiteID:    &suiteID,
-		Name:       "My Test",
-		Title:      "My Test",
-		Status:     "RUNNING",
-		StartTime:  &start,
-		Metadata:   map[string]interface{}{"browser": "chromium"},
-		RetryCount: int32Ptr(2),
-		RetryIndex: int32Ptr(0),
-		Timeout:    int32Ptr(30000),
+		ID:             "run-123:test:test-123",
+		RunID:          "run-123",
+		ExternalTestID: "test-123",
+		SuiteID:        &suiteID,
+		Name:           "My Test",
+		Title:          "My Test",
+		Status:         "RUNNING",
+		StartTime:      &start,
+		Metadata:       map[string]interface{}{"browser": "chromium"},
+		RetryCount:     int32Ptr(2),
+		RetryIndex:     int32Ptr(0),
+		Timeout:        int32Ptr(30000),
 	}
 	attempt := &m.TestAttempt{
-		ID:           "test-123:0",
+		ID:           "run-123:test:test-123:0",
 		RunID:        "run-123",
-		TestID:       "test-123",
+		TestID:       "run-123:test:test-123",
 		AttemptIndex: 0,
 		Status:       "RUNNING",
 		StartTime:    &start,
@@ -42,7 +43,7 @@ func TestUpsertTestBeginCreatesTestAndAttempt(t *testing.T) {
 	}
 
 	var storedTest m.Test
-	if err := repo.db.WithContext(ctx).First(&storedTest, "id = ?", "test-123").Error; err != nil {
+	if err := repo.db.WithContext(ctx).First(&storedTest, "id = ?", "run-123:test:test-123").Error; err != nil {
 		t.Fatalf("load stored test: %v", err)
 	}
 	if storedTest.Status != "RUNNING" {
@@ -53,7 +54,7 @@ func TestUpsertTestBeginCreatesTestAndAttempt(t *testing.T) {
 	}
 
 	var storedAttempt m.TestAttempt
-	if err := repo.db.WithContext(ctx).Where("test_id = ? AND attempt_index = ?", "test-123", 0).First(&storedAttempt).Error; err != nil {
+	if err := repo.db.WithContext(ctx).Where("test_id = ? AND attempt_index = ?", "run-123:test:test-123", 0).First(&storedAttempt).Error; err != nil {
 		t.Fatalf("load stored attempt: %v", err)
 	}
 	if storedAttempt.Status != "RUNNING" {
@@ -67,29 +68,30 @@ func TestUpsertTestBeginCreatesTestAndAttempt(t *testing.T) {
 func TestFinalizeTestEndAggregatesPassingRetries(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
-	suiteID := "suite-123"
+	suiteID := "run-123:suite:suite-123"
 	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
 	firstEnd := start.Add(2 * time.Second)
 	secondStart := start.Add(3 * time.Second)
 	secondEnd := start.Add(5 * time.Second)
 
 	firstTest := &m.Test{
-		ID:         "test-123",
-		RunID:      "run-123",
-		SuiteID:    &suiteID,
-		Name:       "My Test",
-		Title:      "My Test",
-		Status:     "FAILED",
-		StartTime:  &start,
-		EndTime:    &firstEnd,
-		Duration:   int64Ptr(int64((2 * time.Second).Nanoseconds())),
-		RetryCount: int32Ptr(2),
-		RetryIndex: int32Ptr(0),
+		ID:             "run-123:test:test-123",
+		RunID:          "run-123",
+		ExternalTestID: "test-123",
+		SuiteID:        &suiteID,
+		Name:           "My Test",
+		Title:          "My Test",
+		Status:         "FAILED",
+		StartTime:      &start,
+		EndTime:        &firstEnd,
+		Duration:       int64Ptr(int64((2 * time.Second).Nanoseconds())),
+		RetryCount:     int32Ptr(2),
+		RetryIndex:     int32Ptr(0),
 	}
 	firstAttempt := &m.TestAttempt{
-		ID:           "test-123:0",
+		ID:           "run-123:test:test-123:0",
 		RunID:        "run-123",
-		TestID:       "test-123",
+		TestID:       "run-123:test:test-123",
 		AttemptIndex: 0,
 		Status:       "FAILED",
 		StartTime:    &start,
@@ -105,22 +107,23 @@ func TestFinalizeTestEndAggregatesPassingRetries(t *testing.T) {
 	}
 
 	secondTest := &m.Test{
-		ID:         "test-123",
-		RunID:      "run-123",
-		SuiteID:    &suiteID,
-		Name:       "My Test",
-		Title:      "My Test",
-		Status:     "PASSED",
-		StartTime:  &secondStart,
-		EndTime:    &secondEnd,
-		Duration:   int64Ptr(int64((2 * time.Second).Nanoseconds())),
-		RetryCount: int32Ptr(2),
-		RetryIndex: int32Ptr(1),
+		ID:             "run-123:test:test-123",
+		RunID:          "run-123",
+		ExternalTestID: "test-123",
+		SuiteID:        &suiteID,
+		Name:           "My Test",
+		Title:          "My Test",
+		Status:         "PASSED",
+		StartTime:      &secondStart,
+		EndTime:        &secondEnd,
+		Duration:       int64Ptr(int64((2 * time.Second).Nanoseconds())),
+		RetryCount:     int32Ptr(2),
+		RetryIndex:     int32Ptr(1),
 	}
 	secondAttempt := &m.TestAttempt{
-		ID:           "test-123:1",
+		ID:           "run-123:test:test-123:1",
 		RunID:        "run-123",
-		TestID:       "test-123",
+		TestID:       "run-123:test:test-123",
 		AttemptIndex: 1,
 		Status:       "PASSED",
 		StartTime:    &secondStart,
@@ -136,7 +139,7 @@ func TestFinalizeTestEndAggregatesPassingRetries(t *testing.T) {
 	}
 
 	var storedTest m.Test
-	if err := repo.db.WithContext(ctx).First(&storedTest, "id = ?", "test-123").Error; err != nil {
+	if err := repo.db.WithContext(ctx).First(&storedTest, "id = ?", "run-123:test:test-123").Error; err != nil {
 		t.Fatalf("load stored test: %v", err)
 	}
 	if storedTest.Status != "PASSED" {
@@ -150,7 +153,7 @@ func TestFinalizeTestEndAggregatesPassingRetries(t *testing.T) {
 	}
 
 	var storedAttempts []m.TestAttempt
-	if err := repo.db.WithContext(ctx).Where("test_id = ?", "test-123").Order("attempt_index asc").Find(&storedAttempts).Error; err != nil {
+	if err := repo.db.WithContext(ctx).Where("test_id = ?", "run-123:test:test-123").Order("attempt_index asc").Find(&storedAttempts).Error; err != nil {
 		t.Fatalf("load stored attempts: %v", err)
 	}
 	if len(storedAttempts) != 2 {
@@ -177,24 +180,25 @@ func TestAggregateTestAttemptStatuses(t *testing.T) {
 func TestAppendTestFailureAndError(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
-	suiteID := "suite-123"
+	suiteID := "run-123:suite:suite-123"
 	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
 
 	test := &m.Test{
-		ID:         "test-123",
-		RunID:      "run-123",
-		SuiteID:    &suiteID,
-		Name:       "My Test",
-		Title:      "My Test",
-		Status:     "FAILED",
-		StartTime:  &start,
-		RetryCount: int32Ptr(1),
-		RetryIndex: int32Ptr(0),
+		ID:             "run-123:test:test-123",
+		RunID:          "run-123",
+		ExternalTestID: "test-123",
+		SuiteID:        &suiteID,
+		Name:           "My Test",
+		Title:          "My Test",
+		Status:         "FAILED",
+		StartTime:      &start,
+		RetryCount:     int32Ptr(1),
+		RetryIndex:     int32Ptr(0),
 	}
 	attempt := &m.TestAttempt{
-		ID:           "test-123:0",
+		ID:           "run-123:test:test-123:0",
 		RunID:        "run-123",
-		TestID:       "test-123",
+		TestID:       "run-123:test:test-123",
 		AttemptIndex: 0,
 		Status:       "FAILED",
 		StartTime:    &start,
@@ -226,7 +230,7 @@ func TestAppendTestFailureAndError(t *testing.T) {
 	}
 
 	var storedAttempt m.TestAttempt
-	if err := repo.db.WithContext(ctx).Where("test_id = ? AND attempt_index = ?", "test-123", 0).First(&storedAttempt).Error; err != nil {
+	if err := repo.db.WithContext(ctx).Where("test_id = ? AND attempt_index = ?", "run-123:test:test-123", 0).First(&storedAttempt).Error; err != nil {
 		t.Fatalf("load stored attempt: %v", err)
 	}
 	if len(storedAttempt.Failures) != 1 || storedAttempt.Failures[0].FailureMessage != "assertion failed" {
@@ -246,4 +250,56 @@ func TestAppendTestFailureAndError(t *testing.T) {
 func int64Ptr(value int64) *int64 {
 	converted := value
 	return &converted
+}
+
+func TestGetRunDocuments_PreservesHistoricalRunsForRepeatedExternalTestID(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	suiteRun1 := "run-1:suite:suite-123"
+	suiteRun2 := "run-2:suite:suite-123"
+	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+
+	for _, run := range []m.TestRun{{ID: "run-1", Name: "Run 1", Status: "PASSED", CreatedAt: start, UpdatedAt: start}, {ID: "run-2", Name: "Run 2", Status: "FAILED", CreatedAt: start.Add(time.Minute), UpdatedAt: start.Add(time.Minute)}} {
+		if err := repo.db.WithContext(ctx).Create(&run).Error; err != nil {
+			t.Fatalf("seed run %s: %v", run.ID, err)
+		}
+	}
+	for _, suite := range []m.Suite{{ID: suiteRun1, RunID: "run-1", ExternalSuiteID: "suite-123", Name: "Suite", CreatedAt: start, UpdatedAt: start}, {ID: suiteRun2, RunID: "run-2", ExternalSuiteID: "suite-123", Name: "Suite", CreatedAt: start.Add(time.Minute), UpdatedAt: start.Add(time.Minute)}} {
+		if err := repo.db.WithContext(ctx).Create(&suite).Error; err != nil {
+			t.Fatalf("seed suite %s: %v", suite.ID, err)
+		}
+	}
+
+	testRun1 := &m.Test{ID: "run-1:test:test-123", RunID: "run-1", ExternalTestID: "test-123", SuiteID: &suiteRun1, Name: "Test", Title: "Test", Status: "PASSED", CreatedAt: start, UpdatedAt: start}
+	testRun2 := &m.Test{ID: "run-2:test:test-123", RunID: "run-2", ExternalTestID: "test-123", SuiteID: &suiteRun2, Name: "Test", Title: "Test", Status: "FAILED", CreatedAt: start.Add(time.Minute), UpdatedAt: start.Add(time.Minute)}
+	for _, test := range []*m.Test{testRun1, testRun2} {
+		if err := repo.db.WithContext(ctx).Create(test).Error; err != nil {
+			t.Fatalf("seed test %s: %v", test.ID, err)
+		}
+	}
+
+	docs, _, err := repo.GetRunDocuments(ctx, ListRunsFilter{}, 10, 0)
+	if err != nil {
+		t.Fatalf("GetRunDocuments failed: %v", err)
+	}
+	if len(docs) != 2 {
+		t.Fatalf("expected 2 run documents, got %d", len(docs))
+	}
+	if len(docs[0].Suites) == 0 || len(docs[0].Suites[0].Tests) != 1 {
+		t.Fatalf("latest run missing test payload: %+v", docs[0].Suites)
+	}
+	if len(docs[1].Suites) == 0 || len(docs[1].Suites[0].Tests) != 1 {
+		t.Fatalf("historical run missing test payload: %+v", docs[1].Suites)
+	}
+	if docs[0].Suites[0].Tests[0].ID != "test-123" || docs[1].Suites[0].Tests[0].ID != "test-123" {
+		t.Fatalf("expected external test IDs in API payloads, got %+v and %+v", docs[0].Suites[0].Tests[0], docs[1].Suites[0].Tests[0])
+	}
+
+	trends, err := repo.GetTestTrends(ctx, "test-123", 10)
+	if err != nil {
+		t.Fatalf("GetTestTrends failed: %v", err)
+	}
+	if len(trends) != 2 {
+		t.Fatalf("expected 2 trend rows, got %d", len(trends))
+	}
 }

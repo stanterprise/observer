@@ -148,8 +148,8 @@ func TestRunStartEventToTestRun_FlattensSuitesAndUsesSuiteMetadata(t *testing.T)
 	if suites[0].ParentSuiteID != nil {
 		t.Fatalf("root suite parent should be nil, got %v", *suites[0].ParentSuiteID)
 	}
-	if suites[1].ParentSuiteID == nil || *suites[1].ParentSuiteID != "suite-root" {
-		t.Fatalf("child suite parent = %v, want suite-root", suites[1].ParentSuiteID)
+	if suites[1].ParentSuiteID == nil || *suites[1].ParentSuiteID != buildSuiteRowID("run-123", "suite-root") {
+		t.Fatalf("child suite parent = %v, want %s", suites[1].ParentSuiteID, buildSuiteRowID("run-123", "suite-root"))
 	}
 	if suites[1].Metadata["suite_level"] != "child" {
 		t.Fatalf("child suite metadata = %+v, want child metadata", suites[1].Metadata)
@@ -198,8 +198,8 @@ func TestRunStartEventToTests_FlattensNestedTests(t *testing.T) {
 	if len(tests) != 2 {
 		t.Fatalf("len(tests) = %d, want 2", len(tests))
 	}
-	if tests[0].SuiteID == nil || *tests[0].SuiteID != "suite-root" {
-		t.Fatalf("root test suiteID = %v, want suite-root", tests[0].SuiteID)
+	if tests[0].SuiteID == nil || *tests[0].SuiteID != buildSuiteRowID("run-123", "suite-root") {
+		t.Fatalf("root test suiteID = %v, want %s", tests[0].SuiteID, buildSuiteRowID("run-123", "suite-root"))
 	}
 	if tests[0].Metadata["test_level"] != "root" {
 		t.Fatalf("root test metadata = %+v, want test metadata", tests[0].Metadata)
@@ -210,8 +210,8 @@ func TestRunStartEventToTests_FlattensNestedTests(t *testing.T) {
 	if tests[0].RetryIndex == nil || *tests[0].RetryIndex != 0 {
 		t.Fatalf("root test retryIndex = %v, want 0", tests[0].RetryIndex)
 	}
-	if tests[1].SuiteID == nil || *tests[1].SuiteID != "suite-child" {
-		t.Fatalf("child test suiteID = %v, want suite-child", tests[1].SuiteID)
+	if tests[1].SuiteID == nil || *tests[1].SuiteID != buildSuiteRowID("run-123", "suite-child") {
+		t.Fatalf("child test suiteID = %v, want %s", tests[1].SuiteID, buildSuiteRowID("run-123", "suite-child"))
 	}
 }
 
@@ -242,11 +242,14 @@ func TestTestCaseRunToRelationalTest(t *testing.T) {
 	if test == nil {
 		t.Fatal("expected relational test mapping")
 	}
-	if test.ID != "test-123" || test.RunID != "run-123" {
+	if test.ID != buildTestRowID("run-123", "test-123") || test.RunID != "run-123" {
 		t.Fatalf("unexpected identity mapping: %+v", test)
 	}
-	if test.SuiteID == nil || *test.SuiteID != "suite-123" {
-		t.Fatalf("SuiteID = %v, want suite-123", test.SuiteID)
+	if test.ExternalTestID != "test-123" {
+		t.Fatalf("ExternalTestID = %q, want test-123", test.ExternalTestID)
+	}
+	if test.SuiteID == nil || *test.SuiteID != buildSuiteRowID("run-123", "suite-123") {
+		t.Fatalf("SuiteID = %v, want %s", test.SuiteID, buildSuiteRowID("run-123", "suite-123"))
 	}
 	if test.Status != common.TestStatus_RUNNING.String() {
 		t.Fatalf("Status = %q, want %q", test.Status, common.TestStatus_RUNNING.String())
@@ -286,8 +289,11 @@ func TestTestCaseRunToRelationalAttempt(t *testing.T) {
 	if attempt == nil {
 		t.Fatal("expected relational attempt mapping")
 	}
-	if attempt.ID != "test-123:2" {
-		t.Fatalf("ID = %q, want test-123:2", attempt.ID)
+	if attempt.ID != buildTestAttemptID(buildTestRowID("run-123", "test-123"), 2) {
+		t.Fatalf("ID = %q, want %s", attempt.ID, buildTestAttemptID(buildTestRowID("run-123", "test-123"), 2))
+	}
+	if attempt.TestID != buildTestRowID("run-123", "test-123") {
+		t.Fatalf("TestID = %q, want %s", attempt.TestID, buildTestRowID("run-123", "test-123"))
 	}
 	if attempt.AttemptIndex != 2 {
 		t.Fatalf("AttemptIndex = %d, want 2", attempt.AttemptIndex)

@@ -138,7 +138,8 @@ func TestCaseRunToRelationalTest(protoTest *entities.TestCaseRun) *Test {
 
 	var suiteID *string
 	if protoTest.TestSuiteId != "" {
-		suiteID = &protoTest.TestSuiteId
+		internalSuiteID := buildSuiteRowID(protoTest.RunId, protoTest.TestSuiteId)
+		suiteID = &internalSuiteID
 	}
 
 	var startTime *time.Time
@@ -160,24 +161,25 @@ func TestCaseRunToRelationalTest(protoTest *entities.TestCaseRun) *Test {
 	}
 
 	return &Test{
-		ID:          protoTest.Id,
-		RunID:       protoTest.RunId,
-		SuiteID:     suiteID,
-		Name:        protoTest.Name,
-		Title:       protoTest.Name,
-		Description: protoTest.Description,
-		Status:      protoTest.Status.String(),
-		StartTime:   startTime,
-		EndTime:     endTime,
-		Duration:    duration,
-		Metadata:    metadata,
-		Tags:        protoTest.Tags,
-		Location:    protoTest.Location,
-		RetryCount:  &protoTest.RetryCount,
-		RetryIndex:  &protoTest.RetryIndex,
-		Timeout:     &protoTest.Timeout,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:             buildTestRowID(protoTest.RunId, protoTest.Id),
+		RunID:          protoTest.RunId,
+		ExternalTestID: protoTest.Id,
+		SuiteID:        suiteID,
+		Name:           protoTest.Name,
+		Title:          protoTest.Name,
+		Description:    protoTest.Description,
+		Status:         protoTest.Status.String(),
+		StartTime:      startTime,
+		EndTime:        endTime,
+		Duration:       duration,
+		Metadata:       metadata,
+		Tags:           protoTest.Tags,
+		Location:       protoTest.Location,
+		RetryCount:     &protoTest.RetryCount,
+		RetryIndex:     &protoTest.RetryIndex,
+		Timeout:        &protoTest.Timeout,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 }
 
@@ -209,9 +211,9 @@ func TestCaseRunToRelationalAttempt(protoTest *entities.TestCaseRun, attachments
 	}
 
 	return &TestAttempt{
-		ID:           buildTestAttemptID(protoTest.Id, attemptIndex),
+		ID:           buildTestAttemptID(buildTestRowID(protoTest.RunId, protoTest.Id), attemptIndex),
 		RunID:        protoTest.RunId,
-		TestID:       protoTest.Id,
+		TestID:       buildTestRowID(protoTest.RunId, protoTest.Id),
 		AttemptIndex: attemptIndex,
 		Status:       protoTest.Status.String(),
 		StartTime:    startTime,
@@ -262,7 +264,8 @@ func flattenSingleSuite(protoSuite *entities.TestSuiteRun) []*Suite {
 	metadata := stringMapToInterfaceMap(protoSuite.Metadata)
 	var parentSuiteID *string
 	if protoSuite.ParentSuiteId != "" {
-		parentSuiteID = &protoSuite.ParentSuiteId
+		internalParentSuiteID := buildSuiteRowID(protoSuite.RunId, protoSuite.ParentSuiteId)
+		parentSuiteID = &internalParentSuiteID
 	}
 
 	var startTime *time.Time
@@ -284,26 +287,27 @@ func flattenSingleSuite(protoSuite *entities.TestSuiteRun) []*Suite {
 	}
 
 	suite := &Suite{
-		ID:            protoSuite.Id,
-		RunID:         protoSuite.RunId,
-		ParentSuiteID: parentSuiteID,
-		Name:          protoSuite.Name,
-		Description:   protoSuite.Description,
-		Status:        protoSuite.Status.String(),
-		Metadata:      metadata,
-		Duration:      duration,
-		Location:      protoSuite.Location,
-		Type:          protoSuite.Type.String(),
-		InitiatedBy:   protoSuite.InitiatedBy,
-		ProjectName:   protoSuite.Project,
-		Author:        protoSuite.Author,
-		Owner:         protoSuite.Owner,
-		TestCaseIDs:   protoSuite.TestCaseIds,
-		SubSuiteIDs:   protoSuite.SubSuiteIds,
-		StartTime:     startTime,
-		EndTime:       endTime,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		ID:              buildSuiteRowID(protoSuite.RunId, protoSuite.Id),
+		RunID:           protoSuite.RunId,
+		ExternalSuiteID: protoSuite.Id,
+		ParentSuiteID:   parentSuiteID,
+		Name:            protoSuite.Name,
+		Description:     protoSuite.Description,
+		Status:          protoSuite.Status.String(),
+		Metadata:        metadata,
+		Duration:        duration,
+		Location:        protoSuite.Location,
+		Type:            protoSuite.Type.String(),
+		InitiatedBy:     protoSuite.InitiatedBy,
+		ProjectName:     protoSuite.Project,
+		Author:          protoSuite.Author,
+		Owner:           protoSuite.Owner,
+		TestCaseIDs:     protoSuite.TestCaseIds,
+		SubSuiteIDs:     protoSuite.SubSuiteIds,
+		StartTime:       startTime,
+		EndTime:         endTime,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 
 	suites := []*Suite{suite}
@@ -337,9 +341,11 @@ func flattenTestsForSuite(protoSuite *entities.TestSuiteRun) []*Test {
 		metadata := stringMapToInterfaceMap(protoTest.Metadata)
 		var suiteID *string
 		if protoTest.TestSuiteId != "" {
-			suiteID = &protoTest.TestSuiteId
+			internalSuiteID := buildSuiteRowID(protoTest.RunId, protoTest.TestSuiteId)
+			suiteID = &internalSuiteID
 		} else if protoSuite.Id != "" {
-			suiteID = &protoSuite.Id
+			internalSuiteID := buildSuiteRowID(protoTest.RunId, protoSuite.Id)
+			suiteID = &internalSuiteID
 		}
 
 		var startTime *time.Time
@@ -365,24 +371,25 @@ func flattenTestsForSuite(protoSuite *entities.TestSuiteRun) []*Test {
 		timeout := &protoTest.Timeout
 
 		test := &Test{
-			ID:          protoTest.Id,
-			RunID:       protoTest.RunId,
-			SuiteID:     suiteID,
-			Name:        protoTest.Name,
-			Title:       protoTest.Name,
-			Description: protoTest.Description,
-			Status:      protoTest.Status.String(),
-			StartTime:   startTime,
-			EndTime:     endTime,
-			Duration:    duration,
-			Metadata:    metadata,
-			Tags:        protoTest.Tags,
-			Location:    protoTest.Location,
-			RetryCount:  retryCount,
-			RetryIndex:  retryIndex,
-			Timeout:     timeout,
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			ID:             buildTestRowID(protoTest.RunId, protoTest.Id),
+			RunID:          protoTest.RunId,
+			ExternalTestID: protoTest.Id,
+			SuiteID:        suiteID,
+			Name:           protoTest.Name,
+			Title:          protoTest.Name,
+			Description:    protoTest.Description,
+			Status:         protoTest.Status.String(),
+			StartTime:      startTime,
+			EndTime:        endTime,
+			Duration:       duration,
+			Metadata:       metadata,
+			Tags:           protoTest.Tags,
+			Location:       protoTest.Location,
+			RetryCount:     retryCount,
+			RetryIndex:     retryIndex,
+			Timeout:        timeout,
+			CreatedAt:      now,
+			UpdatedAt:      now,
 		}
 		tests = append(tests, test)
 	}
@@ -423,6 +430,14 @@ func firstInt32Metadata(metadata map[string]string, keys ...string) *int32 {
 
 func buildRunShardID(runID string, shardIndex *int32) string {
 	return runID + ":" + fmt.Sprintf("%d", *shardIndex)
+}
+
+func buildSuiteRowID(runID, externalSuiteID string) string {
+	return fmt.Sprintf("%s:suite:%s", runID, externalSuiteID)
+}
+
+func buildTestRowID(runID, externalTestID string) string {
+	return fmt.Sprintf("%s:test:%s", runID, externalTestID)
 }
 
 func buildTestAttemptID(testID string, attemptIndex int32) string {

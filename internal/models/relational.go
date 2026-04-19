@@ -52,6 +52,7 @@ func (RunShard) TableName() string {
 type Suite struct {
 	ID              string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
 	RunID           string                 `gorm:"column:run_id;type:text;not null;index:idx_suites_run_id;index:idx_suites_run_status,priority:1" json:"runId,omitempty"`
+	ExternalSuiteID string                 `gorm:"column:external_suite_id;type:text;index:idx_suites_run_external_suite_id,priority:2" json:"externalSuiteId,omitempty"`
 	ParentSuiteID   *string                `gorm:"column:parent_suite_id;type:text" json:"parentSuiteId,omitempty"`
 	Name            string                 `gorm:"column:name;type:text" json:"name,omitempty"`
 	Description     string                 `gorm:"column:description;type:text" json:"description,omitempty"`
@@ -83,24 +84,25 @@ func (Suite) TableName() string {
 
 // Test maps to the PostgreSQL tests table.
 type Test struct {
-	ID          string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID       string                 `gorm:"column:run_id;type:text;not null;index:idx_tests_run_id" json:"runId,omitempty"`
-	SuiteID     *string                `gorm:"column:suite_id;type:text;not null;index:idx_tests_suite_status,priority:1" json:"suiteId,omitempty"`
-	Name        string                 `gorm:"column:name;type:text" json:"name,omitempty"`
-	Title       string                 `gorm:"column:title;type:text" json:"title,omitempty"`
-	Description string                 `gorm:"column:description;type:text" json:"description,omitempty"`
-	Status      string                 `gorm:"column:status;type:text;index:idx_tests_suite_status,priority:2" json:"status,omitempty"`
-	StartTime   *time.Time             `gorm:"column:started_at" json:"startTime,omitempty"`
-	EndTime     *time.Time             `gorm:"column:finished_at" json:"endTime,omitempty"`
-	Duration    *int64                 `gorm:"column:duration" json:"duration,omitempty"`
-	Metadata    map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
-	Tags        []string               `gorm:"column:tags;type:jsonb;serializer:json" json:"tags,omitempty"`
-	Location    string                 `gorm:"column:location;type:text" json:"location,omitempty"`
-	RetryCount  *int32                 `gorm:"column:retry_count" json:"retryCount,omitempty"`
-	RetryIndex  *int32                 `gorm:"column:retry_index" json:"retryIndex,omitempty"`
-	Timeout     *int32                 `gorm:"column:timeout" json:"timeout,omitempty"`
-	CreatedAt   time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
-	UpdatedAt   time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
+	ID             string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
+	RunID          string                 `gorm:"column:run_id;type:text;not null;index:idx_tests_run_id" json:"runId,omitempty"`
+	ExternalTestID string                 `gorm:"column:external_test_id;type:text;index:idx_tests_suite_external_test_id,priority:2;index:idx_tests_run_external_test_id,priority:2" json:"externalTestId,omitempty"`
+	SuiteID        *string                `gorm:"column:suite_id;type:text;not null;index:idx_tests_suite_status,priority:1" json:"suiteId,omitempty"`
+	Name           string                 `gorm:"column:name;type:text" json:"name,omitempty"`
+	Title          string                 `gorm:"column:title;type:text" json:"title,omitempty"`
+	Description    string                 `gorm:"column:description;type:text" json:"description,omitempty"`
+	Status         string                 `gorm:"column:status;type:text;index:idx_tests_suite_status,priority:2" json:"status,omitempty"`
+	StartTime      *time.Time             `gorm:"column:started_at" json:"startTime,omitempty"`
+	EndTime        *time.Time             `gorm:"column:finished_at" json:"endTime,omitempty"`
+	Duration       *int64                 `gorm:"column:duration" json:"duration,omitempty"`
+	Metadata       map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
+	Tags           []string               `gorm:"column:tags;type:jsonb;serializer:json" json:"tags,omitempty"`
+	Location       string                 `gorm:"column:location;type:text" json:"location,omitempty"`
+	RetryCount     *int32                 `gorm:"column:retry_count" json:"retryCount,omitempty"`
+	RetryIndex     *int32                 `gorm:"column:retry_index" json:"retryIndex,omitempty"`
+	Timeout        *int32                 `gorm:"column:timeout" json:"timeout,omitempty"`
+	CreatedAt      time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
+	UpdatedAt      time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 
 	Attempts []TestAttempt `gorm:"foreignKey:TestID;references:ID" json:"attempts,omitempty"`
 }

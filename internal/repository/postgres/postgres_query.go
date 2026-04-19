@@ -130,7 +130,7 @@ func (r *PostgresRepository) GetTestTrends(ctx context.Context, testID string, l
 
 	var tests []m.Test
 	if err := r.db.WithContext(ctx).
-		Where("id = ?", testID).
+		Where("external_test_id = ? OR id = ?", testID, testID).
 		Order("created_at desc").
 		Limit(int(limit)).
 		Find(&tests).Error; err != nil {
@@ -140,7 +140,7 @@ func (r *PostgresRepository) GetTestTrends(ctx context.Context, testID string, l
 	items := make([]*TestTrendItem, 0, len(tests))
 	for _, test := range tests {
 		item := &TestTrendItem{
-			TestID:    test.ID,
+			TestID:    testExternalID(test),
 			RunID:     test.RunID,
 			Status:    test.Status,
 			Duration:  test.Duration,
@@ -449,9 +449,9 @@ func buildSuiteDocument(suite m.Suite) *m.SuiteDocument {
 		parentSuiteID = *suite.ParentSuiteID
 	}
 	return &m.SuiteDocument{
-		ID:              suite.ID,
+		ID:              suiteExternalID(suite),
 		RunID:           suite.RunID,
-		ParentSuiteID:   parentSuiteID,
+		ParentSuiteID:   suiteParentExternalID(suite, parentSuiteID),
 		Name:            suite.Name,
 		Description:     suite.Description,
 		Status:          suite.Status,
@@ -484,7 +484,7 @@ func buildTestDocument(test m.Test, attempts []m.TestAttempt) *m.TestDocument {
 	currentAttempt := selectCurrentAttemptDoc(attemptDocs, test.RetryIndex)
 
 	testDoc := &m.TestDocument{
-		ID:          test.ID,
+		ID:          testExternalID(test),
 		Name:        test.Name,
 		Title:       test.Title,
 		Description: test.Description,
@@ -511,7 +511,7 @@ func buildTestDocument(test m.Test, attempts []m.TestAttempt) *m.TestDocument {
 		Steps:       []*m.StepDocument{},
 	}
 	if test.SuiteID != nil {
-		testDoc.SuiteID = *test.SuiteID
+		testDoc.SuiteID = suiteIDToExternal(*test.SuiteID)
 	}
 	if currentAttempt != nil {
 		testDoc.ErrorMessage = currentAttempt.ErrorMessage
@@ -593,6 +593,42 @@ func markerFromMetadata(metadata map[string]interface{}) (string, bool) {
 		return "", false
 	}
 	return marker, true
+}
+
+func suiteExternalID(suite m.Suite) string {
+	if suite.ExternalSuiteID != "" {
+		return suite.ExternalSuiteID
+	}
+	return suiteIDToExternal(suite.ID)
+}
+
+func suiteParentExternalID(suite m.Suite, fallback string) string {
+	if suite.ParentSuiteID == nil {
+		return ""
+	}
+	if fallback != "" {
+		return suiteIDToExternal(fallback)
+	}
+	return suiteIDToExternal(*suite.ParentSuiteID)
+}
+
+func suiteIDToExternal(value string) string {
+	parts := strings.SplitN(value, ":suite:", 2)
+	if len(parts) == 2 && parts[1] != "" {
+		return parts[1]
+	}
+	return value
+}
+
+func testExternalID(test m.Test) string {
+	if test.ExternalTestID != "" {
+		return test.ExternalTestID
+	}
+	parts := strings.SplitN(test.ID, ":test:", 2)
+	if len(parts) == 2 && parts[1] != "" {
+		return parts[1]
+	}
+	return test.ID
 }
 
 func cloneMetadata(input map[string]interface{}) map[string]interface{} {

@@ -127,23 +127,24 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 
 func upsertRelationalTest(tx *gorm.DB, test *m.Test, now time.Time) error {
 	assignment := m.Test{
-		RunID:       test.RunID,
-		SuiteID:     test.SuiteID,
-		Name:        test.Name,
-		Title:       test.Title,
-		Description: test.Description,
-		Status:      test.Status,
-		StartTime:   test.StartTime,
-		EndTime:     test.EndTime,
-		Duration:    test.Duration,
-		Metadata:    test.Metadata,
-		Tags:        test.Tags,
-		Location:    test.Location,
-		RetryCount:  test.RetryCount,
-		RetryIndex:  test.RetryIndex,
-		Timeout:     test.Timeout,
-		UpdatedAt:   now,
-		CreatedAt:   now,
+		RunID:          test.RunID,
+		ExternalTestID: test.ExternalTestID,
+		SuiteID:        test.SuiteID,
+		Name:           test.Name,
+		Title:          test.Title,
+		Description:    test.Description,
+		Status:         test.Status,
+		StartTime:      test.StartTime,
+		EndTime:        test.EndTime,
+		Duration:       test.Duration,
+		Metadata:       test.Metadata,
+		Tags:           test.Tags,
+		Location:       test.Location,
+		RetryCount:     test.RetryCount,
+		RetryIndex:     test.RetryIndex,
+		Timeout:        test.Timeout,
+		UpdatedAt:      now,
+		CreatedAt:      now,
 	}
 
 	stored := m.Test{ID: test.ID}
@@ -216,8 +217,13 @@ func (r *PostgresRepository) AppendTestFailure(ctx context.Context, runID, testI
 
 	now := time.Now()
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		internalTestID, err := resolveInternalTestID(tx, runID, testID)
+		if err != nil {
+			return err
+		}
+
 		var attempt m.TestAttempt
-		if err := tx.Where("run_id = ? AND test_id = ? AND attempt_index = ?", runID, testID, attemptIndex).First(&attempt).Error; err != nil {
+		if err := tx.Where("run_id = ? AND test_id = ? AND attempt_index = ?", runID, internalTestID, attemptIndex).First(&attempt).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return fmt.Errorf("test attempt not found: runID=%s, testID=%s, attemptIndex=%d", runID, testID, attemptIndex)
 			}
@@ -230,7 +236,7 @@ func (r *PostgresRepository) AppendTestFailure(ctx context.Context, runID, testI
 			return fmt.Errorf("append relational test failure: %w", err)
 		}
 
-		if err := tx.Model(&m.Test{}).Where("id = ?", testID).Update("updated_at", now).Error; err != nil {
+		if err := tx.Model(&m.Test{}).Where("id = ?", internalTestID).Update("updated_at", now).Error; err != nil {
 			return fmt.Errorf("touch relational test after failure: %w", err)
 		}
 
@@ -261,8 +267,13 @@ func (r *PostgresRepository) AppendTestError(ctx context.Context, runID, testID 
 
 	now := time.Now()
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		internalTestID, err := resolveInternalTestID(tx, runID, testID)
+		if err != nil {
+			return err
+		}
+
 		var attempt m.TestAttempt
-		if err := tx.Where("run_id = ? AND test_id = ? AND attempt_index = ?", runID, testID, attemptIndex).First(&attempt).Error; err != nil {
+		if err := tx.Where("run_id = ? AND test_id = ? AND attempt_index = ?", runID, internalTestID, attemptIndex).First(&attempt).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return fmt.Errorf("test attempt not found: runID=%s, testID=%s, attemptIndex=%d", runID, testID, attemptIndex)
 			}
@@ -275,7 +286,7 @@ func (r *PostgresRepository) AppendTestError(ctx context.Context, runID, testID 
 			return fmt.Errorf("append relational test error: %w", err)
 		}
 
-		if err := tx.Model(&m.Test{}).Where("id = ?", testID).Update("updated_at", now).Error; err != nil {
+		if err := tx.Model(&m.Test{}).Where("id = ?", internalTestID).Update("updated_at", now).Error; err != nil {
 			return fmt.Errorf("touch relational test after error: %w", err)
 		}
 
@@ -287,4 +298,16 @@ func (r *PostgresRepository) AppendTestError(ctx context.Context, runID, testID 
 
 	r.logger.Info("test error appended", "run_id", runID, "test_id", testID, "attempt_index", attemptIndex)
 	return nil
+}
+
+func resolveInternalTestID(tx *gorm.DB, runID, externalTestID string) (string, error) {
+	var test m.Test
+	err := tx.Where("run_id = ? AND (external_test_id = ? OR id = ?)", runID, externalTestID, externalTestID).First(&test).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return "", fmt.Errorf("test not found: runID=%s, testID=%s", runID, externalTestID)
+		}
+		return "", fmt.Errorf("load relational test: %w", err)
+	}
+	return test.ID, nil
 }
