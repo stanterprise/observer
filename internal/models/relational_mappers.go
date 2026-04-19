@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	entities "github.com/stanterprise/proto-go/testsystem/v1/entities"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 )
 
@@ -18,29 +19,8 @@ func RunStartEventToTestRun(req *events.ReportRunStartEventRequest) (*TestRun, [
 
 	now := time.Now()
 
-	md := make(map[string]interface{})
-	for k, v := range req.Metadata {
-		md[k] = v
-	}
-	suites := make([]*Suite, 0, len(req.TestSuites))
-	for _, protoSuite := range req.TestSuites {
-		if protoSuite == nil {
-			continue
-		}
-		suite := &Suite{
-			ID:            protoSuite.Id,
-			RunID:         protoSuite.RunId,
-			ParentSuiteID: &protoSuite.ParentSuiteId,
-			Name:          protoSuite.Name,
-			Description:   protoSuite.Description,
-			Metadata:      md,
-			Location:      protoSuite.Location,
-			Type:          protoSuite.Type.String(),
-			InitiatedBy:   protoSuite.InitiatedBy,
-			ProjectName:   protoSuite.Project,
-		}
-		suites = append(suites, suite)
-	}
+	md := stringMapToInterfaceMap(req.Metadata)
+	suites := flattenSuiteRuns(req.TestSuites)
 
 	return &TestRun{
 		ID:         req.RunId,
@@ -155,6 +135,83 @@ func parseRunShardMetadata(metadata map[string]string) (*int32, *int32) {
 	)
 
 	return shardIndex, shardCount
+}
+
+func flattenSuiteRuns(protoSuites []*entities.TestSuiteRun) []*Suite {
+	suites := make([]*Suite, 0)
+	for _, protoSuite := range protoSuites {
+		suites = append(suites, flattenSingleSuite(protoSuite)...)
+	}
+	return suites
+}
+
+func flattenSingleSuite(protoSuite *entities.TestSuiteRun) []*Suite {
+	if protoSuite == nil {
+		return nil
+	}
+
+	now := time.Now()
+	metadata := stringMapToInterfaceMap(protoSuite.Metadata)
+	var parentSuiteID *string
+	if protoSuite.ParentSuiteId != "" {
+		parentSuiteID = &protoSuite.ParentSuiteId
+	}
+
+	var startTime *time.Time
+	if protoSuite.StartTime != nil {
+		t := protoSuite.StartTime.AsTime()
+		startTime = &t
+	}
+
+	var endTime *time.Time
+	if protoSuite.EndTime != nil {
+		t := protoSuite.EndTime.AsTime()
+		endTime = &t
+	}
+
+	var duration *int64
+	if protoSuite.Duration != nil {
+		d := protoSuite.Duration.AsDuration().Nanoseconds()
+		duration = &d
+	}
+
+	suite := &Suite{
+		ID:            protoSuite.Id,
+		RunID:         protoSuite.RunId,
+		ParentSuiteID: parentSuiteID,
+		Name:          protoSuite.Name,
+		Description:   protoSuite.Description,
+		Status:        protoSuite.Status.String(),
+		Metadata:      metadata,
+		Duration:      duration,
+		Location:      protoSuite.Location,
+		Type:          protoSuite.Type.String(),
+		InitiatedBy:   protoSuite.InitiatedBy,
+		ProjectName:   protoSuite.Project,
+		Author:        protoSuite.Author,
+		Owner:         protoSuite.Owner,
+		TestCaseIDs:   protoSuite.TestCaseIds,
+		SubSuiteIDs:   protoSuite.SubSuiteIds,
+		StartTime:     startTime,
+		EndTime:       endTime,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	suites := []*Suite{suite}
+	for _, childSuite := range protoSuite.SubSuites {
+		suites = append(suites, flattenSingleSuite(childSuite)...)
+	}
+
+	return suites
+}
+
+func stringMapToInterfaceMap(metadata map[string]string) map[string]interface{} {
+	converted := make(map[string]interface{}, len(metadata))
+	for k, v := range metadata {
+		converted[k] = v
+	}
+	return converted
 }
 
 func firstInt32Metadata(metadata map[string]string, keys ...string) *int32 {

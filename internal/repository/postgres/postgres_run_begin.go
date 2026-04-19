@@ -7,6 +7,7 @@ import (
 
 	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository"
+	"gorm.io/gorm"
 )
 
 // UpsertRunStart upserts a TestRun row from a mapped run start event.
@@ -26,12 +27,10 @@ func (r *PostgresRepository) UpsertRunStart(ctx context.Context, run *m.TestRun)
 	run.CreatedAt = now
 	run.UpdatedAt = now
 
-	result := r.db.WithContext(ctx).
-		Where(m.TestRun{ID: run.ID}).
-		Assign(m.TestRun{
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		assignment := m.TestRun{
 			Name:        run.Name,
 			Status:      run.Status,
-			TotalTests:  run.TotalTests,
 			InitiatedBy: run.InitiatedBy,
 			ProjectName: run.ProjectName,
 			Metadata:    run.Metadata,
@@ -39,15 +38,90 @@ func (r *PostgresRepository) UpsertRunStart(ctx context.Context, run *m.TestRun)
 			UpdatedAt:   now,
 			CreatedAt:   now,
 			Description: run.Description,
-		}).
-		FirstOrCreate(run)
+		}
 
-	if result.Error != nil {
-		return fmt.Errorf("upsert run start: %w", result.Error)
+		if isShardedRunStart(run.Metadata) {
+			var existing m.TestRun
+			err := tx.Where("id = ?", run.ID).First(&existing).Error
+			if err != nil && err != gorm.ErrRecordNotFound {
+				return fmt.Errorf("load existing run start: %w", err)
+			}
+			assignment.Metadata = mergeRunStartMetadata(existing.Metadata, run.Metadata)
+			assignment.TotalTests = mergeRunStartTotalTests(existing.TotalTests, run.TotalTests, true)
+		} else {
+			assignment.TotalTests = mergeRunStartTotalTests(0, run.TotalTests, false)
+		}
+
+		result := tx.
+			Where(m.TestRun{ID: run.ID}).
+			Assign(assignment).
+			FirstOrCreate(run)
+
+		if result.Error != nil {
+			return fmt.Errorf("upsert run start: %w", result.Error)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	r.logger.Info("test run upserted", "run_id", run.ID)
 	return nil
+}
+
+// UpsertRunStartSuites upserts suite rows emitted in the run-start payload.
+func (r *PostgresRepository) UpsertRunStartSuites(ctx context.Context, suites []*m.Suite) error {
+	if err := r.ensureDB(); err != nil {
+		return err
+	}
+
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		for _, suite := range suites {
+			if suite == nil {
+				continue
+			}
+			if err := repository.ValidateRunID(suite.RunID); err != nil {
+				return err
+			}
+			suite.CreatedAt = now
+			suite.UpdatedAt = now
+
+			result := tx.
+				Where(m.Suite{ID: suite.ID}).
+				Assign(m.Suite{
+					RunID:           suite.RunID,
+					ParentSuiteID:   suite.ParentSuiteID,
+					Name:            suite.Name,
+					Description:     suite.Description,
+					Status:          suite.Status,
+					Metadata:        suite.Metadata,
+					Duration:        suite.Duration,
+					Location:        suite.Location,
+					Type:            suite.Type,
+					TestSuiteSpecID: suite.TestSuiteSpecID,
+					InitiatedBy:     suite.InitiatedBy,
+					ProjectName:     suite.ProjectName,
+					Author:          suite.Author,
+					Owner:           suite.Owner,
+					TestCaseIDs:     suite.TestCaseIDs,
+					SubSuiteIDs:     suite.SubSuiteIDs,
+					Tags:            suite.Tags,
+					StartTime:       suite.StartTime,
+					EndTime:         suite.EndTime,
+					UpdatedAt:       now,
+					CreatedAt:       now,
+				}).
+				FirstOrCreate(suite)
+			if result.Error != nil {
+				return fmt.Errorf("upsert run start suite %s: %w", suite.ID, result.Error)
+			}
+		}
+
+		return nil
+	})
 }
 
 // UpsertRunShardStart upserts a run shard row derived from run-level shard metadata.
@@ -94,4 +168,34 @@ func (r *PostgresRepository) UpsertRunShardStart(ctx context.Context, shard *m.R
 
 	r.logger.Info("run shard upserted", "run_id", shard.RunID, "shard_index", *shard.ShardIndex)
 	return nil
+}
+
+func isShardedRunStart(metadata map[string]interface{}) bool {
+	if metadata == nil {
+		return false
+	}
+	_, hasTotal := metadata["shard.total"]
+	_, hasCurrent := metadata["shard.current"]
+	return hasTotal && hasCurrent
+}
+
+func mergeRunStartMetadata(existing, incoming map[string]interface{}) map[string]interface{} {
+	merged := make(map[string]interface{}, len(existing)+len(incoming))
+	for key, value := range existing {
+		merged[key] = value
+	}
+	for key, value := range incoming {
+		merged[key] = value
+	}
+	return merged
+}
+
+func mergeRunStartTotalTests(existing, incoming int32, sharded bool) int32 {
+	if !sharded {
+		return incoming
+	}
+	if incoming <= 0 {
+		return existing
+	}
+	return existing + incoming
 }
