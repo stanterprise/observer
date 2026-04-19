@@ -51,13 +51,13 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 - [ ] Add PostgreSQL connection config (`POSTGRES_DSN`, pooling, timeouts).
 - [ ] Add `MONGO_STEP_BUFFER_TTL` env var (default: 15 minutes).
 - [ ] Add object storage size threshold for step payloads (default: ~4MB).
-- [ ] Add boot-time validation that PG DSN is reachable (ping on connect).
+- [x] Add boot-time validation that PG DSN is reachable (ping on connect).
 - [ ] Add safe defaults for local/dev mode (POSTGRES_DSN optional; MongoDB-only fallback).
 
 ### 1.2 PostgreSQL integration
 
-- [ ] Add PostgreSQL connection module with pooling and health checks (`internal/database/postgres.go`).
-- [ ] Add graceful shutdown integration for PG clients (`defer pgDB.Close()` in processor).
+- [x] Add PostgreSQL connection module with pooling and health checks (`internal/database/postgres.go`).
+- [x] Add graceful shutdown integration for PG clients (`defer pgDB.Close()` in processor).
 - [ ] Integrate with existing observability for query performance.
 
 ### 1.3 Telemetry scaffolding
@@ -72,32 +72,32 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 
 ### 2.1 Connectivity and lifecycle
 
-- [ ] Add PostgreSQL connection module with pooling and health checks.
-- [ ] Add graceful shutdown integration for PG clients.
+- [x] Add PostgreSQL connection module with pooling and health checks.
+- [x] Add graceful shutdown integration for PG clients.
 - [ ] Add configuration options for connection pool sizes and timeouts (via DSN + pgxpool config).
 
 ### 2.2 Schema definition and initialization
 
-- [ ] Define `runs` table schema (DDL or Go structs).
-- [ ] Define `run_shards` table schema.
-- [ ] Define `suites` table schema.
-- [ ] Define `tests` table schema.
-- [ ] Define `test_attempts` table schema with unique constraint on `(test_id, attempt_index)`.
-- [ ] Implement idempotent schema initialization in PG connection module: `CREATE TABLE IF NOT EXISTS` (no backfill of legacy MongoDB data).
-- [ ] Add indexes for query optimization: (run_id), (suite_id), (test_id), (status, created_at).
+- [x] Define `runs` table schema (DDL or Go structs).
+- [x] Define `run_shards` table schema.
+- [x] Define `suites` table schema.
+- [x] Define `tests` table schema.
+- [x] Define `test_attempts` table schema with unique constraint on `(test_id, attempt_index)`.
+- [x] Implement idempotent schema initialization in PG connection module: `CREATE TABLE IF NOT EXISTS` (no backfill of legacy MongoDB data).
+- [x] Add indexes for query optimization: (run_id), (suite_id), (test_id), (status, created_at).
 
 ### 2.3 Repository interfaces and implementations
 
 - [ ] Define PG repository interfaces for runs/suites/tests/test_attempts.
 - [ ] Implement idempotent upsert semantics for event redelivery safety (ON CONFLICT DO UPDATE).
 - [ ] Implement attempt begin/end transitions with explicit state machine checks (NOT IN terminal statuses guard).
-- [ ] Implement read queries for dashboard and detail endpoints (GetRun, ListRuns, GetSuite, ListTestsBySuite, etc.).
+- [x] Implement read queries for dashboard and detail endpoints (GetRun, ListRuns, GetSuite, ListTestsBySuite, etc.).
 
 ## 3. Shard Stitching and Logical Run Identity
 
 - [ ] Define canonical logical run key composition.
 - [ ] Implement key derivation in ingestion/processor path.
-- [ ] Implement run shard attach/update behavior in PG.
+- [x] Implement run shard attach/update behavior in PG.
 - [ ] Implement run completion policy for strict + fallback timeout modes.
 - [ ] Add reconciliation for orphaned/incomplete shard groups.
 - [ ] Add tests for split-shard inputs representing one logical run.
