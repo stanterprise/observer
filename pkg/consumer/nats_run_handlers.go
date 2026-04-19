@@ -48,13 +48,15 @@ func (c *NATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) e
 	}
 
 	testRun := models.RunEndEventToTestRun(&req)
-	if runShard := models.RunEndEventToRunShard(&req); runShard != nil {
-		if _, err := c.pgRepo.FinalizeRunShardEnd(ctx, runShard); err != nil {
-			return fmt.Errorf("finalize run shard end: %w", err)
-		}
-	} else {
-		if err := c.pgRepo.FinalizeRunEnd(ctx, testRun); err != nil {
-			return fmt.Errorf("finalize run end: %w", err)
+	if c.pgRepo.IsConfigured() {
+		if runShard := models.RunEndEventToRunShard(&req); runShard != nil {
+			if _, err := c.pgRepo.FinalizeRunShardEnd(ctx, runShard); err != nil {
+				return fmt.Errorf("finalize run shard end: %w", err)
+			}
+		} else {
+			if err := c.pgRepo.FinalizeRunEnd(ctx, testRun); err != nil {
+				return fmt.Errorf("finalize run end: %w", err)
+			}
 		}
 	}
 
@@ -143,23 +145,25 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 
 	testRun, relationalSuites := models.RunStartEventToTestRun(&req)
 	relationalTests := models.RunStartEventToTests(&req)
-	if runShard := models.RunStartEventToRunShard(&req); runShard != nil {
-		if err := c.pgRepo.UpsertRunStart(ctx, testRun); err != nil {
-			return fmt.Errorf("upsert run start: %w", err)
+	if c.pgRepo.IsConfigured() {
+		if runShard := models.RunStartEventToRunShard(&req); runShard != nil {
+			if err := c.pgRepo.UpsertRunStart(ctx, testRun); err != nil {
+				return fmt.Errorf("upsert run start: %w", err)
+			}
+			if err := c.pgRepo.UpsertRunShardStart(ctx, runShard); err != nil {
+				return fmt.Errorf("upsert run shard start: %w", err)
+			}
+		} else {
+			if err := c.pgRepo.UpsertRunStart(ctx, testRun); err != nil {
+				return fmt.Errorf("upsert run start: %w", err)
+			}
 		}
-		if err := c.pgRepo.UpsertRunShardStart(ctx, runShard); err != nil {
-			return fmt.Errorf("upsert run shard start: %w", err)
+		if err := c.pgRepo.UpsertRunStartSuites(ctx, relationalSuites); err != nil {
+			return fmt.Errorf("upsert run start suites: %w", err)
 		}
-	} else {
-		if err := c.pgRepo.UpsertRunStart(ctx, testRun); err != nil {
-			return fmt.Errorf("upsert run start: %w", err)
+		if err := c.pgRepo.UpsertRunStartTests(ctx, relationalTests); err != nil {
+			return fmt.Errorf("upsert run start tests: %w", err)
 		}
-	}
-	if err := c.pgRepo.UpsertRunStartSuites(ctx, relationalSuites); err != nil {
-		return fmt.Errorf("upsert run start suites: %w", err)
-	}
-	if err := c.pgRepo.UpsertRunStartTests(ctx, relationalTests); err != nil {
-		return fmt.Errorf("upsert run start tests: %w", err)
 	}
 
 	return c.repo.MapSuites(ctx, req.RunId, req.Name, runMetadata, req.TotalTests, suites)

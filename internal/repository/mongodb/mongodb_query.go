@@ -280,7 +280,7 @@ func (r *MongoRepository) GetTestTrends(ctx context.Context, testID string, limi
 					bson.M{"$ifNull": []interface{}{"$tests", []interface{}{}}},
 					bson.M{
 						"$reduce": bson.M{
-							"input":        "$suites",
+							"input":        bson.M{"$ifNull": []interface{}{"$suites", []interface{}{}}},
 							"initialValue": []interface{}{},
 							"in": bson.M{
 								"$concatArrays": []interface{}{

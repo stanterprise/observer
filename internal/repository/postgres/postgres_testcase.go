@@ -88,6 +88,13 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 		if err := upsertRelationalTestAttempt(tx, attempt, now); err != nil {
 			return err
 		}
+		if attempt.Steps != nil {
+			if err := tx.Model(&m.TestAttempt{}).
+				Where("test_id = ? AND attempt_index = ?", attempt.TestID, attempt.AttemptIndex).
+				Updates(map[string]interface{}{"steps": attempt.Steps, "updated_at": now}).Error; err != nil {
+				return fmt.Errorf("persist relational test attempt steps: %w", err)
+			}
+		}
 
 		var attempts []m.TestAttempt
 		if err := tx.Where("test_id = ?", test.ID).Find(&attempts).Error; err != nil {

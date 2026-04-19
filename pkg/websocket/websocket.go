@@ -573,6 +573,9 @@ func (c *Client) matchesFilters(event *publisher.Event) bool {
 	// If no filters are set, match all events
 	if len(c.filters.EventTypes) == 0 && c.filters.RunID == "" &&
 		c.filters.TestID == "" && c.filters.SuiteID == "" {
+		if isLowPriorityEvent(event.Type) {
+			return false
+		}
 		return true
 	}
 

@@ -32,6 +32,8 @@ type TestRunDocument struct {
 	Suites []*SuiteDocument `bson:"suites,omitempty" json:"suites,omitempty"`
 	// Embedded test cases
 	Tests []*TestDocument `bson:"tests,omitempty" json:"tests,omitempty"`
+	// ActiveTestSteps buffers in-flight step trees by test id while the attempt is running.
+	ActiveTestSteps map[string]*ActiveTestStepsDocument `bson:"active_test_steps,omitempty" json:"activeTestSteps,omitempty"`
 }
 
 // SuiteDocument represents a test suite embedded within a test run document.
@@ -86,6 +88,20 @@ type AttemptDocument struct {
 	StdErr       []*OutputDocument        `bson:"stderr,omitempty" json:"stderr,omitempty"`
 	CreatedAt    time.Time                `bson:"created_at" json:"createdAt"`
 	UpdatedAt    time.Time                `bson:"updated_at" json:"updatedAt"`
+}
+
+// ActiveTestStepsDocument stores transient in-flight steps for a single active test attempt.
+// The owning TestRunDocument keys this object by test id in ActiveTestSteps.
+type ActiveTestStepsDocument struct {
+	TestID         string          `bson:"test_id" json:"testId"`
+	RetryIndex     int32           `bson:"retry_index" json:"retryIndex"`
+	Status         string          `bson:"status,omitempty" json:"status,omitempty"`
+	Steps          []*StepDocument `bson:"steps,omitempty" json:"steps,omitempty"`
+	FirstEventAt   *time.Time      `bson:"first_event_at,omitempty" json:"firstEventAt,omitempty"`
+	LastEventAt    *time.Time      `bson:"last_event_at,omitempty" json:"lastEventAt,omitempty"`
+	FlushStartedAt *time.Time      `bson:"flush_started_at,omitempty" json:"flushStartedAt,omitempty"`
+	CreatedAt      time.Time       `bson:"created_at" json:"createdAt"`
+	UpdatedAt      time.Time       `bson:"updated_at" json:"updatedAt"`
 }
 
 // TestDocument represents a test case embedded within a suite or run document.

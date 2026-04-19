@@ -51,6 +51,10 @@ func (r *MongoRepository) UpsertTestBegin(ctx context.Context, runID string, tes
 		return err
 	}
 
+	if err := r.SyncActiveTestSteps(ctx, runID, test.ID, *test.RetryIndex, test.StartTime); err != nil {
+		return err
+	}
+
 	return nil
 }
 

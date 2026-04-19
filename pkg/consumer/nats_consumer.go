@@ -732,7 +732,7 @@ func (c *NATSConsumer) retainRawMessage(ctx context.Context, msg jetstream.Msg, 
 	// Parse the raw message bytes into a JSON map so the payload is stored as a
 	// readable BSON document rather than binary bytes.  We keep the full event
 	// envelope (type, timestamp, data) so the audit trail is complete.
-	var parsedPayload interface{}
+	parsedPayload := map[string]interface{}{}
 	if err := json.Unmarshal(msg.Data(), &parsedPayload); err != nil {
 		// Fallback: wrap in a map so it remains a BSON document.
 		parsedPayload = map[string]interface{}{

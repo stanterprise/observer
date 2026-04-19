@@ -8,16 +8,14 @@ import (
 	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// UpsertStepBegin creates or updates a step within the document identified by runID.
-// With attempt-based retries: steps are stored in attempts[retry_index].steps instead of tests.steps.
+// UpsertStepBegin appends a step to the active run-scoped step buffer keyed by test id.
 // - runID: Required. Identifies the document (_id).
 // - step: The step to create/update (step.ID identifies the step).
 // - testID: Required. ID of parent test containing this step.
-// - retry_index: Required. Retry attempt index to target for step storage.
-// Returns error if runID is empty or parent test not found.
+// - retry_index: Required. Retry attempt index for the active buffer.
+// Returns error if runID is empty or the active test buffer has not been initialized.
 func (r *MongoRepository) UpsertStepBegin(ctx context.Context, runID string, step *m.StepDocument, testID string, retry_index int32) error {
 	if err := repository.ValidateRunID(runID); err != nil {
 		return err
@@ -43,76 +41,36 @@ func (r *MongoRepository) UpsertStepBegin(ctx context.Context, runID string, ste
 		"retryIndex", retry_index,
 		"stepTitle", step.Title)
 
-	return r.upsertStepInTestAttempt(ctx, runID, testID, retry_index, step, now)
-}
-
-// upsertStepInTestAttempt handles steps as children of attempts[retry_index] array.
-// With attempt-based retries: steps are stored in attempts[retry_index].steps instead of tests.steps.
-// Note: "step begin" events should ONLY insert new steps, never update existing ones.
-func (r *MongoRepository) upsertStepInTestAttempt(ctx context.Context, runID string, testID string, retry_index int32, step *m.StepDocument, now time.Time) error {
-	// Use a tight filter that includes the specific attempt so MatchedCount==0 reliably means
-	// "the attempt does not exist yet", rather than relying on ModifiedCount==0 which is
-	// unreliable when the update also contains a $set that always modifies the document.
+	field := stepBufferField(testID)
 	filter := bson.M{
-		"_id": runID,
-		"tests": bson.M{
-			"$elemMatch": bson.M{
-				"id": testID,
-				"attempts": bson.M{
-					"$elemMatch": bson.M{"retry_index": retry_index},
-				},
-			},
-		},
+		"_id":                  runID,
+		field + ".retry_index": retry_index,
 	}
 	update := bson.M{
-		"$push": bson.M{"tests.$[test].attempts.$[attempt].steps": step},
-		"$set":  bson.M{"updated_at": now},
-	}
-	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
-		Filters: []interface{}{
-			bson.M{"test.id": testID},
-			bson.M{"attempt.retry_index": retry_index},
+		"$push": bson.M{field + ".steps": step},
+		"$set": bson.M{
+			field + ".status":        activeStepBufferStatusActive,
+			field + ".last_event_at": now,
+			field + ".updated_at":    now,
+			"updated_at":             now,
 		},
-	})
+	}
 
-	r.logger.Debug("Inserting new step into attempt",
-		"runID", runID,
-		"stepID", step.ID,
-		"stepTitle", step.Title,
-		"testID", testID,
-		"retryIndex", retry_index)
-
-	result, err := r.collection.UpdateOne(ctx, filter, update, arrayFilters)
+	result, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
-		return fmt.Errorf("insert step into test attempt: %w", err)
+		return fmt.Errorf("insert step into active test buffer: %w", err)
 	}
 
 	if result.MatchedCount == 0 {
-		r.logger.Warn("attempt missing for step begin, creating attempt from step context",
+		r.logger.Warn("active test buffer missing for step begin",
 			"runID", runID,
 			"testID", testID,
 			"retryIndex", retry_index,
 			"stepID", step.ID)
-
-		if err := r.ensureAttemptExists(ctx, runID, testID, retry_index, step.StartTime, now); err != nil {
-			return fmt.Errorf("ensure attempt exists for step begin: %w", err)
-		}
-
-		result, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
-		if err != nil {
-			return fmt.Errorf("retry insert step into test attempt: %w", err)
-		}
-		if result.MatchedCount == 0 {
-			r.logger.Error("parent test not found after ensuring attempt",
-				"runID", runID,
-				"testID", testID,
-				"retryIndex", retry_index,
-				"stepID", step.ID)
-			return fmt.Errorf("parent test not found: runID=%s, testID=%s, retryIndex=%d", runID, testID, retry_index)
-		}
+		return fmt.Errorf("parent test not found: runID=%s, testID=%s, retryIndex=%d", runID, testID, retry_index)
 	}
 
-	r.logger.Info("step begin (inserted)",
+	r.logger.Info("step begin buffered",
 		"runID", runID,
 		"stepID", step.ID,
 		"testID", testID,

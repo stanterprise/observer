@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -167,6 +168,96 @@ func TestFinalizeTestEndAggregatesPassingRetries(t *testing.T) {
 	}
 }
 
+func TestFinalizeTestEndPersistsAttemptStepsWithoutClearingOnLaterRetry(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	suiteID := "run-123:suite:suite-123"
+	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+	end := start.Add(2 * time.Second)
+
+	test := &m.Test{
+		ID:             "run-123:test:test-steps",
+		RunID:          "run-123",
+		ExternalTestID: "test-steps",
+		SuiteID:        &suiteID,
+		Name:           "Step Test",
+		Title:          "Step Test",
+		Status:         "PASSED",
+		StartTime:      &start,
+		EndTime:        &end,
+		RetryCount:     int32Ptr(0),
+		RetryIndex:     int32Ptr(0),
+	}
+	stepsRaw := jsonRawMessage(t, []*m.StepDocument{{ID: "step-1", Title: "Click", Status: "PASSED"}})
+	attempt := &m.TestAttempt{
+		ID:           "run-123:test:test-steps:0",
+		RunID:        "run-123",
+		TestID:       "run-123:test:test-steps",
+		AttemptIndex: 0,
+		Status:       "PASSED",
+		StartTime:    &start,
+		EndTime:      &end,
+		Steps:        stepsRaw,
+	}
+
+	if err := repo.UpsertTestBegin(ctx, test, attempt); err != nil {
+		t.Fatalf("UpsertTestBegin failed: %v", err)
+	}
+	if err := repo.FinalizeTestEnd(ctx, test, attempt); err != nil {
+		t.Fatalf("FinalizeTestEnd failed: %v", err)
+	}
+
+	var storedAttempt m.TestAttempt
+	if err := repo.db.WithContext(ctx).Where("test_id = ? AND attempt_index = ?", "run-123:test:test-steps", 0).First(&storedAttempt).Error; err != nil {
+		t.Fatalf("load stored attempt: %v", err)
+	}
+	if storedAttempt.Steps == nil {
+		t.Fatal("expected stored steps to be persisted")
+	}
+	decoded := decodeAttemptSteps(storedAttempt.Steps)
+	if len(decoded) != 1 || decoded[0].ID != "step-1" {
+		t.Fatalf("decoded steps = %+v, want step-1", decoded)
+	}
+
+	secondEnd := end.Add(2 * time.Second)
+	retryTest := &m.Test{
+		ID:             "run-123:test:test-steps",
+		RunID:          "run-123",
+		ExternalTestID: "test-steps",
+		SuiteID:        &suiteID,
+		Name:           "Step Test",
+		Title:          "Step Test",
+		Status:         "PASSED",
+		StartTime:      &end,
+		EndTime:        &secondEnd,
+		RetryCount:     int32Ptr(1),
+		RetryIndex:     int32Ptr(1),
+	}
+	retryAttempt := &m.TestAttempt{
+		ID:           "run-123:test:test-steps:1",
+		RunID:        "run-123",
+		TestID:       "run-123:test:test-steps",
+		AttemptIndex: 1,
+		Status:       "PASSED",
+		StartTime:    &end,
+		EndTime:      &secondEnd,
+	}
+	if err := repo.UpsertTestBegin(ctx, retryTest, retryAttempt); err != nil {
+		t.Fatalf("UpsertTestBegin retry failed: %v", err)
+	}
+	if err := repo.FinalizeTestEnd(ctx, retryTest, retryAttempt); err != nil {
+		t.Fatalf("FinalizeTestEnd retry failed: %v", err)
+	}
+
+	if err := repo.db.WithContext(ctx).Where("test_id = ? AND attempt_index = ?", "run-123:test:test-steps", 0).First(&storedAttempt).Error; err != nil {
+		t.Fatalf("reload stored attempt: %v", err)
+	}
+	decoded = decodeAttemptSteps(storedAttempt.Steps)
+	if len(decoded) != 1 || decoded[0].ID != "step-1" {
+		t.Fatalf("decoded steps after retry = %+v, want preserved step-1", decoded)
+	}
+}
+
 func TestAggregateTestAttemptStatuses(t *testing.T) {
 	attempts := []m.TestAttempt{{AttemptIndex: 0, Status: "FAILED"}, {AttemptIndex: 1, Status: "PASSED"}}
 	if got := aggregateTestAttemptStatuses(attempts, "FAILED"); got != "PASSED" {
@@ -250,6 +341,16 @@ func TestAppendTestFailureAndError(t *testing.T) {
 func int64Ptr(value int64) *int64 {
 	converted := value
 	return &converted
+}
+
+func jsonRawMessage(t *testing.T, steps []*m.StepDocument) *json.RawMessage {
+	t.Helper()
+	raw, err := json.Marshal(steps)
+	if err != nil {
+		t.Fatalf("marshal raw message: %v", err)
+	}
+	message := json.RawMessage(raw)
+	return &message
 }
 
 func TestGetRunDocuments_PreservesHistoricalRunsForRepeatedExternalTestID(t *testing.T) {

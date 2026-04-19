@@ -31,3 +31,7 @@ func (r *PostgresRepository) ensureDB() error {
 	}
 	return nil
 }
+
+func (r *PostgresRepository) IsConfigured() bool {
+	return r != nil && r.db != nil
+}

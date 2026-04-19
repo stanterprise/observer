@@ -205,18 +205,26 @@ func TestNATSToMongoDB_FullEventFlow(t *testing.T) {
 		t.Errorf("Test duration = %v, want %v", finalDoc.Tests[0].Duration, testDuration)
 	}
 
-	// Step should be in test's attempts[0].steps array (attempt-based retries)
-	if len(finalDoc.Tests[0].Attempts) == 0 {
-		t.Fatalf("Test has no attempts array")
+	// Step events are buffered in the run-scoped active_test_steps map until the
+	// processor flushes them into PostgreSQL on test end.
+	if finalDoc.ActiveTestSteps == nil {
+		t.Fatal("expected active_test_steps to exist")
 	}
-	if len(finalDoc.Tests[0].Attempts[0].Steps) != 1 {
-		t.Fatalf("Steps count in attempt 0 = %v, want 1", len(finalDoc.Tests[0].Attempts[0].Steps))
+	buffer, ok := finalDoc.ActiveTestSteps[testID]
+	if !ok {
+		t.Fatalf("expected active step buffer for test %s", testID)
 	}
-	if finalDoc.Tests[0].Attempts[0].Steps[0].ID != stepID {
-		t.Errorf("Step ID = %v, want %v", finalDoc.Tests[0].Attempts[0].Steps[0].ID, stepID)
+	if buffer.RetryIndex != 0 {
+		t.Fatalf("buffer retry index = %d, want 0", buffer.RetryIndex)
 	}
-	if finalDoc.Tests[0].Attempts[0].Steps[0].Status != "PASSED" {
-		t.Errorf("Step status = %v, want PASSED", finalDoc.Tests[0].Attempts[0].Steps[0].Status)
+	if len(buffer.Steps) != 1 {
+		t.Fatalf("buffered steps count = %d, want 1", len(buffer.Steps))
+	}
+	if buffer.Steps[0].ID != stepID {
+		t.Errorf("Step ID = %v, want %v", buffer.Steps[0].ID, stepID)
+	}
+	if buffer.Steps[0].Status != "PASSED" {
+		t.Errorf("Step status = %v, want PASSED", buffer.Steps[0].Status)
 	}
 
 	// Cleanup stream

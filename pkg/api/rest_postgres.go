@@ -201,6 +201,16 @@ func (h *PostgresHandler) handleTestDetailByRunAndTest(w http.ResponseWriter, r 
 		return
 	}
 
+	liveTests, err := h.loadLiveRunningTestDetails(r.Context(), runID, foundTests)
+	if err != nil {
+		h.logger.Error("failed to load live running test details", "run_id", runID, "test_id", testID, "error", err)
+		h.internalError(w)
+		return
+	}
+	if liveTests != nil {
+		foundTests = liveTests
+	}
+
 	h.writeJSON(w, map[string]interface{}{
 		"runId": runID,
 		"tests": foundTests,
