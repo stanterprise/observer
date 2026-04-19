@@ -100,6 +100,25 @@ type ActiveTestStepsDocument struct {
 	FirstEventAt   *time.Time      `bson:"first_event_at,omitempty" json:"firstEventAt,omitempty"`
 	LastEventAt    *time.Time      `bson:"last_event_at,omitempty" json:"lastEventAt,omitempty"`
 	FlushStartedAt *time.Time      `bson:"flush_started_at,omitempty" json:"flushStartedAt,omitempty"`
+	TTLAt          *time.Time      `bson:"ttl_at,omitempty" json:"ttlAt,omitempty"`
+	CreatedAt      time.Time       `bson:"created_at" json:"createdAt"`
+	UpdatedAt      time.Time       `bson:"updated_at" json:"updatedAt"`
+}
+
+// LiveStepBufferDocument is the standalone collection representation of an
+// active step buffer. The collection is initialized separately so later phases
+// can cut over from the embedded run-document buffer without another schema hop.
+type LiveStepBufferDocument struct {
+	ID             string          `bson:"_id" json:"id"`
+	RunID          string          `bson:"run_id" json:"runId"`
+	TestID         string          `bson:"test_id" json:"testId"`
+	AttemptIndex   int32           `bson:"attempt_index" json:"attemptIndex"`
+	Status         string          `bson:"status,omitempty" json:"status,omitempty"`
+	Steps          []*StepDocument `bson:"steps,omitempty" json:"steps,omitempty"`
+	FirstEventAt   *time.Time      `bson:"first_event_at,omitempty" json:"firstEventAt,omitempty"`
+	LastEventAt    *time.Time      `bson:"last_event_at,omitempty" json:"lastEventAt,omitempty"`
+	FlushStartedAt *time.Time      `bson:"flush_started_at,omitempty" json:"flushStartedAt,omitempty"`
+	TTLAt          *time.Time      `bson:"ttl_at,omitempty" json:"ttlAt,omitempty"`
 	CreatedAt      time.Time       `bson:"created_at" json:"createdAt"`
 	UpdatedAt      time.Time       `bson:"updated_at" json:"updatedAt"`
 }

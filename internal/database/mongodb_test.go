@@ -1,9 +1,17 @@
 package database
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"testing"
+	"time"
+
+	"github.com/testcontainers/testcontainers-go"
+	mongocontainer "github.com/testcontainers/testcontainers-go/modules/mongodb"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func TestExtractDBName(t *testing.T) {
@@ -236,11 +244,129 @@ func TestConnectMongoDBFromEnv_NoURI(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	db, err := ConnectMongoDBFromEnv(logger)
-
 	if err != nil {
 		t.Errorf("ConnectMongoDBFromEnv() error = %v, want nil", err)
 	}
 	if db != nil {
 		t.Errorf("ConnectMongoDBFromEnv() db = %v, want nil", db)
+	}
+}
+
+func TestMongoStepBufferTTL(t *testing.T) {
+	original := os.Getenv("MONGO_STEP_BUFFER_TTL")
+	defer func() {
+		if original == "" {
+			os.Unsetenv("MONGO_STEP_BUFFER_TTL")
+		} else {
+			os.Setenv("MONGO_STEP_BUFFER_TTL", original)
+		}
+	}()
+
+	tests := []struct {
+		name  string
+		value string
+		want  time.Duration
+	}{
+		{name: "default when unset", value: "", want: defaultMongoStepBufferTTL},
+		{name: "duration syntax", value: "45m", want: 45 * time.Minute},
+		{name: "plain seconds", value: "120", want: 120 * time.Second},
+		{name: "invalid falls back", value: "garbage", want: defaultMongoStepBufferTTL},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.value == "" {
+				os.Unsetenv("MONGO_STEP_BUFFER_TTL")
+			} else {
+				os.Setenv("MONGO_STEP_BUFFER_TTL", tt.value)
+			}
+
+			got := MongoStepBufferTTL(nil)
+			if got != tt.want {
+				t.Fatalf("MongoStepBufferTTL() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEnsureLiveStepBufferIndexes(t *testing.T) {
+	ctx := context.Background()
+	mongoContainer, err := mongocontainer.RunContainer(ctx, testcontainers.WithImage("mongo:7.0"))
+	if err != nil {
+		t.Fatalf("RunContainer failed: %v", err)
+	}
+	defer mongoContainer.Terminate(ctx)
+
+	mongoURI, err := mongoContainer.ConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("ConnectionString failed: %v", err)
+	}
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		t.Fatalf("mongo.Connect failed: %v", err)
+	}
+	defer client.Disconnect(ctx)
+
+	dbName := "observer_index_test_" + time.Now().Format("20060102150405")
+	connection := &MongoDBConnection{
+		Client:   client,
+		Database: client.Database(dbName),
+		logger:   slog.New(slog.NewTextHandler(os.Stdout, nil)),
+	}
+
+	original := os.Getenv("MONGO_STEP_BUFFER_TTL")
+	defer func() {
+		if original == "" {
+			os.Unsetenv("MONGO_STEP_BUFFER_TTL")
+		} else {
+			os.Setenv("MONGO_STEP_BUFFER_TTL", original)
+		}
+	}()
+	os.Setenv("MONGO_STEP_BUFFER_TTL", "30m")
+
+	if err := connection.EnsureLiveStepBufferIndexes(ctx); err != nil {
+		t.Fatalf("EnsureLiveStepBufferIndexes failed: %v", err)
+	}
+
+	if got := connection.LiveStepBuffersCollection().Name(); got != "live_step_buffers" {
+		t.Fatalf("LiveStepBuffersCollection().Name() = %q, want %q", got, "live_step_buffers")
+	}
+
+	cursor, err := connection.LiveStepBuffersCollection().Indexes().List(ctx)
+	if err != nil {
+		t.Fatalf("Indexes().List failed: %v", err)
+	}
+	defer cursor.Close(ctx)
+
+	var indexes []bson.M
+	if err := cursor.All(ctx, &indexes); err != nil {
+		t.Fatalf("decode indexes failed: %v", err)
+	}
+
+	var ttlFound, runIDFound bool
+	for _, index := range indexes {
+		name, _ := index["name"].(string)
+		key, _ := index["key"].(bson.M)
+		switch name {
+		case "live_step_buffers_ttl_at_ttl":
+			ttlFound = key["ttl_at"] == int32(1) || key["ttl_at"] == int64(1) || key["ttl_at"] == 1
+			expire, ok := index["expireAfterSeconds"]
+			if !ok || expire == nil {
+				t.Fatalf("ttl index missing expireAfterSeconds: %#v", index)
+			}
+			if expire != int32(0) && expire != int64(0) && expire != 0 {
+				t.Fatalf("ttl index expireAfterSeconds = %v, want 0", expire)
+			}
+		case "live_step_buffers_run_id_idx":
+			runIDFound = key["run_id"] == int32(1) || key["run_id"] == int64(1) || key["run_id"] == 1
+		}
+	}
+
+	if !ttlFound {
+		t.Fatal("expected ttl_at index to be created")
+	}
+	if !runIDFound {
+		t.Fatal("expected run_id index to be created")
 	}
 }

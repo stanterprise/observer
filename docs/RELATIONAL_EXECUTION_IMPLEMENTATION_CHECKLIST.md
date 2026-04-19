@@ -34,7 +34,7 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 
 **This plan only applies to NEW runs ingested after the feature branch is deployed:**
 
-- PostgreSQL tables are created at startup (idempotent `CREATE TABLE IF NOT EXISTS`).
+- PostgreSQL schema is created/updated at startup via GORM `AutoMigrate`.
 - **No backfill or transformation of existing MongoDB runs occurs.**
 - Existing MongoDB run documents remain in the database as read-only historical records.
 - The API serves both data sources correctly:
@@ -42,17 +42,26 @@ Use this as the execution tracker for implementation, rollout, and cutover.
   - Legacy runs: remain in MongoDB, served from MongoDB for backward compatibility.
 - Run isolation is enforced: PostgreSQL runs are independent logical entities.
 
+## 0.2 Current Implementation Delta
+
+- Live in-flight step buffering is currently implemented as `active_test_steps` embedded inside the MongoDB run document, keyed by test ID, rather than as a separate `live_step_buffers` collection.
+- PostgreSQL write paths are implemented and active for runs, suites, tests, attempts, and finalized step payloads.
+- Active test detail reads in the PostgreSQL REST path use a live MongoDB overlay for running attempts.
+- Step payload offload to object storage, TTL-based cleanup, and reconciliation workers remain planned and are not yet implemented.
+
 ---
 
 ## 1. Foundation and Configuration
 
 ### 1.1 Configuration
 
-- [ ] Add PostgreSQL connection config (`POSTGRES_DSN`, pooling, timeouts).
-- [ ] Add `MONGO_STEP_BUFFER_TTL` env var (default: 15 minutes).
+- [x] Add PostgreSQL connection config (`POSTGRES_DSN`, optional `DATABASE_URL` fallback, default pool settings).
+- [x] Add `MONGO_STEP_BUFFER_TTL` env var (default: 15 minutes).
 - [ ] Add object storage size threshold for step payloads (default: ~4MB).
 - [x] Add boot-time validation that PG DSN is reachable (ping on connect).
-- [ ] Add safe defaults for local/dev mode (POSTGRES_DSN optional; MongoDB-only fallback).
+- [ ] Add safe defaults for local/dev mode (POSTGRES_DSN optional; MongoDB-only fallback across all services).
+
+Current state: the processor supports MongoDB-only fallback when PostgreSQL is unset; the API service still requires PostgreSQL.
 
 ### 1.2 PostgreSQL integration
 
@@ -74,7 +83,7 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 
 - [x] Add PostgreSQL connection module with pooling and health checks.
 - [x] Add graceful shutdown integration for PG clients.
-- [ ] Add configuration options for connection pool sizes and timeouts (via DSN + pgxpool config).
+- [ ] Add configuration options for connection pool sizes and timeouts beyond the current hard-coded defaults.
 
 ### 2.2 Schema definition and initialization
 
@@ -83,13 +92,13 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 - [x] Define `suites` table schema.
 - [x] Define `tests` table schema.
 - [x] Define `test_attempts` table schema with unique constraint on `(test_id, attempt_index)`.
-- [x] Implement idempotent schema initialization in PG connection module: `CREATE TABLE IF NOT EXISTS` (no backfill of legacy MongoDB data).
+- [x] Implement idempotent schema initialization in PG connection module via GORM `AutoMigrate` (no backfill of legacy MongoDB data).
 - [x] Add indexes for query optimization: (run_id), (suite_id), (test_id), (status, created_at).
 
 ### 2.3 Repository interfaces and implementations
 
 - [ ] Define PG repository interfaces for runs/suites/tests/test_attempts.
-- [ ] Implement idempotent upsert semantics for event redelivery safety (ON CONFLICT DO UPDATE).
+- [x] Implement idempotent upsert semantics for event redelivery safety (currently via GORM `Assign` + `FirstOrCreate` / transactional updates).
 - [ ] Implement attempt begin/end transitions with explicit state machine checks (NOT IN terminal statuses guard).
 - [x] Implement read queries for dashboard and detail endpoints (GetRun, ListRuns, GetSuite, ListTestsBySuite, etc.).
 
@@ -104,36 +113,39 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 
 ## 4. MongoDB Live Step Buffer
 
+Current implementation note: the standalone `live_step_buffers` collection and indexes now exist, but the active write path still mirrors the embedded `active_test_steps` structure inside the MongoDB run document until the 4.3 cutover is completed.
+
 ### 4.1 Collection and indexes
 
-- [ ] Create `live_step_buffers` collection initialization (`LiveStepBuffersCollection()` accessor).
-- [ ] Add TTL index on `ttl_at` with `expireAfterSeconds` derived from `MONGO_STEP_BUFFER_TTL`.
-- [ ] Add supporting index for run-end sweep (`run_id`).
+- [x] Create `live_step_buffers` collection initialization (`LiveStepBuffersCollection()` accessor).
+- [x] Add TTL index on `ttl_at` for absolute-expiry cleanup driven by `MONGO_STEP_BUFFER_TTL`-derived `ttl_at` values.
+- [x] Add supporting index for run-end sweep (`run_id`).
 
 ### 4.2 Document contract
 
-- [ ] Implement document shape with `_id=test_id` (unique per active test).
-- [ ] Add `attempt_index` as a regular attribute (not part of ID).
-- [ ] Add `status` field (`active | flush_in_progress`).
-- [ ] Add `first_event_at`, `last_event_at`, `flush_started_at` for tracking.
-- [ ] Add `ttl_at` timestamp for TTL cleanup.
+- [x] Implement document shape with `_id=test_id` (unique per active test) for the standalone collection contract.
+- [x] Implement active step buffer keyed by test ID within the run document.
+- [x] Add `attempt_index` as a regular attribute (not part of ID).
+- [x] Add `status` field (`active | flush_in_progress`).
+- [x] Add `first_event_at`, `last_event_at`, `flush_started_at` for tracking.
+- [x] Add `ttl_at` timestamp for TTL cleanup.
 
 ### 4.3 Write path
 
-- [ ] Implement create/reset behavior at attempt start, setting `ttl_at = now() + MONGO_STEP_BUFFER_TTL`.
-- [ ] Implement atomic step begin/step end mutations using MongoDB `$set` and `$push` (Phase 5).
+- [x] Implement create/reset behavior at attempt start, including `ttl_at` on the embedded active buffer.
+- [x] Implement atomic step begin/step end mutations using MongoDB `$set` and `$push` against the embedded active-step buffer.
 - [ ] Enforce invariants on attempt index progression in code (Phase 5).
 - [ ] Handle duplicate NATS event deliveries idempotently via event key (Phase 5).
 
 ## 5. Flush Protocol (Mongo -> PG) and Object Storage Integration
 
-- [ ] Implement transition to `flush_in_progress=true` prior to finalization write.
-- [ ] Implement final payload assembly from Mongo step tree (serialize to JSON).
+- [x] Implement transition to `flush_in_progress=true` prior to finalization write.
+- [x] Implement final payload assembly from Mongo step tree (serialize to JSON).
 - [ ] Implement payload size guard before PG write (threshold: ~4MB default, configurable).
-- [ ] Write to `test_attempts.steps` JSONB when under threshold.
+- [x] Write to `test_attempts.steps` JSONB when under threshold.
 - [ ] When above threshold: compress payload, use existing `pkg/storage` drivers (local, S3) to persist, store pointer in `test_attempts.steps_ref`.
-- [ ] Confirm PG transaction success before deleting Mongo buffer.
-- [ ] Implement retry-safe behavior on flush failure: clear `flush_in_progress`, retry via reconciliation.
+- [x] Confirm PG finalize success before deleting Mongo buffer.
+- [x] Implement immediate retry-safe behavior on flush failure by clearing `flush_in_progress` so later retry paths remain possible.
 - [ ] Emit structured logs with attempt IDs, flush outcome, flush latency, and storage location.
 
 ## 6. Reconciliation and Recovery
@@ -161,14 +173,14 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 ### 7.1 REST API routing
 
 - [ ] Add attempt-aware endpoint(s) if missing.
-- [ ] Route active attempts to Mongo live buffer.
-- [ ] Route terminal attempts to PG (`steps` or `steps_ref`).
+- [x] Route active attempts to Mongo live buffer.
+- [x] Route terminal attempts to PG (`steps`; `steps_ref` remains unimplemented).
 - [ ] Add fallback behavior for missing sources with clear error states.
 
 ### 7.2 WebSocket behavior
 
 - [ ] On subscribe, send active snapshot from Mongo when attempt is active.
-- [ ] Continue streaming deltas from event path.
+- [x] Continue streaming deltas from event path.
 - [ ] Emit terminal transition message when attempt finalizes.
 - [ ] Ensure post-terminal fetches resolve from PG.
 
@@ -176,7 +188,7 @@ Use this as the execution tracker for implementation, rollout, and cutover.
 
 - [ ] Disable oversized raw-message retention append behavior in processor.
 - [ ] Stop creating new giant run documents for retention.
-- [ ] Ensure read-only compatibility for existing historical data (no breaking changes).
+- [x] Ensure read-only compatibility for existing historical data (no breaking changes).
 - [ ] Document deprecation timeline for legacy path.
 
 ## 9. Testing Matrix
@@ -208,7 +220,7 @@ Since this is a feature branch with complete cutover on merge (no incremental ro
 
 ### 10.1 Integration testing
 
-- [ ] Run full test suite against new PG + Mongo architecture locally.
+- [x] Run full test suite against new PG + Mongo architecture locally.
 - [ ] Run load tests with high-step-count scenarios (50MB, 250MB, 1GB profiles).
 - [ ] Validate all SLOs before merging to master.
 
@@ -224,8 +236,8 @@ Since this is a feature branch with complete cutover on merge (no incremental ro
 
 - [ ] All 8 branch implementation phases complete and tested.
 - [ ] Verify all tests pass (unit, integration, load, chaos).
-- [ ] Confirm active-step reads served by Mongo buffer (active terminal status).
-- [ ] Confirm terminal-step reads served by PG (post-terminal status).
+- [x] Confirm active-step reads served by Mongo buffer during active attempts.
+- [x] Confirm terminal-step reads served by PG after finalization.
 - [ ] Remove legacy raw-messages oversized retention code path (no longer needed).
 - [ ] Update deployment documentation for PostgreSQL configuration in AIO and distributed modes.
 - [ ] Code review passed; ready for master merge.

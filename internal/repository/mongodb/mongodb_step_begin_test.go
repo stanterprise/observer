@@ -108,6 +108,18 @@ func TestUpsertStepBegin_BuffersStepInActiveRunDocument(t *testing.T) {
 	if buffer["retry_index"] != int32(0) {
 		t.Fatalf("expected retry_index=0, got %v", buffer["retry_index"])
 	}
+	if buffer["status"] != activeStepBufferStatusActive {
+		t.Fatalf("expected status=%q, got %v", activeStepBufferStatusActive, buffer["status"])
+	}
+	if buffer["first_event_at"] == nil {
+		t.Fatal("expected first_event_at to be set")
+	}
+	if buffer["last_event_at"] == nil {
+		t.Fatal("expected last_event_at to be set")
+	}
+	if buffer["ttl_at"] == nil {
+		t.Fatal("expected ttl_at to be set")
+	}
 	steps := fetchActiveTestSteps(t, repo, runID, testID)
 	if len(steps) != 1 {
 		t.Fatalf("expected 1 buffered step, got %d", len(steps))
@@ -187,6 +199,9 @@ func TestSyncActiveTestSteps_NewRetryReplacesBufferedSteps(t *testing.T) {
 	}
 	if buffer["retry_index"] != int32(1) {
 		t.Fatalf("expected retry_index=1 after reset, got %v", buffer["retry_index"])
+	}
+	if buffer["ttl_at"] == nil {
+		t.Fatal("expected ttl_at to be set after retry reset")
 	}
 	steps := fetchActiveTestSteps(t, repo, runID, testID)
 	if len(steps) != 0 {

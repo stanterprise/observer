@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	db "github.com/stanterprise/observer/internal/database"
 	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository"
 	"go.mongodb.org/mongo-driver/bson"
@@ -40,6 +41,7 @@ func (r *MongoRepository) SyncActiveTestSteps(ctx context.Context, runID, testID
 	if eventTime == nil {
 		eventTime = &now
 	}
+	ttlAt := now.Add(db.MongoStepBufferTTL(r.logger))
 
 	buffer := &m.ActiveTestStepsDocument{
 		TestID:       testID,
@@ -48,6 +50,7 @@ func (r *MongoRepository) SyncActiveTestSteps(ctx context.Context, runID, testID
 		Steps:        []*m.StepDocument{},
 		FirstEventAt: eventTime,
 		LastEventAt:  eventTime,
+		TTLAt:        &ttlAt,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -85,6 +88,7 @@ func (r *MongoRepository) SyncActiveTestSteps(ctx context.Context, runID, testID
 		"$set": bson.M{
 			field + ".status":        activeStepBufferStatusActive,
 			field + ".last_event_at": eventTime,
+			field + ".ttl_at":        ttlAt,
 			field + ".updated_at":    now,
 			"updated_at":             now,
 		},

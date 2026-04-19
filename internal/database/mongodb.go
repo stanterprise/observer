@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+const defaultMongoStepBufferTTL = 15 * time.Minute
 
 // MongoDBConnection wraps a MongoDB client and database
 type MongoDBConnection struct {
@@ -57,11 +61,17 @@ func ConnectMongoDB(uri string, logger *slog.Logger) (*MongoDBConnection, error)
 	logger.Info("connected to mongodb",
 		"database", dbName)
 
-	return &MongoDBConnection{
+	connection := &MongoDBConnection{
 		Client:   client,
 		Database: client.Database(dbName),
 		logger:   logger,
-	}, nil
+	}
+
+	if err := connection.EnsureLiveStepBufferIndexes(ctx); err != nil {
+		return nil, err
+	}
+
+	return connection, nil
 }
 
 // ConnectMongoDBFromEnv reads MONGODB_URI or MONGO_URI env variable and connects to MongoDB.
@@ -176,6 +186,64 @@ func (m *MongoDBConnection) TestRunsCollection() *mongo.Collection {
 // RawMessagesCollection returns the raw_messages collection handle used for message retention.
 func (m *MongoDBConnection) RawMessagesCollection() *mongo.Collection {
 	return m.Collection("raw_messages")
+}
+
+// LiveStepBuffersCollection returns the live_step_buffers collection handle used
+// for the standalone active-step-buffer contract.
+func (m *MongoDBConnection) LiveStepBuffersCollection() *mongo.Collection {
+	return m.Collection("live_step_buffers")
+}
+
+// EnsureLiveStepBufferIndexes creates the TTL and run sweep indexes required by
+// the standalone live step buffer collection.
+func (m *MongoDBConnection) EnsureLiveStepBufferIndexes(ctx context.Context) error {
+	if m == nil || m.Database == nil {
+		return fmt.Errorf("mongodb connection is not initialized")
+	}
+
+	models := []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "ttl_at", Value: 1}},
+			Options: options.Index().
+				SetName("live_step_buffers_ttl_at_ttl").
+				SetExpireAfterSeconds(0),
+		},
+		{
+			Keys: bson.D{{Key: "run_id", Value: 1}},
+			Options: options.Index().
+				SetName("live_step_buffers_run_id_idx"),
+		},
+	}
+
+	if _, err := m.LiveStepBuffersCollection().Indexes().CreateMany(ctx, models); err != nil {
+		return fmt.Errorf("create live step buffer indexes: %w", err)
+	}
+
+	return nil
+}
+
+// MongoStepBufferTTL resolves the configured TTL for live step buffers. Invalid
+// values fall back to the default so service startup remains safe.
+func MongoStepBufferTTL(logger *slog.Logger) time.Duration {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	raw := strings.TrimSpace(os.Getenv("MONGO_STEP_BUFFER_TTL"))
+	if raw == "" {
+		return defaultMongoStepBufferTTL
+	}
+
+	if duration, err := time.ParseDuration(raw); err == nil && duration > 0 {
+		return duration
+	}
+
+	if seconds, err := strconv.Atoi(raw); err == nil && seconds > 0 {
+		return time.Duration(seconds) * time.Second
+	}
+
+	logger.Warn("invalid MONGO_STEP_BUFFER_TTL; using default", "value", raw, "default", defaultMongoStepBufferTTL.String())
+	return defaultMongoStepBufferTTL
 }
 
 // IsMongoDBURI checks if the provided DSN is a MongoDB URI
