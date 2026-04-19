@@ -41,9 +41,14 @@ func TestAggregateRunShardStatuses(t *testing.T) {
 			want:   "TIMEDOUT",
 		},
 		{
-			name:   "passed wins over skipped",
-			shards: []m.RunShard{{Status: "PASSED"}, {Status: "SKIPPED"}},
+			name:   "all passed required for passed",
+			shards: []m.RunShard{{Status: "PASSED"}, {Status: "PASSED"}},
 			want:   "PASSED",
+		},
+		{
+			name:   "interrupted wins when no failures",
+			shards: []m.RunShard{{Status: "PASSED"}, {Status: "INTERRUPTED"}},
+			want:   "INTERRUPTED",
 		},
 		{
 			name:   "unknown fallback",
@@ -70,7 +75,7 @@ func TestBuildAggregatedRunFromShards(t *testing.T) {
 
 	run, ok := buildAggregatedRunFromShards("run-123", []m.RunShard{
 		{ShardIndex: &shardOne, Status: "PASSED", StartTime: &start, EndTime: &finish},
-		{ShardIndex: &shardTwo, Status: "SKIPPED", StartTime: &finish, EndTime: &finishLater},
+		{ShardIndex: &shardTwo, Status: "INTERRUPTED", StartTime: &finish, EndTime: &finishLater},
 	}, time.Now())
 	if !ok {
 		t.Fatal("expected aggregated run")
@@ -78,8 +83,8 @@ func TestBuildAggregatedRunFromShards(t *testing.T) {
 	if run.ID != "run-123" {
 		t.Fatalf("ID = %q, want run-123", run.ID)
 	}
-	if run.Status != "PASSED" {
-		t.Fatalf("Status = %q, want PASSED", run.Status)
+	if run.Status != "INTERRUPTED" {
+		t.Fatalf("Status = %q, want INTERRUPTED", run.Status)
 	}
 	if run.StartTime == nil || !run.StartTime.Equal(start) {
 		t.Fatalf("StartTime = %v, want %v", run.StartTime, start)

@@ -199,28 +199,28 @@ func buildAggregatedRunFromShards(runID string, shards []m.RunShard, now time.Ti
 }
 
 func aggregateRunShardStatuses(shards []m.RunShard) string {
+	if len(shards) == 0 {
+		return "UNKNOWN"
+	}
+
 	statusCounts := make(map[string]int)
 	for _, shard := range shards {
 		statusCounts[shard.Status]++
 	}
 
 	switch {
+	case statusCounts["PASSED"] == len(shards):
+		return "PASSED"
+	case statusCounts["RUNNING"] > 0:
+		return "RUNNING"
+	case statusCounts["NOT_RUN"] > 0:
+		return "RUNNING"
 	case statusCounts["FAILED"] > 0:
 		return "FAILED"
-	case statusCounts["BROKEN"] > 0:
-		return "BROKEN"
 	case statusCounts["TIMEDOUT"] > 0:
 		return "TIMEDOUT"
 	case statusCounts["INTERRUPTED"] > 0:
 		return "INTERRUPTED"
-	case statusCounts["RUNNING"] > 0:
-		return "RUNNING"
-	case statusCounts["PASSED"] > 0:
-		return "PASSED"
-	case statusCounts["SKIPPED"] > 0:
-		return "SKIPPED"
-	case statusCounts["NOT_RUN"] > 0:
-		return "NOT_RUN"
 	default:
 		return "UNKNOWN"
 	}
