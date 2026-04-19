@@ -139,6 +139,73 @@ func TestPostgresHandleRunDetail(t *testing.T) {
 	}
 }
 
+func TestPostgresHandleTestDetailByRunAndTest_UsesLiveMongoForRunningSteps(t *testing.T) {
+	handler, db := setupPostgresHandler(t)
+	now := time.Date(2026, 4, 19, 15, 0, 0, 0, time.UTC)
+	suiteID := "suite-1"
+	retryIndex := int32(0)
+	stepStart := now.Add(5 * time.Second)
+	stepDuration := int64(3 * time.Second)
+
+	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Release", Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
+	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: now, UpdatedAt: now})
+	seedTests(t, db, m.Test{ID: "test-1", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test", Title: "Suite Test", Status: "RUNNING", RetryIndex: &retryIndex, CreatedAt: now, UpdatedAt: now})
+	seedAttempts(t, db, m.TestAttempt{ID: "test-1:0", RunID: "run-1", TestID: "test-1", AttemptIndex: 0, Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
+
+	handler.SetLiveRunRepo(fakeLiveRunRepo{doc: &m.TestRunDocument{
+		ID: "run-1",
+		Suites: []*m.SuiteDocument{{
+			ID: suiteID,
+			Tests: []*m.TestDocument{{
+				ID:         "test-1",
+				Status:     "RUNNING",
+				RetryIndex: &retryIndex,
+				Steps: []*m.StepDocument{{
+					ID:        "step-1",
+					Title:     "Live step",
+					Status:    "RUNNING",
+					StartTime: &stepStart,
+					Duration:  &stepDuration,
+				}},
+				Attempts: []*m.AttemptDocument{{
+					RetryIndex: 0,
+					Status:     "RUNNING",
+					Steps: []*m.StepDocument{{
+						ID:     "step-1",
+						Title:  "Live step",
+						Status: "RUNNING",
+					}},
+				}},
+			}},
+		}},
+	}})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/run-1/tests/test-1", nil)
+	rec := httptest.NewRecorder()
+	handler.handleTestDetailByRunAndTest(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var response struct {
+		RunID string            `json:"runId"`
+		Tests []*m.TestDocument `json:"tests"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.RunID != "run-1" || len(response.Tests) != 1 {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+	if len(response.Tests[0].Steps) != 1 || response.Tests[0].Steps[0].Title != "Live step" {
+		t.Fatalf("expected live steps from Mongo-backed source, got %+v", response.Tests[0].Steps)
+	}
+	if len(response.Tests[0].Attempts) != 1 || len(response.Tests[0].Attempts[0].Steps) != 1 {
+		t.Fatalf("expected live attempt details from Mongo-backed source, got %+v", response.Tests[0].Attempts)
+	}
+}
+
 func TestPostgresHandleDeleteRuns(t *testing.T) {
 	handler, db := setupPostgresHandler(t)
 	now := time.Date(2026, 4, 19, 14, 0, 0, 0, time.UTC)
@@ -254,4 +321,13 @@ func assertRecordCount(t *testing.T, db *gorm.DB, model interface{}, column, val
 	if count != want {
 		t.Fatalf("count %T for %s=%s = %d, want %d", model, column, value, count, want)
 	}
+}
+
+type fakeLiveRunRepo struct {
+	doc *m.TestRunDocument
+	err error
+}
+
+func (f fakeLiveRunRepo) GetTestRun(_ context.Context, _ string) (*m.TestRunDocument, error) {
+	return f.doc, f.err
 }

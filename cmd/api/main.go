@@ -23,12 +23,11 @@ import (
 
 func main() {
 	port := flag.String("port", envOr("PORT", "8080"), "HTTP port to listen on")
-	rawMsgCollection := flag.String("raw-messages-collection", envOr("RAW_MESSAGES_COLLECTION", "raw_messages"), "MongoDB collection for retained raw messages (overrides RAW_MESSAGES_COLLECTION env var)")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Connect to MongoDB (optional when PostgreSQL-backed REST routes are enabled).
+	// Connect to MongoDB optionally for live running-test detail enrichment.
 	mongoDB, err := database.ConnectMongoDBFromEnv(logger)
 	if err != nil {
 		logger.Error("mongodb connect failed", "error", err)
@@ -38,25 +37,21 @@ func main() {
 		logger.Info("mongodb connection available for API")
 	}
 
-	// Connect to PostgreSQL (optional — API continues without it).
+	// Connect to PostgreSQL (required for the REST API).
 	pgDB, err := database.ConnectPostgresFromEnv(logger)
 	if err != nil {
 		logger.Error("postgres connect failed", "error", err)
 		os.Exit(1)
 	}
 	if pgDB == nil {
-		logger.Warn("POSTGRES_DSN / DATABASE_URL not set; PostgreSQL endpoints are disabled")
-	} else {
-		defer func() {
-			if closeErr := pgDB.Close(); closeErr != nil {
-				logger.Warn("failed to close postgres connection", "error", closeErr)
-			}
-		}()
-	}
-	if mongoDB == nil && pgDB == nil {
-		logger.Error("API requires at least one database backend; configure PostgreSQL for REST routes or MongoDB for legacy routes/raw messages")
+		logger.Error("POSTGRES_DSN / DATABASE_URL not set; PostgreSQL is required for the REST API")
 		os.Exit(1)
 	}
+	defer func() {
+		if closeErr := pgDB.Close(); closeErr != nil {
+			logger.Warn("failed to close postgres connection", "error", closeErr)
+		}
+	}()
 
 	// Ensure MongoDB connection cleanup
 	if mongoDB != nil {
@@ -68,30 +63,12 @@ func main() {
 	}
 
 	// Create database-backed handlers.
-	var repo *mongodb.MongoRepository
-	var mongoHandler *api.MongoHandler
+	var liveRunRepo *mongodb.MongoRepository
 	if mongoDB != nil {
-		repo = mongodb.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
-		mongoHandler = api.NewMongoHandler(repo, logger)
+		liveRunRepo = mongodb.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
+		logger.Info("mongodb live test detail enrichment enabled")
 	}
-	var pgRepo *postgres.PostgresRepository
-	if pgDB != nil {
-		pgRepo = postgres.NewPostgresRepository(pgDB.DB, logger)
-	}
-
-	// Attach raw message repository if the collection is reachable.
-	// The collection is always attempted; if it's empty (no retention data) the
-	// endpoint simply returns 404 per-request rather than refusing to start.
-	var rawMsgRepo *mongodb.RawMessageRepository
-	if mongoDB != nil {
-		rawMsgRepo = mongodb.NewRawMessageRepository(mongoDB.Collection(*rawMsgCollection), logger)
-		if mongoHandler != nil {
-			mongoHandler.SetRawMessageRepo(rawMsgRepo)
-		}
-		logger.Info("raw message audit endpoint enabled",
-			"collection", rawMsgRepo.CollectionName(),
-			"database", rawMsgRepo.DatabaseName())
-	}
+	pgRepo := postgres.NewPostgresRepository(pgDB.DB, logger)
 
 	// Initialize storage driver (optional)
 	storageDriver, err := storage.NewDriverFromEnv(logger)
@@ -111,18 +88,9 @@ func main() {
 		logger.Info("storage driver not configured; attachment retrieval will use inline storage only")
 	}
 
-	// Create attachment handler
-	var attachmentHandler *api.AttachmentHandler
-	if repo != nil {
-		attachmentHandler = api.NewAttachmentHandler(repo, storageDriver, logger)
-	}
-	var postgresHandler *api.PostgresHandler
-	var postgresAttachmentHandler *api.PostgresAttachmentHandler
-	if pgRepo != nil {
-		postgresHandler = api.NewPostgresHandler(pgRepo, logger)
-		postgresHandler.SetRawMessageRepo(rawMsgRepo)
-		postgresAttachmentHandler = api.NewPostgresAttachmentHandler(pgRepo, storageDriver, logger)
-	}
+	postgresHandler := api.NewPostgresHandler(pgRepo, logger)
+	postgresHandler.SetLiveRunRepo(liveRunRepo)
+	postgresAttachmentHandler := api.NewPostgresAttachmentHandler(pgRepo, storageDriver, logger)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub(logger)
@@ -188,17 +156,8 @@ func main() {
 	})
 
 	// REST API endpoints
-	if postgresHandler != nil {
-		postgresHandler.RegisterRoutes(router)
-		postgresAttachmentHandler.RegisterRoutes(router)
-	} else {
-		if mongoHandler == nil || attachmentHandler == nil {
-			logger.Error("MongoDB-backed API handlers are unavailable")
-			os.Exit(1)
-		}
-		mongoHandler.RegisterRoutes(router)
-		attachmentHandler.RegisterRoutes(router)
-	}
+	postgresHandler.RegisterRoutes(router)
+	postgresAttachmentHandler.RegisterRoutes(router)
 
 	addr := ":" + *port
 

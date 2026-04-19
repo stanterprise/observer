@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -9,14 +10,17 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	m "github.com/stanterprise/observer/internal/models"
-	mongoRepo "github.com/stanterprise/observer/internal/repository/mongodb"
 	pgRepo "github.com/stanterprise/observer/internal/repository/postgres"
 )
 
 type PostgresHandler struct {
-	repo           *pgRepo.PostgresRepository
-	rawMessageRepo *mongoRepo.RawMessageRepository
-	logger         *slog.Logger
+	repo        *pgRepo.PostgresRepository
+	liveRunRepo liveRunRepository
+	logger      *slog.Logger
+}
+
+type liveRunRepository interface {
+	GetTestRun(ctx context.Context, id string) (*m.TestRunDocument, error)
 }
 
 func NewPostgresHandler(repo *pgRepo.PostgresRepository, logger *slog.Logger) *PostgresHandler {
@@ -26,51 +30,21 @@ func NewPostgresHandler(repo *pgRepo.PostgresRepository, logger *slog.Logger) *P
 	return &PostgresHandler{repo: repo, logger: logger}
 }
 
-func (h *PostgresHandler) SetRawMessageRepo(r *mongoRepo.RawMessageRepository) {
-	h.rawMessageRepo = r
+func (h *PostgresHandler) SetLiveRunRepo(r liveRunRepository) {
+	h.liveRunRepo = r
 }
 
 func (h *PostgresHandler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/tests", h.handleTests)
 	r.Get("/api/tests/{testId}/trends", h.handleTestTrends)
 	r.Get("/api/runs", h.handleRuns)
-	r.Get("/api/raw-messages/runs", h.handleRawMessageRuns)
 	r.Get("/api/runs/stats", h.handleRunsStats)
 	r.Get("/api/runs/{runId}", h.handleRunDetail)
 	r.Get("/api/runs/{runId}/tests/{testId}", h.handleTestDetailByRunAndTest)
-	r.Get("/api/runs/{runId}/raw-messages", h.handleRawMessagesForRun)
 	r.Delete("/api/runs/delete", h.handleDeleteRuns)
 	r.Put("/api/runs/marker", h.handleUpdateMarker)
 	r.Get("/api/markers", h.handleMarkers)
 	r.Get("/api/marker/{markerValue}/stats", h.handleMarkerStats)
-}
-
-func (h *PostgresHandler) handleRawMessageRuns(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		h.methodNotAllowed(w)
-		return
-	}
-	if h.rawMessageRepo == nil {
-		h.notFound(w, "Message retention is not enabled")
-		return
-	}
-
-	limit, offset := parseLimitOffset(r, 50)
-	runs, total, err := h.rawMessageRepo.ListRunSummaries(r.Context(), limit, offset)
-	if err != nil {
-		h.logger.Error("failed to list raw message runs", "error", err)
-		h.internalError(w)
-		return
-	}
-
-	h.writeJSON(w, map[string]interface{}{
-		"runs": runs,
-		"pagination": map[string]interface{}{
-			"total":  total,
-			"limit":  limit,
-			"offset": offset,
-		},
-	})
 }
 
 func (h *PostgresHandler) handleTests(w http.ResponseWriter, r *http.Request) {
@@ -346,16 +320,6 @@ func (h *PostgresHandler) handleMarkerStats(w http.ResponseWriter, r *http.Reque
 		"count":  len(runs),
 	})
 }
-
-func (h *PostgresHandler) handleRawMessagesForRun(w http.ResponseWriter, r *http.Request) {
-	runID := routeParamOrPath(r, "runId", "/api/runs/", "/raw-messages")
-	if runID == "" {
-		h.badRequest(w, "Run ID required")
-		return
-	}
-	h.handleRawMessages(w, r, runID)
-}
-
 func (h *PostgresHandler) handleDeleteRuns(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
 		h.methodNotAllowed(w)
@@ -433,35 +397,6 @@ func (h *PostgresHandler) handleUpdateMarker(w http.ResponseWriter, r *http.Requ
 
 	h.writeJSON(w, response)
 }
-
-func (h *PostgresHandler) handleRawMessages(w http.ResponseWriter, r *http.Request, runID string) {
-	if r.Method != http.MethodGet {
-		h.methodNotAllowed(w)
-		return
-	}
-	if runID == "" {
-		h.badRequest(w, "Run ID required")
-		return
-	}
-	if h.rawMessageRepo == nil {
-		h.notFound(w, "Message retention is not enabled")
-		return
-	}
-
-	doc, err := h.rawMessageRepo.GetByRunID(r.Context(), runID)
-	if err != nil {
-		h.logger.Error("failed to fetch raw messages", "run_id", runID, "error", err)
-		h.internalError(w)
-		return
-	}
-	if doc == nil {
-		h.notFound(w, "No retained messages found for run")
-		return
-	}
-
-	h.writeJSON(w, doc)
-}
-
 func (h *PostgresHandler) writeJSON(w http.ResponseWriter, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(payload)
@@ -545,6 +480,102 @@ func findTestsInSuite(suite *m.SuiteDocument, testID string, found *[]*m.TestDoc
 			return
 		}
 	}
+}
+
+func (h *PostgresHandler) loadLiveRunningTestDetails(ctx context.Context, runID string, tests []*m.TestDocument) ([]*m.TestDocument, error) {
+	if h.liveRunRepo == nil || !needsLiveRunningDetails(tests) {
+		return nil, nil
+	}
+
+	liveDoc, err := h.liveRunRepo.GetTestRun(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+	if liveDoc == nil {
+		return nil, nil
+	}
+
+	liveTests := make([]*m.TestDocument, 0, len(tests))
+	for _, test := range tests {
+		liveMatches := findTestsInRun(liveDoc, test.ID)
+		if len(liveMatches) == 0 {
+			liveTests = append(liveTests, test)
+			continue
+		}
+		liveTests = append(liveTests, mergeLiveRunningTestDetails(test, liveMatches[0]))
+	}
+
+	return liveTests, nil
+}
+
+func needsLiveRunningDetails(tests []*m.TestDocument) bool {
+	for _, test := range tests {
+		if test != nil && (test.Status == "RUNNING" || test.Status == "") {
+			return true
+		}
+	}
+	return false
+}
+
+func mergeLiveRunningTestDetails(base, live *m.TestDocument) *m.TestDocument {
+	if base == nil {
+		return live
+	}
+	if live == nil {
+		return base
+	}
+
+	merged := *base
+	if live.Status != "" {
+		merged.Status = live.Status
+	}
+	if live.StartTime != nil {
+		merged.StartTime = live.StartTime
+	}
+	if live.EndTime != nil {
+		merged.EndTime = live.EndTime
+	}
+	if live.Duration != nil {
+		merged.Duration = live.Duration
+	}
+	if !live.UpdatedAt.IsZero() {
+		merged.UpdatedAt = live.UpdatedAt
+	}
+	if live.RetryIndex != nil {
+		merged.RetryIndex = live.RetryIndex
+	}
+	if len(live.Attempts) > 0 {
+		merged.Attempts = live.Attempts
+	}
+	if len(live.Steps) > 0 {
+		merged.Steps = live.Steps
+	}
+	if len(live.Attachments) > 0 {
+		merged.Attachments = live.Attachments
+	}
+	if len(live.Failures) > 0 {
+		merged.Failures = live.Failures
+	}
+	if len(live.Errors) > 0 {
+		merged.Errors = live.Errors
+	}
+	if len(live.ErrorList) > 0 {
+		merged.ErrorList = live.ErrorList
+	}
+	if len(live.StdOut) > 0 {
+		merged.StdOut = live.StdOut
+	}
+	if len(live.StdErr) > 0 {
+		merged.StdErr = live.StdErr
+	}
+	if live.ErrorMessage != "" {
+		merged.ErrorMessage = live.ErrorMessage
+	}
+	if live.StackTrace != "" {
+		merged.StackTrace = live.StackTrace
+	}
+
+	return &merged
 }
 
 func buildTestStatistics(tests []*m.TestDocument) map[string]int {
