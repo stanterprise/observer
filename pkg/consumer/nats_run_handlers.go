@@ -48,8 +48,15 @@ func (c *NATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) e
 	}
 
 	testRun := models.RunEndEventToTestRun(&req)
-
-	c.pgRepo.FinalizeRunEnd(ctx, testRun)
+	if runShard := models.RunEndEventToRunShard(&req); runShard != nil {
+		if _, err := c.pgRepo.FinalizeRunShardEnd(ctx, runShard); err != nil {
+			return fmt.Errorf("finalize run shard end: %w", err)
+		}
+	} else {
+		if err := c.pgRepo.FinalizeRunEnd(ctx, testRun); err != nil {
+			return fmt.Errorf("finalize run end: %w", err)
+		}
+	}
 
 	c.emitRunCompletenessSummary(req.RunId, req.FinalStatus.String())
 
@@ -135,8 +142,18 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 	}
 
 	testRun, _ := models.RunStartEventToTestRun(&req)
-
-	c.pgRepo.UpsertRunStart(ctx, testRun)
+	if runShard := models.RunStartEventToRunShard(&req); runShard != nil {
+		if err := c.pgRepo.UpsertRunStart(ctx, testRun); err != nil {
+			return fmt.Errorf("upsert run start: %w", err)
+		}
+		if err := c.pgRepo.UpsertRunShardStart(ctx, runShard); err != nil {
+			return fmt.Errorf("upsert run shard start: %w", err)
+		}
+	} else {
+		if err := c.pgRepo.UpsertRunStart(ctx, testRun); err != nil {
+			return fmt.Errorf("upsert run start: %w", err)
+		}
+	}
 	// TODO: upsert suites when this method is fully implemented.
 
 	return c.repo.MapSuites(ctx, req.RunId, req.Name, runMetadata, req.TotalTests, suites)

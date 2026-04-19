@@ -34,9 +34,8 @@ func (TestRun) TableName() string {
 // RunShard maps to the PostgreSQL run_shards table.
 type RunShard struct {
 	ID                 string     `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID              string     `gorm:"column:run_id;type:text;not null;index:idx_run_shards_run_status,priority:1;uniqueIndex:ux_run_shards_run_id_shard_key,priority:1" json:"runId"`
-	ShardKey           string     `gorm:"column:shard_key;type:text;not null;uniqueIndex:ux_run_shards_run_id_shard_key,priority:2" json:"shardKey"`
-	ShardIndex         *int32     `gorm:"column:shard_index" json:"shardIndex,omitempty"`
+	RunID              string     `gorm:"column:run_id;type:text;not null;index:idx_run_shards_run_status,priority:1;uniqueIndex:ux_run_shards_run_id_shard_index,priority:1" json:"runId"`
+	ShardIndex         *int32     `gorm:"column:shard_index;uniqueIndex:ux_run_shards_run_id_shard_index,priority:2" json:"shardIndex,omitempty"`
 	ShardCountExpected *int32     `gorm:"column:shard_count_expected" json:"shardCountExpected,omitempty"`
 	Status             string     `gorm:"column:status;type:text;index:idx_run_shards_run_status,priority:2" json:"status,omitempty"`
 	StartTime          *time.Time `gorm:"column:started_at" json:"startTime,omitempty"`
