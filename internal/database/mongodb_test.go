@@ -370,3 +370,72 @@ func TestEnsureLiveStepBufferIndexes(t *testing.T) {
 		t.Fatal("expected run_id index to be created")
 	}
 }
+
+func TestEnsureLiveStepBufferIndexesReconcilesLegacyTTLIndex(t *testing.T) {
+	ctx := context.Background()
+	mongoContainer, err := mongocontainer.RunContainer(ctx, testcontainers.WithImage("mongo:7.0"))
+	if err != nil {
+		t.Fatalf("RunContainer failed: %v", err)
+	}
+	defer mongoContainer.Terminate(ctx)
+
+	mongoURI, err := mongoContainer.ConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("ConnectionString failed: %v", err)
+	}
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		t.Fatalf("mongo.Connect failed: %v", err)
+	}
+	defer client.Disconnect(ctx)
+
+	dbName := "observer_legacy_index_test_" + time.Now().Format("20060102150405")
+	connection := &MongoDBConnection{
+		Client:   client,
+		Database: client.Database(dbName),
+		logger:   slog.New(slog.NewTextHandler(os.Stdout, nil)),
+	}
+
+	legacyTTLIndex := mongo.IndexModel{
+		Keys: bson.D{{Key: "ttl_at", Value: 1}},
+		Options: options.Index().
+			SetName("ttl_idx").
+			SetExpireAfterSeconds(900),
+	}
+
+	if _, err := connection.LiveStepBuffersCollection().Indexes().CreateOne(ctx, legacyTTLIndex); err != nil {
+		t.Fatalf("CreateOne legacy ttl index failed: %v", err)
+	}
+
+	if err := connection.EnsureLiveStepBufferIndexes(ctx); err != nil {
+		t.Fatalf("EnsureLiveStepBufferIndexes failed: %v", err)
+	}
+
+	indexes, err := listCollectionIndexes(ctx, connection.LiveStepBuffersCollection())
+	if err != nil {
+		t.Fatalf("listCollectionIndexes failed: %v", err)
+	}
+
+	var legacyFound, reconciledFound bool
+	for _, index := range indexes {
+		name, _ := index["name"].(string)
+		switch name {
+		case "ttl_idx":
+			legacyFound = true
+		case "live_step_buffers_ttl_at_ttl":
+			reconciledFound = true
+			expire, ok := extractInt64(index["expireAfterSeconds"])
+			if !ok || expire != 0 {
+				t.Fatalf("reconciled ttl index expireAfterSeconds = %v, want 0", index["expireAfterSeconds"])
+			}
+		}
+	}
+
+	if legacyFound {
+		t.Fatal("expected legacy ttl_idx index to be removed")
+	}
+	if !reconciledFound {
+		t.Fatal("expected live_step_buffers_ttl_at_ttl index to be created")
+	}
+}

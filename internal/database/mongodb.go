@@ -201,25 +201,136 @@ func (m *MongoDBConnection) EnsureLiveStepBufferIndexes(ctx context.Context) err
 		return fmt.Errorf("mongodb connection is not initialized")
 	}
 
-	models := []mongo.IndexModel{
-		{
-			Keys: bson.D{{Key: "ttl_at", Value: 1}},
-			Options: options.Index().
-				SetName("live_step_buffers_ttl_at_ttl").
-				SetExpireAfterSeconds(0),
-		},
-		{
-			Keys: bson.D{{Key: "run_id", Value: 1}},
-			Options: options.Index().
-				SetName("live_step_buffers_run_id_idx"),
-		},
+	if err := m.ensureLiveStepBufferTTLIndex(ctx); err != nil {
+		return err
 	}
 
-	if _, err := m.LiveStepBuffersCollection().Indexes().CreateMany(ctx, models); err != nil {
-		return fmt.Errorf("create live step buffer indexes: %w", err)
+	if err := m.ensureLiveStepBufferRunIDIndex(ctx); err != nil {
+		return err
 	}
 
 	return nil
+}
+
+func (m *MongoDBConnection) ensureLiveStepBufferTTLIndex(ctx context.Context) error {
+	collection := m.LiveStepBuffersCollection()
+	existingIndexes, err := listCollectionIndexes(ctx, collection)
+	if err != nil {
+		return fmt.Errorf("list live step buffer indexes: %w", err)
+	}
+
+	for _, index := range existingIndexes {
+		if !hasSingleFieldIndex(index["key"], "ttl_at") {
+			continue
+		}
+
+		expireAfterSeconds, ok := extractInt64(index["expireAfterSeconds"])
+		if ok && expireAfterSeconds == 0 {
+			return nil
+		}
+
+		name, _ := index["name"].(string)
+		if name == "" {
+			return fmt.Errorf("found incompatible live step buffer ttl index without a name")
+		}
+
+		if _, err := collection.Indexes().DropOne(ctx, name); err != nil {
+			return fmt.Errorf("drop incompatible live step buffer ttl index %q: %w", name, err)
+		}
+		break
+	}
+
+	model := mongo.IndexModel{
+		Keys: bson.D{{Key: "ttl_at", Value: 1}},
+		Options: options.Index().
+			SetName("live_step_buffers_ttl_at_ttl").
+			SetExpireAfterSeconds(0),
+	}
+
+	if _, err := collection.Indexes().CreateOne(ctx, model); err != nil {
+		return fmt.Errorf("create live step buffer ttl index: %w", err)
+	}
+
+	return nil
+}
+
+func (m *MongoDBConnection) ensureLiveStepBufferRunIDIndex(ctx context.Context) error {
+	collection := m.LiveStepBuffersCollection()
+	existingIndexes, err := listCollectionIndexes(ctx, collection)
+	if err != nil {
+		return fmt.Errorf("list live step buffer indexes: %w", err)
+	}
+
+	for _, index := range existingIndexes {
+		if hasSingleFieldIndex(index["key"], "run_id") {
+			return nil
+		}
+	}
+
+	model := mongo.IndexModel{
+		Keys: bson.D{{Key: "run_id", Value: 1}},
+		Options: options.Index().
+			SetName("live_step_buffers_run_id_idx"),
+	}
+
+	if _, err := collection.Indexes().CreateOne(ctx, model); err != nil {
+		return fmt.Errorf("create live step buffer run_id index: %w", err)
+	}
+
+	return nil
+}
+
+func listCollectionIndexes(ctx context.Context, collection *mongo.Collection) ([]bson.M, error) {
+	cursor, err := collection.Indexes().List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var indexes []bson.M
+	if err := cursor.All(ctx, &indexes); err != nil {
+		return nil, err
+	}
+
+	return indexes, nil
+}
+
+func hasSingleFieldIndex(rawKey interface{}, field string) bool {
+	switch key := rawKey.(type) {
+	case bson.M:
+		if len(key) != 1 {
+			return false
+		}
+		value, ok := key[field]
+		if !ok {
+			return false
+		}
+		order, ok := extractInt64(value)
+		return ok && order == 1
+	case bson.D:
+		if len(key) != 1 {
+			return false
+		}
+		order, ok := extractInt64(key[0].Value)
+		return key[0].Key == field && ok && order == 1
+	default:
+		return false
+	}
+}
+
+func extractInt64(value interface{}) (int64, bool) {
+	switch v := value.(type) {
+	case int:
+		return int64(v), true
+	case int32:
+		return int64(v), true
+	case int64:
+		return v, true
+	case float64:
+		return int64(v), true
+	default:
+		return 0, false
+	}
 }
 
 // MongoStepBufferTTL resolves the configured TTL for live step buffers. Invalid
