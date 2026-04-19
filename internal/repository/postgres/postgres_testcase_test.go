@@ -174,6 +174,75 @@ func TestAggregateTestAttemptStatuses(t *testing.T) {
 	}
 }
 
+func TestAppendTestFailureAndError(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	suiteID := "suite-123"
+	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+
+	test := &m.Test{
+		ID:         "test-123",
+		RunID:      "run-123",
+		SuiteID:    &suiteID,
+		Name:       "My Test",
+		Title:      "My Test",
+		Status:     "FAILED",
+		StartTime:  &start,
+		RetryCount: int32Ptr(1),
+		RetryIndex: int32Ptr(0),
+	}
+	attempt := &m.TestAttempt{
+		ID:           "test-123:0",
+		RunID:        "run-123",
+		TestID:       "test-123",
+		AttemptIndex: 0,
+		Status:       "FAILED",
+		StartTime:    &start,
+	}
+	if err := repo.UpsertTestBegin(ctx, test, attempt); err != nil {
+		t.Fatalf("seed attempt: %v", err)
+	}
+
+	failureTime := start.Add(time.Second)
+	failure := &m.TestFailureDocument{
+		FailureMessage: "assertion failed",
+		StackTrace:     "stack trace",
+		Timestamp:      &failureTime,
+		Attachments:    []map[string]interface{}{{"name": "failure.txt"}},
+	}
+	if err := repo.AppendTestFailure(ctx, "run-123", "test-123", 0, failure); err != nil {
+		t.Fatalf("AppendTestFailure failed: %v", err)
+	}
+
+	errorTime := start.Add(2 * time.Second)
+	errorDoc := &m.TestErrorDocument{
+		ErrorMessage: "stderr line",
+		StackTrace:   "error stack",
+		Timestamp:    &errorTime,
+		Attachments:  []map[string]interface{}{{"name": "error.txt"}},
+	}
+	if err := repo.AppendTestError(ctx, "run-123", "test-123", 0, errorDoc); err != nil {
+		t.Fatalf("AppendTestError failed: %v", err)
+	}
+
+	var storedAttempt m.TestAttempt
+	if err := repo.db.WithContext(ctx).Where("test_id = ? AND attempt_index = ?", "test-123", 0).First(&storedAttempt).Error; err != nil {
+		t.Fatalf("load stored attempt: %v", err)
+	}
+	if len(storedAttempt.Failures) != 1 || storedAttempt.Failures[0].FailureMessage != "assertion failed" {
+		t.Fatalf("stored failures = %+v, want assertion failed", storedAttempt.Failures)
+	}
+	if len(storedAttempt.Failures[0].Attachments) != 1 || storedAttempt.Failures[0].Attachments[0]["name"] != "failure.txt" {
+		t.Fatalf("stored failure attachments = %+v, want failure.txt", storedAttempt.Failures[0].Attachments)
+	}
+	if len(storedAttempt.Errors) != 1 || storedAttempt.Errors[0].ErrorMessage != "stderr line" {
+		t.Fatalf("stored errors = %+v, want stderr line", storedAttempt.Errors)
+	}
+	if len(storedAttempt.Errors[0].Attachments) != 1 || storedAttempt.Errors[0].Attachments[0]["name"] != "error.txt" {
+		t.Fatalf("stored error attachments = %+v, want error.txt", storedAttempt.Errors[0].Attachments)
+	}
+}
+
 func int64Ptr(value int64) *int64 {
 	converted := value
 	return &converted

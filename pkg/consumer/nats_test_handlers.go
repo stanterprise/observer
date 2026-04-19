@@ -238,6 +238,10 @@ func (c *NATSConsumer) handleTestFailure(ctx context.Context, data json.RawMessa
 		retryIndex = *testDoc.RetryIndex
 	}
 
+	if err := c.pgRepo.AppendTestFailure(ctx, req.RunId, req.TestId, retryIndex, &failure); err != nil {
+		return fmt.Errorf("append relational test failure: %w", err)
+	}
+
 	if err := c.repo.AppendTestFailure(ctx, req.RunId, req.TestId, retryIndex, failure); err != nil {
 		return fmt.Errorf("append test failure: %w", err)
 	}
@@ -304,6 +308,10 @@ func (c *NATSConsumer) handleTestError(ctx context.Context, data json.RawMessage
 	retryIndex := int32(0)
 	if testDoc.RetryIndex != nil {
 		retryIndex = *testDoc.RetryIndex
+	}
+
+	if err := c.pgRepo.AppendTestError(ctx, req.RunId, req.TestId, retryIndex, &errorDoc); err != nil {
+		return fmt.Errorf("append relational test error: %w", err)
 	}
 
 	if err := c.repo.AppendTestError(ctx, req.RunId, req.TestId, retryIndex, errorDoc); err != nil {
