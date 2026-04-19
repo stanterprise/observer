@@ -142,6 +142,7 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 	}
 
 	testRun, relationalSuites := models.RunStartEventToTestRun(&req)
+	relationalTests := models.RunStartEventToTests(&req)
 	if runShard := models.RunStartEventToRunShard(&req); runShard != nil {
 		if err := c.pgRepo.UpsertRunStart(ctx, testRun); err != nil {
 			return fmt.Errorf("upsert run start: %w", err)
@@ -156,6 +157,9 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 	}
 	if err := c.pgRepo.UpsertRunStartSuites(ctx, relationalSuites); err != nil {
 		return fmt.Errorf("upsert run start suites: %w", err)
+	}
+	if err := c.pgRepo.UpsertRunStartTests(ctx, relationalTests); err != nil {
+		return fmt.Errorf("upsert run start tests: %w", err)
 	}
 
 	return c.repo.MapSuites(ctx, req.RunId, req.Name, runMetadata, req.TotalTests, suites)

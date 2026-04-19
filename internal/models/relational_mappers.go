@@ -33,6 +33,15 @@ func RunStartEventToTestRun(req *events.ReportRunStartEventRequest) (*TestRun, [
 	}, suites
 }
 
+// RunStartEventToTests maps embedded test cases in a run-start payload to relational test rows.
+func RunStartEventToTests(req *events.ReportRunStartEventRequest) []*Test {
+	if req == nil {
+		return nil
+	}
+
+	return flattenTestRuns(req.TestSuites)
+}
+
 // RunStartEventToRunShard maps run-level shard metadata to a RunShard row.
 // Returns nil when the run is not sharded or shard metadata is incomplete.
 func RunStartEventToRunShard(req *events.ReportRunStartEventRequest) *RunShard {
@@ -206,12 +215,97 @@ func flattenSingleSuite(protoSuite *entities.TestSuiteRun) []*Suite {
 	return suites
 }
 
+func flattenTestRuns(protoSuites []*entities.TestSuiteRun) []*Test {
+	tests := make([]*Test, 0)
+	for _, protoSuite := range protoSuites {
+		tests = append(tests, flattenTestsForSuite(protoSuite)...)
+	}
+	return tests
+}
+
+func flattenTestsForSuite(protoSuite *entities.TestSuiteRun) []*Test {
+	if protoSuite == nil {
+		return nil
+	}
+
+	now := time.Now()
+	tests := make([]*Test, 0, len(protoSuite.TestCases))
+	for _, protoTest := range protoSuite.TestCases {
+		if protoTest == nil {
+			continue
+		}
+
+		metadata := stringMapToInterfaceMap(protoTest.Metadata)
+		var suiteID *string
+		if protoTest.TestSuiteId != "" {
+			suiteID = &protoTest.TestSuiteId
+		} else if protoSuite.Id != "" {
+			suiteID = &protoSuite.Id
+		}
+
+		var startTime *time.Time
+		if protoTest.StartTime != nil {
+			t := protoTest.StartTime.AsTime()
+			startTime = &t
+		}
+
+		var endTime *time.Time
+		if protoTest.EndTime != nil {
+			t := protoTest.EndTime.AsTime()
+			endTime = &t
+		}
+
+		var duration *int64
+		if protoTest.Duration != nil {
+			d := protoTest.Duration.AsDuration().Nanoseconds()
+			duration = &d
+		}
+
+		retryCount := protoInt32Ptr(protoTest.RetryCount)
+		retryIndex := protoInt32Ptr(protoTest.RetryIndex)
+		timeout := protoInt32Ptr(protoTest.Timeout)
+
+		test := &Test{
+			ID:          protoTest.Id,
+			RunID:       protoTest.RunId,
+			SuiteID:     suiteID,
+			Name:        protoTest.Name,
+			Title:       protoTest.Name,
+			Description: protoTest.Description,
+			Status:      protoTest.Status.String(),
+			StartTime:   startTime,
+			EndTime:     endTime,
+			Duration:    duration,
+			Metadata:    metadata,
+			Tags:        protoTest.Tags,
+			Location:    protoTest.Location,
+			RetryCount:  retryCount,
+			RetryIndex:  retryIndex,
+			Timeout:     timeout,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		 tests = append(tests, test)
+	}
+
+	for _, childSuite := range protoSuite.SubSuites {
+		tests = append(tests, flattenTestsForSuite(childSuite)...)
+	}
+
+	return tests
+}
+
 func stringMapToInterfaceMap(metadata map[string]string) map[string]interface{} {
 	converted := make(map[string]interface{}, len(metadata))
 	for k, v := range metadata {
 		converted[k] = v
 	}
 	return converted
+}
+
+func protoInt32Ptr(value int32) *int32 {
+	converted := value
+	return &converted
 }
 
 func firstInt32Metadata(metadata map[string]string, keys ...string) *int32 {

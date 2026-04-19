@@ -124,6 +124,55 @@ func (r *PostgresRepository) UpsertRunStartSuites(ctx context.Context, suites []
 	})
 }
 
+// UpsertRunStartTests upserts test rows emitted in the run-start payload.
+func (r *PostgresRepository) UpsertRunStartTests(ctx context.Context, tests []*m.Test) error {
+	if err := r.ensureDB(); err != nil {
+		return err
+	}
+
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		for _, test := range tests {
+			if test == nil {
+				continue
+			}
+			if err := repository.ValidateRunID(test.RunID); err != nil {
+				return err
+			}
+			test.CreatedAt = now
+			test.UpdatedAt = now
+
+			result := tx.
+				Where(m.Test{ID: test.ID}).
+				Assign(m.Test{
+					RunID:       test.RunID,
+					SuiteID:     test.SuiteID,
+					Name:        test.Name,
+					Title:       test.Title,
+					Description: test.Description,
+					Status:      test.Status,
+					StartTime:   test.StartTime,
+					EndTime:     test.EndTime,
+					Duration:    test.Duration,
+					Metadata:    test.Metadata,
+					Tags:        test.Tags,
+					Location:    test.Location,
+					RetryCount:  test.RetryCount,
+					RetryIndex:  test.RetryIndex,
+					Timeout:     test.Timeout,
+					UpdatedAt:   now,
+					CreatedAt:   now,
+				}).
+				FirstOrCreate(test)
+			if result.Error != nil {
+				return fmt.Errorf("upsert run start test %s: %w", test.ID, result.Error)
+			}
+		}
+
+		return nil
+	})
+}
+
 // UpsertRunShardStart upserts a run shard row derived from run-level shard metadata.
 func (r *PostgresRepository) UpsertRunShardStart(ctx context.Context, shard *m.RunShard) error {
 	if shard == nil {

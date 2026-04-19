@@ -155,3 +155,62 @@ func TestRunStartEventToTestRun_FlattensSuitesAndUsesSuiteMetadata(t *testing.T)
 		t.Fatalf("child suite metadata = %+v, want child metadata", suites[1].Metadata)
 	}
 }
+
+func TestRunStartEventToTests_FlattensNestedTests(t *testing.T) {
+	req := &events.ReportRunStartEventRequest{
+		RunId: "run-123",
+		TestSuites: []*entities.TestSuiteRun{
+			{
+				Id:    "suite-root",
+				RunId: "run-123",
+				TestCases: []*entities.TestCaseRun{
+					{
+						Id:          "test-root",
+						RunId:       "run-123",
+						TestSuiteId: "suite-root",
+						Name:        "Root Test",
+						Metadata: map[string]string{
+							"test_level": "root",
+						},
+						RetryCount: 1,
+						RetryIndex: 0,
+					},
+				},
+				SubSuites: []*entities.TestSuiteRun{
+					{
+						Id:            "suite-child",
+						RunId:         "run-123",
+						ParentSuiteId: "suite-root",
+						TestCases: []*entities.TestCaseRun{
+							{
+								Id:    "test-child",
+								RunId: "run-123",
+								Name:  "Child Test",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := RunStartEventToTests(req)
+	if len(tests) != 2 {
+		t.Fatalf("len(tests) = %d, want 2", len(tests))
+	}
+	if tests[0].SuiteID == nil || *tests[0].SuiteID != "suite-root" {
+		t.Fatalf("root test suiteID = %v, want suite-root", tests[0].SuiteID)
+	}
+	if tests[0].Metadata["test_level"] != "root" {
+		t.Fatalf("root test metadata = %+v, want test metadata", tests[0].Metadata)
+	}
+	if tests[0].RetryCount == nil || *tests[0].RetryCount != 1 {
+		t.Fatalf("root test retryCount = %v, want 1", tests[0].RetryCount)
+	}
+	if tests[0].RetryIndex == nil || *tests[0].RetryIndex != 0 {
+		t.Fatalf("root test retryIndex = %v, want 0", tests[0].RetryIndex)
+	}
+	if tests[1].SuiteID == nil || *tests[1].SuiteID != "suite-child" {
+		t.Fatalf("child test suiteID = %v, want suite-child", tests[1].SuiteID)
+	}
+}
