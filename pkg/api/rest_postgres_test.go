@@ -1,0 +1,192 @@
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	m "github.com/stanterprise/observer/internal/models"
+	pgRepo "github.com/stanterprise/observer/internal/repository/postgres"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+func TestPostgresHandleMarkers(t *testing.T) {
+	handler, db := setupPostgresHandler(t)
+	now := time.Date(2026, 4, 18, 10, 0, 0, 0, time.UTC)
+	seedRuns(t, db,
+		m.TestRun{ID: "run-1", Name: "Run 1", Metadata: map[string]interface{}{"MARKER": "release-1.0"}, CreatedAt: now, UpdatedAt: now},
+		m.TestRun{ID: "run-2", Name: "Run 2", Metadata: map[string]interface{}{"MARKER": "release-1.0"}, CreatedAt: now.Add(time.Minute), UpdatedAt: now.Add(time.Minute)},
+		m.TestRun{ID: "run-3", Name: "Run 3", Metadata: map[string]interface{}{"MARKER": "nightly"}, CreatedAt: now.Add(2 * time.Minute), UpdatedAt: now.Add(2 * time.Minute)},
+		m.TestRun{ID: "run-4", Name: "Run 4", Metadata: map[string]interface{}{"environment": "staging"}, CreatedAt: now.Add(3 * time.Minute), UpdatedAt: now.Add(3 * time.Minute)},
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/markers", nil)
+	rec := httptest.NewRecorder()
+	handler.handleMarkers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var response struct {
+		Markers []struct {
+			Marker string `json:"marker"`
+			Count  int64  `json:"count"`
+		} `json:"markers"`
+		Count int `json:"count"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Count != 2 {
+		t.Fatalf("expected 2 unique markers, got %d", response.Count)
+	}
+	if len(response.Markers) != 2 {
+		t.Fatalf("expected 2 marker rows, got %d", len(response.Markers))
+	}
+	if response.Markers[0].Marker != "release-1.0" || response.Markers[0].Count != 2 {
+		t.Fatalf("unexpected first marker row: %+v", response.Markers[0])
+	}
+}
+
+func TestPostgresHandleRuns(t *testing.T) {
+	handler, db := setupPostgresHandler(t)
+	now := time.Date(2026, 4, 18, 11, 0, 0, 0, time.UTC)
+	suiteID := "suite-1"
+	suiteID2 := "suite-2"
+	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Release", Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
+	seedSuites(t, db,
+		m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: now, UpdatedAt: now},
+		m.Suite{ID: suiteID2, RunID: "run-1", Name: "Suite 2", CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)},
+	)
+	seedTests(t, db,
+		m.Test{ID: "test-root", RunID: "run-1", SuiteID: &suiteID2, Name: "Root Test", Title: "Root Test", Status: "PASSED", CreatedAt: now, UpdatedAt: now},
+		m.Test{ID: "test-suite", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test", Title: "Suite Test", Status: "FAILED", CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)},
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs", nil)
+	rec := httptest.NewRecorder()
+	handler.handleRuns(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var response struct {
+		Runs []struct {
+			ID         string                 `json:"id"`
+			Name       string                 `json:"name"`
+			TotalTests int                    `json:"totalTests"`
+			Statistics map[string]interface{} `json:"statistics"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(response.Runs) != 1 {
+		t.Fatalf("expected 1 run, got %d", len(response.Runs))
+	}
+	if response.Runs[0].ID != "run-1" || response.Runs[0].TotalTests != 2 {
+		t.Fatalf("unexpected run summary: %+v", response.Runs[0])
+	}
+	if got := int(response.Runs[0].Statistics["passed"].(float64)); got != 1 {
+		t.Fatalf("passed count = %d, want 1", got)
+	}
+	if got := int(response.Runs[0].Statistics["failed"].(float64)); got != 1 {
+		t.Fatalf("failed count = %d, want 1", got)
+	}
+}
+
+func TestPostgresHandleRunDetail(t *testing.T) {
+	handler, db := setupPostgresHandler(t)
+	now := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+	suiteID := "suite-1"
+	retryIndex := int32(0)
+	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Release", Status: "PASSED", CreatedAt: now, UpdatedAt: now})
+	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: now, UpdatedAt: now})
+	seedTests(t, db, m.Test{ID: "test-1", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test", Title: "Suite Test", Status: "PASSED", RetryIndex: &retryIndex, CreatedAt: now, UpdatedAt: now})
+	seedAttempts(t, db, m.TestAttempt{ID: "test-1:0", RunID: "run-1", TestID: "test-1", AttemptIndex: 0, Status: "PASSED", Attachments: []map[string]interface{}{{"name": "trace.txt", "storage": "inline", "content": "dGVzdA==", "content_encoding": "base64"}}, CreatedAt: now, UpdatedAt: now})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/run-1", nil)
+	rec := httptest.NewRecorder()
+	handler.handleRunDetail(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var response m.TestRunDocument
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.ID != "run-1" {
+		t.Fatalf("run id = %q, want run-1", response.ID)
+	}
+	if len(response.Suites) != 1 || len(response.Suites[0].Tests) != 1 {
+		t.Fatalf("unexpected suite/test nesting: %+v", response.Suites)
+	}
+	if len(response.Suites[0].Tests[0].Attempts) != 1 {
+		t.Fatalf("expected 1 attempt, got %+v", response.Suites[0].Tests[0].Attempts)
+	}
+	if len(response.Suites[0].Tests[0].Attachments) != 1 {
+		t.Fatalf("expected current-attempt attachments on test document, got %+v", response.Suites[0].Tests[0].Attachments)
+	}
+}
+
+func setupPostgresHandler(t *testing.T) (*PostgresHandler, *gorm.DB) {
+	t.Helper()
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite db: %v", err)
+	}
+	if err := db.AutoMigrate(modelsForPostgresHandlerTests()...); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+	repo := pgRepo.NewPostgresRepository(db, nil)
+	return NewPostgresHandler(repo, nil), db
+}
+
+func modelsForPostgresHandlerTests() []interface{} {
+	return []interface{}{
+		&m.TestRun{},
+		&m.RunShard{},
+		&m.Suite{},
+		&m.Test{},
+		&m.TestAttempt{},
+		&m.Attachment{},
+	}
+}
+
+func seedRuns(t *testing.T, db *gorm.DB, runs ...m.TestRun) {
+	t.Helper()
+	if err := db.WithContext(context.Background()).Create(&runs).Error; err != nil {
+		t.Fatalf("seed runs: %v", err)
+	}
+}
+
+func seedSuites(t *testing.T, db *gorm.DB, suites ...m.Suite) {
+	t.Helper()
+	if err := db.WithContext(context.Background()).Create(&suites).Error; err != nil {
+		t.Fatalf("seed suites: %v", err)
+	}
+}
+
+func seedTests(t *testing.T, db *gorm.DB, tests ...m.Test) {
+	t.Helper()
+	if err := db.WithContext(context.Background()).Create(&tests).Error; err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+}
+
+func seedAttempts(t *testing.T, db *gorm.DB, attempts ...m.TestAttempt) {
+	t.Helper()
+	if err := db.WithContext(context.Background()).Create(&attempts).Error; err != nil {
+		t.Fatalf("seed attempts: %v", err)
+	}
+}

@@ -13,6 +13,7 @@ import (
 
 	"github.com/stanterprise/observer/internal/database"
 	"github.com/stanterprise/observer/internal/repository/mongodb"
+	"github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/api"
 	"github.com/stanterprise/observer/pkg/storage"
 	"github.com/stanterprise/observer/pkg/websocket"
@@ -25,18 +26,15 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Connect to MongoDB
+	// Connect to MongoDB (optional when PostgreSQL-backed REST routes are enabled).
 	mongoDB, err := database.ConnectMongoDBFromEnv(logger)
 	if err != nil {
 		logger.Error("mongodb connect failed", "error", err)
 		os.Exit(1)
 	}
-	if mongoDB == nil {
-		logger.Error("MONGODB_URI or MONGO_URI not set; API requires MongoDB")
-		os.Exit(1)
+	if mongoDB != nil {
+		logger.Info("mongodb connection available for API")
 	}
-
-	logger.Info("using MongoDB backend for API")
 
 	// Connect to PostgreSQL (optional — API continues without it).
 	pgDB, err := database.ConnectPostgresFromEnv(logger)
@@ -53,26 +51,45 @@ func main() {
 			}
 		}()
 	}
+	if mongoDB == nil && pgDB == nil {
+		logger.Error("API requires at least one database backend; configure PostgreSQL for REST routes or MongoDB for legacy routes/raw messages")
+		os.Exit(1)
+	}
 
 	// Ensure MongoDB connection cleanup
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		mongoDB.Close(ctx)
-	}()
+	if mongoDB != nil {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			mongoDB.Close(ctx)
+		}()
+	}
 
-	// Create MongoDB repository and handler
-	repo := mongodb.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
-	mongoHandler := api.NewMongoHandler(repo, logger)
+	// Create database-backed handlers.
+	var repo *mongodb.MongoRepository
+	var mongoHandler *api.MongoHandler
+	if mongoDB != nil {
+		repo = mongodb.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
+		mongoHandler = api.NewMongoHandler(repo, logger)
+	}
+	var pgRepo *postgres.PostgresRepository
+	if pgDB != nil {
+		pgRepo = postgres.NewPostgresRepository(pgDB.DB, logger)
+	}
 
 	// Attach raw message repository if the collection is reachable.
 	// The collection is always attempted; if it's empty (no retention data) the
 	// endpoint simply returns 404 per-request rather than refusing to start.
-	rawMsgRepo := mongodb.NewRawMessageRepository(mongoDB.Collection(*rawMsgCollection), logger)
-	mongoHandler.SetRawMessageRepo(rawMsgRepo)
-	logger.Info("raw message audit endpoint enabled",
-		"collection", rawMsgRepo.CollectionName(),
-		"database", rawMsgRepo.DatabaseName())
+	var rawMsgRepo *mongodb.RawMessageRepository
+	if mongoDB != nil {
+		rawMsgRepo = mongodb.NewRawMessageRepository(mongoDB.Collection(*rawMsgCollection), logger)
+		if mongoHandler != nil {
+			mongoHandler.SetRawMessageRepo(rawMsgRepo)
+		}
+		logger.Info("raw message audit endpoint enabled",
+			"collection", rawMsgRepo.CollectionName(),
+			"database", rawMsgRepo.DatabaseName())
+	}
 
 	// Initialize storage driver (optional)
 	storageDriver, err := storage.NewDriverFromEnv(logger)
@@ -93,7 +110,17 @@ func main() {
 	}
 
 	// Create attachment handler
-	attachmentHandler := api.NewAttachmentHandler(repo, storageDriver, logger)
+	var attachmentHandler *api.AttachmentHandler
+	if repo != nil {
+		attachmentHandler = api.NewAttachmentHandler(repo, storageDriver, logger)
+	}
+	var postgresHandler *api.PostgresHandler
+	var postgresAttachmentHandler *api.PostgresAttachmentHandler
+	if pgRepo != nil {
+		postgresHandler = api.NewPostgresHandler(pgRepo, logger)
+		postgresHandler.SetRawMessageRepo(rawMsgRepo)
+		postgresAttachmentHandler = api.NewPostgresAttachmentHandler(pgRepo, storageDriver, logger)
+	}
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub(logger)
@@ -162,8 +189,17 @@ func main() {
 	})
 
 	// REST API endpoints
-	mongoHandler.RegisterRoutes(mux)
-	attachmentHandler.RegisterRoutes(mux)
+	if postgresHandler != nil {
+		postgresHandler.RegisterRoutes(mux)
+		postgresAttachmentHandler.RegisterRoutes(mux)
+	} else {
+		if mongoHandler == nil || attachmentHandler == nil {
+			logger.Error("MongoDB-backed API handlers are unavailable")
+			os.Exit(1)
+		}
+		mongoHandler.RegisterRoutes(mux)
+		attachmentHandler.RegisterRoutes(mux)
+	}
 
 	addr := ":" + *port
 

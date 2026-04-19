@@ -113,6 +113,15 @@ func (h *AttachmentHandler) handleAttachment(w http.ResponseWriter, r *http.Requ
 
 // handleInlineAttachment serves inline attachment content
 func (h *AttachmentHandler) handleInlineAttachment(w http.ResponseWriter, r *http.Request, attachment map[string]interface{}) {
+	handleInlineAttachment(w, h.logger, attachment)
+}
+
+// handleProxyAttachment proxies attachment content through the API
+func (h *AttachmentHandler) handleProxyAttachment(w http.ResponseWriter, r *http.Request, storageKey string, attachment map[string]interface{}) {
+	handleProxyAttachment(w, r, h.storageDriver, h.logger, storageKey, attachment)
+}
+
+func handleInlineAttachment(w http.ResponseWriter, logger *slog.Logger, attachment map[string]interface{}) {
 	content, ok := attachment["content"].(string)
 	if !ok || content == "" {
 		http.Error(w, "Inline content not found", http.StatusInternalServerError)
@@ -123,20 +132,17 @@ func (h *AttachmentHandler) handleInlineAttachment(w http.ResponseWriter, r *htt
 	if encoding, ok := attachment["content_encoding"].(string); ok && encoding == "base64" {
 		decoded, err := base64.StdEncoding.DecodeString(content)
 		if err != nil {
-			h.logger.Error("failed to decode base64 attachment", "error", err)
+			logger.Error("failed to decode base64 attachment", "error", err)
 		} else {
 			contentBytes = decoded
 		}
 	}
 
-	// Set content type
 	if mimeType, ok := attachment["mime_type"].(string); ok && mimeType != "" {
 		w.Header().Set("Content-Type", mimeType)
 	} else {
 		w.Header().Set("Content-Type", "application/octet-stream")
 	}
-
-	// Set content disposition with filename
 	if name, ok := attachment["name"].(string); ok && name != "" {
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, name))
 	}
@@ -145,27 +151,20 @@ func (h *AttachmentHandler) handleInlineAttachment(w http.ResponseWriter, r *htt
 	w.Write(contentBytes)
 }
 
-// handleProxyAttachment proxies attachment content through the API
-func (h *AttachmentHandler) handleProxyAttachment(w http.ResponseWriter, r *http.Request, storageKey string, attachment map[string]interface{}) {
-	ctx := r.Context()
-
-	// Download from storage
-	reader, err := h.storageDriver.Download(ctx, storageKey)
+func handleProxyAttachment(w http.ResponseWriter, r *http.Request, storageDriver storage.Driver, logger *slog.Logger, storageKey string, attachment map[string]interface{}) {
+	reader, err := storageDriver.Download(r.Context(), storageKey)
 	if err != nil {
-		h.logger.Error("failed to download attachment", "storage_key", storageKey, "error", err)
+		logger.Error("failed to download attachment", "storage_key", storageKey, "error", err)
 		http.Error(w, "Failed to retrieve attachment", http.StatusInternalServerError)
 		return
 	}
 	defer reader.Close()
 
-	// Set content type
 	if mimeType, ok := attachment["mime_type"].(string); ok && mimeType != "" {
 		w.Header().Set("Content-Type", mimeType)
 	} else {
 		w.Header().Set("Content-Type", "application/octet-stream")
 	}
-
-	// Set content length if available
 	if rawSize, ok := attachment["size"]; ok {
 		var size int64
 		switch v := rawSize.(type) {
@@ -182,16 +181,13 @@ func (h *AttachmentHandler) handleProxyAttachment(w http.ResponseWriter, r *http
 			w.Header().Set("Content-Length", fmt.Sprintf("%d", size))
 		}
 	}
-
-	// Set content disposition with filename
 	if name, ok := attachment["name"].(string); ok && name != "" {
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, name))
 	}
 
-	// Stream the content
 	w.WriteHeader(http.StatusOK)
 	if _, err := io.Copy(w, reader); err != nil {
-		h.logger.Error("failed to stream attachment", "storage_key", storageKey, "error", err)
+		logger.Error("failed to stream attachment", "storage_key", storageKey, "error", err)
 	}
 }
 
