@@ -157,6 +157,8 @@ func modelsForSQLiteMigration() []interface{} {
 		&m.RunShard{},
 		&m.Suite{},
 		&m.Test{},
+		&m.TestAttempt{},
+		&m.Attachment{},
 	}
 }
 

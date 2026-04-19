@@ -214,3 +214,94 @@ func TestRunStartEventToTests_FlattensNestedTests(t *testing.T) {
 		t.Fatalf("child test suiteID = %v, want suite-child", tests[1].SuiteID)
 	}
 }
+
+func TestTestCaseRunToRelationalTest(t *testing.T) {
+	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+	end := start.Add(2 * time.Second)
+	req := &entities.TestCaseRun{
+		Id:          "test-123",
+		RunId:       "run-123",
+		TestSuiteId: "suite-123",
+		Name:        "My Test",
+		Description: "desc",
+		Status:      common.TestStatus_RUNNING,
+		StartTime:   timestamppb.New(start),
+		EndTime:     timestamppb.New(end),
+		Duration:    durationpb.New(2 * time.Second),
+		Metadata: map[string]string{
+			"browser": "chromium",
+		},
+		Tags:       []string{"smoke"},
+		Location:   "spec.ts:10",
+		RetryCount: 2,
+		RetryIndex: 1,
+		Timeout:    30000,
+	}
+
+	test := TestCaseRunToRelationalTest(req)
+	if test == nil {
+		t.Fatal("expected relational test mapping")
+	}
+	if test.ID != "test-123" || test.RunID != "run-123" {
+		t.Fatalf("unexpected identity mapping: %+v", test)
+	}
+	if test.SuiteID == nil || *test.SuiteID != "suite-123" {
+		t.Fatalf("SuiteID = %v, want suite-123", test.SuiteID)
+	}
+	if test.Status != common.TestStatus_RUNNING.String() {
+		t.Fatalf("Status = %q, want %q", test.Status, common.TestStatus_RUNNING.String())
+	}
+	if test.StartTime == nil || !test.StartTime.Equal(start) {
+		t.Fatalf("StartTime = %v, want %v", test.StartTime, start)
+	}
+	if test.EndTime == nil || !test.EndTime.Equal(end) {
+		t.Fatalf("EndTime = %v, want %v", test.EndTime, end)
+	}
+	if test.Duration == nil || *test.Duration != int64((2*time.Second).Nanoseconds()) {
+		t.Fatalf("Duration = %v, want %d", test.Duration, (2 * time.Second).Nanoseconds())
+	}
+	if test.Metadata["browser"] != "chromium" {
+		t.Fatalf("Metadata = %+v, want browser metadata", test.Metadata)
+	}
+	if test.RetryIndex == nil || *test.RetryIndex != 1 {
+		t.Fatalf("RetryIndex = %v, want 1", test.RetryIndex)
+	}
+}
+
+func TestTestCaseRunToRelationalAttempt(t *testing.T) {
+	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+	req := &entities.TestCaseRun{
+		Id:           "test-123",
+		RunId:        "run-123",
+		Status:       common.TestStatus_FAILED,
+		StartTime:    timestamppb.New(start),
+		ErrorMessage: "boom",
+		StackTrace:   "trace",
+		Errors:       []string{"boom", "stack"},
+		RetryIndex:   2,
+	}
+	attachments := []map[string]interface{}{{"name": "trace.txt"}}
+
+	attempt := TestCaseRunToRelationalAttempt(req, attachments)
+	if attempt == nil {
+		t.Fatal("expected relational attempt mapping")
+	}
+	if attempt.ID != "test-123:2" {
+		t.Fatalf("ID = %q, want test-123:2", attempt.ID)
+	}
+	if attempt.AttemptIndex != 2 {
+		t.Fatalf("AttemptIndex = %d, want 2", attempt.AttemptIndex)
+	}
+	if attempt.Status != common.TestStatus_FAILED.String() {
+		t.Fatalf("Status = %q, want %q", attempt.Status, common.TestStatus_FAILED.String())
+	}
+	if attempt.StartTime == nil || !attempt.StartTime.Equal(start) {
+		t.Fatalf("StartTime = %v, want %v", attempt.StartTime, start)
+	}
+	if len(attempt.Attachments) != 1 || attempt.Attachments[0]["name"] != "trace.txt" {
+		t.Fatalf("Attachments = %+v, want trace.txt attachment", attempt.Attachments)
+	}
+	if attempt.ErrorMessage != "boom" || attempt.StackTrace != "trace" {
+		t.Fatalf("unexpected error mapping: %+v", attempt)
+	}
+}

@@ -127,6 +127,105 @@ func RunEndEventToRunShard(req *events.TestRunEndEventRequest) *RunShard {
 	return shard
 }
 
+// TestCaseRunToRelationalTest maps a TestCaseRun payload to the relational tests row.
+func TestCaseRunToRelationalTest(protoTest *entities.TestCaseRun) *Test {
+	if protoTest == nil {
+		return nil
+	}
+
+	now := time.Now()
+	metadata := stringMapToInterfaceMap(protoTest.Metadata)
+
+	var suiteID *string
+	if protoTest.TestSuiteId != "" {
+		suiteID = &protoTest.TestSuiteId
+	}
+
+	var startTime *time.Time
+	if protoTest.StartTime != nil {
+		t := protoTest.StartTime.AsTime()
+		startTime = &t
+	}
+
+	var endTime *time.Time
+	if protoTest.EndTime != nil {
+		t := protoTest.EndTime.AsTime()
+		endTime = &t
+	}
+
+	var duration *int64
+	if protoTest.Duration != nil {
+		d := protoTest.Duration.AsDuration().Nanoseconds()
+		duration = &d
+	}
+
+	return &Test{
+		ID:          protoTest.Id,
+		RunID:       protoTest.RunId,
+		SuiteID:     suiteID,
+		Name:        protoTest.Name,
+		Title:       protoTest.Name,
+		Description: protoTest.Description,
+		Status:      protoTest.Status.String(),
+		StartTime:   startTime,
+		EndTime:     endTime,
+		Duration:    duration,
+		Metadata:    metadata,
+		Tags:        protoTest.Tags,
+		Location:    protoTest.Location,
+		RetryCount:  &protoTest.RetryCount,
+		RetryIndex:  &protoTest.RetryIndex,
+		Timeout:     &protoTest.Timeout,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+}
+
+// TestCaseRunToRelationalAttempt maps a TestCaseRun payload to the relational test_attempts row.
+func TestCaseRunToRelationalAttempt(protoTest *entities.TestCaseRun, attachments []map[string]interface{}) *TestAttempt {
+	if protoTest == nil {
+		return nil
+	}
+
+	now := time.Now()
+	attemptIndex := protoTest.RetryIndex
+
+	var startTime *time.Time
+	if protoTest.StartTime != nil {
+		t := protoTest.StartTime.AsTime()
+		startTime = &t
+	}
+
+	var endTime *time.Time
+	if protoTest.EndTime != nil {
+		t := protoTest.EndTime.AsTime()
+		endTime = &t
+	}
+
+	var duration *int64
+	if protoTest.Duration != nil {
+		d := protoTest.Duration.AsDuration().Nanoseconds()
+		duration = &d
+	}
+
+	return &TestAttempt{
+		ID:           buildTestAttemptID(protoTest.Id, attemptIndex),
+		RunID:        protoTest.RunId,
+		TestID:       protoTest.Id,
+		AttemptIndex: attemptIndex,
+		Status:       protoTest.Status.String(),
+		StartTime:    startTime,
+		EndTime:      endTime,
+		Duration:     duration,
+		Attachments:  attachments,
+		ErrorMessage: protoTest.ErrorMessage,
+		StackTrace:   protoTest.StackTrace,
+		ErrorList:    protoTest.Errors,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+}
+
 func parseRunShardMetadata(metadata map[string]string) (*int32, *int32) {
 	shardIndex := firstInt32Metadata(metadata,
 		"shard.current",
@@ -261,9 +360,9 @@ func flattenTestsForSuite(protoSuite *entities.TestSuiteRun) []*Test {
 			duration = &d
 		}
 
-		retryCount := protoInt32Ptr(protoTest.RetryCount)
-		retryIndex := protoInt32Ptr(protoTest.RetryIndex)
-		timeout := protoInt32Ptr(protoTest.Timeout)
+		retryCount := &protoTest.RetryCount
+		retryIndex := &protoTest.RetryIndex
+		timeout := &protoTest.Timeout
 
 		test := &Test{
 			ID:          protoTest.Id,
@@ -285,7 +384,7 @@ func flattenTestsForSuite(protoSuite *entities.TestSuiteRun) []*Test {
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}
-		 tests = append(tests, test)
+		tests = append(tests, test)
 	}
 
 	for _, childSuite := range protoSuite.SubSuites {
@@ -301,11 +400,6 @@ func stringMapToInterfaceMap(metadata map[string]string) map[string]interface{} 
 		converted[k] = v
 	}
 	return converted
-}
-
-func protoInt32Ptr(value int32) *int32 {
-	converted := value
-	return &converted
 }
 
 func firstInt32Metadata(metadata map[string]string, keys ...string) *int32 {
@@ -329,4 +423,8 @@ func firstInt32Metadata(metadata map[string]string, keys ...string) *int32 {
 
 func buildRunShardID(runID string, shardIndex *int32) string {
 	return runID + ":" + fmt.Sprintf("%d", *shardIndex)
+}
+
+func buildTestAttemptID(testID string, attemptIndex int32) string {
+	return fmt.Sprintf("%s:%d", testID, attemptIndex)
 }

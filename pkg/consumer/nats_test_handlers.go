@@ -97,6 +97,14 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 		// Fallback: if no TestSuiteRunId, use RunId as both
 		suiteID = runID
 	}
+	relationalTest := m.TestCaseRunToRelationalTest(req.TestCase)
+	if relationalTest != nil && relationalTest.SuiteID == nil {
+		relationalTest.SuiteID = &suiteID
+	}
+	relationalAttempt := m.TestCaseRunToRelationalAttempt(req.TestCase, attachments)
+	if err := c.pgRepo.UpsertTestBegin(ctx, relationalTest, relationalAttempt); err != nil {
+		return fmt.Errorf("upsert relational test begin: %w", err)
+	}
 
 	if err := c.repo.UpsertTestBegin(ctx, runID, test, suiteID); err != nil {
 		return err
@@ -161,6 +169,11 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 	}
 
 	runID := req.TestCase.RunId
+	relationalTest := m.TestCaseRunToRelationalTest(req.TestCase)
+	relationalAttempt := m.TestCaseRunToRelationalAttempt(req.TestCase, attachments)
+	if err := c.pgRepo.FinalizeTestEnd(ctx, relationalTest, relationalAttempt); err != nil {
+		return fmt.Errorf("finalize relational test end: %w", err)
+	}
 	return c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), req.TestCase.RetryIndex, endTime, duration, attachments)
 }
 
