@@ -28,6 +28,26 @@ func stepBufferField(testID string) string {
 	return "active_test_steps." + stepBufferKey(testID)
 }
 
+func liveStepBufferID(runID, testID string) string {
+	return runID + ":" + stepBufferKey(testID)
+}
+
+func newLiveStepBuffer(runID, testID string, retryIndex int32, eventTime, now time.Time, ttlAt time.Time) *m.LiveStepBufferDocument {
+	return &m.LiveStepBufferDocument{
+		ID:           liveStepBufferID(runID, testID),
+		RunID:        runID,
+		TestID:       testID,
+		AttemptIndex: retryIndex,
+		Status:       activeStepBufferStatusActive,
+		Steps:        []*m.StepDocument{},
+		FirstEventAt: &eventTime,
+		LastEventAt:  &eventTime,
+		TTLAt:        &ttlAt,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+}
+
 func (r *MongoRepository) SyncActiveTestSteps(ctx context.Context, runID, testID string, retryIndex int32, startTime *time.Time) error {
 	if err := repository.ValidateRunID(runID); err != nil {
 		return err
@@ -37,72 +57,154 @@ func (r *MongoRepository) SyncActiveTestSteps(ctx context.Context, runID, testID
 	}
 
 	now := time.Now()
-	eventTime := startTime
-	if eventTime == nil {
-		eventTime = &now
+	eventTime := now
+	if startTime != nil {
+		eventTime = *startTime
 	}
 	ttlAt := now.Add(db.MongoStepBufferTTL(r.logger))
+	bufferID := liveStepBufferID(runID, testID)
 
-	buffer := &m.ActiveTestStepsDocument{
-		TestID:       testID,
-		RetryIndex:   retryIndex,
-		Status:       activeStepBufferStatusActive,
-		Steps:        []*m.StepDocument{},
-		FirstEventAt: eventTime,
-		LastEventAt:  eventTime,
-		TTLAt:        &ttlAt,
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	}
-
-	field := stepBufferField(testID)
-	replaceFilter := bson.M{
-		"_id":      runID,
-		"tests.id": testID,
-		"$or": bson.A{
-			bson.M{field: bson.M{"$exists": false}},
-			bson.M{field + ".retry_index": bson.M{"$ne": retryIndex}},
-		},
-	}
-	replaceUpdate := bson.M{
-		"$set": bson.M{
-			field:        buffer,
-			"updated_at": now,
-		},
-	}
-
-	result, err := r.collection.UpdateOne(ctx, replaceFilter, replaceUpdate)
+	var existing m.LiveStepBufferDocument
+	err := r.collection.FindOne(ctx, bson.M{"_id": bufferID}).Decode(&existing)
 	if err != nil {
-		return fmt.Errorf("sync active test steps: %w", err)
+		if err == mongo.ErrNoDocuments {
+			_, insertErr := r.collection.InsertOne(ctx, newLiveStepBuffer(runID, testID, retryIndex, eventTime, now, ttlAt))
+			if insertErr != nil {
+				return fmt.Errorf("create active test steps buffer: %w", insertErr)
+			}
+			return nil
+		}
+		return fmt.Errorf("load active test steps buffer: %w", err)
 	}
-	if result.MatchedCount > 0 {
+
+	if existing.AttemptIndex != retryIndex {
+		replacement := newLiveStepBuffer(runID, testID, retryIndex, eventTime, now, ttlAt)
+		replacement.CreatedAt = existing.CreatedAt
+		if replacement.CreatedAt.IsZero() {
+			replacement.CreatedAt = now
+		}
+		if _, err := r.collection.ReplaceOne(ctx, bson.M{"_id": bufferID}, replacement); err != nil {
+			return fmt.Errorf("replace active test steps buffer: %w", err)
+		}
 		return nil
 	}
 
-	touchFilter := bson.M{
-		"_id":                  runID,
-		"tests.id":             testID,
-		field + ".retry_index": retryIndex,
+	existing.Status = activeStepBufferStatusActive
+	existing.LastEventAt = &eventTime
+	if existing.FirstEventAt == nil {
+		existing.FirstEventAt = &eventTime
 	}
-	touchUpdate := bson.M{
-		"$set": bson.M{
-			field + ".status":        activeStepBufferStatusActive,
-			field + ".last_event_at": eventTime,
-			field + ".ttl_at":        ttlAt,
-			field + ".updated_at":    now,
-			"updated_at":             now,
-		},
-		"$unset": bson.M{
-			field + ".flush_started_at": "",
-		},
+	existing.TTLAt = &ttlAt
+	existing.FlushStartedAt = nil
+	existing.UpdatedAt = now
+
+	if _, err := r.collection.ReplaceOne(ctx, bson.M{"_id": bufferID}, &existing); err != nil {
+		return fmt.Errorf("touch active test steps buffer: %w", err)
 	}
 
-	result, err = r.collection.UpdateOne(ctx, touchFilter, touchUpdate)
-	if err != nil {
-		return fmt.Errorf("touch active test steps: %w", err)
+	return nil
+}
+
+func (r *MongoRepository) UpsertStepBegin(ctx context.Context, runID string, step *m.StepDocument, testID string, retryIndex int32) error {
+	if err := repository.ValidateRunID(runID); err != nil {
+		return err
 	}
-	if result.MatchedCount == 0 {
-		return fmt.Errorf("parent test not found: runID=%s, testID=%s", runID, testID)
+	if step == nil {
+		return fmt.Errorf("step is required")
+	}
+	if testID == "" {
+		return fmt.Errorf("testID is required")
+	}
+
+	now := time.Now()
+	step.RunID = runID
+	step.TestCaseRunID = testID
+	step.RetryIndex = retryIndex
+	step.UpdatedAt = now
+	if step.CreatedAt.IsZero() {
+		step.CreatedAt = now
+	}
+	if step.Steps == nil {
+		step.Steps = []*m.StepDocument{}
+	}
+
+	buffer, err := r.loadLiveStepBuffer(ctx, runID, testID)
+	if err != nil {
+		return err
+	}
+	if buffer == nil || buffer.AttemptIndex != retryIndex {
+		return fmt.Errorf("active step buffer not found: runID=%s, testID=%s, retryIndex=%d", runID, testID, retryIndex)
+	}
+
+	buffer.Status = activeStepBufferStatusActive
+	buffer.LastEventAt = &now
+	ttlAt := now.Add(db.MongoStepBufferTTL(r.logger))
+	buffer.TTLAt = &ttlAt
+	buffer.UpdatedAt = now
+	upsertStepDocument(&buffer.Steps, step)
+
+	if err := r.saveLiveStepBuffer(ctx, buffer); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepID string, testID string, retryIndex int32, status string, metadata map[string]interface{}, errorMsg string, errors []string, duration *int64) error {
+	if err := repository.ValidateRunID(runID); err != nil {
+		return err
+	}
+	if stepID == "" {
+		return fmt.Errorf("stepID is required")
+	}
+	if testID == "" {
+		return fmt.Errorf("testID is required")
+	}
+
+	buffer, err := r.loadLiveStepBuffer(ctx, runID, testID)
+	if err != nil {
+		return err
+	}
+	if buffer == nil || buffer.AttemptIndex != retryIndex {
+		return fmt.Errorf("active step buffer not found: runID=%s, testID=%s, retryIndex=%d", runID, testID, retryIndex)
+	}
+
+	step := findStepDocument(buffer.Steps, stepID)
+	if step == nil {
+		return fmt.Errorf("step not found in active buffer: runID=%s, stepID=%s, testID=%s, retryIndex=%d", runID, stepID, testID, retryIndex)
+	}
+
+	now := time.Now()
+	step.UpdatedAt = now
+	if status != "" {
+		step.Status = status
+	}
+	if len(metadata) > 0 {
+		if step.Metadata == nil {
+			step.Metadata = map[string]interface{}{}
+		}
+		for key, value := range metadata {
+			step.Metadata[key] = value
+		}
+	}
+	if errorMsg != "" {
+		step.Error = errorMsg
+	}
+	if len(errors) > 0 {
+		step.Errors = append([]string(nil), errors...)
+	}
+	if duration != nil {
+		step.Duration = duration
+	}
+
+	buffer.Status = activeStepBufferStatusActive
+	buffer.LastEventAt = &now
+	ttlAt := now.Add(db.MongoStepBufferTTL(r.logger))
+	buffer.TTLAt = &ttlAt
+	buffer.UpdatedAt = now
+
+	if err := r.saveLiveStepBuffer(ctx, buffer); err != nil {
+		return err
 	}
 
 	return nil
@@ -117,40 +219,22 @@ func (r *MongoRepository) PrepareActiveTestStepsFlush(ctx context.Context, runID
 	}
 
 	now := time.Now()
-	field := stepBufferField(testID)
-	filter := bson.M{
-		"_id":                  runID,
-		field + ".retry_index": retryIndex,
-	}
-	update := bson.M{
-		"$set": bson.M{
-			field + ".status":           activeStepBufferStatusFlushInProgress,
-			field + ".flush_started_at": now,
-			field + ".updated_at":       now,
-			"updated_at":                now,
-		},
-	}
-	projection := bson.M{field: 1}
-	var doc bson.M
+	var buffer m.LiveStepBufferDocument
 	err := r.collection.FindOneAndUpdate(
 		ctx,
-		filter,
-		update,
-		options.FindOneAndUpdate().SetReturnDocument(options.After).SetProjection(projection),
-	).Decode(&doc)
+		bson.M{"_id": liveStepBufferID(runID, testID), "attempt_index": retryIndex},
+		bson.M{"$set": bson.M{
+			"status":           activeStepBufferStatusFlushInProgress,
+			"flush_started_at": now,
+			"updated_at":       now,
+		}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&buffer)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, false, nil
 		}
 		return nil, false, fmt.Errorf("prepare active test steps flush: %w", err)
-	}
-
-	buffer, found, err := decodeActiveTestStepsBuffer(doc, testID)
-	if err != nil {
-		return nil, false, err
-	}
-	if !found || buffer == nil {
-		return nil, false, nil
 	}
 
 	return cloneStepDocuments(buffer.Steps), true, nil
@@ -165,18 +249,16 @@ func (r *MongoRepository) ResetActiveTestStepsFlushState(ctx context.Context, ru
 	}
 
 	now := time.Now()
-	field := stepBufferField(testID)
 	_, err := r.collection.UpdateOne(ctx, bson.M{
-		"_id":                  runID,
-		field + ".retry_index": retryIndex,
+		"_id":           liveStepBufferID(runID, testID),
+		"attempt_index": retryIndex,
 	}, bson.M{
 		"$set": bson.M{
-			field + ".status":     activeStepBufferStatusActive,
-			field + ".updated_at": now,
-			"updated_at":          now,
+			"status":     activeStepBufferStatusActive,
+			"updated_at": now,
 		},
 		"$unset": bson.M{
-			field + ".flush_started_at": "",
+			"flush_started_at": "",
 		},
 	})
 	if err != nil {
@@ -194,47 +276,145 @@ func (r *MongoRepository) DeleteActiveTestSteps(ctx context.Context, runID, test
 	}
 
 	now := time.Now()
-	field := stepBufferField(testID)
 	_, err := r.collection.UpdateOne(ctx, bson.M{
-		"_id":                  runID,
-		field + ".retry_index": retryIndex,
+		"_id":           liveStepBufferID(runID, testID),
+		"attempt_index": retryIndex,
 	}, bson.M{
-		"$unset": bson.M{field: ""},
-		"$set":   bson.M{"updated_at": now},
+		"$set": bson.M{"updated_at": now},
 	})
 	if err != nil {
 		return fmt.Errorf("delete active test steps: %w", err)
 	}
+	if _, err := r.collection.DeleteOne(ctx, bson.M{"_id": liveStepBufferID(runID, testID), "attempt_index": retryIndex}); err != nil {
+		return fmt.Errorf("delete live step buffer: %w", err)
+	}
 	return nil
 }
 
-func decodeActiveTestStepsBuffer(doc bson.M, testID string) (*m.ActiveTestStepsDocument, bool, error) {
-	rawActive, ok := doc["active_test_steps"]
-	if !ok {
-		return nil, false, nil
-	}
-
-	active, ok := rawActive.(bson.M)
-	if !ok {
-		return nil, false, fmt.Errorf("decode active test steps: invalid active_test_steps shape")
-	}
-
-	rawBuffer, ok := active[stepBufferKey(testID)]
-	if !ok {
-		return nil, false, nil
-	}
-
-	bsonBytes, err := bson.Marshal(rawBuffer)
+func (r *MongoRepository) loadLiveStepBuffer(ctx context.Context, runID, testID string) (*m.LiveStepBufferDocument, error) {
+	var buffer m.LiveStepBufferDocument
+	err := r.collection.FindOne(ctx, bson.M{"_id": liveStepBufferID(runID, testID)}).Decode(&buffer)
 	if err != nil {
-		return nil, false, fmt.Errorf("marshal active test steps buffer: %w", err)
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("load live step buffer: %w", err)
 	}
+	return &buffer, nil
+}
 
-	var buffer m.ActiveTestStepsDocument
-	if err := bson.Unmarshal(bsonBytes, &buffer); err != nil {
-		return nil, false, fmt.Errorf("unmarshal active test steps buffer: %w", err)
+func (r *MongoRepository) saveLiveStepBuffer(ctx context.Context, buffer *m.LiveStepBufferDocument) error {
+	if buffer == nil {
+		return fmt.Errorf("buffer is required")
 	}
+	if _, err := r.collection.ReplaceOne(ctx, bson.M{"_id": buffer.ID}, buffer); err != nil {
+		return fmt.Errorf("save live step buffer: %w", err)
+	}
+	return nil
+}
 
-	return &buffer, true, nil
+func upsertStepDocument(target *[]*m.StepDocument, step *m.StepDocument) bool {
+	if step == nil {
+		return false
+	}
+	if existing := findStepDocument(*target, step.ID); existing != nil {
+		mergeStepDocument(existing, step)
+		return true
+	}
+	if step.ParentStepID != "" {
+		if parent := findStepDocument(*target, step.ParentStepID); parent != nil {
+			parent.Steps = append(parent.Steps, cloneStepDocuments([]*m.StepDocument{step})[0])
+			return true
+		}
+	}
+	*target = append(*target, cloneStepDocuments([]*m.StepDocument{step})[0])
+	return true
+}
+
+func findStepDocument(steps []*m.StepDocument, stepID string) *m.StepDocument {
+	for _, step := range steps {
+		if step == nil {
+			continue
+		}
+		if step.ID == stepID {
+			return step
+		}
+		if nested := findStepDocument(step.Steps, stepID); nested != nil {
+			return nested
+		}
+	}
+	return nil
+}
+
+func mergeStepDocument(target, source *m.StepDocument) {
+	if target == nil || source == nil {
+		return
+	}
+	if source.RunID != "" {
+		target.RunID = source.RunID
+	}
+	if source.TestCaseRunID != "" {
+		target.TestCaseRunID = source.TestCaseRunID
+	}
+	if source.ParentStepID != "" {
+		target.ParentStepID = source.ParentStepID
+	}
+	if source.Title != "" {
+		target.Title = source.Title
+	}
+	if source.Description != "" {
+		target.Description = source.Description
+	}
+	if source.StartTime != nil {
+		target.StartTime = source.StartTime
+	}
+	if source.Duration != nil {
+		target.Duration = source.Duration
+	}
+	if source.Type != "" {
+		target.Type = source.Type
+	}
+	if len(source.Metadata) > 0 {
+		if target.Metadata == nil {
+			target.Metadata = map[string]interface{}{}
+		}
+		for key, value := range source.Metadata {
+			target.Metadata[key] = value
+		}
+	}
+	if len(source.Tags) > 0 {
+		target.Tags = append([]string(nil), source.Tags...)
+	}
+	if source.WorkerIndex != "" {
+		target.WorkerIndex = source.WorkerIndex
+	}
+	if source.Status != "" {
+		target.Status = source.Status
+	}
+	if source.Category != "" {
+		target.Category = source.Category
+	}
+	if source.Location != "" {
+		target.Location = source.Location
+	}
+	if source.RetryIndex != 0 {
+		target.RetryIndex = source.RetryIndex
+	}
+	if source.Error != "" {
+		target.Error = source.Error
+	}
+	if len(source.Errors) > 0 {
+		target.Errors = append([]string(nil), source.Errors...)
+	}
+	if !source.CreatedAt.IsZero() {
+		target.CreatedAt = source.CreatedAt
+	}
+	if !source.UpdatedAt.IsZero() {
+		target.UpdatedAt = source.UpdatedAt
+	}
+	if len(source.Steps) > 0 {
+		target.Steps = cloneStepDocuments(source.Steps)
+	}
 }
 
 func cloneStepDocuments(input []*m.StepDocument) []*m.StepDocument {

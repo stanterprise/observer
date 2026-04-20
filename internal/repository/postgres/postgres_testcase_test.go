@@ -66,6 +66,117 @@ func TestUpsertTestBeginCreatesTestAndAttempt(t *testing.T) {
 	}
 }
 
+func TestUpsertTestBeginAndFinalizeUpdateSeededPlaceholderTest(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	suiteID := "run-123:suite:suite-123"
+	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+	end := start.Add(2 * time.Second)
+
+	seeded := &m.Test{
+		ID:             "run-123:test:test-seeded",
+		RunID:          "run-123",
+		ExternalTestID: "test-seeded",
+		SuiteID:        &suiteID,
+		Name:           "Seeded Placeholder",
+		Title:          "Seeded Placeholder",
+		Status:         "NOT_RUN",
+		CreatedAt:      start,
+		UpdatedAt:      start,
+	}
+	if err := repo.db.WithContext(ctx).Create(seeded).Error; err != nil {
+		t.Fatalf("seed test placeholder: %v", err)
+	}
+
+	beginTest := &m.Test{
+		ID:             seeded.ID,
+		RunID:          seeded.RunID,
+		ExternalTestID: seeded.ExternalTestID,
+		SuiteID:        &suiteID,
+		Name:           "Seeded Placeholder",
+		Title:          "Seeded Placeholder",
+		Status:         "RUNNING",
+		StartTime:      &start,
+		Metadata:       map[string]interface{}{"annotation_0_type": "tag", "annotation_0_description": "regression"},
+		Tags:           []string{"@sample"},
+		RetryCount:     int32Ptr(3),
+		RetryIndex:     int32Ptr(0),
+		Timeout:        int32Ptr(0),
+	}
+	beginAttempt := &m.TestAttempt{
+		ID:           seeded.ID + ":0",
+		RunID:        seeded.RunID,
+		TestID:       seeded.ID,
+		AttemptIndex: 0,
+		Status:       "RUNNING",
+		StartTime:    &start,
+		Attachments:  []map[string]interface{}{{"name": "stdout.txt"}},
+	}
+	if err := repo.UpsertTestBegin(ctx, beginTest, beginAttempt); err != nil {
+		t.Fatalf("UpsertTestBegin on seeded placeholder failed: %v", err)
+	}
+
+	endTest := &m.Test{
+		ID:             seeded.ID,
+		RunID:          seeded.RunID,
+		ExternalTestID: seeded.ExternalTestID,
+		SuiteID:        &suiteID,
+		Name:           "Seeded Placeholder",
+		Title:          "Seeded Placeholder",
+		Status:         "PASSED",
+		StartTime:      &start,
+		EndTime:        &end,
+		Duration:       int64Ptr(int64((2 * time.Second).Nanoseconds())),
+		Metadata:       map[string]interface{}{"annotation_0_type": "tag", "annotation_0_description": "regression"},
+		Tags:           []string{"@sample"},
+		RetryCount:     int32Ptr(3),
+		RetryIndex:     int32Ptr(0),
+		Timeout:        int32Ptr(0),
+	}
+	endAttempt := &m.TestAttempt{
+		ID:           seeded.ID + ":0",
+		RunID:        seeded.RunID,
+		TestID:       seeded.ID,
+		AttemptIndex: 0,
+		Status:       "PASSED",
+		StartTime:    &start,
+		EndTime:      &end,
+		Duration:     int64Ptr(int64((2 * time.Second).Nanoseconds())),
+		Attachments:  []map[string]interface{}{{"name": "result.json"}},
+	}
+	if err := repo.FinalizeTestEnd(ctx, endTest, endAttempt); err != nil {
+		t.Fatalf("FinalizeTestEnd on seeded placeholder failed: %v", err)
+	}
+
+	var storedTest m.Test
+	if err := repo.db.WithContext(ctx).First(&storedTest, "id = ?", seeded.ID).Error; err != nil {
+		t.Fatalf("load updated test: %v", err)
+	}
+	if storedTest.Status != "PASSED" {
+		t.Fatalf("stored test status = %q, want PASSED", storedTest.Status)
+	}
+	if storedTest.SuiteID == nil || *storedTest.SuiteID != suiteID {
+		t.Fatalf("stored suite id = %v, want %s", storedTest.SuiteID, suiteID)
+	}
+	if got := storedTest.Metadata["annotation_0_description"]; got != "regression" {
+		t.Fatalf("stored metadata annotation_0_description = %v, want regression", got)
+	}
+	if len(storedTest.Tags) != 1 || storedTest.Tags[0] != "@sample" {
+		t.Fatalf("stored tags = %+v, want @sample", storedTest.Tags)
+	}
+
+	var storedAttempt m.TestAttempt
+	if err := repo.db.WithContext(ctx).Where("test_id = ? AND attempt_index = ?", seeded.ID, 0).First(&storedAttempt).Error; err != nil {
+		t.Fatalf("load updated attempt: %v", err)
+	}
+	if storedAttempt.Status != "PASSED" {
+		t.Fatalf("stored attempt status = %q, want PASSED", storedAttempt.Status)
+	}
+	if len(storedAttempt.Attachments) != 1 || storedAttempt.Attachments[0]["name"] != "result.json" {
+		t.Fatalf("stored attempt attachments = %+v, want result.json", storedAttempt.Attachments)
+	}
+}
+
 func TestFinalizeTestEndAggregatesPassingRetries(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
@@ -255,6 +366,73 @@ func TestFinalizeTestEndPersistsAttemptStepsWithoutClearingOnLaterRetry(t *testi
 	decoded = decodeAttemptSteps(storedAttempt.Steps)
 	if len(decoded) != 1 || decoded[0].ID != "step-1" {
 		t.Fatalf("decoded steps after retry = %+v, want preserved step-1", decoded)
+	}
+}
+
+func TestFinalizeTestEndPreservesSuiteIDForSparseTerminalPayload(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	suiteID := "run-123:suite:suite-123"
+	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+	end := start.Add(2 * time.Second)
+
+	beginTest := &m.Test{
+		ID:             "run-123:test:test-sparse",
+		RunID:          "run-123",
+		ExternalTestID: "test-sparse",
+		SuiteID:        &suiteID,
+		Name:           "Sparse Test",
+		Title:          "Sparse Test",
+		Status:         "RUNNING",
+		StartTime:      &start,
+		RetryCount:     int32Ptr(0),
+		RetryIndex:     int32Ptr(0),
+	}
+	beginAttempt := &m.TestAttempt{
+		ID:           "run-123:test:test-sparse:0",
+		RunID:        "run-123",
+		TestID:       "run-123:test:test-sparse",
+		AttemptIndex: 0,
+		Status:       "RUNNING",
+		StartTime:    &start,
+	}
+	if err := repo.UpsertTestBegin(ctx, beginTest, beginAttempt); err != nil {
+		t.Fatalf("UpsertTestBegin failed: %v", err)
+	}
+
+	endTest := &m.Test{
+		ID:             "run-123:test:test-sparse",
+		RunID:          "run-123",
+		ExternalTestID: "test-sparse",
+		Status:         "PASSED",
+		EndTime:        &end,
+		RetryCount:     int32Ptr(0),
+		RetryIndex:     int32Ptr(0),
+	}
+	endAttempt := &m.TestAttempt{
+		ID:           "run-123:test:test-sparse:0",
+		RunID:        "run-123",
+		TestID:       "run-123:test:test-sparse",
+		AttemptIndex: 0,
+		Status:       "PASSED",
+		EndTime:      &end,
+	}
+	if err := repo.FinalizeTestEnd(ctx, endTest, endAttempt); err != nil {
+		t.Fatalf("FinalizeTestEnd failed: %v", err)
+	}
+
+	var storedTest m.Test
+	if err := repo.db.WithContext(ctx).First(&storedTest, "id = ?", "run-123:test:test-sparse").Error; err != nil {
+		t.Fatalf("load stored test: %v", err)
+	}
+	if storedTest.SuiteID == nil || *storedTest.SuiteID != suiteID {
+		t.Fatalf("stored suite id = %v, want %s", storedTest.SuiteID, suiteID)
+	}
+	if storedTest.Name != "Sparse Test" {
+		t.Fatalf("stored name = %q, want Sparse Test", storedTest.Name)
+	}
+	if storedTest.Status != "PASSED" {
+		t.Fatalf("stored status = %q, want PASSED", storedTest.Status)
 	}
 }
 

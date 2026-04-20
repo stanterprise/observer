@@ -15,6 +15,20 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+func ensureRelationalTestSuiteID(relationalTest *m.Test, runID, suiteID string) {
+	if relationalTest == nil || relationalTest.SuiteID != nil {
+		return
+	}
+	if suiteID == "" {
+		suiteID = runID
+	}
+	if runID == "" || suiteID == "" {
+		return
+	}
+	internalSuiteID := fmt.Sprintf("%s:suite:%s", runID, suiteID)
+	relationalTest.SuiteID = &internalSuiteID
+}
+
 // handleTestBegin processes a test begin event
 func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage) error {
 	var req events.TestBeginEventRequest
@@ -93,15 +107,8 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 	// TestSuiteRunId is the parent suite containing this test
 	runID := req.TestCase.RunId
 	suiteID := req.TestCase.TestSuiteId
-	if suiteID == "" {
-		// Fallback: if no TestSuiteRunId, use RunId as both
-		suiteID = runID
-	}
 	relationalTest := m.TestCaseRunToRelationalTest(req.TestCase)
-	if relationalTest != nil && relationalTest.SuiteID == nil {
-		internalSuiteID := fmt.Sprintf("%s:suite:%s", runID, suiteID)
-		relationalTest.SuiteID = &internalSuiteID
-	}
+	ensureRelationalTestSuiteID(relationalTest, runID, suiteID)
 	relationalAttempt := m.TestCaseRunToRelationalAttempt(req.TestCase, attachments)
 	if c.pgRepo.IsConfigured() {
 		if err := c.pgRepo.UpsertTestBegin(ctx, relationalTest, relationalAttempt); err != nil {
@@ -109,8 +116,10 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 		}
 	}
 
-	if err := c.repo.UpsertTestBegin(ctx, runID, test, suiteID); err != nil {
-		return err
+	if c.bufferRepo != nil {
+		if err := c.bufferRepo.SyncActiveTestSteps(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex, startTime); err != nil {
+			return fmt.Errorf("sync active test steps: %w", err)
+		}
 	}
 
 	// Replay deferred steps asynchronously so test.begin processing is not
@@ -148,18 +157,6 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 		"status", req.TestCase.Status,
 		"retry_index", req.TestCase.RetryIndex)
 
-	var duration *int64
-	if req.TestCase.Duration != nil {
-		nanos := req.TestCase.Duration.AsDuration().Nanoseconds()
-		duration = &nanos
-	}
-
-	var endTime *time.Time
-	if req.TestCase.EndTime != nil {
-		t := req.TestCase.EndTime.AsTime()
-		endTime = &t
-	}
-
 	// Convert attachments
 	attachments := make([]map[string]interface{}, 0, len(req.TestCase.Attachments))
 	for _, att := range req.TestCase.Attachments {
@@ -173,38 +170,40 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 
 	runID := req.TestCase.RunId
 	relationalTest := m.TestCaseRunToRelationalTest(req.TestCase)
+	ensureRelationalTestSuiteID(relationalTest, runID, req.TestCase.TestSuiteId)
 	relationalAttempt := m.TestCaseRunToRelationalAttempt(req.TestCase, attachments)
-	if err := c.repo.UpsertTestEnd(ctx, runID, req.TestCase.Id, req.TestCase.Status.String(), req.TestCase.RetryIndex, endTime, duration, attachments); err != nil {
-		return err
-	}
 
 	if c.pgRepo.IsConfigured() {
-		steps, buffered, err := c.repo.PrepareActiveTestStepsFlush(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex)
-		if err != nil {
-			return fmt.Errorf("prepare active test steps flush: %w", err)
-		}
-		if buffered {
-			rawSteps, err := marshalAttemptSteps(steps)
+		buffered := false
+		if c.bufferRepo != nil {
+			steps, hasBuffer, err := c.bufferRepo.PrepareActiveTestStepsFlush(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex)
 			if err != nil {
-				if resetErr := c.repo.ResetActiveTestStepsFlushState(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex); resetErr != nil {
-					c.logger.Warn("failed to reset active test step buffer after marshal error", "run_id", runID, "test_id", req.TestCase.Id, "retry_index", req.TestCase.RetryIndex, "error", resetErr)
-				}
-				return fmt.Errorf("marshal attempt steps: %w", err)
+				return fmt.Errorf("prepare active test steps flush: %w", err)
 			}
-			relationalAttempt.Steps = rawSteps
+			if hasBuffer {
+				buffered = true
+				rawSteps, err := marshalAttemptSteps(steps)
+				if err != nil {
+					if resetErr := c.bufferRepo.ResetActiveTestStepsFlushState(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex); resetErr != nil {
+						c.logger.Warn("failed to reset active test step buffer after marshal error", "run_id", runID, "test_id", req.TestCase.Id, "retry_index", req.TestCase.RetryIndex, "error", resetErr)
+					}
+					return fmt.Errorf("marshal attempt steps: %w", err)
+				}
+				relationalAttempt.Steps = rawSteps
+			}
 		}
 
 		if err := c.pgRepo.FinalizeTestEnd(ctx, relationalTest, relationalAttempt); err != nil {
-			if buffered {
-				if resetErr := c.repo.ResetActiveTestStepsFlushState(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex); resetErr != nil {
+			if buffered && c.bufferRepo != nil {
+				if resetErr := c.bufferRepo.ResetActiveTestStepsFlushState(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex); resetErr != nil {
 					c.logger.Warn("failed to reset active test step buffer after postgres failure", "run_id", runID, "test_id", req.TestCase.Id, "retry_index", req.TestCase.RetryIndex, "error", resetErr)
 				}
 			}
 			return fmt.Errorf("finalize relational test end: %w", err)
 		}
 
-		if buffered {
-			if err := c.repo.DeleteActiveTestSteps(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex); err != nil {
+		if buffered && c.bufferRepo != nil {
+			if err := c.bufferRepo.DeleteActiveTestSteps(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex); err != nil {
 				return fmt.Errorf("delete active test steps after flush: %w", err)
 			}
 		}
@@ -259,31 +258,14 @@ func (c *NATSConsumer) handleTestFailure(ctx context.Context, data json.RawMessa
 	}
 
 	// Fetch test document to get retry_index (failure events don't include it)
-	testDoc, err := c.repo.GetTestFromRun(ctx, req.TestId)
-	if err != nil {
-		return fmt.Errorf("get test for failure: %w", err)
-	}
-	if testDoc == nil {
-		c.logger.Warn("test not found for failure event", "test_id", req.TestId)
-		return nil
-	}
-
-	// Use retry_index from test document (defaults to 0 if nil)
+	// MongoDB GetTestFromRun and AppendTestFailure removed (legacy)
+	// Use Postgres only
 	retryIndex := int32(0)
-	if testDoc.RetryIndex != nil {
-		retryIndex = *testDoc.RetryIndex
-	}
-
 	if c.pgRepo.IsConfigured() {
 		if err := c.pgRepo.AppendTestFailure(ctx, req.RunId, req.TestId, retryIndex, &failure); err != nil {
 			return fmt.Errorf("append relational test failure: %w", err)
 		}
 	}
-
-	if err := c.repo.AppendTestFailure(ctx, req.RunId, req.TestId, retryIndex, failure); err != nil {
-		return fmt.Errorf("append test failure: %w", err)
-	}
-
 	return nil
 }
 
@@ -333,35 +315,18 @@ func (c *NATSConsumer) handleTestError(ctx context.Context, data json.RawMessage
 	}
 
 	// Fetch test document to get retry_index (error events don't include it)
-	testDoc, err := c.repo.GetTestFromRun(ctx, req.TestId)
-	if err != nil {
-		return fmt.Errorf("get test for error: %w", err)
-	}
-	if testDoc == nil {
-		c.logger.Warn("test not found for error event", "test_id", req.TestId)
-		return nil
-	}
-
-	// Use retry_index from test document (defaults to 0 if nil)
+	// MongoDB GetTestFromRun and AppendTestError removed (legacy)
+	// Use Postgres only
 	retryIndex := int32(0)
-	if testDoc.RetryIndex != nil {
-		retryIndex = *testDoc.RetryIndex
-	}
-
 	if c.pgRepo.IsConfigured() {
 		if err := c.pgRepo.AppendTestError(ctx, req.RunId, req.TestId, retryIndex, &errorDoc); err != nil {
 			return fmt.Errorf("append relational test error: %w", err)
 		}
 	}
-
-	if err := c.repo.AppendTestError(ctx, req.RunId, req.TestId, retryIndex, errorDoc); err != nil {
-		return fmt.Errorf("append test error: %w", err)
-	}
-
 	return nil
 }
 
-// processAttachment processes an attachment and returns a map suitable for MongoDB storage.
+// processAttachment processes an attachment and returns a map suitable for storage.
 // It uses a size-based strategy:
 // - < 100KB: Store inline as base64 content
 // - >= 100KB: Store in external storage (if configured)

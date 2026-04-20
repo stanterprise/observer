@@ -11,7 +11,6 @@ import (
 
 	"github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/pkg/api/graph/model"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 // TestCase is the resolver for the testCase field.
@@ -43,66 +42,14 @@ func (r *queryResolver) Step(ctx context.Context, id string) (*models.StepRun, e
 
 // TestRuns is the resolver for the testRuns field.
 func (r *queryResolver) TestRuns(ctx context.Context, limit *int, offset *int) ([]string, error) {
-	// Use MongoDB repository to list run IDs
-	limitVal := int64(20)
-	offsetVal := int64(0)
-	if limit != nil && *limit > 0 {
-		limitVal = int64(*limit)
-	}
-	if offset != nil && *offset >= 0 {
-		offsetVal = int64(*offset)
-	}
-
-	docs, _, err := r.repo.ListTestRuns(ctx, bson.M{}, limitVal, offsetVal)
-	if err != nil {
-		r.logger.Error("failed to fetch test runs", "error", err)
-		return nil, err
-	}
-
-	runIDs := make([]string, 0, len(docs))
-	for _, doc := range docs {
-		runIDs = append(runIDs, doc.ID)
-	}
-
-	return runIDs, nil
+	r.logger.Warn("GraphQL testRuns resolver called but not implemented")
+	return []string{}, nil
 }
 
 // RunStats is the resolver for the runStats field.
 func (r *queryResolver) RunStats(ctx context.Context, runID string) (*model.RunStats, error) {
-	stats := &model.RunStats{}
-
-	// Get test run document
-	doc, err := r.repo.GetTestRun(ctx, runID)
-	if err != nil {
-		r.logger.Error("failed to fetch test run for stats", "run_id", runID, "error", err)
-		return nil, err
-	}
-
-	// Count tests by status
-	stats.TotalTests = len(doc.Tests)
-	for _, tc := range doc.Tests {
-		switch tc.Status {
-		case "PASSED":
-			stats.PassedTests++
-		case "FAILED":
-			stats.FailedTests++
-		case "SKIPPED":
-			stats.SkippedTests++
-		}
-		// Track latest update
-		if stats.LatestUpdate == nil || tc.UpdatedAt.After(*stats.LatestUpdate) {
-			stats.LatestUpdate = &tc.UpdatedAt
-		}
-	}
-
-	// Count total steps across all tests
-	totalSteps := 0
-	for _, tc := range doc.Tests {
-		totalSteps += len(tc.Steps)
-	}
-	stats.TotalSteps = totalSteps
-
-	return stats, nil
+	r.logger.Warn("GraphQL runStats resolver called but not implemented", "run_id", runID)
+	return &model.RunStats{}, nil
 }
 
 // Metadata is the resolver for the metadata field.
@@ -119,13 +66,8 @@ func (r *stepRunResolver) Error(ctx context.Context, obj *models.StepRun) (*stri
 
 // TestCase is the resolver for the testCase field.
 func (r *stepRunResolver) TestCase(ctx context.Context, obj *models.StepRun) (*models.TestCaseRun, error) {
-	// Find parent test case using GetTestFromRun
-	test, err := r.repo.GetTestFromRun(ctx, obj.TestCaseRunID)
-	if err != nil {
-		r.logger.Error("failed to fetch parent test case", "test_case_run_id", obj.TestCaseRunID, "error", err)
-		return nil, err
-	}
-	return test, nil
+	r.logger.Warn("GraphQL stepRun.testCase resolver called but not implemented", "test_case_run_id", obj.TestCaseRunID)
+	return nil, fmt.Errorf("GraphQL API not implemented")
 }
 
 // Metadata is the resolver for the metadata field.
@@ -164,6 +106,8 @@ func (r *Resolver) StepRun() StepRunResolver { return &stepRunResolver{r} }
 // TestCaseRun returns TestCaseRunResolver implementation.
 func (r *Resolver) TestCaseRun() TestCaseRunResolver { return &testCaseRunResolver{r} }
 
-type queryResolver struct{ *Resolver }
-type stepRunResolver struct{ *Resolver }
-type testCaseRunResolver struct{ *Resolver }
+type (
+	queryResolver       struct{ *Resolver }
+	stepRunResolver     struct{ *Resolver }
+	testCaseRunResolver struct{ *Resolver }
+)

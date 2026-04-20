@@ -14,7 +14,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stanterprise/observer/internal/database"
-	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/api"
 	"github.com/stanterprise/observer/pkg/storage"
@@ -26,16 +25,6 @@ func main() {
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	// Connect to MongoDB optionally for live running-test detail enrichment.
-	mongoDB, err := database.ConnectMongoDBFromEnv(logger)
-	if err != nil {
-		logger.Error("mongodb connect failed", "error", err)
-		os.Exit(1)
-	}
-	if mongoDB != nil {
-		logger.Info("mongodb connection available for API")
-	}
 
 	// Connect to PostgreSQL (required for the REST API).
 	pgDB, err := database.ConnectPostgresFromEnv(logger)
@@ -53,21 +42,7 @@ func main() {
 		}
 	}()
 
-	// Ensure MongoDB connection cleanup
-	if mongoDB != nil {
-		defer func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			mongoDB.Close(ctx)
-		}()
-	}
-
 	// Create database-backed handlers.
-	var liveRunRepo *mongodb.MongoRepository
-	if mongoDB != nil {
-		liveRunRepo = mongodb.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
-		logger.Info("mongodb live test detail enrichment enabled")
-	}
 	pgRepo := postgres.NewPostgresRepository(pgDB.DB, logger)
 
 	// Initialize storage driver (optional)
@@ -89,7 +64,6 @@ func main() {
 	}
 
 	postgresHandler := api.NewPostgresHandler(pgRepo, logger)
-	postgresHandler.SetLiveRunRepo(liveRunRepo)
 	postgresAttachmentHandler := api.NewPostgresAttachmentHandler(pgRepo, storageDriver, logger)
 
 	// Initialize WebSocket hub

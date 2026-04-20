@@ -76,8 +76,10 @@ func (c *NATSConsumer) handleStepBegin(ctx context.Context, data json.RawMessage
 	runID := req.Step.RunId
 	testID := extractTestID(req.Step.TestCaseId, req.Step.RunId)
 	retryIndex := req.Step.RetryIndex
-	if err := c.repo.UpsertStepBegin(ctx, runID, step, req.Step.TestCaseId, retryIndex); err != nil {
-		return err
+	if c.bufferRepo != nil {
+		if err := c.bufferRepo.UpsertStepBegin(ctx, runID, step, testID, retryIndex); err != nil {
+			return err
+		}
 	}
 
 	// After the step is created, schedule deferred replay sweeps so any
@@ -106,11 +108,8 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 		"status", req.Step.Status,
 		"retry_index", req.Step.RetryIndex)
 
-	// Extract testID from TestCaseRunId (same as in handleStepBegin)
 	testID := extractTestID(req.Step.TestCaseId, req.Step.RunId)
 	runID := req.Step.RunId
-
-	// Extract retry_index from Step (defaults to 0 if not set)
 	retryIndex := req.Step.RetryIndex
 
 	// Convert metadata (including error metadata from Playwright reporter)
@@ -122,25 +121,23 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 	// Extract step attachments from metadata if present
 	stepAttachments := c.extractStepAttachments(ctx, req.Step.Metadata)
 
-	// Extract error fields
 	errorMsg := req.Step.Error
 	errors := req.Step.Errors
 
-	// Calculate duration if available
 	var duration *int64
 	if req.Step.Duration != nil {
 		nanos := req.Step.Duration.AsDuration().Nanoseconds()
 		duration = &nanos
 	}
 
-	if err := c.repo.UpsertStepEnd(ctx, runID, req.Step.Id, testID, retryIndex, mongoStatusToString(req.Step.Status), metadata, errorMsg, errors, duration); err != nil {
-		return err
+	if c.bufferRepo != nil {
+		if err := c.bufferRepo.UpsertStepEnd(ctx, runID, req.Step.Id, testID, retryIndex, statusToString(req.Step.Status), metadata, errorMsg, errors, duration); err != nil {
+			return err
+		}
 	}
 
 	if len(stepAttachments) > 0 {
-		if err := c.repo.AppendTestAttachments(ctx, runID, testID, retryIndex, stepAttachments); err != nil {
-			return fmt.Errorf("append step attachments: %w", err)
-		}
+		// TODO: Implement Postgres AppendTestAttachments if needed, or remove if not required.
 	}
 
 	return nil

@@ -24,28 +24,11 @@ func (c *NATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) e
 
 	c.logger.Info("run end", "run_id", req.RunId, "status", req.FinalStatus)
 
-	// Convert protobuf Timestamp to *time.Time
-	var startTime *time.Time
-	if req.StartTime != nil {
-		t := req.StartTime.AsTime()
-		startTime = &t
-	}
-
-	// Convert protobuf Duration to *int64 (nanoseconds)
-	var duration *int64
-	if req.Duration != nil {
-		d := req.Duration.AsDuration().Nanoseconds()
-		duration = &d
-	}
+	// Convert protobuf Timestamp to *time.Time (removed, unused)
+	// Convert protobuf Duration to *int64 (removed, unused)
 
 	// Update the test run document with final status, times, and duration
-	if err := c.repo.UpdateTestRunEnd(ctx, req.RunId, req.FinalStatus.String(), startTime, duration); err != nil {
-		return fmt.Errorf("update run end: %w", err)
-	}
-
-	if err := c.repo.MarkRunningTestsAsTimedOut(ctx, req.RunId); err != nil {
-		return fmt.Errorf("mark running tests as timed out: %w", err)
-	}
+	// MongoDB UpdateTestRunEnd and MarkRunningTestsAsTimedOut removed (legacy)
 
 	testRun := models.RunEndEventToTestRun(&req)
 	if c.pgRepo.IsConfigured() {
@@ -166,5 +149,6 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 		}
 	}
 
-	return c.repo.MapSuites(ctx, req.RunId, req.Name, runMetadata, req.TotalTests, suites)
+	// MongoDB MapSuites removed (legacy)
+	return nil
 }

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -133,55 +134,161 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 }
 
 func upsertRelationalTest(tx *gorm.DB, test *m.Test, now time.Time) error {
-	assignment := m.Test{
-		RunID:          test.RunID,
-		ExternalTestID: test.ExternalTestID,
-		SuiteID:        test.SuiteID,
-		Name:           test.Name,
-		Title:          test.Title,
-		Description:    test.Description,
-		Status:         test.Status,
-		StartTime:      test.StartTime,
-		EndTime:        test.EndTime,
-		Duration:       test.Duration,
-		Metadata:       test.Metadata,
-		Tags:           test.Tags,
-		Location:       test.Location,
-		RetryCount:     test.RetryCount,
-		RetryIndex:     test.RetryIndex,
-		Timeout:        test.Timeout,
-		UpdatedAt:      now,
-		CreatedAt:      now,
+	var stored m.Test
+	err := tx.Where("id = ?", test.ID).First(&stored).Error
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("load relational test: %w", err)
+		}
+		if test.SuiteID == nil {
+			return fmt.Errorf("suite id is required for new relational test")
+		}
+		create := m.Test{
+			ID:             test.ID,
+			RunID:          test.RunID,
+			ExternalTestID: test.ExternalTestID,
+			SuiteID:        test.SuiteID,
+			Name:           test.Name,
+			Title:          test.Title,
+			Description:    test.Description,
+			Status:         test.Status,
+			StartTime:      test.StartTime,
+			EndTime:        test.EndTime,
+			Duration:       test.Duration,
+			Metadata:       test.Metadata,
+			Tags:           test.Tags,
+			Location:       test.Location,
+			RetryCount:     test.RetryCount,
+			RetryIndex:     test.RetryIndex,
+			Timeout:        test.Timeout,
+			UpdatedAt:      now,
+			CreatedAt:      now,
+		}
+		if err := tx.Create(&create).Error; err != nil {
+			return fmt.Errorf("create relational test: %w", err)
+		}
+		return nil
 	}
 
-	stored := m.Test{ID: test.ID}
-	result := tx.Where(&stored).Assign(assignment).FirstOrCreate(&stored)
-	if result.Error != nil {
-		return fmt.Errorf("upsert relational test: %w", result.Error)
+	if test.RunID != "" {
+		stored.RunID = test.RunID
+	}
+	if test.ExternalTestID != "" {
+		stored.ExternalTestID = test.ExternalTestID
+	}
+	if test.SuiteID != nil {
+		stored.SuiteID = test.SuiteID
+	}
+	if test.Name != "" {
+		stored.Name = test.Name
+	}
+	if test.Title != "" {
+		stored.Title = test.Title
+	}
+	if test.Description != "" {
+		stored.Description = test.Description
+	}
+	if test.Status != "" {
+		stored.Status = test.Status
+	}
+	if test.StartTime != nil {
+		stored.StartTime = test.StartTime
+	}
+	if test.EndTime != nil {
+		stored.EndTime = test.EndTime
+	}
+	if test.Duration != nil {
+		stored.Duration = test.Duration
+	}
+	if len(test.Metadata) > 0 {
+		stored.Metadata = test.Metadata
+	}
+	if len(test.Tags) > 0 {
+		stored.Tags = test.Tags
+	}
+	if test.Location != "" {
+		stored.Location = test.Location
+	}
+	if test.RetryCount != nil {
+		stored.RetryCount = test.RetryCount
+	}
+	if test.RetryIndex != nil {
+		stored.RetryIndex = test.RetryIndex
+	}
+	if test.Timeout != nil {
+		stored.Timeout = test.Timeout
+	}
+	stored.UpdatedAt = now
+
+	if err := tx.Save(&stored).Error; err != nil {
+		return fmt.Errorf("update relational test: %w", err)
 	}
 	return nil
 }
 
 func upsertRelationalTestAttempt(tx *gorm.DB, attempt *m.TestAttempt, now time.Time) error {
-	assignment := m.TestAttempt{
-		ID:           attempt.ID,
-		RunID:        attempt.RunID,
-		Status:       attempt.Status,
-		StartTime:    attempt.StartTime,
-		EndTime:      attempt.EndTime,
-		Duration:     attempt.Duration,
-		Attachments:  attempt.Attachments,
-		ErrorMessage: attempt.ErrorMessage,
-		StackTrace:   attempt.StackTrace,
-		ErrorList:    attempt.ErrorList,
-		UpdatedAt:    now,
-		CreatedAt:    now,
+	var stored m.TestAttempt
+	err := tx.Where("test_id = ? AND attempt_index = ?", attempt.TestID, attempt.AttemptIndex).First(&stored).Error
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("load relational test attempt: %w", err)
+		}
+		create := m.TestAttempt{
+			ID:           attempt.ID,
+			RunID:        attempt.RunID,
+			TestID:       attempt.TestID,
+			AttemptIndex: attempt.AttemptIndex,
+			Status:       attempt.Status,
+			StartTime:    attempt.StartTime,
+			EndTime:      attempt.EndTime,
+			Duration:     attempt.Duration,
+			Attachments:  attempt.Attachments,
+			ErrorMessage: attempt.ErrorMessage,
+			StackTrace:   attempt.StackTrace,
+			ErrorList:    attempt.ErrorList,
+			UpdatedAt:    now,
+			CreatedAt:    now,
+		}
+		if err := tx.Create(&create).Error; err != nil {
+			return fmt.Errorf("create relational test attempt: %w", err)
+		}
+		return nil
 	}
 
-	stored := m.TestAttempt{TestID: attempt.TestID, AttemptIndex: attempt.AttemptIndex}
-	result := tx.Where(&stored).Assign(assignment).FirstOrCreate(&stored)
-	if result.Error != nil {
-		return fmt.Errorf("upsert relational test attempt: %w", result.Error)
+	if attempt.ID != "" {
+		stored.ID = attempt.ID
+	}
+	if attempt.RunID != "" {
+		stored.RunID = attempt.RunID
+	}
+	if attempt.Status != "" {
+		stored.Status = attempt.Status
+	}
+	if attempt.StartTime != nil {
+		stored.StartTime = attempt.StartTime
+	}
+	if attempt.EndTime != nil {
+		stored.EndTime = attempt.EndTime
+	}
+	if attempt.Duration != nil {
+		stored.Duration = attempt.Duration
+	}
+	if attempt.Attachments != nil {
+		stored.Attachments = attempt.Attachments
+	}
+	if attempt.ErrorMessage != "" {
+		stored.ErrorMessage = attempt.ErrorMessage
+	}
+	if attempt.StackTrace != "" {
+		stored.StackTrace = attempt.StackTrace
+	}
+	if attempt.ErrorList != nil {
+		stored.ErrorList = attempt.ErrorList
+	}
+	stored.UpdatedAt = now
+
+	if err := tx.Save(&stored).Error; err != nil {
+		return fmt.Errorf("update relational test attempt: %w", err)
 	}
 	return nil
 }

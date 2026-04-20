@@ -37,6 +37,12 @@ func ptrInt32(v int32) *int32 {
 // TestCaseRunId format is typically: {runId}-{testId}
 // This function strips the runId prefix to get just the testId.
 func extractTestID(testCaseRunID, runID string) string {
+	if runID != "" {
+		prefix := runID + "-"
+		if strings.HasPrefix(testCaseRunID, prefix) {
+			return strings.TrimPrefix(testCaseRunID, prefix)
+		}
+	}
 	// Otherwise, return as-is (backward compatibility)
 	return testCaseRunID
 }
@@ -53,19 +59,18 @@ func extractTestID(testCaseRunID, runID string) string {
 //
 // All operations follow an upsert pattern: update if entity exists, insert if not found.
 type NATSConsumer struct {
-	nc             *nats.Conn
-	js             jetstream.JetStream
-	logger         *slog.Logger
-	repo           *mongodb.MongoRepository
-	pgRepo         *postgres.PostgresRepository
-	rawMessageRepo *mongodb.RawMessageRepository
-	storageDriver  storage.Driver
-	stream         string
-	consumer       jetstream.Consumer
-	prefix         string
-	maxDeliver     int
-	ackWait        time.Duration
-	dlqSubject     string
+	nc            *nats.Conn
+	js            jetstream.JetStream
+	logger        *slog.Logger
+	bufferRepo    *mongodb.MongoRepository
+	pgRepo        *postgres.PostgresRepository
+	storageDriver storage.Driver
+	stream        string
+	consumer      jetstream.Consumer
+	prefix        string
+	maxDeliver    int
+	ackWait       time.Duration
+	dlqSubject    string
 
 	deferCfg   deferQueueConfig
 	deferQueue map[string][]deferredStepEvent
@@ -75,8 +80,8 @@ type NATSConsumer struct {
 	runIntegrityByID map[string]*runIntegrity
 }
 
-// MongoNATSConsumerConfig holds configuration for MongoDB NATS consumer
-type MongoNATSConsumerConfig struct {
+// NATSConsumerConfig holds configuration for NATS consumer
+type NATSConsumerConfig struct {
 	URL          string
 	StreamName   string
 	ConsumerName string
@@ -88,10 +93,7 @@ type MongoNATSConsumerConfig struct {
 
 	DeferQueueMaxAttempts int
 	DeferQueueTTL         time.Duration
-	// RetainMessages enables storing every raw NATS message payload in a dedicated
-	// MongoDB collection ("raw_messages") for auditing and debugging purposes.
-	// Set via the RETAIN_MESSAGES environment variable.
-	RetainMessages bool
+	RetainMessages        bool // (optional, for future use)
 }
 
 type deferredStepEvent struct {
@@ -124,58 +126,44 @@ type runIntegrity struct {
 	LastUpdatedAt   time.Time
 }
 
-// NewNATSConsumer creates a new NATS JetStream consumer with MongoDB and Postgres backend.
-// If rawMessageRepo is non-nil and cfg.RetainMessages is true, every received message
-// will be persisted to the raw_messages collection before processing.
-func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *mongodb.MongoRepository, rawMessageRepo *mongodb.RawMessageRepository, pgRepo *postgres.PostgresRepository) (*NATSConsumer, error) {
+// NewNATSConsumer creates a new NATS JetStream consumer with Postgres backend and MongoDB-backed live step buffer support.
+func NewNATSConsumer(cfg NATSConsumerConfig, logger *slog.Logger, bufferRepo *mongodb.MongoRepository, pgRepo *postgres.PostgresRepository) (*NATSConsumer, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}
-
 	if cfg.URL == "" {
 		return nil, fmt.Errorf("NATS URL is required")
 	}
-
-	if repo == nil {
-		return nil, fmt.Errorf("MongoDB repository is required for processor")
-	}
-
 	if pgRepo == nil {
 		return nil, fmt.Errorf("Postgres repository is required for processor")
 	}
-
+	if bufferRepo == nil {
+		return nil, fmt.Errorf("MongoDB live step buffer repository is required for processor")
+	}
 	if cfg.StreamName == "" {
 		cfg.StreamName = publisher.DefaultStreamName
 	}
-
 	if cfg.ConsumerName == "" {
 		cfg.ConsumerName = "processor"
 	}
-
 	if cfg.BatchSize <= 0 {
 		cfg.BatchSize = 10
 	}
-
 	if cfg.MaxWait <= 0 {
 		cfg.MaxWait = 5 * time.Second
 	}
-
 	if cfg.MaxDeliver <= 0 {
 		cfg.MaxDeliver = 5
 	}
-
 	if cfg.AckWait <= 0 {
 		cfg.AckWait = 30 * time.Second
 	}
-
 	if cfg.DLQSubject == "" {
 		cfg.DLQSubject = publisher.DefaultSubjectPrefix + ".dlq"
 	}
-
 	if cfg.DeferQueueMaxAttempts <= 0 {
 		cfg.DeferQueueMaxAttempts = cfg.MaxDeliver
 	}
-
 	if cfg.DeferQueueTTL <= 0 {
 		cfg.DeferQueueTTL = 5 * time.Minute
 	}
@@ -192,7 +180,7 @@ func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *mon
 	}
 
 	// Connect to NATS
-	nc, err := nats.Connect(cfg.URL, nats.Name("observer-mongo-processor"))
+	nc, err := nats.Connect(cfg.URL, nats.Name("observer-processor"))
 	if err != nil {
 		if storageDriver != nil {
 			storageDriver.Close()
@@ -211,23 +199,24 @@ func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *mon
 	}
 
 	c := &NATSConsumer{
-		nc:             nc,
-		js:             js,
-		logger:         logger,
-		repo:           repo,
-		rawMessageRepo: rawMessageRepo,
-		pgRepo:         pgRepo,
-		storageDriver:  storageDriver,
-		stream:         cfg.StreamName,
-		prefix:         publisher.DefaultSubjectPrefix,
-		maxDeliver:     cfg.MaxDeliver,
-		ackWait:        cfg.AckWait,
-		dlqSubject:     cfg.DLQSubject,
+		nc:            nc,
+		js:            js,
+		logger:        logger,
+		bufferRepo:    bufferRepo,
+		pgRepo:        pgRepo,
+		storageDriver: storageDriver,
+		stream:        cfg.StreamName,
+		prefix:        publisher.DefaultSubjectPrefix,
+		maxDeliver:    cfg.MaxDeliver,
+		ackWait:       cfg.AckWait,
+		dlqSubject:    cfg.DLQSubject,
 		deferCfg: deferQueueConfig{
 			maxAttempts: cfg.DeferQueueMaxAttempts,
 			ttl:         cfg.DeferQueueTTL,
 		},
 		deferQueue:       make(map[string][]deferredStepEvent),
+		integrityMu:      sync.Mutex{},
+		deferMu:          sync.Mutex{},
 		runIntegrityByID: make(map[string]*runIntegrity),
 	}
 
@@ -242,8 +231,7 @@ func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *mon
 	}
 	c.consumer = consumer
 
-	retainMsg := cfg.RetainMessages && rawMessageRepo != nil
-	logger.Info("MongoDB NATS consumer initialized",
+	logger.Info("NATS consumer initialized",
 		"url", cfg.URL,
 		"stream", cfg.StreamName,
 		"consumer", cfg.ConsumerName,
@@ -254,7 +242,7 @@ func NewNATSConsumer(cfg MongoNATSConsumerConfig, logger *slog.Logger, repo *mon
 		"dlq_subject", cfg.DLQSubject,
 		"defer_queue_max_attempts", cfg.DeferQueueMaxAttempts,
 		"defer_queue_ttl", cfg.DeferQueueTTL,
-		"retain_messages", retainMsg)
+	)
 
 	return c, nil
 }
@@ -292,8 +280,8 @@ func (c *NATSConsumer) ensureConsumer(ctx context.Context, consumerName string, 
 }
 
 // Start begins consuming messages from NATS
-func (c *NATSConsumer) Start(ctx context.Context, cfg MongoNATSConsumerConfig) error {
-	c.logger.Info("starting MongoDB consumer")
+func (c *NATSConsumer) Start(ctx context.Context, cfg NATSConsumerConfig) error {
+	c.logger.Info("starting NATS consumer")
 
 	for {
 		select {
@@ -376,16 +364,7 @@ func (c *NATSConsumer) processMessage(ctx context.Context, msg jetstream.Msg) (p
 		"subject", msg.Subject(),
 		"timestamp", event.Timestamp)
 
-	// Persist the raw message when retention is enabled.
-	if c.rawMessageRepo != nil {
-		if err := c.retainRawMessage(ctx, msg, event); err != nil {
-			// Log but do not fail processing – retention is best-effort.
-			c.logger.Warn("failed to retain raw message",
-				"subject", msg.Subject(),
-				"event_type", event.Type,
-				"error", err)
-		}
-	}
+	// (Legacy raw message retention removed)
 
 	switch event.Type {
 	case publisher.EventTypeSuiteBegin:
@@ -730,11 +709,11 @@ func (c *NATSConsumer) retainRawMessage(ctx context.Context, msg jetstream.Msg, 
 	}
 
 	// Parse the raw message bytes into a JSON map so the payload is stored as a
-	// readable BSON document rather than binary bytes.  We keep the full event
+	// readable JSON document rather than binary bytes.  We keep the full event
 	// envelope (type, timestamp, data) so the audit trail is complete.
 	parsedPayload := map[string]interface{}{}
 	if err := json.Unmarshal(msg.Data(), &parsedPayload); err != nil {
-		// Fallback: wrap in a map so it remains a BSON document.
+		// Fallback: wrap in a map so it remains a JSON document.
 		parsedPayload = map[string]interface{}{
 			"raw":   string(msg.Data()),
 			"error": err.Error(),
@@ -754,7 +733,8 @@ func (c *NATSConsumer) retainRawMessage(ctx context.Context, msg jetstream.Msg, 
 		retained.Sequence = meta.Sequence.Stream
 	}
 
-	return c.rawMessageRepo.AppendMessage(ctx, runID, retained)
+	// Legacy raw message retention removed; nothing to return here.
+	return nil
 }
 
 // extractRunID extracts the run_id from a JSON-encoded event data payload.
@@ -816,8 +796,8 @@ func nestedRunID(data json.RawMessage) string {
 	return ""
 }
 
-// mongoStatusToString converts protobuf status to string
-func mongoStatusToString(status common.TestStatus) string {
+// statusToString converts protobuf status to string
+func statusToString(status common.TestStatus) string {
 	return status.String()
 }
 
@@ -830,7 +810,7 @@ func (c *NATSConsumer) Close() error {
 	}
 	if c.nc != nil {
 		c.nc.Close()
-		c.logger.Info("MongoDB NATS consumer closed")
+		c.logger.Info("NATS consumer closed")
 	}
 	return nil
 }

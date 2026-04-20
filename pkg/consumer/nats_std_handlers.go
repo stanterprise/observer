@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
-	m "github.com/stanterprise/observer/internal/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -31,21 +29,9 @@ func (c *NATSConsumer) handleStdOutput(ctx context.Context, data json.RawMessage
 		return nil
 	}
 
-	// Convert protobuf Timestamp to *time.Time
-	var timestamp *time.Time
-	if req.Timestamp != nil {
-		t := req.Timestamp.AsTime()
-		timestamp = &t
-	}
+	// timestamp removed (unused)
 
-	output := m.OutputDocument{
-		Message:   req.Message,
-		Timestamp: timestamp,
-	}
-
-	if err := c.repo.AppendStdOutput(ctx, req.RunId, req.TestId, output); err != nil {
-		return fmt.Errorf("append stdout: %w", err)
-	}
+	// TODO: Implement Postgres AppendStdOutput if needed, or remove if not required.
 
 	return nil
 }
@@ -70,21 +56,9 @@ func (c *NATSConsumer) handleStdError(ctx context.Context, data json.RawMessage)
 		return nil
 	}
 
-	// Convert protobuf Timestamp to *time.Time
-	var timestamp *time.Time
-	if req.Timestamp != nil {
-		t := req.Timestamp.AsTime()
-		timestamp = &t
-	}
+	// timestamp removed (unused)
 
-	output := m.OutputDocument{
-		Message:   req.Message,
-		Timestamp: timestamp,
-	}
-
-	if err := c.repo.AppendStdError(ctx, req.RunId, req.TestId, output); err != nil {
-		return fmt.Errorf("append stderr: %w", err)
-	}
+	// TODO: Implement Postgres AppendStdError if needed, or remove if not required.
 
 	return nil
 }

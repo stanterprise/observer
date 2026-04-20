@@ -1,7 +1,9 @@
 package api
 
 import (
+	"encoding/base64"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -75,5 +77,75 @@ func (h *PostgresAttachmentHandler) handleAttachment(w http.ResponseWriter, r *h
 		http.Error(w, "External URI not found", http.StatusInternalServerError)
 	default:
 		http.Error(w, fmt.Sprintf("Unknown storage type: %s", storageType), http.StatusInternalServerError)
+	}
+}
+
+func handleInlineAttachment(w http.ResponseWriter, logger *slog.Logger, attachment map[string]interface{}) {
+	content, ok := attachment["content"].(string)
+	if !ok || content == "" {
+		http.Error(w, "Inline content not found", http.StatusInternalServerError)
+		return
+	}
+
+	contentBytes := []byte(content)
+	if encoding, ok := attachment["content_encoding"].(string); ok && encoding == "base64" {
+		decoded, err := base64.StdEncoding.DecodeString(content)
+		if err != nil {
+			logger.Error("failed to decode base64 attachment", "error", err)
+		} else {
+			contentBytes = decoded
+		}
+	}
+
+	if mimeType, ok := attachment["mime_type"].(string); ok && mimeType != "" {
+		w.Header().Set("Content-Type", mimeType)
+	} else {
+		w.Header().Set("Content-Type", "application/octet-stream")
+	}
+	if name, ok := attachment["name"].(string); ok && name != "" {
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, name))
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(contentBytes)
+}
+
+func handleProxyAttachment(w http.ResponseWriter, r *http.Request, storageDriver storage.Driver, logger *slog.Logger, storageKey string, attachment map[string]interface{}) {
+	reader, err := storageDriver.Download(r.Context(), storageKey)
+	if err != nil {
+		logger.Error("failed to download attachment", "storage_key", storageKey, "error", err)
+		http.Error(w, "Failed to retrieve attachment", http.StatusInternalServerError)
+		return
+	}
+	defer reader.Close()
+
+	if mimeType, ok := attachment["mime_type"].(string); ok && mimeType != "" {
+		w.Header().Set("Content-Type", mimeType)
+	} else {
+		w.Header().Set("Content-Type", "application/octet-stream")
+	}
+	if rawSize, ok := attachment["size"]; ok {
+		var size int64
+		switch v := rawSize.(type) {
+		case int64:
+			size = v
+		case int32:
+			size = int64(v)
+		case int:
+			size = int64(v)
+		case float64:
+			size = int64(v)
+		}
+		if size > 0 {
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", size))
+		}
+	}
+	if name, ok := attachment["name"].(string); ok && name != "" {
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, name))
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := io.Copy(w, reader); err != nil {
+		logger.Error("failed to stream attachment", "storage_key", storageKey, "error", err)
 	}
 }
