@@ -2,6 +2,7 @@
 set -eu
 
 install -d -m 0755 -o mongodb -g mongodb /data/mongodb
+chown -R mongodb:mongodb /data/mongodb
 touch /data/mongodb/mongod.log
 chown mongodb:mongodb /data/mongodb/mongod.log
 

@@ -12,7 +12,7 @@ services:
     profiles: ["aio"]
     restart: unless-stopped
     environment:
-      MONGODB_URI: mongodb://localhost:27017/observer
+      MONGODB_URI: mongodb://127.0.0.1:27017/observer
       POSTGRES_USER: ${POSTGRES_USER:-observer}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_DB: ${POSTGRES_DB:-observer}
