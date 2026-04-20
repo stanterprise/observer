@@ -71,7 +71,7 @@ charts/observer/
 
 ### AIO (All-in-One)
 
-Single pod with embedded MongoDB and NATS. Best for development and testing.
+Single pod with embedded MongoDB, PostgreSQL, and NATS. Best for development and testing.
 
 ```bash
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
@@ -84,7 +84,7 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
 
 ### Distributed
 
-Separate services with MongoDB and NATS. Best for production.
+Separate services with MongoDB, PostgreSQL, and NATS. Best for production.
 
 ```bash
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer

@@ -13,6 +13,10 @@ services:
     restart: unless-stopped
     environment:
       MONGODB_URI: mongodb://localhost:27017/observer
+      POSTGRES_USER: ${POSTGRES_USER:-observer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-observer}
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-observer}:${POSTGRES_PASSWORD:-password}@127.0.0.1:5432/${POSTGRES_DB:-observer}?sslmode=disable
       STORAGE_DRIVER: local
       STORAGE_LOCAL_BASE_PATH: /data/artifacts
       STORAGE_LOCAL_BASE_URL: http://localhost:${AIO_WEB_PORT:-3000}/api/attachments
@@ -22,6 +26,7 @@ services:
       - "0.0.0.0:${AIO_API_PORT:-8080}:8080" # API service (internal)
       - "0.0.0.0:${AIO_NATS_PORT:-4222}:4222" # NATS client
       - "0.0.0.0:${AIO_NATS_HTTP_PORT:-8222}:8222" # NATS monitoring
+      - "0.0.0.0:${AIO_POSTGRES_PORT:-5432}:5432" # PostgreSQL for local debugging
     volumes:
       - aio-data:/data
     healthcheck:
@@ -78,6 +83,7 @@ services:
       NATS_URL: nats://nats:4222
       NATS_STREAM: tests_events
       NATS_CONSUMER: processor
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-observer}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-observer}?sslmode=disable
       MONGODB_URI: mongodb://${MONGO_USER:-root}:${MONGO_PASSWORD:-password}@mongodb:27017/${MONGO_DATABASE:-observer}?authSource=admin
       STORAGE_DRIVER: local
       STORAGE_LOCAL_BASE_PATH: /data/artifacts
@@ -88,6 +94,8 @@ services:
       nats:
         condition: service_healthy
       mongodb:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "pgrep", "-f", "processor"]
@@ -135,6 +143,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: "8080"
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-observer}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-observer}?sslmode=disable
       MONGODB_URI: mongodb://${MONGO_USER:-root}:${MONGO_PASSWORD:-password}@mongodb:27017/${MONGO_DATABASE:-observer}?authSource=admin
       NATS_URL: nats://nats:4222
       NATS_STREAM: tests_events
@@ -151,6 +160,8 @@ services:
       mongodb:
         condition: service_healthy
       nats:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
@@ -268,6 +279,32 @@ services:
     networks:
       - observer-net
 
+  # PostgreSQL service for relational execution storage
+  postgres:
+    image: postgres:16-alpine
+    container_name: observer-postgres
+    profiles: ["dist", "infra", "web-dev"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-observer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-observer}
+    ports:
+      - "0.0.0.0:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-observer} -d ${POSTGRES_DB:-observer}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - observer-net
+
   nats:
     image: nats:2.10-alpine
     container_name: observer-nats
@@ -289,6 +326,7 @@ services:
 
 volumes:
   mongodb-data:
+  postgres-data:
   nats-data:
   aio-data:
   observer-artifacts:

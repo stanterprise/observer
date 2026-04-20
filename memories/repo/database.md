@@ -1,0 +1,1 @@
+- Legacy MongoDB index `ttl_idx` on `live_step_buffers.ttl_at` with `expireAfterSeconds: 900` conflicts with the newer absolute TTL index `live_step_buffers_ttl_at_ttl` (`expireAfterSeconds: 0`). Startup should reconcile by dropping incompatible legacy TTL index definitions before creating required indexes.

@@ -8,12 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Initial public release
 - All-in-One (AIO) deployment mode with embedded services
 - Distributed deployment mode for production
 - gRPC ingestion service for test event collection
 - NATS JetStream-based event processing
-- MongoDB persistence layer
+- PostgreSQL persistence layer for run history
+- MongoDB-backed live step buffering during in-flight execution
 - REST API with WebSocket support for real-time updates
 - React + TypeScript + Tailwind CSS web UI
 - Docker and Kubernetes/Helm deployment support
@@ -22,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Apache 2.0 license
 
 ### Architecture
+
 - Phase 1: NATS JetStream publisher in ingestion service
 - Phase 2: NATS JetStream consumer in processor service
 - Phase 3: WebSocket real-time streaming and Web UI

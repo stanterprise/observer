@@ -11,8 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stanterprise/observer/internal/database"
-	"github.com/stanterprise/observer/internal/repository"
+	"github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/api"
 	"github.com/stanterprise/observer/pkg/storage"
 	"github.com/stanterprise/observer/pkg/websocket"
@@ -20,43 +22,28 @@ import (
 
 func main() {
 	port := flag.String("port", envOr("PORT", "8080"), "HTTP port to listen on")
-	rawMsgCollection := flag.String("raw-messages-collection", envOr("RAW_MESSAGES_COLLECTION", "raw_messages"), "MongoDB collection for retained raw messages (overrides RAW_MESSAGES_COLLECTION env var)")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Connect to MongoDB
-	mongoDB, err := database.ConnectMongoDBFromEnv(logger)
+	// Connect to PostgreSQL (required for the REST API).
+	pgDB, err := database.ConnectPostgresFromEnv(logger)
 	if err != nil {
-		logger.Error("mongodb connect failed", "error", err)
+		logger.Error("postgres connect failed", "error", err)
 		os.Exit(1)
 	}
-	if mongoDB == nil {
-		logger.Error("MONGODB_URI or MONGO_URI not set; API requires MongoDB")
+	if pgDB == nil {
+		logger.Error("POSTGRES_DSN / DATABASE_URL not set; PostgreSQL is required for the REST API")
 		os.Exit(1)
 	}
-
-	logger.Info("using MongoDB backend for API")
-
-	// Ensure MongoDB connection cleanup
 	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		mongoDB.Close(ctx)
+		if closeErr := pgDB.Close(); closeErr != nil {
+			logger.Warn("failed to close postgres connection", "error", closeErr)
+		}
 	}()
 
-	// Create MongoDB repository and handler
-	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
-	mongoHandler := api.NewMongoHandler(repo, logger)
-
-	// Attach raw message repository if the collection is reachable.
-	// The collection is always attempted; if it's empty (no retention data) the
-	// endpoint simply returns 404 per-request rather than refusing to start.
-	rawMsgRepo := repository.NewRawMessageRepository(mongoDB.Collection(*rawMsgCollection), logger)
-	mongoHandler.SetRawMessageRepo(rawMsgRepo)
-	logger.Info("raw message audit endpoint enabled",
-		"collection", rawMsgRepo.CollectionName(),
-		"database", rawMsgRepo.DatabaseName())
+	// Create database-backed handlers.
+	pgRepo := postgres.NewPostgresRepository(pgDB.DB, logger)
 
 	// Initialize storage driver (optional)
 	storageDriver, err := storage.NewDriverFromEnv(logger)
@@ -76,8 +63,8 @@ func main() {
 		logger.Info("storage driver not configured; attachment retrieval will use inline storage only")
 	}
 
-	// Create attachment handler
-	attachmentHandler := api.NewAttachmentHandler(repo, storageDriver, logger)
+	postgresHandler := api.NewPostgresHandler(pgRepo, logger)
+	postgresAttachmentHandler := api.NewPostgresAttachmentHandler(pgRepo, storageDriver, logger)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub(logger)
@@ -109,21 +96,18 @@ func main() {
 	})
 
 	// Create HTTP server with endpoints
-	mux := http.NewServeMux()
+	router := chi.NewRouter()
+	router.Use(middleware.StripSlashes)
 
 	// Health check endpoint
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "OK\n")
 	})
-	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
 		hub.ServeWS(w, r)
 	})
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
+	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Observer API Service\n")
 		fmt.Fprintf(w, "Available endpoints:\n")
@@ -146,13 +130,13 @@ func main() {
 	})
 
 	// REST API endpoints
-	mongoHandler.RegisterRoutes(mux)
-	attachmentHandler.RegisterRoutes(mux)
+	postgresHandler.RegisterRoutes(router)
+	postgresAttachmentHandler.RegisterRoutes(router)
 
 	addr := ":" + *port
 
 	// Wrap with CORS middleware for local development
-	handler := corsMiddleware(mux, logger)
+	handler := corsMiddleware(router, logger)
 
 	srv := &http.Server{
 		Addr:    addr,

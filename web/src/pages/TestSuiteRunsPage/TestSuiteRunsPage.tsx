@@ -216,7 +216,7 @@ export function TestSuiteRunsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-[var(--stitch-on-surface-muted)]">
+        <div className="text-(--stitch-on-surface-muted)">
           Loading test runs...
         </div>
       </div>
@@ -226,7 +226,7 @@ export function TestSuiteRunsPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-[var(--status-failure)]">Error: {error}</div>
+        <div className="text-(--status-failure)">Error: {error}</div>
       </div>
     );
   }
@@ -245,13 +245,13 @@ export function TestSuiteRunsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-[var(--stitch-on-surface)]">
+        <h1 className="text-3xl font-bold text-(--stitch-on-surface)">
           Test Suite Runs
         </h1>
         <div className="flex gap-2">
           <Link
             to="/suite_runs/raw-messages"
-            className="px-4 py-2 bg-[var(--stitch-surface-card)] text-[var(--stitch-on-surface)] border border-[var(--stitch-outline)] rounded-md hover:bg-[var(--stitch-surface-card)] transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-(--stitch-surface-card) text-(--stitch-on-surface) border border-(--stitch-outline) rounded-md hover:bg-(--stitch-surface-card) transition-colors flex items-center gap-2"
           >
             <FileText className="h-4 w-4" />
             Raw Messages
@@ -260,7 +260,7 @@ export function TestSuiteRunsPage() {
             <>
               <button
                 onClick={handleSetMarker}
-                className="px-4 py-2 bg-[var(--stitch-primary)] text-white rounded-md hover:brightness-105 transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-(--stitch-primary) text-white rounded-md hover:brightness-105 transition-colors flex items-center gap-2"
                 disabled={updatingMarker}
               >
                 <Tag className="h-4 w-4" />
@@ -268,7 +268,7 @@ export function TestSuiteRunsPage() {
               </button>
               <button
                 onClick={handleRemoveMarker}
-                className="px-4 py-2 bg-[var(--stitch-surface-low)] text-[var(--stitch-on-surface)] rounded-md hover:bg-[var(--stitch-surface-card)] transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-(--stitch-surface-low) text-(--stitch-on-surface) rounded-md hover:bg-(--stitch-surface-card) transition-colors flex items-center gap-2"
                 disabled={updatingMarker}
               >
                 <X className="h-4 w-4" />
@@ -276,7 +276,7 @@ export function TestSuiteRunsPage() {
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="px-4 py-2 bg-[var(--status-failure)] text-white rounded-md hover:brightness-105 transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-(--status-failure) text-white rounded-md hover:brightness-105 transition-colors flex items-center gap-2"
                 disabled={deleting}
               >
                 <Trash2 className="h-4 w-4" />
@@ -286,7 +286,7 @@ export function TestSuiteRunsPage() {
           )}
           <button
             onClick={() => fetchRuns()}
-            className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-[var(--stitch-on-primary)] shadow-sm transition-all hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stitch-primary)] focus-visible:ring-offset-2"
+            className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-(--stitch-on-primary) shadow-sm transition-all hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2"
             style={{
               backgroundImage:
                 "linear-gradient(135deg, var(--stitch-primary), var(--stitch-primary-strong))",
@@ -299,9 +299,9 @@ export function TestSuiteRunsPage() {
       </div>
 
       {error && (
-        <Card className="border border-[var(--status-failure-border)] bg-[var(--status-failure-soft)]">
+        <Card className="border border-(--status-failure-border) bg-(--status-failure-soft)">
           <CardContent className="py-4">
-            <div className="flex items-center gap-2 text-[var(--status-failure)]">
+            <div className="flex items-center gap-2 text-(--status-failure)">
               <AlertCircle className="h-5 w-5" />
               <span>{error}</span>
             </div>
@@ -315,14 +315,14 @@ export function TestSuiteRunsPage() {
           <Card className="max-w-md w-full mx-4">
             <CardContent className="p-6">
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <AlertCircle className="h-6 w-6 text-[var(--status-failure)]" />
+                <div className="shrink-0">
+                  <AlertCircle className="h-6 w-6 text-(--status-failure)" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-[var(--stitch-on-surface)] mb-2">
+                  <h3 className="text-lg font-semibold text-(--stitch-on-surface) mb-2">
                     Delete Test Runs
                   </h3>
-                  <p className="text-[var(--stitch-on-surface-muted)] mb-4">
+                  <p className="text-(--stitch-on-surface-muted) mb-4">
                     Are you sure you want to delete {selectedRuns.size} test run
                     {selectedRuns.size !== 1 ? "s" : ""}? This action cannot be
                     undone.
@@ -330,14 +330,14 @@ export function TestSuiteRunsPage() {
                   <div className="flex gap-3 justify-end">
                     <button
                       onClick={() => setShowDeleteConfirm(false)}
-                      className="px-4 py-2 border border-[var(--stitch-outline)] rounded-md hover:bg-[var(--stitch-surface-card)] transition-colors"
+                      className="px-4 py-2 border border-(--stitch-outline) rounded-md hover:bg-(--stitch-surface-card) transition-colors"
                       disabled={deleting}
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleDeleteSelected}
-                      className="px-4 py-2 bg-[var(--status-failure)] text-white rounded-md hover:brightness-105 transition-colors flex items-center gap-2"
+                      className="px-4 py-2 bg-(--status-failure) text-white rounded-md hover:brightness-105 transition-colors flex items-center gap-2"
                       disabled={deleting}
                     >
                       {deleting ? (
@@ -367,14 +367,14 @@ export function TestSuiteRunsPage() {
             <CardContent className="p-6">
               <div className="space-y-4">
                 <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <Tag className="h-6 w-6 text-[var(--stitch-primary)]" />
+                  <div className="shrink-0">
+                    <Tag className="h-6 w-6 text-(--stitch-primary)" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-[var(--stitch-on-surface)] mb-2">
+                    <h3 className="text-lg font-semibold text-(--stitch-on-surface) mb-2">
                       Set Marker for Test Runs
                     </h3>
-                    <p className="text-[var(--stitch-on-surface-muted)] mb-4">
+                    <p className="text-(--stitch-on-surface-muted) mb-4">
                       Set a marker for {selectedRuns.size} test run
                       {selectedRuns.size !== 1 ? "s" : ""}. Markers help
                       organize and filter runs.
@@ -382,7 +382,7 @@ export function TestSuiteRunsPage() {
                     <div className="mb-4">
                       <label
                         htmlFor="marker-input"
-                        className="block text-sm font-medium text-[var(--stitch-on-surface)] mb-2"
+                        className="block text-sm font-medium text-(--stitch-on-surface) mb-2"
                       >
                         Marker Value
                       </label>
@@ -392,7 +392,7 @@ export function TestSuiteRunsPage() {
                         value={markerValue}
                         onChange={(e) => setMarkerValue(e.target.value)}
                         placeholder="e.g., release-1.0, nightly, staging"
-                        className="w-full px-3 py-2 border border-[var(--stitch-outline)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--stitch-primary)]"
+                        className="w-full px-3 py-2 border border-(--stitch-outline) rounded-md focus:outline-none focus:ring-2 focus:ring-(--stitch-primary)"
                         disabled={updatingMarker}
                       />
                     </div>
@@ -402,14 +402,14 @@ export function TestSuiteRunsPage() {
                           setShowMarkerDialog(false);
                           setMarkerValue("");
                         }}
-                        className="px-4 py-2 border border-[var(--stitch-outline)] rounded-md hover:bg-[var(--stitch-surface-card)] transition-colors"
+                        className="px-4 py-2 border border-(--stitch-outline) rounded-md hover:bg-(--stitch-surface-card) transition-colors"
                         disabled={updatingMarker}
                       >
                         Cancel
                       </button>
                       <button
                         onClick={() => handleUpdateMarker(markerValue || null)}
-                        className="px-4 py-2 bg-[var(--stitch-primary)] text-white rounded-md hover:brightness-105 transition-colors flex items-center gap-2"
+                        className="px-4 py-2 bg-(--stitch-primary) text-white rounded-md hover:brightness-105 transition-colors flex items-center gap-2"
                         disabled={updatingMarker || !markerValue.trim()}
                       >
                         {updatingMarker ? (
@@ -437,11 +437,11 @@ export function TestSuiteRunsPage() {
         <Card>
           <CardContent>
             <div className="text-center py-12">
-              <Play className="mx-auto h-12 w-12 text-[var(--stitch-on-surface-muted)]" />
-              <h3 className="mt-2 text-sm font-medium text-[var(--stitch-on-surface)]">
+              <Play className="mx-auto h-12 w-12 text-(--stitch-on-surface-muted)" />
+              <h3 className="mt-2 text-sm font-medium text-(--stitch-on-surface)">
                 No test runs found
               </h3>
-              <p className="mt-1 text-sm text-[var(--stitch-on-surface-muted)]">
+              <p className="mt-1 text-sm text-(--stitch-on-surface-muted)">
                 Test suite runs will appear here once tests are executed.
               </p>
             </div>
@@ -451,8 +451,8 @@ export function TestSuiteRunsPage() {
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="min-w-[1220px] w-full table-auto divide-y divide-[var(--stitch-outline)]">
-                <thead className="bg-[var(--stitch-surface-card)]">
+              <table className="min-w-[1220px] w-full table-auto divide-y divide-(--stitch-outline)">
+                <thead className="bg-(--stitch-surface-card)">
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left w-12">
                       <input
@@ -461,72 +461,72 @@ export function TestSuiteRunsPage() {
                           runs.length > 0 && selectedRuns.size === runs.length
                         }
                         onChange={toggleSelectAll}
-                        className="h-4 w-4 text-[var(--stitch-primary)] focus:ring-[var(--stitch-primary)] border-[var(--stitch-outline)] rounded cursor-pointer"
+                        className="h-4 w-4 text-(--stitch-primary) focus:ring-(--stitch-primary) border-(--stitch-outline) rounded cursor-pointer"
                         aria-label="Select all runs"
                       />
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider w-[38rem]"
+                      className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider w-152"
                     >
                       Run Name
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider w-[14rem]"
+                      className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider w-56"
                     >
                       <div className="flex items-center">
-                        <Tag className="h-4 w-4 mr-1 text-[var(--stitch-primary)]" />
+                        <Tag className="h-4 w-4 mr-1 text-(--stitch-primary)" />
                         Marker
                       </div>
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider w-[10rem]"
+                      className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider w-40"
                     >
                       Status
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider w-[10rem]"
+                      className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider w-40"
                     >
                       Result
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-center text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider w-[10rem]"
+                      className="px-6 py-3 text-center text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider w-40"
                     >
                       <div className="inline-flex items-center justify-center">
                         <span className="inline-flex items-center justify-center">
-                          <CheckCircle className="h-4 w-4 mr-1 text-[var(--status-success)]" />
+                          <CheckCircle className="h-4 w-4 mr-1 text-(--status-success)" />
                           Passed
                         </span>
                         {" + "}
                         <span className="inline-flex items-center justify-center">
-                          <XCircle className="h-4 w-4 mr-1 text-[var(--status-failure)]" />
+                          <XCircle className="h-4 w-4 mr-1 text-(--status-failure)" />
                           Failed
                         </span>
                         {" + "}
                         <span className="inline-flex items-center justify-center">
-                          <CircleDashed className="h-4 w-4 mr-1 text-[var(--stitch-on-surface-muted)]" />
+                          <CircleDashed className="h-4 w-4 mr-1 text-(--stitch-on-surface-muted)" />
                           Skipped
                         </span>
                       </div>
                       <div className="inline-flex items-center justify-center">
                         {" / "}
                         <div className="flex items-center justify-center">
-                          <Play className="h-4 w-4 mr-1 text-[var(--stitch-primary)]" />
+                          <Play className="h-4 w-4 mr-1 text-(--stitch-primary)" />
                           Total
                         </div>
                       </div>
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-[var(--stitch-on-surface-muted)] uppercase tracking-wider w-[14rem]"
+                      className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider w-56"
                     >
                       <button
                         onClick={toggleSortOrder}
-                        className="flex items-center hover:text-[var(--stitch-on-surface)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--stitch-primary)] focus:ring-offset-2 rounded-md px-2 py-1 -mx-2 -my-1"
+                        className="flex items-center hover:text-(--stitch-on-surface) transition-colors focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md px-2 py-1 -mx-2 -my-1"
                         aria-label={`Sort by last updated, currently ${
                           sortOrder === "desc" ? "newest first" : "oldest first"
                         }`}
@@ -538,44 +538,44 @@ export function TestSuiteRunsPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-[var(--stitch-surface-card)] divide-y divide-[var(--stitch-outline)]">
+                <tbody className="bg-(--stitch-surface-card) divide-y divide-(--stitch-outline)">
                   {sortedRuns.map((run) => {
                     const status = getRunStatus(run);
                     return (
                       <tr
                         key={run.id}
-                        className="hover:bg-[var(--stitch-surface-card)] transition-colors"
+                        className="hover:bg-(--stitch-surface-card) transition-colors"
                       >
                         <td className="px-6 py-4 w-12">
                           <input
                             type="checkbox"
                             checked={selectedRuns.has(run.id)}
                             onChange={() => toggleRunSelection(run.id)}
-                            className="h-4 w-4 text-[var(--stitch-primary)] focus:ring-[var(--stitch-primary)] border-[var(--stitch-outline)] rounded cursor-pointer"
+                            className="h-4 w-4 text-(--stitch-primary) focus:ring-(--stitch-primary) border-(--stitch-outline) rounded cursor-pointer"
                             aria-label={`Select ${run.name || run.id}`}
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-normal break-words max-w-[38rem]">
+                        <td className="px-6 py-4 whitespace-normal wrap-break-word max-w-152">
                           <Link
                             to={`/suite_runs/${run.id}`}
-                            className="text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--stitch-primary)] focus:ring-offset-2 rounded"
+                            className="text-(--stitch-primary) hover:text-(--stitch-primary) font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded"
                           >
                             {run.name || run.id}
                           </Link>
                         </td>
-                        <td className="px-6 py-4 whitespace-normal break-words max-w-[14rem]">
+                        <td className="px-6 py-4 whitespace-normal wrap-break-word max-w-56">
                           {run.metadata?.MARKER ? (
                             <Link
                               to={`/marker/${encodeURIComponent(
                                 run.metadata.MARKER as string,
                               )}/stats`}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--stitch-primary-soft)] text-[var(--stitch-primary)] hover:bg-[var(--stitch-primary-soft)] transition-colors"
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-(--stitch-primary-soft) text-(--stitch-primary) hover:bg-(--stitch-primary-soft) transition-colors"
                             >
                               <Tag className="h-3 w-3 mr-1" />
                               {run.metadata.MARKER as string}
                             </Link>
                           ) : (
-                            <span className="text-[var(--stitch-on-surface-muted)] text-sm italic">
+                            <span className="text-(--stitch-on-surface-muted) text-sm italic">
                               No marker
                             </span>
                           )}
@@ -591,37 +591,37 @@ export function TestSuiteRunsPage() {
                           {status !== "RUNNING" && <Badge status={status} />}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className="text-[var(--status-success)] font-semibold">
+                          <span className="text-(--status-success) font-semibold">
                             {run.statistics!.passed}
                           </span>
                           {" + "}
-                          <span className="text-[var(--status-failure)] font-semibold">
+                          <span className="text-(--status-failure) font-semibold">
                             {run.statistics!.failed +
                               (run.statistics!.broken || 0) +
                               (run.statistics!.timedout || 0) +
                               (run.statistics!.interrupted || 0)}
                           </span>
                           {" + "}
-                          <span className="text-[var(--stitch-on-surface-muted)] font-semibold">
+                          <span className="text-(--stitch-on-surface-muted) font-semibold">
                             {run.statistics!.skipped}
                           </span>
                           {" / "}
-                          <span className="text-[var(--stitch-primary)] font-semibold">
+                          <span className="text-(--stitch-primary) font-semibold">
                             {run.statistics!.total}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-normal text-sm text-[var(--stitch-on-surface-muted)]">
+                        <td className="px-6 py-4 whitespace-normal text-sm text-(--stitch-on-surface-muted)">
                           {run.updatedAt ? (
                             <div className="flex flex-col">
                               <span>
                                 {new Date(run.updatedAt).toLocaleDateString()}
                               </span>
-                              <span className="text-xs text-[var(--stitch-on-surface-muted)]">
+                              <span className="text-xs text-(--stitch-on-surface-muted)">
                                 {new Date(run.updatedAt).toLocaleTimeString()}
                               </span>
                             </div>
                           ) : (
-                            <span className="text-[var(--stitch-on-surface-muted)]">
+                            <span className="text-(--stitch-on-surface-muted)">
                               N/A
                             </span>
                           )}

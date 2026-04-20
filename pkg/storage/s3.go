@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -109,19 +110,19 @@ func (d *S3Driver) Upload(ctx context.Context, name, mimeType string, content io
 	// Note: S3 uses a prefix for organization, local driver stores flat
 	storageKey := fmt.Sprintf("attachments/%s%s", id, ext)
 
-	// Wrap reader to count bytes as they're uploaded (stream directly without buffering)
-	var size int64
-	countingReader := &sizeCountingReader{
-		reader: content,
-		size:   &size,
+	contentBytes, err := io.ReadAll(content)
+	if err != nil {
+		return nil, fmt.Errorf("read S3 upload content: %w", err)
 	}
+	size := int64(len(contentBytes))
 
-	// Upload to S3 - stream directly without buffering entire content in memory
+	// Upload to S3 using a seekable reader so S3-compatible backends like MinIO
+	// can compute checksums without TLS-specific streaming constraints.
 	uploadedAt := time.Now()
-	_, err := d.client.PutObject(ctx, &s3.PutObjectInput{
+	_, err = d.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(d.bucket),
 		Key:         aws.String(storageKey),
-		Body:        countingReader,
+		Body:        bytes.NewReader(contentBytes),
 		ContentType: aws.String(mimeType),
 		Metadata: map[string]string{
 			"original-name": name,
@@ -157,18 +158,6 @@ func (d *S3Driver) Upload(ctx context.Context, name, mimeType string, content io
 		StorageURI: storageURI,
 		UploadedAt: uploadedAt,
 	}, nil
-}
-
-// sizeCountingReader wraps an io.Reader and counts bytes read
-type sizeCountingReader struct {
-	reader io.Reader
-	size   *int64
-}
-
-func (r *sizeCountingReader) Read(p []byte) (n int, err error) {
-	n, err = r.reader.Read(p)
-	*r.size += int64(n)
-	return n, err
 }
 
 // Download retrieves an attachment from S3

@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/stanterprise/observer/internal/models"
 	m "github.com/stanterprise/observer/internal/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // handleRunEnd processes a test run end event
-func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) error {
 	var req events.TestRunEndEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -23,27 +24,23 @@ func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessa
 
 	c.logger.Info("run end", "run_id", req.RunId, "status", req.FinalStatus)
 
-	// Convert protobuf Timestamp to *time.Time
-	var startTime *time.Time
-	if req.StartTime != nil {
-		t := req.StartTime.AsTime()
-		startTime = &t
-	}
-
-	// Convert protobuf Duration to *int64 (nanoseconds)
-	var duration *int64
-	if req.Duration != nil {
-		d := req.Duration.AsDuration().Nanoseconds()
-		duration = &d
-	}
+	// Convert protobuf Timestamp to *time.Time (removed, unused)
+	// Convert protobuf Duration to *int64 (removed, unused)
 
 	// Update the test run document with final status, times, and duration
-	if err := c.repo.UpdateTestRunEnd(ctx, req.RunId, req.FinalStatus.String(), startTime, duration); err != nil {
-		return fmt.Errorf("update run end: %w", err)
-	}
+	// MongoDB UpdateTestRunEnd and MarkRunningTestsAsTimedOut removed (legacy)
 
-	if err := c.repo.MarkRunningTestsAsTimedOut(ctx, req.RunId); err != nil {
-		return fmt.Errorf("mark running tests as timed out: %w", err)
+	testRun := models.RunEndEventToTestRun(&req)
+	if c.pgRepo.IsConfigured() {
+		if runShard := models.RunEndEventToRunShard(&req); runShard != nil {
+			if _, err := c.pgRepo.FinalizeRunShardEnd(ctx, runShard); err != nil {
+				return fmt.Errorf("finalize run shard end: %w", err)
+			}
+		} else {
+			if err := c.pgRepo.FinalizeRunEnd(ctx, testRun); err != nil {
+				return fmt.Errorf("finalize run end: %w", err)
+			}
+		}
 	}
 
 	c.emitRunCompletenessSummary(req.RunId, req.FinalStatus.String())
@@ -51,7 +48,7 @@ func (c *MongoNATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessa
 	return nil
 }
 
-func (c *MongoNATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage) error {
 	var req events.ReportRunStartEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -129,5 +126,29 @@ func (c *MongoNATSConsumer) handleRunStart(ctx context.Context, data json.RawMes
 		suites = append(suites, suite)
 	}
 
-	return c.repo.MapSuites(ctx, req.RunId, req.Name, runMetadata, req.TotalTests, suites)
+	testRun, relationalSuites := models.RunStartEventToTestRun(&req)
+	relationalTests := models.RunStartEventToTests(&req)
+	if c.pgRepo.IsConfigured() {
+		if runShard := models.RunStartEventToRunShard(&req); runShard != nil {
+			if err := c.pgRepo.UpsertRunStart(ctx, testRun); err != nil {
+				return fmt.Errorf("upsert run start: %w", err)
+			}
+			if err := c.pgRepo.UpsertRunShardStart(ctx, runShard); err != nil {
+				return fmt.Errorf("upsert run shard start: %w", err)
+			}
+		} else {
+			if err := c.pgRepo.UpsertRunStart(ctx, testRun); err != nil {
+				return fmt.Errorf("upsert run start: %w", err)
+			}
+		}
+		if err := c.pgRepo.UpsertRunStartSuites(ctx, relationalSuites); err != nil {
+			return fmt.Errorf("upsert run start suites: %w", err)
+		}
+		if err := c.pgRepo.UpsertRunStartTests(ctx, relationalTests); err != nil {
+			return fmt.Errorf("upsert run start tests: %w", err)
+		}
+	}
+
+	// MongoDB MapSuites removed (legacy)
+	return nil
 }

@@ -10,7 +10,7 @@ import {
   Search,
   X,
   Filter,
-  Map,
+  Map as MapIcon,
   FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,9 +18,84 @@ import { cn } from "@/lib/utils";
 import { SuiteTitleCard } from "./SuiteTitleCard";
 import type { TestStatus } from "@/types/common";
 import { assembleSuiteHierarchy } from "../TestSuiteRunsPage/utils";
+import type { Test } from "@/types/testCase";
 import type { TestSuite } from "@/types/testSuite";
 import TestSuiteRecord from "./TestSuiteRecord";
 import type { TestRun } from "@/types/testRun";
+
+function flattenSuiteTests(suites: TestSuite[]): Test[] {
+  const flattened: Test[] = [];
+
+  const visit = (suite: TestSuite) => {
+    flattened.push(...(suite.tests ?? []));
+    suite.suites?.forEach(visit);
+  };
+
+  suites.forEach(visit);
+  return flattened;
+}
+
+function flattenSuites(suites: TestSuite[]): TestSuite[] {
+  const flattened: TestSuite[] = [];
+
+  const visit = (suite: TestSuite) => {
+    flattened.push({
+      ...suite,
+      tests: [],
+      suites: [],
+    });
+    suite.suites?.forEach(visit);
+  };
+
+  suites.forEach(visit);
+  return flattened;
+}
+
+function dedupeTests(tests: Test[]): Test[] {
+  const byKey = new Map<string, Test>();
+
+  for (const test of tests) {
+    byKey.set(`${test.id}:${test.suiteId ?? ""}`, test);
+  }
+
+  return Array.from(byKey.values());
+}
+
+function computeStatistics(tests: Test[]) {
+  return {
+    total: tests.length,
+    passed: tests.filter((test) => test.status === "PASSED").length,
+    failed: tests.filter((test) => test.status === "FAILED").length,
+    skipped: tests.filter((test) => test.status === "SKIPPED").length,
+    running: tests.filter((test) => test.status === "RUNNING").length,
+    broken: tests.filter((test) => test.status === "BROKEN").length,
+    timedout: tests.filter((test) => test.status === "TIMEDOUT").length,
+    interrupted: tests.filter((test) => test.status === "INTERRUPTED").length,
+    unknown: tests.filter((test) => test.status === "UNKNOWN").length,
+    expected: tests.filter(
+      (test) => test.status === "PASSED" && (test.attempts?.length ?? 0) === 1,
+    ).length,
+    flaky: tests.filter(
+      (test) => test.status === "PASSED" && (test.attempts?.length ?? 0) > 1,
+    ).length,
+  };
+}
+
+function normalizeRunDetail(data: TestRun): TestRun {
+  const nestedSuites = data.suites ?? [];
+  const suites = flattenSuites(nestedSuites);
+  const tests = dedupeTests([
+    ...(data.tests ?? []),
+    ...flattenSuiteTests(nestedSuites),
+  ]);
+
+  return {
+    ...data,
+    suites,
+    tests,
+    statistics: computeStatistics(tests),
+  };
+}
 
 export function TestRunDetailPage() {
   const pollIntervalMs = config.pollingIntervalMs;
@@ -52,27 +127,7 @@ export function TestRunDetailPage() {
             `Failed to fetch run details: ${response.statusText}`,
           );
         }
-        const data = await response.json();
-
-        data.statistics = {
-          total: data.tests.length,
-          passed: data.tests.filter((t: any) => t.status === "PASSED").length,
-          failed: data.tests.filter((t: any) => t.status === "FAILED").length,
-          skipped: data.tests.filter((t: any) => t.status === "SKIPPED").length,
-          running: data.tests.filter((t: any) => t.status === "RUNNING").length,
-          broken: data.tests.filter((t: any) => t.status === "BROKEN").length,
-          timedout: data.tests.filter((t: any) => t.status === "TIMEDOUT")
-            .length,
-          interrupted: data.tests.filter((t: any) => t.status === "INTERRUPTED")
-            .length,
-          unknown: data.tests.filter((t: any) => t.status === "UNKNOWN").length,
-          expected: data.tests.filter(
-            (t: any) => t.status === "PASSED" && t.attempts.length === 1,
-          ).length,
-          flaky: data.tests.filter(
-            (t: any) => t.status === "PASSED" && t.attempts.length > 1,
-          ).length,
-        };
+        const data = normalizeRunDetail(await response.json());
         console.log("Fetched run details:", data);
 
         setRunDetail(data);
@@ -130,10 +185,19 @@ export function TestRunDetailPage() {
         suites: [],
       } as TestSuite;
     }
-    return assembleSuiteHierarchy(
-      runDetail.suites || [],
-      runDetail.tests || [],
-    );
+
+    if (!runDetail.suites || runDetail.suites.length === 0) {
+      return {
+        id: runDetail.id,
+        name: runDetail.name || runDetail.id,
+        type: "ROOT",
+        runId: runDetail.id,
+        tests: runDetail.tests || [],
+        suites: [],
+      } as TestSuite;
+    }
+
+    return assembleSuiteHierarchy(runDetail.suites, runDetail.tests || []);
   }, [runDetail, runId]);
 
   // Get unique suite types from the hierarchy
@@ -420,7 +484,7 @@ export function TestRunDetailPage() {
                 "linear-gradient(135deg, var(--stitch-primary), var(--stitch-primary-end))",
             }}
           >
-            <Map className="h-5 w-5" />
+            <MapIcon className="h-5 w-5" />
             <span className="font-medium">View Test Map</span>
           </Link>
         </div>

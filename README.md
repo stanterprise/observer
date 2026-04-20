@@ -4,7 +4,7 @@
 
 A test observability system that collects test execution events via gRPC. The system can operate in two modes:
 
-- 🧩 **All-in-One (AIO)** — Single container with embedded services for local/dev use
+- 🧩 **All-in-One (AIO)** — Single container with embedded MongoDB, PostgreSQL, and NATS for local/dev use
 - ⚙️ **Distributed Mode** — Multi-container deployment for production/CI
 
 > 💡 **Quick Start with Codespaces:** Click the badge above to launch a fully configured development environment in seconds! See [CODESPACES.md](CODESPACES.md) for details.
@@ -16,7 +16,7 @@ Get Observer running in 2 minutes! Choose your preferred method:
 **Docker (Fastest)**
 
 ```bash
-docker run -d -p 3000:80 -p 50051:50051 -v observer-data:/data \
+docker run -d -p 3000:80 -p 50051:50051 -p 5432:5432 -v observer-data:/data \
   ghcr.io/stanterprise/observer/aio:latest
 ```
 
@@ -27,7 +27,7 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer --vers
 kubectl port-forward svc/observer-web 3000:80
 ```
 
-Access the Web UI at http://localhost:3000 and gRPC at localhost:50051
+Access the Web UI at http://localhost:3000, gRPC at localhost:50051, and PostgreSQL at localhost:5432 for local inspection.
 
 📖 See [QUICKSTART.md](QUICKSTART.md) for detailed instructions and more deployment options.
 
@@ -220,12 +220,12 @@ make docker-buildx-aio      # Fast cached builds
 
 ### Processor Service
 
-| Variable         | Default                 | Description                                   |
-| ---------------- | ----------------------- | --------------------------------------------- |
-| `MONGODB_URI`    | -                       | MongoDB connection string (required)          |
-| `NATS_URL`       | `nats://localhost:4222` | NATS server URL                               |
-| `NATS_STREAM`    | `tests_events`          | JetStream stream name                         |
-| `NATS_CONSUMER`  | `processor`             | Durable consumer name for JetStream consumer  |
+| Variable        | Default                 | Description                                  |
+| --------------- | ----------------------- | -------------------------------------------- |
+| `MONGODB_URI`   | -                       | MongoDB connection string (required)         |
+| `NATS_URL`      | `nats://localhost:4222` | NATS server URL                              |
+| `NATS_STREAM`   | `tests_events`          | JetStream stream name                        |
+| `NATS_CONSUMER` | `processor`             | Durable consumer name for JetStream consumer |
 
 ### API Service
 

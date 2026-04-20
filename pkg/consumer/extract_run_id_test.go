@@ -92,3 +92,39 @@ func TestExtractRunID(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractTestID(t *testing.T) {
+	tests := []struct {
+		name          string
+		testCaseRunID string
+		runID         string
+		want          string
+	}{
+		{
+			name:          "strips run prefix when present",
+			testCaseRunID: "run-123-test-456",
+			runID:         "run-123",
+			want:          "test-456",
+		},
+		{
+			name:          "returns raw id when no prefix present",
+			testCaseRunID: "test-456",
+			runID:         "run-123",
+			want:          "test-456",
+		},
+		{
+			name:          "returns raw id when run id empty",
+			testCaseRunID: "run-123-test-456",
+			runID:         "",
+			want:          "run-123-test-456",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := extractTestID(tt.testCaseRunID, tt.runID); got != tt.want {
+				t.Fatalf("extractTestID(%q, %q) = %q, want %q", tt.testCaseRunID, tt.runID, got, tt.want)
+			}
+		})
+	}
+}

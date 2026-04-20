@@ -1,2 +1,8 @@
 #!/command/with-contenv sh
+set -eu
+
+until wget --spider -q http://127.0.0.1:8222/healthz; do
+	sleep 1
+done
+
 exec /usr/local/bin/ingestion

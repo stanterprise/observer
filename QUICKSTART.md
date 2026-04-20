@@ -6,7 +6,7 @@ Get Observer up and running in minutes!
 
 ### Option 1: Docker (Fastest - 2 minutes)
 
-For local development and testing.
+For local development and testing. The AIO image embeds MongoDB, PostgreSQL, and NATS.
 
 ```bash
 # Pull and run the All-in-One image
@@ -14,12 +14,14 @@ docker run -d \
   --name observer \
   -p 3000:80 \
   -p 50051:50051 \
+  -p 5432:5432 \
   -v observer-data:/data \
   ghcr.io/stanterprise/observer/aio:latest
 
 # Access:
 # - Web UI: http://localhost:3000
 # - gRPC endpoint: localhost:50051
+# - PostgreSQL: localhost:5432
 ```
 
 ### Option 2: Docker Compose (5 minutes)

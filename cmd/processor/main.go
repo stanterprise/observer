@@ -10,8 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	"gorm.io/gorm"
+
 	"github.com/stanterprise/observer/internal/database"
-	"github.com/stanterprise/observer/internal/repository"
+	"github.com/stanterprise/observer/internal/repository/mongodb"
+	"github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/consumer"
 )
 
@@ -27,58 +30,61 @@ func main() {
 		dlqSubject       = flag.String("dlq-subject", envOr("NATS_DLQ_SUBJECT", "tests.events.v1.dlq"), "JetStream subject for dead-letter messages")
 		deferMaxAttempts = flag.Int("defer-max-attempts", envOrInt("DEFER_QUEUE_MAX_ATTEMPTS", 5), "Maximum replay attempts for deferred orphan step events")
 		deferTTL         = flag.Duration("defer-ttl", envOrDuration("DEFER_QUEUE_TTL", 5*time.Minute), "TTL for deferred orphan step events")
-		retainMessages   = flag.Bool("retain-messages", envOr("RETAIN_MESSAGES", "") == "true", "Retain all raw NATS messages grouped by run_id in MongoDB (overrides RETAIN_MESSAGES env var)")
-		rawMsgCollection = flag.String("raw-messages-collection", envOr("RAW_MESSAGES_COLLECTION", "raw_messages"), "MongoDB collection for retained raw messages (overrides RAW_MESSAGES_COLLECTION env var)")
+		retainMessages   = flag.Bool("retain-messages", envOr("RETAIN_MESSAGES", "") == "true", "Deprecated no-op retained for compatibility; raw MongoDB message retention has been removed")
 	)
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Connect to MongoDB
+	// Connect to MongoDB for bufferized step management only.
 	mongoDB, err := database.ConnectMongoDBFromEnv(logger)
 	if err != nil {
 		logger.Error("mongodb connect failed", "error", err)
 		os.Exit(1)
 	}
 	if mongoDB == nil {
-		logger.Error("MONGODB_URI or MONGO_URI not set; processor requires MongoDB")
+		logger.Error("MONGODB_URI or MONGO_URI not set (required for bufferized step management)")
 		os.Exit(1)
 	}
+	defer mongoDB.Close(context.Background())
 
-	logger.Info("using MongoDB backend")
+	// Connect to PostgreSQL (optional — processor continues without it but PG writes will no-op).
+	pgDB, err := database.ConnectPostgresFromEnv(logger)
+	if err != nil {
+		logger.Error("postgres connect failed", "error", err)
+		os.Exit(1)
+	}
+	var pgGormDB *gorm.DB
+	if pgDB != nil {
+		defer func() {
+			if closeErr := pgDB.Close(); closeErr != nil {
+				logger.Warn("failed to close postgres connection", "error", closeErr)
+			}
+		}()
+		pgGormDB = pgDB.DB
+	}
+	pgRepo := postgres.NewPostgresRepository(pgGormDB, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	defer mongoDB.Close(ctx)
 
-	repo := repository.NewMongoRepository(mongoDB.TestRunsCollection(), logger)
+	// Instantiate MongoRepository for the standalone live step buffer collection.
+	bufferRepo := mongodb.NewMongoRepository(mongoDB.LiveStepBuffersCollection(), logger)
 
-	// Optionally create the raw message repository when retention is enabled.
-	var rawMsgRepo *repository.RawMessageRepository
-	if *retainMessages {
-		rawMsgRepo = repository.NewRawMessageRepository(mongoDB.Collection(*rawMsgCollection), logger)
-		logger.Info("raw message retention enabled",
-			"database", mongoDB.DatabaseName(),
-			"collection", rawMsgRepo.CollectionName())
+	cfg := consumer.NATSConsumerConfig{
+		URL:          *natsURL,
+		StreamName:   *streamName,
+		ConsumerName: *consumerName,
+		BatchSize:    *batchSize,
+		MaxWait:      *maxWait,
+		MaxDeliver:   *maxDeliver,
+		AckWait:      *ackWait,
+		DLQSubject:   *dlqSubject,
 	}
 
-	cfg := consumer.MongoNATSConsumerConfig{
-		URL:                   *natsURL,
-		StreamName:            *streamName,
-		ConsumerName:          *consumerName,
-		BatchSize:             *batchSize,
-		MaxWait:               *maxWait,
-		MaxDeliver:            *maxDeliver,
-		AckWait:               *ackWait,
-		DLQSubject:            *dlqSubject,
-		DeferQueueMaxAttempts: *deferMaxAttempts,
-		DeferQueueTTL:         *deferTTL,
-		RetainMessages:        *retainMessages,
-	}
-
-	natsConsumer, err := consumer.NewMongoNATSConsumer(cfg, logger, repo, rawMsgRepo)
+	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, bufferRepo, pgRepo)
 	if err != nil {
-		logger.Error("failed to create MongoDB NATS consumer", "error", err)
+		logger.Error("failed to create NATS consumer", "error", err)
 		os.Exit(1)
 	}
 	defer natsConsumer.Close()

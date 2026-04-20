@@ -32,6 +32,7 @@ npm run dev
 ```
 
 The development server will start at `http://localhost:3000` with proxying configured for:
+
 - `/api/*` → `http://localhost:8080/api/*`
 - `/ws` → `ws://localhost:8080/ws`
 
@@ -51,10 +52,10 @@ The built files will be in the `dist/` directory.
 
 Configure API and WebSocket endpoints via environment variables:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_URL` | Base URL for REST API requests | `/api` |
-| `VITE_WS_URL` | WebSocket endpoint URL | `ws://localhost/ws` (auto-detects protocol) |
+| Variable       | Description                    | Default                                     |
+| -------------- | ------------------------------ | ------------------------------------------- |
+| `VITE_API_URL` | Base URL for REST API requests | `/api`                                      |
+| `VITE_WS_URL`  | WebSocket endpoint URL         | `ws://localhost/ws` (auto-detects protocol) |
 
 ### Example: Custom API Endpoint
 
@@ -71,6 +72,7 @@ In AIO mode, the Web UI is served by Nginx within the same container as the back
 - **Web UI**: Port 80 (configurable via `AIO_WEB_PORT`)
 - **API Backend**: Internal port 8080 (proxied by Nginx)
 - **WebSocket**: Proxied through Nginx at `/ws`
+- **Data Services**: Embedded MongoDB and PostgreSQL behind the backend services
 
 Access the UI at `http://localhost:3000` (or your configured port).
 

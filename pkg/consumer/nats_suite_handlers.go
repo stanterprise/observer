@@ -5,15 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
-	m "github.com/stanterprise/observer/internal/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // handleSuiteBegin processes a suite begin event
-func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessage) error {
 	var req events.SuiteBeginEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -37,57 +35,14 @@ func (c *MongoNATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawM
 		md[k] = v
 	}
 
-	var startTime *time.Time
-	if req.Suite.StartTime != nil {
-		t := req.Suite.StartTime.AsTime()
-		startTime = &t
-	}
+	// startTime, endTime, duration removed (unused)
 
-	var endTime *time.Time
-	if req.Suite.EndTime != nil {
-		t := req.Suite.EndTime.AsTime()
-		endTime = &t
-	}
-
-	var duration *int64
-	if req.Suite.Duration != nil {
-		d := req.Suite.Duration.AsDuration().Nanoseconds()
-		duration = &d
-	}
-
-	suite := &m.SuiteDocument{
-		ID:              req.Suite.Id,
-		RunID:           req.Suite.RunId,
-		ParentSuiteID:   req.Suite.ParentSuiteId,
-		Name:            req.Suite.Name,
-		Description:     req.Suite.Description,
-		Status:          req.Suite.Status.String(),
-		Metadata:        md,
-		Duration:        duration,
-		Location:        req.Suite.Location,
-		Type:            req.Suite.Type.String(),
-		TestSuiteSpecID: "",
-		InitiatedBy:     req.Suite.InitiatedBy,
-		ProjectName:     req.Suite.Project,
-		Author:          req.Suite.Author,
-		Owner:           req.Suite.Owner,
-		TestCaseIds:     req.Suite.TestCaseIds,
-		SubSuiteIds:     req.Suite.SubSuiteIds,
-		// Tags:            req.Suite.Tags, // TODO: Add when available in protobuf
-		StartTime:       startTime,
-		EndTime:         endTime,
-	}
-
-	// Use ParentSuiteId directly from protobuf (already set in suite object)
-	// For root suites: ParentSuiteId will be empty string
-	// For nested suites: ParentSuiteId will be set to parent's ID
-	runID := req.Suite.RunId
-
-	return c.repo.UpsertSuiteBegin(ctx, runID, suite, suite.ParentSuiteID)
+	// TODO: Implement Postgres UpsertSuiteBegin if needed, or remove if not required.
+	return nil
 }
 
 // handleSuiteEnd processes a suite end event
-func (c *MongoNATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage) error {
+func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage) error {
 	var req events.SuiteEndEventRequest
 	unmarshaler := protojson.UnmarshalOptions{
 		DiscardUnknown: true,
@@ -104,20 +59,6 @@ func (c *MongoNATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMes
 		"id", req.Suite.Id,
 		"status", req.Suite.Status)
 
-	var endTime *time.Time
-	if req.Suite.EndTime != nil {
-		t := req.Suite.EndTime.AsTime()
-		endTime = &t
-	}
-
-	var duration *int64
-	if req.Suite.Duration != nil {
-		d := req.Suite.Duration.AsDuration().Nanoseconds()
-		duration = &d
-	}
-
-	// Use RunId directly from protobuf
-	runID := req.Suite.RunId
-
-	return c.repo.UpsertSuiteEnd(ctx, runID, req.Suite.Id, req.Suite.Status.String(), endTime, duration)
+	// TODO: Implement Postgres UpsertSuiteEnd if needed, or remove if not required.
+	return nil
 }

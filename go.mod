@@ -1,8 +1,6 @@
 module github.com/stanterprise/observer
 
-go 1.24.0
-
-toolchain go1.24.9
+go 1.25.0
 
 require (
 	github.com/99designs/gqlgen v0.17.83
@@ -10,10 +8,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.7
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.7
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
+	github.com/go-chi/chi/v5 v5.2.3
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/nats-io/nats.go v1.47.0
-	github.com/stanterprise/proto-go v0.0.15
+	github.com/stanterprise/proto-go v0.1.0
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/mongodb v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/nats v0.40.0
@@ -21,6 +20,9 @@ require (
 	go.mongodb.org/mongo-driver v1.17.3
 	google.golang.org/grpc v1.75.1
 	google.golang.org/protobuf v1.36.10
+	gorm.io/driver/postgres v1.6.0
+	gorm.io/driver/sqlite v1.6.0
+	gorm.io/gorm v1.31.1
 )
 
 require (
@@ -61,9 +63,16 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/pgx/v5 v5.6.0 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
+	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.1.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect

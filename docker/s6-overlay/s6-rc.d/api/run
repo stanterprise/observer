@@ -1,2 +1,16 @@
 #!/command/with-contenv sh
+set -eu
+
+if [ -z "${POSTGRES_DSN:-}" ]; then
+	export POSTGRES_DSN="postgres://${POSTGRES_USER:-observer}:${POSTGRES_PASSWORD:-password}@127.0.0.1:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-observer}?sslmode=disable"
+fi
+
+until pg_isready -h 127.0.0.1 -p "${POSTGRES_PORT:-5432}" -U "${POSTGRES_USER:-observer}" -d "${POSTGRES_DB:-observer}" >/dev/null 2>&1; do
+	sleep 1
+done
+
+until wget --spider -q http://127.0.0.1:8222/healthz; do
+	sleep 1
+done
+
 exec /usr/local/bin/api

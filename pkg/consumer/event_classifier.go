@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/stanterprise/observer/internal/repository"
 	"github.com/stanterprise/observer/pkg/publisher"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 )
@@ -25,17 +24,15 @@ const (
 
 // Classifier determines if an event can be immediately processed or needs buffering
 type Classifier struct {
-	repo   *repository.MongoRepository
 	logger *slog.Logger
 }
 
 // NewClassifier creates a new event classifier
-func NewClassifier(repo *repository.MongoRepository, logger *slog.Logger) *Classifier {
+func NewClassifier(logger *slog.Logger) *Classifier {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}
 	return &Classifier{
-		repo:   repo,
 		logger: logger,
 	}
 }
@@ -91,24 +88,7 @@ func (c *Classifier) classifySuiteBegin(ctx context.Context, event publisher.Eve
 		return ClassifyImmediate, nil
 	}
 
-	// Non-root suite: check if parent exists
-	exists, err := c.repo.SuiteExists(ctx, parentSuiteID)
-	if err != nil {
-		c.logger.Error("failed to check parent suite existence",
-			"suite_id", req.Suite.Id,
-			"parent_suite_id", parentSuiteID,
-			"error", err)
-		return ClassifyBuffer, fmt.Errorf("check parent suite: %w", err)
-	}
-
-	if exists {
-		c.logger.Debug("nested suite begin - parent exists - immediate",
-			"suite_id", req.Suite.Id,
-			"parent_suite_id", parentSuiteID)
-		return ClassifyImmediate, nil
-	}
-
-	c.logger.Debug("nested suite begin - parent missing - buffer",
+	c.logger.Debug("nested suite begin - parent existence unknown - buffer",
 		"suite_id", req.Suite.Id,
 		"parent_suite_id", parentSuiteID)
 	return ClassifyBuffer, nil
@@ -127,37 +107,7 @@ func (c *Classifier) classifySuiteEnd(ctx context.Context, event publisher.Event
 
 	suiteID := req.Suite.Id
 
-	// Check if this is a root suite by checking if a document with this ID exists
-	// Root suite ID is used as the document _id
-	exists, err := c.repo.SuiteExists(ctx, suiteID)
-	if err != nil {
-		c.logger.Error("failed to check suite existence",
-			"suite_id", suiteID,
-			"error", err)
-		return ClassifyImmediate, fmt.Errorf("check suite: %w", err)
-	}
-
-	// If suite exists as a document (root suite), this triggers reconciliation
-	// We check by attempting to get the run document with this ID
-	run, err := c.repo.GetTestRun(ctx, suiteID)
-	if err != nil {
-		return ClassifyImmediate, fmt.Errorf("get test run: %w", err)
-	}
-
-	if run != nil && run.ID == suiteID {
-		c.logger.Debug("root suite end - trigger reconciliation",
-			"suite_id", suiteID)
-		return ClassifyReconcile, nil
-	}
-
-	// Non-root suite end can be processed immediately if suite exists
-	if exists {
-		c.logger.Debug("nested suite end - immediate",
-			"suite_id", suiteID)
-		return ClassifyImmediate, nil
-	}
-
-	c.logger.Debug("suite end - suite missing - buffer",
+	c.logger.Debug("suite end - suite existence unknown - buffer",
 		"suite_id", suiteID)
 	return ClassifyBuffer, nil
 }
@@ -187,24 +137,7 @@ func (c *Classifier) classifyTestBegin(ctx context.Context, event publisher.Even
 		return ClassifyBuffer, nil
 	}
 
-	// Check if parent suite exists
-	exists, err := c.repo.SuiteExists(ctx, parentSuiteID)
-	if err != nil {
-		c.logger.Error("failed to check parent suite existence",
-			"test_id", req.TestCase.Id,
-			"parent_suite_id", parentSuiteID,
-			"error", err)
-		return ClassifyBuffer, fmt.Errorf("check parent suite: %w", err)
-	}
-
-	if exists {
-		c.logger.Debug("test begin - parent suite exists - immediate",
-			"test_id", req.TestCase.Id,
-			"parent_suite_id", parentSuiteID)
-		return ClassifyImmediate, nil
-	}
-
-	c.logger.Debug("test begin - parent suite missing - buffer",
+	c.logger.Debug("test begin - parent suite existence unknown - buffer",
 		"test_id", req.TestCase.Id,
 		"parent_suite_id", parentSuiteID)
 	return ClassifyBuffer, nil
@@ -223,22 +156,7 @@ func (c *Classifier) classifyTestEnd(ctx context.Context, event publisher.Event)
 
 	testID := req.TestCase.Id
 
-	// Check if test exists
-	exists, err := c.repo.TestExists(ctx, testID)
-	if err != nil {
-		c.logger.Error("failed to check test existence",
-			"test_id", testID,
-			"error", err)
-		return ClassifyBuffer, fmt.Errorf("check test: %w", err)
-	}
-
-	if exists {
-		c.logger.Debug("test end - test exists - immediate",
-			"test_id", testID)
-		return ClassifyImmediate, nil
-	}
-
-	c.logger.Debug("test end - test missing - buffer",
+	c.logger.Debug("test end - test existence unknown - buffer",
 		"test_id", testID)
 	return ClassifyBuffer, nil
 }
@@ -262,24 +180,7 @@ func (c *Classifier) classifyStepBegin(ctx context.Context, event publisher.Even
 		return ClassifyBuffer, nil
 	}
 
-	// Check if parent test exists
-	exists, err := c.repo.TestExists(ctx, testID)
-	if err != nil {
-		c.logger.Error("failed to check parent test existence",
-			"step_id", req.Step.Id,
-			"test_id", testID,
-			"error", err)
-		return ClassifyBuffer, fmt.Errorf("check parent test: %w", err)
-	}
-
-	if exists {
-		c.logger.Debug("step begin - parent test exists - immediate",
-			"step_id", req.Step.Id,
-			"test_id", testID)
-		return ClassifyImmediate, nil
-	}
-
-	c.logger.Debug("step begin - parent test missing - buffer",
+	c.logger.Debug("step begin - parent test existence unknown - buffer",
 		"step_id", req.Step.Id,
 		"test_id", testID)
 	return ClassifyBuffer, nil
@@ -298,22 +199,7 @@ func (c *Classifier) classifyStepEnd(ctx context.Context, event publisher.Event)
 
 	stepID := req.Step.Id
 
-	// Check if step exists
-	exists, err := c.repo.StepExists(ctx, stepID)
-	if err != nil {
-		c.logger.Error("failed to check step existence",
-			"step_id", stepID,
-			"error", err)
-		return ClassifyBuffer, fmt.Errorf("check step: %w", err)
-	}
-
-	if exists {
-		c.logger.Debug("step end - step exists - immediate",
-			"step_id", stepID)
-		return ClassifyImmediate, nil
-	}
-
-	c.logger.Debug("step end - step missing - buffer",
+	c.logger.Debug("step end - step existence unknown - buffer",
 		"step_id", stepID)
 	return ClassifyBuffer, nil
 }
@@ -347,22 +233,7 @@ func (c *Classifier) classifyRunEnd(ctx context.Context, event publisher.Event) 
 	}
 
 	runID := req.RunId
-	// Check if run exists
-	exists, err := c.repo.TestRunExists(ctx, runID)
-	if err != nil {
-		c.logger.Error("failed to check run existence",
-			"run_id", runID,
-			"error", err)
-		return ClassifyBuffer, fmt.Errorf("check run: %w", err)
-	}
-
-	if exists {
-		c.logger.Debug("run end - immediate",
-			"run_id", runID)
-		return ClassifyImmediate, nil
-	}
-
-	c.logger.Debug("run end - run missing - buffer",
+	c.logger.Debug("run end - run existence unknown - buffer",
 		"run_id", runID)
 	return ClassifyBuffer, nil
 }
