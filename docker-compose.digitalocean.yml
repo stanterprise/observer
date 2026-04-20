@@ -39,7 +39,7 @@ services:
 
     environment:
       # MongoDB configuration
-      MONGODB_URI: mongodb://localhost:27017/observer
+      MONGODB_URI: mongodb://127.0.0.1:27017/observer
 
       # PostgreSQL configuration for relational execution
       POSTGRES_DSN: postgres://${POSTGRES_USER:-observer}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-observer}?sslmode=disable

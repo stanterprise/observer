@@ -166,7 +166,7 @@ RUN mkdir -p /data/artifacts /data/db /data/mongodb /data/postgresql /run /run/p
     chown -R postgres:postgres /data/postgresql /run/postgresql
 
 # Environment variables
-ENV MONGODB_URI=mongodb://localhost:27017/observer \
+ENV MONGODB_URI=mongodb://127.0.0.1:27017/observer \
     POSTGRES_MAJOR=15 \
     STORAGE_DRIVER=local \
     ARTIFACTS_DIR=/data/artifacts \
