@@ -3,7 +3,7 @@
 This project provides **test observability** across multiple frameworks (Playwright, pytest, JUnit, etc.) using a gRPC-based event protocol.  
 The system can operate in two modes:
 
-- 🧩 **All-in-One (AIO)** — a compact, single-container deployment for local/dev use.
+- 🧩 **All-in-One (AIO)** — a compact, single-container deployment with embedded MongoDB, PostgreSQL, and NATS for local/dev use.
 - ⚙️ **Distributed Mode** — scalable multi-container deployment similar to Selenium Grid, used in CI/CD or production.
 
 The architecture follows the same principles in both modes — identical binaries, different configuration via environment variables.
@@ -14,7 +14,7 @@ The architecture follows the same principles in both modes — identical binarie
 
 - Unified schema and ingestion protocol (protobuf)
 - Real-time event streaming via NATS or Kafka
-- MongoDB-backed storage for test runs and events
+- MongoDB-backed live buffering plus PostgreSQL-backed relational run storage
 - Pluggable artifact storage (local, S3, MinIO)
 - Extensible APIs for custom dashboards, analytics, and alerting
 - Simple onboarding (AIO) + horizontal scalability (distributed)

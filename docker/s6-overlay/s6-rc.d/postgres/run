@@ -1,0 +1,43 @@
+#!/command/with-contenv sh
+set -eu
+
+pg_major="${POSTGRES_MAJOR:-15}"
+pg_bin_dir="/usr/lib/postgresql/${pg_major}/bin"
+pg_data_dir="${POSTGRES_DATA_DIR:-/data/postgresql}"
+pg_socket_dir="/run/postgresql"
+pg_user="${POSTGRES_USER:-observer}"
+pg_password="${POSTGRES_PASSWORD:-password}"
+pg_db="${POSTGRES_DB:-observer}"
+
+install -d -m 0700 -o postgres -g postgres "$pg_data_dir"
+install -d -m 0775 -o postgres -g postgres "$pg_socket_dir"
+
+if [ ! -s "$pg_data_dir/PG_VERSION" ]; then
+	s6-setuidgid postgres "$pg_bin_dir/initdb" -D "$pg_data_dir" --username=postgres --auth-local=trust --auth-host=scram-sha-256 --encoding=UTF8 --locale=C.UTF-8 >/dev/null
+	cat >> "$pg_data_dir/postgresql.conf" <<EOF
+listen_addresses = '127.0.0.1'
+port = 5432
+unix_socket_directories = '$pg_socket_dir'
+EOF
+	s6-setuidgid postgres "$pg_bin_dir/pg_ctl" -D "$pg_data_dir" -w start >/dev/null
+	role_exists=$(s6-setuidgid postgres "$pg_bin_dir/psql" -h "$pg_socket_dir" -U postgres -d postgres -tA --set=observer_user="$pg_user" <<'EOF'
+SELECT 1 FROM pg_roles WHERE rolname = :'observer_user';
+EOF
+	)
+	if [ -z "$role_exists" ]; then
+		s6-setuidgid postgres "$pg_bin_dir/createuser" -h "$pg_socket_dir" -U postgres --login "$pg_user"
+	fi
+	s6-setuidgid postgres "$pg_bin_dir/psql" -h "$pg_socket_dir" -U postgres -d postgres --set=observer_user="$pg_user" --set=observer_password="$pg_password" <<'EOF'
+SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L', :'observer_user', :'observer_password')\gexec
+EOF
+	db_exists=$(s6-setuidgid postgres "$pg_bin_dir/psql" -h "$pg_socket_dir" -U postgres -d postgres -tA --set=observer_db="$pg_db" <<'EOF'
+SELECT 1 FROM pg_database WHERE datname = :'observer_db';
+EOF
+	)
+	if [ -z "$db_exists" ]; then
+		s6-setuidgid postgres "$pg_bin_dir/createdb" -h "$pg_socket_dir" -U postgres -O "$pg_user" "$pg_db"
+	fi
+	s6-setuidgid postgres "$pg_bin_dir/pg_ctl" -D "$pg_data_dir" -m fast -w stop >/dev/null
+fi
+
+exec s6-setuidgid postgres "$pg_bin_dir/postgres" -D "$pg_data_dir"

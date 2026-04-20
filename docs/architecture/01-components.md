@@ -25,10 +25,10 @@
 
 ## 4. Databases
 
-| Mode        | Engine  | Notes                                |
-| ----------- | ------- | ------------------------------------ |
-| AIO         | MongoDB | Embedded for local/dev               |
-| Distributed | MongoDB | External service in distributed mode |
+| Mode        | Engine               | Notes                                                    |
+| ----------- | -------------------- | -------------------------------------------------------- |
+| AIO         | MongoDB + PostgreSQL | Embedded MongoDB live buffer plus embedded relational DB |
+| Distributed | MongoDB + PostgreSQL | External services for live buffering and relational data |
 
 ## 5. Artifact Storage
 

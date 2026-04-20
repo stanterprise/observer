@@ -6,16 +6,22 @@ A single container with multiple internal services managed via **s6-overlay**.
 
 ### Includes
 
-- `observer` binary (ingestion + API)
+- `ingestion`, `processor`, and `api` services managed by `s6-overlay`
 - Embedded `nats-server`
 - Embedded MongoDB
+- Embedded PostgreSQL
+- Nginx-served Web UI
 - Local artifact store
 
 ### Ports
 
-- `8080` → API & UI
+- `80` → Web UI
+- `50051` → gRPC ingestion
+- `8080` → Internal API
 - `4222` → NATS
-- `4317` → OTLP tracing
+- `8222` → NATS monitoring
+- `27017` → Internal MongoDB
+- `5432` → Internal PostgreSQL, optionally published by Compose as `AIO_POSTGRES_PORT`
 
 ### Use Case
 
@@ -33,7 +39,8 @@ Each component runs as an independent container or Kubernetes Deployment.
 - `processor` (event consumer)
 - `api` (HTTP + UI)
 - `nats` (message broker)
-- `mongodb` (DB)
+- `mongodb` (live step buffer DB)
+- `postgres` (relational run storage)
 
 ### Scaling
 

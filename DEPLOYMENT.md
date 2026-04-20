@@ -19,7 +19,7 @@ Observer provides pre-built Docker images for all components, published to GitHu
 
 All images are available at `ghcr.io/stanterprise/observer/`:
 
-- **aio**: All-in-One image with all services embedded
+- **aio**: All-in-One image with embedded MongoDB, PostgreSQL, NATS, and application services
 - **ingestion**: gRPC ingestion service
 - **processor**: Event processor service
 - **api**: REST/GraphQL API service with WebSocket support
@@ -28,6 +28,7 @@ All images are available at `ghcr.io/stanterprise/observer/`:
 ### Image Tags
 
 Images are tagged with:
+
 - `latest` - Latest build from main branch
 - `main` - Main branch build
 - `develop` - Develop branch build
@@ -60,14 +61,17 @@ docker run -d \
   -p 3000:80 \
   -p 50051:50051 \
   -p 8080:8080 \
+  -p 5432:5432 \
   -v observer-data:/data \
   ghcr.io/stanterprise/observer/aio:latest
 ```
 
 Access:
+
 - Web UI: http://localhost:3000
 - gRPC: localhost:50051
 - API: http://localhost:8080
+- PostgreSQL: localhost:5432
 
 #### Distributed Mode with Docker Compose
 
@@ -164,8 +168,10 @@ kubectl get all -l app.kubernetes.io/instance=observer
 Best for: Development, testing, proof-of-concept, small-scale deployments
 
 **Features:**
+
 - Single pod deployment
 - Embedded MongoDB database
+- Embedded PostgreSQL database
 - Embedded NATS server
 - All services in one container
 - Lower resource requirements
@@ -199,6 +205,7 @@ kubectl port-forward svc/observer-aio 50051:50051
 Best for: Production, CI/CD, high-scale deployments, high availability
 
 **Features:**
+
 - Separate pods for each service
 - Horizontal scaling with HPA
 - External or embedded MongoDB
@@ -223,6 +230,7 @@ helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
 ```
 
 **Services:**
+
 - `observer-ingestion`: gRPC endpoint (port 50051)
 - `observer-processor`: Event processor (no external port)
 - `observer-api`: REST/GraphQL API + WebSocket (port 8080)
@@ -263,7 +271,7 @@ aio:
   persistence:
     enabled: true
     size: 10Gi
-    storageClass: "standard"  # or your preferred storage class
+    storageClass: "standard" # or your preferred storage class
 ```
 
 #### Distributed Mode
@@ -390,7 +398,7 @@ image:
 
 distributed:
   enabled: true
-  
+
   ingestion:
     replicaCount: 3
     autoscaling:
@@ -400,7 +408,7 @@ distributed:
     resources:
       requests: { cpu: 200m, memory: 256Mi }
       limits: { cpu: 1000m, memory: 512Mi }
-  
+
   processor:
     replicaCount: 3
     autoscaling:
@@ -410,7 +418,7 @@ distributed:
     resources:
       requests: { cpu: 500m, memory: 512Mi }
       limits: { cpu: 2000m, memory: 2Gi }
-  
+
   api:
     replicaCount: 3
     autoscaling:
@@ -420,7 +428,7 @@ distributed:
     resources:
       requests: { cpu: 200m, memory: 256Mi }
       limits: { cpu: 1000m, memory: 1Gi }
-  
+
   web:
         replicaCount: 2
     resources:
@@ -473,7 +481,7 @@ ingress:
     - secretName: observer-tls
       hosts:
         - observer.example.com
-  
+
   grpc:
     enabled: true
     annotations:
@@ -633,5 +641,6 @@ kubectl delete namespace observer
 ## Support
 
 For issues and questions:
+
 - GitHub Issues: https://github.com/stanterprise/observer/issues
 - Documentation: https://github.com/stanterprise/observer/tree/main/docs
