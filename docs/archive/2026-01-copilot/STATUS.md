@@ -2,7 +2,7 @@
 
 **Last updated**: 2025-12-17
 
-Observer is a test observability system that ingests test execution events via gRPC, publishes them to NATS JetStream, persists them to MongoDB, and serves historical + real-time views via an API service (REST + WebSocket) and a React Web UI.
+Observer is a test observability system that ingests test execution events via gRPC, publishes them to NATS JetStream, persists historical run data to PostgreSQL, uses MongoDB only for live step buffering during in-flight execution, and serves historical + real-time views via an API service (REST + WebSocket) and a React Web UI.
 
 ## Where to look
 

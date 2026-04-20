@@ -30,14 +30,13 @@ func main() {
 		dlqSubject       = flag.String("dlq-subject", envOr("NATS_DLQ_SUBJECT", "tests.events.v1.dlq"), "JetStream subject for dead-letter messages")
 		deferMaxAttempts = flag.Int("defer-max-attempts", envOrInt("DEFER_QUEUE_MAX_ATTEMPTS", 5), "Maximum replay attempts for deferred orphan step events")
 		deferTTL         = flag.Duration("defer-ttl", envOrDuration("DEFER_QUEUE_TTL", 5*time.Minute), "TTL for deferred orphan step events")
-		retainMessages   = flag.Bool("retain-messages", envOr("RETAIN_MESSAGES", "") == "true", "Retain all raw NATS messages grouped by run_id in MongoDB (overrides RETAIN_MESSAGES env var)")
-		// rawMsgCollection removed (no longer used)
+		retainMessages   = flag.Bool("retain-messages", envOr("RETAIN_MESSAGES", "") == "true", "Deprecated no-op retained for compatibility; raw MongoDB message retention has been removed")
 	)
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Connect to MongoDB for bufferized step management and raw message retention only.
+	// Connect to MongoDB for bufferized step management only.
 	mongoDB, err := database.ConnectMongoDBFromEnv(logger)
 	if err != nil {
 		logger.Error("mongodb connect failed", "error", err)
@@ -85,7 +84,7 @@ func main() {
 
 	natsConsumer, err := consumer.NewNATSConsumer(cfg, logger, bufferRepo, pgRepo)
 	if err != nil {
-		logger.Error("failed to create MongoDB NATS consumer", "error", err)
+		logger.Error("failed to create NATS consumer", "error", err)
 		os.Exit(1)
 	}
 	defer natsConsumer.Close()

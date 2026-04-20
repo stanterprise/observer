@@ -47,17 +47,10 @@ func extractTestID(testCaseRunID, runID string) string {
 	return testCaseRunID
 }
 
-// NATSConsumer wraps a NATS JetStream consumer for processing test events
-// and persisting them to MongoDB using a document-based data model.
-//
-// Event Processing Flow:
-// - Suite Begin (root): Creates a new TestRunDocument if it doesn't exist
-// - Suite Begin (nested): Finds parent suite in root document and upserts the nested suite
-// - Test Begin: Finds parent suite in root document and upserts the test
-// - Step Begin: Finds parent test in root document and upserts the step
-// - End Events: Find and update existing entities within the root document
-//
-// All operations follow an upsert pattern: update if entity exists, insert if not found.
+// NATSConsumer wraps a NATS JetStream consumer for processing test events.
+// Structured run, suite, test, and attempt data is persisted to PostgreSQL,
+// while MongoDB is retained only for the live step buffer used during in-flight
+// execution.
 type NATSConsumer struct {
 	nc            *nats.Conn
 	js            jetstream.JetStream
@@ -93,7 +86,7 @@ type NATSConsumerConfig struct {
 
 	DeferQueueMaxAttempts int
 	DeferQueueTTL         time.Duration
-	RetainMessages        bool // (optional, for future use)
+	RetainMessages        bool // Deprecated no-op; legacy raw message retention was removed.
 }
 
 type deferredStepEvent struct {
@@ -267,7 +260,7 @@ func (c *NATSConsumer) ensureConsumer(ctx context.Context, consumerName string, 
 		DeliverPolicy: jetstream.DeliverAllPolicy,
 		MaxDeliver:    maxDeliver,
 		AckWait:       ackWait,
-		Description:   "MongoDB test event processor consumer",
+		Description:   "Observer test event processor consumer",
 	}
 
 	consumer, err := c.js.CreateOrUpdateConsumer(ctx, c.stream, consumerCfg)

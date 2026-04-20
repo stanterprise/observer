@@ -41,10 +41,10 @@ The API service includes:
 make build-api && ./bin/api
 ```
 
-### With database (recommended)
+### With PostgreSQL (recommended)
 
 ```bash
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' ./bin/api
+DATABASE_URL='postgres://observer:observer@localhost:5432/observer?sslmode=disable' ./bin/api
 ```
 
 ### With NATS for WebSocket events
@@ -53,10 +53,10 @@ MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' 
 NATS_URL='nats://localhost:4222' ./bin/api
 ```
 
-### Full configuration (database + WebSocket)
+### Full configuration (PostgreSQL + WebSocket)
 
 ```bash
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+DATABASE_URL='postgres://observer:observer@localhost:5432/observer?sslmode=disable' \
 NATS_URL='nats://localhost:4222' \
 ./bin/api
 ```
@@ -129,7 +129,7 @@ query {
 
 **Example REST Queries:**
 
-````bash
+```bash
 # List all tests
 curl http://localhost:8080/api/tests
 
@@ -144,7 +144,7 @@ curl http://localhost:8080/api/tests/test-123
 
 # Get run statistics
 curl http://localhost:8080/api/runs/run-1
-`>>>> master
+```
 
 ## WebSocket Real-Time Events
 
@@ -153,14 +153,14 @@ The `/ws` endpoint provides real-time streaming of test execution events.
 ### Connection
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/ws');
+const ws = new WebSocket("ws://localhost:8080/ws");
 
-ws.onopen = () => console.log('Connected');
+ws.onopen = () => console.log("Connected");
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  console.log('Event:', data.type, data);
+  console.log("Event:", data.type, data);
 };
-````
+```
 
 ### Event Format
 
@@ -191,27 +191,26 @@ A simple HTML test client is available at [`../../docs/websocket-test-client.htm
 
 ## Environment Variables
 
-| Variable           | Default        | Description                                   |
-| ------------------ | -------------- | --------------------------------------------- |
-| `PORT`             | `8080`         | HTTP listening port                           |
-| `MONGODB_URI`      | -              | MongoDB connection string (required)          |
-| `NATS_URL`         | -              | NATS server URL for WebSocket (optional)      |
-| `NATS_STREAM`      | `tests_events` | JetStream stream name                         |
-| `NATS_WS_CONSUMER` | `websocket`    | Consumer name for WebSocket                   |
-| `AUTH_MODE`        | `dev`          | Authentication mode: `dev` or `oidc` (future) |
-| `OIDC_ISSUER`      | -              | OIDC issuer URL (future)                      |
+| Variable           | Default        | Description                                          |
+| ------------------ | -------------- | ---------------------------------------------------- |
+| `PORT`             | `8080`         | HTTP listening port                                  |
+| `DATABASE_URL`     | -              | PostgreSQL connection string (required for REST API) |
+| `POSTGRES_DSN`     | -              | Alternate PostgreSQL DSN env var                     |
+| `NATS_URL`         | -              | NATS server URL for WebSocket (optional)             |
+| `NATS_STREAM`      | `tests_events` | JetStream stream name                                |
+| `NATS_WS_CONSUMER` | `websocket`    | Consumer name for WebSocket                          |
+| `AUTH_MODE`        | `dev`          | Authentication mode: `dev` or `oidc` (future)        |
+| `OIDC_ISSUER`      | -              | OIDC issuer URL (future)                             |
 
 ## GraphQL Schema
 
 ### Types
 
 - **TestCaseRun** - Represents a test execution
-
   - `id`, `runId`, `title`, `status`, `metadata`, `createdAt`, `updatedAt`
   - `steps` - Associated step runs
 
 - **StepRun** - Represents a test step execution
-
   - `id`, `runId`, `testCaseRunId`, `status`, `createdAt`, `updatedAt`
   - `testCase` - Parent test case
 

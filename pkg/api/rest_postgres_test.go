@@ -139,7 +139,7 @@ func TestPostgresHandleRunDetail(t *testing.T) {
 	}
 }
 
-func TestPostgresHandleTestDetailByRunAndTest_UsesLiveMongoForRunningSteps(t *testing.T) {
+func TestPostgresHandleTestDetailByRunAndTest_UsesLiveRunningDetailRepo(t *testing.T) {
 	handler, db := setupPostgresHandler(t)
 	now := time.Date(2026, 4, 19, 15, 0, 0, 0, time.UTC)
 	suiteID := "suite-1"
@@ -199,10 +199,10 @@ func TestPostgresHandleTestDetailByRunAndTest_UsesLiveMongoForRunningSteps(t *te
 		t.Fatalf("unexpected response: %+v", response)
 	}
 	if len(response.Tests[0].Steps) != 1 || response.Tests[0].Steps[0].Title != "Live step" {
-		t.Fatalf("expected live steps from Mongo-backed source, got %+v", response.Tests[0].Steps)
+		t.Fatalf("expected live steps from live detail source, got %+v", response.Tests[0].Steps)
 	}
 	if len(response.Tests[0].Attempts) != 1 || len(response.Tests[0].Attempts[0].Steps) != 1 {
-		t.Fatalf("expected live attempt details from Mongo-backed source, got %+v", response.Tests[0].Attempts)
+		t.Fatalf("expected live attempt details from live detail source, got %+v", response.Tests[0].Attempts)
 	}
 }
 
