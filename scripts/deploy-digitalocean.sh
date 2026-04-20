@@ -307,6 +307,11 @@ build_and_start() {
         docker compose -f docker-compose.digitalocean.yml up -d
     fi
 
+    # The outer reverse proxy resolves the observer container name once at startup.
+    # If the observer container was recreated during deployment, nginx can keep a
+    # stale upstream IP and return 502 until it is restarted.
+    docker compose -f docker-compose.digitalocean.yml restart nginx >/dev/null 2>&1 || true
+
     print_success "Services started"
 }
 
