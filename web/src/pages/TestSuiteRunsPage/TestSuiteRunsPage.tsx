@@ -22,6 +22,7 @@ import {
 import type { TestRun } from "@/types/testRun";
 import { getRunCompletionStatus, getRunStatus } from "./utils";
 import type { TestStatus } from "@/types/common";
+import Dialog from "@/components/Dialog";
 
 export function TestSuiteRunsPage() {
   const pollIntervalMs = config.pollingIntervalMs;
@@ -312,126 +313,71 @@ export function TestSuiteRunsPage() {
 
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="max-w-md w-full mx-4">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <div className="shrink-0">
-                  <AlertCircle className="h-6 w-6 text-(--status-failure)" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-(--stitch-on-surface) mb-2">
-                    Delete Test Runs
-                  </h3>
-                  <p className="text-(--stitch-on-surface-muted) mb-4">
-                    Are you sure you want to delete {selectedRuns.size} test run
-                    {selectedRuns.size !== 1 ? "s" : ""}? This action cannot be
-                    undone.
-                  </p>
-                  <div className="flex gap-3 justify-end">
-                    <button
-                      onClick={() => setShowDeleteConfirm(false)}
-                      className="px-4 py-2 border border-(--stitch-outline) rounded-md hover:bg-(--stitch-surface-card) transition-colors"
-                      disabled={deleting}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleDeleteSelected}
-                      className="px-4 py-2 bg-(--status-failure) text-white rounded-md hover:brightness-105 transition-colors flex items-center gap-2"
-                      disabled={deleting}
-                    >
-                      {deleting ? (
-                        <>
-                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                          Deleting...
-                        </>
-                      ) : (
-                        <>
-                          <Trash2 className="h-4 w-4" />
-                          Delete
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <Dialog
+          title="Delete Test Runs"
+          text={`Are you sure you want to delete ${selectedRuns.size} test run${
+            selectedRuns.size !== 1 ? "s" : ""
+          }? This action cannot be undone.`}
+          icon={<AlertCircle className="h-5 w-5" />}
+          onConfirm={handleDeleteSelected}
+          onCancel={() => setShowDeleteConfirm(false)}
+          onSuccessButtonContent={
+            deleting ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </>
+            )
+          }
+          confirmVariant="danger"
+          showCloseButton
+          disabled={deleting}
+        />
       )}
 
       {/* Marker Dialog */}
       {showMarkerDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="max-w-md w-full mx-4">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="shrink-0">
-                    <Tag className="h-6 w-6 text-(--stitch-primary)" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-(--stitch-on-surface) mb-2">
-                      Set Marker for Test Runs
-                    </h3>
-                    <p className="text-(--stitch-on-surface-muted) mb-4">
-                      Set a marker for {selectedRuns.size} test run
-                      {selectedRuns.size !== 1 ? "s" : ""}. Markers help
-                      organize and filter runs.
-                    </p>
-                    <div className="mb-4">
-                      <label
-                        htmlFor="marker-input"
-                        className="block text-sm font-medium text-(--stitch-on-surface) mb-2"
-                      >
-                        Marker Value
-                      </label>
-                      <input
-                        id="marker-input"
-                        type="text"
-                        value={markerValue}
-                        onChange={(e) => setMarkerValue(e.target.value)}
-                        placeholder="e.g., release-1.0, nightly, staging"
-                        className="w-full px-3 py-2 border border-(--stitch-outline) rounded-md focus:outline-none focus:ring-2 focus:ring-(--stitch-primary)"
-                        disabled={updatingMarker}
-                      />
-                    </div>
-                    <div className="flex gap-3 justify-end">
-                      <button
-                        onClick={() => {
-                          setShowMarkerDialog(false);
-                          setMarkerValue("");
-                        }}
-                        className="px-4 py-2 border border-(--stitch-outline) rounded-md hover:bg-(--stitch-surface-card) transition-colors"
-                        disabled={updatingMarker}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleUpdateMarker(markerValue || null)}
-                        className="px-4 py-2 bg-(--stitch-primary) text-white rounded-md hover:brightness-105 transition-colors flex items-center gap-2"
-                        disabled={updatingMarker || !markerValue.trim()}
-                      >
-                        {updatingMarker ? (
-                          <>
-                            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                            Updating...
-                          </>
-                        ) : (
-                          <>
-                            <Tag className="h-4 w-4" />
-                            Set Marker
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <Dialog
+          title="Set Marker for Test Runs"
+          text={`Set a marker for ${selectedRuns.size} test run${
+            selectedRuns.size !== 1 ? "s" : ""
+          }. Markers help organize and filter runs.`}
+          icon={<Tag className="h-5 w-5" />}
+          input={{
+            label: "Marker Value",
+            value: markerValue,
+            onChange: setMarkerValue,
+            placeholder: "e.g., release-1.0, nightly, staging",
+            required: true,
+            autoFocus: true,
+          }}
+          onConfirm={() => handleUpdateMarker(markerValue || null)}
+          onCancel={() => {
+            setShowMarkerDialog(false);
+            setMarkerValue("");
+          }}
+          onSuccessButtonContent={
+            updatingMarker ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                Updating...
+              </>
+            ) : (
+              <>
+                <Tag className="h-4 w-4" />
+                Set Marker
+              </>
+            )
+          }
+          confirmVariant="secondary"
+          showCloseButton
+          disabled={updatingMarker}
+        />
       )}
 
       {runs.length === 0 ? (
