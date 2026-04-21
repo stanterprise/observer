@@ -42,6 +42,7 @@ export default function AttemptsAccordion({
             const isOpen = openAttempt === attempt.attemptIndex;
             const attemptStatus = getAttemptStatus(attempt);
             const attemptSteps = attempt.steps || [];
+            const attemptStepsCount = attempt.stepsCount ?? attemptSteps.length;
 
             return (
               <div
@@ -71,8 +72,8 @@ export default function AttemptsAccordion({
                         )}
                       </div>
                       <div className="text-sm text-(--stitch-on-surface-muted) mt-1">
-                        {attemptSteps.length} step
-                        {attemptSteps.length !== 1 ? "s" : ""}
+                        {attemptStepsCount} step
+                        {attemptStepsCount !== 1 ? "s" : ""}
                         {attempt.startTime && (
                           <span className="ml-2">
                             • Started{" "}
@@ -164,7 +165,7 @@ export default function AttemptsAccordion({
                     )}
 
                     {/* Steps */}
-                    {attemptSteps.length > 0 ? (
+                    {attemptStepsCount > 0 ? (
                       <StepContainer
                         test={{
                           id: test.id,
