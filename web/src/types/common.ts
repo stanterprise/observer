@@ -1,5 +1,6 @@
 export type TestStatus =
   | "PASSED"
+  | "FLAKY"
   | "FAILED"
   | "SKIPPED"
   | "RUNNING"

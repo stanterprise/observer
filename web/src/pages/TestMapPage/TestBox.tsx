@@ -17,6 +17,8 @@ const getTestStatusColor = (test: Test): string => {
   const statusColors: Record<TestStatus, string> = {
     PASSED:
       "bg-[var(--status-success-soft)] border-[var(--status-success-border)]",
+    FLAKY:
+      "bg-[var(--status-warning-soft)] border-[var(--status-warning-border)]",
     FAILED:
       "bg-[var(--status-failure-soft)] border-[var(--status-failure-border)]",
     SKIPPED:
