@@ -30,7 +30,7 @@ func (r *PostgresRepository) UpsertRunStart(ctx context.Context, run *m.TestRun)
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		assignment := m.TestRun{
 			Name:        run.Name,
-			Status:      run.Status,
+			Status:      "RUNNING",
 			InitiatedBy: run.InitiatedBy,
 			ProjectName: run.ProjectName,
 			Metadata:    run.Metadata,
