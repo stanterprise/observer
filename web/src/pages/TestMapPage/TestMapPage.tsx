@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
+import { useRefresh } from "@/lib/refresh";
 import { ArrowLeft, Map, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TestRun } from "@/types/testRun";
@@ -9,6 +10,7 @@ import TestBox from "./TestBox";
 
 export function TestMapPage() {
   const pollIntervalMs = config.pollingIntervalMs;
+  const { autoRefreshEnabled } = useRefresh();
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
   const [runDetail, setRunDetail] = useState<TestRun | null>(null);
@@ -58,7 +60,7 @@ export function TestMapPage() {
   }, [runId, fetchRunDetail]);
 
   useEffect(() => {
-    if (!runId) return;
+    if (!runId || !autoRefreshEnabled) return;
     const intervalId = window.setInterval(() => {
       fetchRunDetail(runId, { silent: true });
     }, pollIntervalMs);
@@ -66,7 +68,7 @@ export function TestMapPage() {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [runId, fetchRunDetail, pollIntervalMs]);
+  }, [runId, autoRefreshEnabled, fetchRunDetail, pollIntervalMs]);
 
   // Measure container dimensions
   useEffect(() => {

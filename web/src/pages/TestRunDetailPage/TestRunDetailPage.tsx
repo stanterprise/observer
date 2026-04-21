@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
+import { useRefresh } from "@/lib/refresh";
 import {
   ArrowLeft,
   Play,
@@ -102,6 +103,7 @@ function normalizeRunDetail(data: TestRun): TestRun {
 
 export function TestRunDetailPage() {
   const pollIntervalMs = config.pollingIntervalMs;
+  const { autoRefreshEnabled } = useRefresh();
   const { runId } = useParams<{ runId: string }>();
   const [runDetail, setRunDetail] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
@@ -166,7 +168,7 @@ export function TestRunDetailPage() {
   }, [runId, fetchRunDetail]);
 
   useEffect(() => {
-    if (!runId) return;
+    if (!runId || !autoRefreshEnabled) return;
     const intervalId = window.setInterval(() => {
       fetchRunDetail(runId, { silent: true });
     }, pollIntervalMs);
@@ -174,7 +176,7 @@ export function TestRunDetailPage() {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [runId, fetchRunDetail, pollIntervalMs]);
+  }, [runId, autoRefreshEnabled, fetchRunDetail, pollIntervalMs]);
 
   // Compute root suite hierarchy (must be computed before early returns)
   const rootSuite = useMemo(() => {

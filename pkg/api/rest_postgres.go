@@ -330,6 +330,7 @@ func (h *PostgresHandler) handleMarkerStats(w http.ResponseWriter, r *http.Reque
 		"count":  len(runs),
 	})
 }
+
 func (h *PostgresHandler) handleDeleteRuns(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
 		h.methodNotAllowed(w)
@@ -407,6 +408,7 @@ func (h *PostgresHandler) handleUpdateMarker(w http.ResponseWriter, r *http.Requ
 
 	h.writeJSON(w, response)
 }
+
 func (h *PostgresHandler) writeJSON(w http.ResponseWriter, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(payload)

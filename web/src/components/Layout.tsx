@@ -1,10 +1,12 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { Activity, Moon, Sun } from "lucide-react";
+import { Activity, Moon, Sun, RefreshCw } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useRefresh } from "@/lib/refresh";
 import { useTheme } from "@/lib/theme";
 
 export function Layout() {
   const location = useLocation();
+  const { autoRefreshEnabled, toggleAutoRefresh } = useRefresh();
   const { isDark, toggleVariant } = useTheme();
 
   const isActive = (path: string) => {
@@ -88,6 +90,34 @@ export function Layout() {
               >
                 Style Guide
               </Link>
+              <button
+                type="button"
+                onClick={toggleAutoRefresh}
+                role="switch"
+                aria-checked={autoRefreshEnabled}
+                className="inline-flex items-center gap-2 rounded-full border border-(--stitch-outline) bg-(--stitch-surface-low) px-3 py-1.5 text-xs font-semibold text-(--stitch-on-surface-muted) transition-colors hover:bg-(--stitch-surface-highest) hover:text-(--stitch-on-surface)"
+                aria-label={`Auto refresh ${autoRefreshEnabled ? "enabled" : "disabled"}`}
+                title={`Auto refresh ${autoRefreshEnabled ? "enabled" : "disabled"}`}
+              >
+                <RefreshCw
+                  className={cn(
+                    "h-3.5 w-3.5 text-(--stitch-primary)",
+                    autoRefreshEnabled && "animate-spin",
+                  )}
+                  aria-hidden="true"
+                />
+                <span className="hidden lg:inline">Auto refresh</span>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[11px] uppercase tracking-[0.14em]",
+                    autoRefreshEnabled
+                      ? "bg-(--status-success-soft) text-(--status-success)"
+                      : "bg-(--status-neutral-soft) text-(--status-neutral)",
+                  )}
+                >
+                  {autoRefreshEnabled ? "On" : "Off"}
+                </span>
+              </button>
               <button
                 type="button"
                 onClick={toggleVariant}

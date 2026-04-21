@@ -5,6 +5,7 @@ import type { TestStatus } from "./common";
 export interface Attempt {
   retryIndex: number;
   steps?: Step[];
+  stepsCount?: number;
   status?: TestStatus;
   startTime?: string;
   endTime?: string;

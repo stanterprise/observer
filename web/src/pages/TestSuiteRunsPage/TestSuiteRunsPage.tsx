@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { useRefresh } from "@/lib/refresh";
 
 import {
   Play,
@@ -26,6 +27,7 @@ import Dialog from "@/components/Dialog";
 
 export function TestSuiteRunsPage() {
   const pollIntervalMs = config.pollingIntervalMs;
+  const { autoRefreshEnabled } = useRefresh();
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +77,10 @@ export function TestSuiteRunsPage() {
   }, [fetchRuns]);
 
   useEffect(() => {
+    if (!autoRefreshEnabled) {
+      return;
+    }
+
     const intervalId = window.setInterval(() => {
       fetchRuns({ silent: true });
     }, pollIntervalMs);
@@ -82,7 +88,7 @@ export function TestSuiteRunsPage() {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [fetchRuns, pollIntervalMs]);
+  }, [autoRefreshEnabled, fetchRuns, pollIntervalMs]);
 
   const toggleRunSelection = (runId: string) => {
     setSelectedRuns((prev) => {
