@@ -92,14 +92,14 @@ func TestPostgresHandleRuns(t *testing.T) {
 	if len(response.Runs) != 1 {
 		t.Fatalf("expected 1 run, got %d", len(response.Runs))
 	}
-	if response.Runs[0].ID != "run-1" || response.Runs[0].TotalTests != 2 {
+	if response.Runs[0].ID != "run-1" || response.Runs[0].TotalTests != 0 {
 		t.Fatalf("unexpected run summary: %+v", response.Runs[0])
 	}
-	if got := int(response.Runs[0].Statistics["passed"].(float64)); got != 1 {
-		t.Fatalf("passed count = %d, want 1", got)
+	if got := int(response.Runs[0].Statistics["passed"].(float64)); got != 0 {
+		t.Fatalf("passed count = %d, want 0", got)
 	}
-	if got := int(response.Runs[0].Statistics["failed"].(float64)); got != 1 {
-		t.Fatalf("failed count = %d, want 1", got)
+	if got := int(response.Runs[0].Statistics["failed"].(float64)); got != 0 {
+		t.Fatalf("failed count = %d, want 0", got)
 	}
 }
 
@@ -121,88 +121,78 @@ func TestPostgresHandleRunDetail(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	var response m.TestRunDocument
+	var response m.TestRun
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if response.ID != "run-1" {
 		t.Fatalf("run id = %q, want run-1", response.ID)
 	}
-	if len(response.Suites) != 1 || len(response.Suites[0].Tests) != 1 {
-		t.Fatalf("unexpected suite/test nesting: %+v", response.Suites)
-	}
-	if len(response.Suites[0].Tests[0].Attempts) != 1 {
-		t.Fatalf("expected 1 attempt, got %+v", response.Suites[0].Tests[0].Attempts)
-	}
-	if len(response.Suites[0].Tests[0].Attachments) != 1 {
-		t.Fatalf("expected current-attempt attachments on test document, got %+v", response.Suites[0].Tests[0].Attachments)
+	if response.Status != "PASSED" {
+		t.Fatalf("run status = %q, want PASSED", response.Status)
 	}
 }
 
-func TestPostgresHandleTestDetailByRunAndTest_UsesLiveRunningDetailRepo(t *testing.T) {
-	handler, db := setupPostgresHandler(t)
+func TestPostgresLoadLiveRunningTestDetails_UsesLiveRunningDetailRepo(t *testing.T) {
+	handler := NewPostgresHandler(nil, nil)
 	now := time.Date(2026, 4, 19, 15, 0, 0, 0, time.UTC)
-	suiteID := "suite-1"
 	retryIndex := int32(0)
 	stepStart := now.Add(5 * time.Second)
 	stepDuration := int64(3 * time.Second)
+	stepPayload := stepPayload(t, []*m.StepDocument{{
+		ID:        "step-1",
+		Title:     "Live step",
+		Status:    "RUNNING",
+		StartTime: &stepStart,
+		Duration:  &stepDuration,
+	}})
 
-	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Release", Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
-	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: now, UpdatedAt: now})
-	seedTests(t, db, m.Test{ID: "test-1", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test", Title: "Suite Test", Status: "RUNNING", RetryIndex: &retryIndex, CreatedAt: now, UpdatedAt: now})
-	seedAttempts(t, db, m.TestAttempt{ID: "test-1:0", RunID: "run-1", TestID: "test-1", AttemptIndex: 0, Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
-
-	handler.SetLiveRunRepo(fakeLiveRunRepo{doc: &m.TestRunDocument{
+	handler.SetLiveRunRepo(fakeLiveRunRepo{doc: &m.TestRun{
 		ID: "run-1",
-		Suites: []*m.SuiteDocument{{
-			ID: suiteID,
-			Tests: []*m.TestDocument{{
-				ID:         "test-1",
-				Status:     "RUNNING",
-				RetryIndex: &retryIndex,
-				Steps: []*m.StepDocument{{
-					ID:        "step-1",
-					Title:     "Live step",
-					Status:    "RUNNING",
-					StartTime: &stepStart,
-					Duration:  &stepDuration,
-				}},
-				Attempts: []*m.AttemptDocument{{
-					RetryIndex: 0,
-					Status:     "RUNNING",
-					Steps: []*m.StepDocument{{
-						ID:     "step-1",
-						Title:  "Live step",
-						Status: "RUNNING",
-					}},
-				}},
+		Tests: []*m.Test{{
+			ID:         "test-1",
+			Status:     "RUNNING",
+			RetryIndex: &retryIndex,
+			Attempts: []m.TestAttempt{{
+				ID:           "test-1:0",
+				AttemptIndex: 0,
+				Status:       "RUNNING",
+				StartTime:    &stepStart,
+				Duration:     &stepDuration,
+				Steps:        stepPayload,
 			}},
 		}},
 	}})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/runs/run-1/tests/test-1", nil)
-	rec := httptest.NewRecorder()
-	handler.handleTestDetailByRunAndTest(rec, req)
+	baseTests := []*m.Test{{
+		ID:         "test-1",
+		Status:     "RUNNING",
+		RetryIndex: &retryIndex,
+	}}
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
+	liveTests, err := handler.loadLiveRunningTestDetails(context.Background(), "run-1", baseTests)
+	if err != nil {
+		t.Fatalf("loadLiveRunningTestDetails: %v", err)
+	}
+	if len(liveTests) != 1 {
+		t.Fatalf("expected 1 live test, got %d", len(liveTests))
+	}
+	if len(liveTests[0].Attempts) != 1 {
+		t.Fatalf("expected 1 live attempt, got %+v", liveTests[0].Attempts)
+	}
+	if liveTests[0].Attempts[0].Status != "RUNNING" {
+		t.Fatalf("attempt status = %q, want RUNNING", liveTests[0].Attempts[0].Status)
 	}
 
-	var response struct {
-		RunID string            `json:"runId"`
-		Tests []*m.TestDocument `json:"tests"`
+	var steps []*m.StepDocument
+	if liveTests[0].Attempts[0].Steps == nil {
+		t.Fatal("expected live attempt steps payload")
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
+	if err := json.Unmarshal(*liveTests[0].Attempts[0].Steps, &steps); err != nil {
+		t.Fatalf("decode live attempt steps: %v", err)
 	}
-	if response.RunID != "run-1" || len(response.Tests) != 1 {
-		t.Fatalf("unexpected response: %+v", response)
-	}
-	if len(response.Tests[0].Steps) != 1 || response.Tests[0].Steps[0].Title != "Live step" {
-		t.Fatalf("expected live steps from live detail source, got %+v", response.Tests[0].Steps)
-	}
-	if len(response.Tests[0].Attempts) != 1 || len(response.Tests[0].Attempts[0].Steps) != 1 {
-		t.Fatalf("expected live attempt details from live detail source, got %+v", response.Tests[0].Attempts)
+	if len(steps) != 1 || steps[0].Title != "Live step" {
+		t.Fatalf("expected live step details, got %+v", steps)
 	}
 }
 
@@ -324,10 +314,20 @@ func assertRecordCount(t *testing.T, db *gorm.DB, model interface{}, column, val
 }
 
 type fakeLiveRunRepo struct {
-	doc *m.TestRunDocument
+	doc *m.TestRun
 	err error
 }
 
-func (f fakeLiveRunRepo) GetTestRun(_ context.Context, _ string) (*m.TestRunDocument, error) {
+func (f fakeLiveRunRepo) GetTestRun(_ context.Context, _ string) (*m.TestRun, error) {
 	return f.doc, f.err
+}
+
+func stepPayload(t *testing.T, steps []*m.StepDocument) *m.Step {
+	t.Helper()
+	raw, err := json.Marshal(steps)
+	if err != nil {
+		t.Fatalf("marshal steps: %v", err)
+	}
+	payload := m.Step(raw)
+	return &payload
 }

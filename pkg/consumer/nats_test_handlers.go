@@ -48,22 +48,10 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 		"run_id", req.TestCase.RunId,
 		"title", req.TestCase.Name)
 
-	// Convert metadata
-	md := make(map[string]interface{})
-	for k, v := range req.TestCase.Metadata {
-		md[k] = v
-	}
-
 	var startTime *time.Time
 	if req.TestCase.StartTime != nil {
 		t := req.TestCase.StartTime.AsTime()
 		startTime = &t
-	}
-
-	var endTime *time.Time
-	if req.TestCase.EndTime != nil {
-		t := req.TestCase.EndTime.AsTime()
-		endTime = &t
 	}
 
 	// Convert attachments
@@ -75,32 +63,6 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 			continue
 		}
 		attachments = append(attachments, attMap)
-	}
-
-	test := &m.Test{
-		ID:           req.TestCase.Id,
-		Name:         req.TestCase.Name,
-		Title:        req.TestCase.Name,
-		Description:  req.TestCase.Description,
-		RunID:        req.TestCase.RunId,
-		Status:       req.TestCase.Status.String(),
-		StartTime:    startTime,
-		EndTime:      endTime,
-		Metadata:     md,
-		Tags:         req.TestCase.Tags,
-		Location:     req.TestCase.Location,
-		RetryCount:   ptrInt32(req.TestCase.RetryCount),
-		RetryIndex:   ptrInt32(req.TestCase.RetryIndex),
-		Timeout:      ptrInt32(req.TestCase.Timeout),
-		Attachments:  attachments,
-		ErrorMessage: req.TestCase.ErrorMessage,
-		StackTrace:   req.TestCase.StackTrace,
-		ErrorList:    req.TestCase.Errors,
-	}
-
-	if req.TestCase.Duration != nil {
-		nanos := req.TestCase.Duration.AsDuration().Nanoseconds()
-		test.Duration = &nanos
 	}
 
 	// runID identifies the document
@@ -183,7 +145,7 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 			if hasBuffer {
 				buffered = true
 				relationalAttempt.StepsCount = int32(len(steps))
-				rawSteps, err := marshalAttemptSteps(steps)
+				rawSteps, err := m.StepFromDocuments(steps)
 				if err != nil {
 					if resetErr := c.bufferRepo.ResetActiveTestStepsFlushState(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex); resetErr != nil {
 						c.logger.Warn("failed to reset active test step buffer after marshal error", "run_id", runID, "test_id", req.TestCase.Id, "retry_index", req.TestCase.RetryIndex, "error", resetErr)
@@ -387,18 +349,6 @@ func (c *NATSConsumer) processAttachment(ctx context.Context, att *common.Attach
 	}
 
 	return attMap, nil
-}
-
-func marshalAttemptSteps(steps []*m.Step) (*json.RawMessage, error) {
-	if steps == nil {
-		steps = []*m.Step{}
-	}
-	raw, err := json.Marshal(steps)
-	if err != nil {
-		return nil, err
-	}
-	message := json.RawMessage(raw)
-	return &message, nil
 }
 
 // scheduleDeferredStepReplaySweep performs a small number of delayed replay

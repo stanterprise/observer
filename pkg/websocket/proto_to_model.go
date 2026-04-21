@@ -22,12 +22,12 @@ func convertMetadata(protoMeta map[string]string) map[string]interface{} {
 
 // protoToTestRunDocument converts ReportRunStartEventRequest to TestRunDocument
 // Only populates fields relevant for WebSocket streaming (omits CreatedAt/UpdatedAt)
-func protoToTestRunDocument(req *events.ReportRunStartEventRequest) *models.TestRunDocument {
+func protoToTestRunDocument(req *events.ReportRunStartEventRequest) *models.TestRun {
 	if req == nil {
 		return nil
 	}
 
-	return &models.TestRunDocument{
+	return &models.TestRun{
 		ID:         req.RunId,
 		Name:       req.Name,
 		TotalTests: req.TotalTests,
@@ -35,9 +35,9 @@ func protoToTestRunDocument(req *events.ReportRunStartEventRequest) *models.Test
 	}
 }
 
-// protoToTestDocument converts protobuf TestCaseRun to TestDocument
+// protoToTest converts protobuf TestCaseRun to TestDocument
 // Only populates fields relevant for WebSocket streaming (omits CreatedAt/UpdatedAt)
-func protoToTestDocument(tc *entities.TestCaseRun) *models.TestDocument {
+func protoToTest(tc *entities.TestCaseRun) *models.Test {
 	if tc == nil {
 		return nil
 	}
@@ -52,10 +52,10 @@ func protoToTestDocument(tc *entities.TestCaseRun) *models.TestDocument {
 		endTime = &t
 	}
 
-	return &models.TestDocument{
+	return &models.Test{
 		ID:          tc.Id,
 		RunID:       tc.RunId,
-		SuiteID:     tc.TestSuiteId,
+		SuiteID:     &tc.TestSuiteId,
 		Name:        tc.Name,
 		Description: tc.Description,
 		Status:      tc.Status.String(),

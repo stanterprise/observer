@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -299,7 +298,7 @@ func TestFinalizeTestEndPersistsAttemptStepsWithoutClearingOnLaterRetry(t *testi
 		RetryCount:     int32Ptr(0),
 		RetryIndex:     int32Ptr(0),
 	}
-	stepsRaw := jsonRawMessage(t, []*m.StepDocument{{ID: "step-1", Title: "Click", Status: "PASSED"}})
+	stepsRaw := stepPayload(t, []*m.StepDocument{{ID: "step-1", Title: "Click", Status: "PASSED"}})
 	attempt := &m.TestAttempt{
 		ID:           "run-123:test:test-steps:0",
 		RunID:        "run-123",
@@ -521,14 +520,13 @@ func int64Ptr(value int64) *int64 {
 	return &converted
 }
 
-func jsonRawMessage(t *testing.T, steps []*m.StepDocument) *json.RawMessage {
+func stepPayload(t *testing.T, steps []*m.StepDocument) *m.Step {
 	t.Helper()
-	raw, err := json.Marshal(steps)
+	payload, err := m.StepFromDocuments(steps)
 	if err != nil {
-		t.Fatalf("marshal raw message: %v", err)
+		t.Fatalf("marshal step payload: %v", err)
 	}
-	message := json.RawMessage(raw)
-	return &message
+	return payload
 }
 
 func TestGetRunDocuments_PreservesHistoricalRunsForRepeatedExternalTestID(t *testing.T) {

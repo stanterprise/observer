@@ -57,6 +57,8 @@ type TestCaseConnection struct {
 	PageInfo *PageInfo `json:"pageInfo"`
 }
 
+type TestConnection = TestCaseConnection
+
 // TestStatus represents the status of a test execution
 type TestStatus string
 

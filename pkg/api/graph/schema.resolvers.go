@@ -14,18 +14,18 @@ import (
 )
 
 // TestCase is the resolver for the testCase field.
-func (r *queryResolver) TestCase(ctx context.Context, id string) (*models.TestCaseRun, error) {
+func (r *queryResolver) TestCase(ctx context.Context, id string) (*models.Test, error) {
 	// Stub implementation - GraphQL is not currently used
 	r.logger.Warn("GraphQL testCase resolver called but not fully implemented", "id", id)
 	return nil, fmt.Errorf("GraphQL API not implemented - use REST API at /api/tests/%s", id)
 }
 
 // TestCases is the resolver for the testCases field.
-func (r *queryResolver) TestCases(ctx context.Context, filter *model.TestCaseFilter, limit *int, offset *int) (*model.TestCaseRunConnection, error) {
+func (r *queryResolver) TestCases(ctx context.Context, filter *model.TestCaseFilter, limit *int, offset *int) (*model.TestCaseConnection, error) {
 	// Stub implementation - GraphQL is not currently used
 	r.logger.Warn("GraphQL testCases resolver called but not fully implemented")
-	return &model.TestCaseRunConnection{
-		Nodes: []*models.TestCaseRun{},
+	return &model.TestCaseConnection{
+		Nodes: []*models.Test{},
 		PageInfo: &model.PageInfo{
 			HasNextPage: false,
 			TotalCount:  0,
@@ -34,7 +34,7 @@ func (r *queryResolver) TestCases(ctx context.Context, filter *model.TestCaseFil
 }
 
 // Step is the resolver for the step field.
-func (r *queryResolver) Step(ctx context.Context, id string) (*models.StepRun, error) {
+func (r *queryResolver) Step(ctx context.Context, id string) (*models.StepDocument, error) {
 	// Stub implementation - GraphQL is not currently used
 	r.logger.Warn("GraphQL step resolver called but not fully implemented", "id", id)
 	return nil, fmt.Errorf("GraphQL API not implemented")
@@ -53,25 +53,35 @@ func (r *queryResolver) RunStats(ctx context.Context, runID string) (*model.RunS
 }
 
 // Metadata is the resolver for the metadata field.
-func (r *stepRunResolver) Metadata(ctx context.Context, obj *models.StepRun) (*string, error) {
-	// StepRun (StepDocument) doesn't have metadata in current schema
-	return nil, nil
+func (r *stepRunResolver) Metadata(ctx context.Context, obj *models.StepDocument) (*string, error) {
+	if len(obj.Metadata) == 0 {
+		return nil, nil
+	}
+	jsonBytes, err := json.Marshal(obj.Metadata)
+	if err != nil {
+		r.logger.Error("failed to marshal step metadata", "id", obj.ID, "error", err)
+		return nil, err
+	}
+	jsonStr := string(jsonBytes)
+	return &jsonStr, nil
 }
 
 // Error is the resolver for the error field.
-func (r *stepRunResolver) Error(ctx context.Context, obj *models.StepRun) (*string, error) {
-	// StepRun doesn't have error field in current schema
-	return nil, nil
+func (r *stepRunResolver) Error(ctx context.Context, obj *models.StepDocument) (*string, error) {
+	if obj.Error == "" {
+		return nil, nil
+	}
+	return &obj.Error, nil
 }
 
 // TestCase is the resolver for the testCase field.
-func (r *stepRunResolver) TestCase(ctx context.Context, obj *models.StepRun) (*models.TestCaseRun, error) {
+func (r *stepRunResolver) TestCase(ctx context.Context, obj *models.StepDocument) (*models.Test, error) {
 	r.logger.Warn("GraphQL stepRun.testCase resolver called but not implemented", "test_case_run_id", obj.TestCaseRunID)
 	return nil, fmt.Errorf("GraphQL API not implemented")
 }
 
 // Metadata is the resolver for the metadata field.
-func (r *testCaseRunResolver) Metadata(ctx context.Context, obj *models.TestCaseRun) (*string, error) {
+func (r *testResolver) Metadata(ctx context.Context, obj *models.Test) (*string, error) {
 	if len(obj.Metadata) == 0 {
 		return nil, nil
 	}
@@ -86,15 +96,21 @@ func (r *testCaseRunResolver) Metadata(ctx context.Context, obj *models.TestCase
 }
 
 // Error is the resolver for the error field.
-func (r *testCaseRunResolver) Error(ctx context.Context, obj *models.TestCaseRun) (*string, error) {
-	// TestCaseRun doesn't have error field in current schema
+func (r *testResolver) Error(ctx context.Context, obj *models.Test) (*string, error) {
+	if len(obj.Attempts) == 0 || obj.RetryIndex == nil {
+		return nil, nil
+	}
+	for i := range obj.Attempts {
+		if obj.Attempts[i].AttemptIndex == *obj.RetryIndex && obj.Attempts[i].ErrorMessage != "" {
+			return &obj.Attempts[i].ErrorMessage, nil
+		}
+	}
 	return nil, nil
 }
 
 // Steps is the resolver for the steps field.
-func (r *testCaseRunResolver) Steps(ctx context.Context, obj *models.TestCaseRun) ([]*models.StepRun, error) {
-	// Steps are embedded in the test document
-	return obj.Steps, nil
+func (r *testResolver) Steps(ctx context.Context, obj *models.Test) ([]*models.StepDocument, error) {
+	return []*models.StepDocument{}, nil
 }
 
 // Query returns QueryResolver implementation.
@@ -103,11 +119,11 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 // StepRun returns StepRunResolver implementation.
 func (r *Resolver) StepRun() StepRunResolver { return &stepRunResolver{r} }
 
-// TestCaseRun returns TestCaseRunResolver implementation.
-func (r *Resolver) TestCaseRun() TestCaseRunResolver { return &testCaseRunResolver{r} }
+// Test returns TestResolver implementation.
+func (r *Resolver) Test() TestResolver { return &testResolver{r} }
 
 type (
-	queryResolver       struct{ *Resolver }
-	stepRunResolver     struct{ *Resolver }
-	testCaseRunResolver struct{ *Resolver }
+	queryResolver   struct{ *Resolver }
+	stepRunResolver struct{ *Resolver }
+	testResolver    struct{ *Resolver }
 )

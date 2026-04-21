@@ -104,21 +104,21 @@ type ComplexityRoot struct {
 type QueryResolver interface {
 	TestCase(ctx context.Context, id string) (*models.Test, error)
 	TestCases(ctx context.Context, filter *model.TestCaseFilter, limit *int, offset *int) (*model.TestCaseConnection, error)
-	Step(ctx context.Context, id string) (*models.Step, error)
+	Step(ctx context.Context, id string) (*models.StepDocument, error)
 	TestRuns(ctx context.Context, limit *int, offset *int) ([]string, error)
 	RunStats(ctx context.Context, runID string) (*model.RunStats, error)
 }
 type StepRunResolver interface {
-	Metadata(ctx context.Context, obj *models.Step) (*string, error)
-	Error(ctx context.Context, obj *models.Step) (*string, error)
+	Metadata(ctx context.Context, obj *models.StepDocument) (*string, error)
+	Error(ctx context.Context, obj *models.StepDocument) (*string, error)
 
-	TestCase(ctx context.Context, obj *models.Step) (*models.Test, error)
+	TestCase(ctx context.Context, obj *models.StepDocument) (*models.Test, error)
 }
 type TestResolver interface {
 	Metadata(ctx context.Context, obj *models.Test) (*string, error)
 	Error(ctx context.Context, obj *models.Test) (*string, error)
 
-	Steps(ctx context.Context, obj *models.Test) ([]*models.Step, error)
+	Steps(ctx context.Context, obj *models.Test) ([]*models.StepDocument, error)
 }
 
 type executableSchema struct {
@@ -1217,7 +1217,7 @@ func (ec *executionContext) fieldContext_RunStats_latestUpdate(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _StepRun_id(ctx context.Context, field graphql.CollectedField, obj *models.StepRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _StepRun_id(ctx context.Context, field graphql.CollectedField, obj *models.StepDocument) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
@@ -1246,7 +1246,7 @@ func (ec *executionContext) fieldContext_StepRun_id(_ context.Context, field gra
 	return fc, nil
 }
 
-func (ec *executionContext) _StepRun_runId(ctx context.Context, field graphql.CollectedField, obj *models.StepRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _StepRun_runId(ctx context.Context, field graphql.CollectedField, obj *models.StepDocument) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
@@ -1275,14 +1275,14 @@ func (ec *executionContext) fieldContext_StepRun_runId(_ context.Context, field 
 	return fc, nil
 }
 
-func (ec *executionContext) _StepRun_TestId(ctx context.Context, field graphql.CollectedField, obj *models.StepRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _StepRun_TestId(ctx context.Context, field graphql.CollectedField, obj *models.StepDocument) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		ec.fieldContext_StepRun_TestId,
 		func(ctx context.Context) (any, error) {
-			return obj.TestID, nil
+			return obj.TestCaseRunID, nil
 		},
 		nil,
 		ec.marshalNString2string,
@@ -1304,7 +1304,7 @@ func (ec *executionContext) fieldContext_StepRun_TestId(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _StepRun_status(ctx context.Context, field graphql.CollectedField, obj *models.StepRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _StepRun_status(ctx context.Context, field graphql.CollectedField, obj *models.StepDocument) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
@@ -1333,7 +1333,7 @@ func (ec *executionContext) fieldContext_StepRun_status(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _StepRun_metadata(ctx context.Context, field graphql.CollectedField, obj *models.StepRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _StepRun_metadata(ctx context.Context, field graphql.CollectedField, obj *models.StepDocument) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
@@ -1362,7 +1362,7 @@ func (ec *executionContext) fieldContext_StepRun_metadata(_ context.Context, fie
 	return fc, nil
 }
 
-func (ec *executionContext) _StepRun_error(ctx context.Context, field graphql.CollectedField, obj *models.StepRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _StepRun_error(ctx context.Context, field graphql.CollectedField, obj *models.StepDocument) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
@@ -1391,7 +1391,7 @@ func (ec *executionContext) fieldContext_StepRun_error(_ context.Context, field 
 	return fc, nil
 }
 
-func (ec *executionContext) _StepRun_createdAt(ctx context.Context, field graphql.CollectedField, obj *models.StepRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _StepRun_createdAt(ctx context.Context, field graphql.CollectedField, obj *models.StepDocument) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
@@ -1420,7 +1420,7 @@ func (ec *executionContext) fieldContext_StepRun_createdAt(_ context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _StepRun_updatedAt(ctx context.Context, field graphql.CollectedField, obj *models.StepRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _StepRun_updatedAt(ctx context.Context, field graphql.CollectedField, obj *models.StepDocument) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
@@ -1449,7 +1449,7 @@ func (ec *executionContext) fieldContext_StepRun_updatedAt(_ context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _StepRun_testCase(ctx context.Context, field graphql.CollectedField, obj *models.StepRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _StepRun_testCase(ctx context.Context, field graphql.CollectedField, obj *models.StepDocument) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
@@ -3616,7 +3616,7 @@ func (ec *executionContext) _RunStats(ctx context.Context, sel ast.SelectionSet,
 
 var stepRunImplementors = []string{"StepRun"}
 
-func (ec *executionContext) _StepRun(ctx context.Context, sel ast.SelectionSet, obj *models.StepRun) graphql.Marshaler {
+func (ec *executionContext) _StepRun(ctx context.Context, sel ast.SelectionSet, obj *models.StepDocument) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, stepRunImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -4374,7 +4374,7 @@ func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋstanterpriseᚋob
 	return ec._PageInfo(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNStepRun2ᚕᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐStepRunᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.StepRun) graphql.Marshaler {
+func (ec *executionContext) marshalNStepRun2ᚕᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐStepRunᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.StepDocument) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -4418,7 +4418,7 @@ func (ec *executionContext) marshalNStepRun2ᚕᚖgithubᚗcomᚋstanterpriseᚋ
 	return ret
 }
 
-func (ec *executionContext) marshalNStepRun2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐStepRun(ctx context.Context, sel ast.SelectionSet, v *models.StepRun) graphql.Marshaler {
+func (ec *executionContext) marshalNStepRun2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐStepRun(ctx context.Context, sel ast.SelectionSet, v *models.StepDocument) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -4866,7 +4866,7 @@ func (ec *executionContext) marshalORunStats2ᚖgithubᚗcomᚋstanterpriseᚋob
 	return ec._RunStats(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOStepRun2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐStepRun(ctx context.Context, sel ast.SelectionSet, v *models.StepRun) graphql.Marshaler {
+func (ec *executionContext) marshalOStepRun2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐStepRun(ctx context.Context, sel ast.SelectionSet, v *models.StepDocument) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}

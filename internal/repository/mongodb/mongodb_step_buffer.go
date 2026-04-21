@@ -210,7 +210,7 @@ func (r *MongoRepository) UpsertStepEnd(ctx context.Context, runID string, stepI
 	return nil
 }
 
-func (r *MongoRepository) PrepareActiveTestStepsFlush(ctx context.Context, runID, testID string, retryIndex int32) ([]*m.Step, bool, error) {
+func (r *MongoRepository) PrepareActiveTestStepsFlush(ctx context.Context, runID, testID string, retryIndex int32) ([]*m.StepDocument, bool, error) {
 	if err := repository.ValidateRunID(runID); err != nil {
 		return nil, false, err
 	}

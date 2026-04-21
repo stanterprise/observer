@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -343,80 +342,6 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string) ([]
 		return []*m.TestRun{}, nil
 	}
 
-	// var suites []m.Suite
-	// if err := r.db.WithContext(ctx).Where("run_id IN ?", runIDs).Order("created_at asc").Find(&suites).Error; err != nil {
-	// 	return nil, fmt.Errorf("load suites: %w", err)
-	// }
-
-	// var tests []m.Test
-	// if err := r.db.WithContext(ctx).Where("run_id IN ?", runIDs).Order("created_at asc").Find(&tests).Error; err != nil {
-	// 	return nil, fmt.Errorf("load tests: %w", err)
-	// }
-
-	// testIDs := make([]string, 0, len(tests))
-	// for _, test := range tests {
-	// 	testIDs = append(testIDs, test.ID)
-	// }
-
-	// attemptsByTest := map[string][]m.TestAttempt{}
-	// if len(testIDs) > 0 {
-	// 	var attempts []m.TestAttempt
-	// 	if err := r.db.WithContext(ctx).Where("test_id IN ?", testIDs).Order("attempt_index asc").Find(&attempts).Error; err != nil {
-	// 		return nil, fmt.Errorf("load test attempts: %w", err)
-	// 	}
-	// 	for _, attempt := range attempts {
-	// 		attempt.Steps = nil // Steps can be large, we will decode them only for the current attempt of each test
-	// 		attemptsByTest[attempt.TestID] = append(attemptsByTest[attempt.TestID], attempt)
-	// 	}
-	// }
-
-	// suiteDocsByRun := make(map[string][]*m.Suite)
-	// rootSuiteDocsByRun := make(map[string][]*m.Suite)
-	// suiteDocByID := make(map[string]*m.Suite, len(suites))
-	// for _, suite := range suites {
-	// 	doc := buildSuite(suite)
-	// 	suiteDocByID[suite.ID] = doc
-	// 	suiteDocsByRun[suite.RunID] = append(suiteDocsByRun[suite.RunID], doc)
-	// }
-	// for _, suite := range suites {
-	// 	doc := suiteDocByID[suite.ID]
-	// 	if suite.ParentSuiteID != nil && *suite.ParentSuiteID != "" {
-	// 		if parent := suiteDocByID[*suite.ParentSuiteID]; parent != nil {
-	// 			parent.Suites = append(parent.Suites, doc)
-	// 			continue
-	// 		}
-	// 	}
-	// 	rootSuiteDocsByRun[suite.RunID] = append(rootSuiteDocsByRun[suite.RunID], doc)
-	// }
-
-	// rootTestsByRun := make(map[string][]*m.Test)
-	// for _, test := range tests {
-	// 	doc := buildTest(test, attemptsByTest[test.ID])
-	// 	if test.SuiteID != nil && *test.SuiteID != "" {
-	// 		if suiteDoc := suiteDocByID[*test.SuiteID]; suiteDoc != nil {
-	// 			suiteDoc.Tests = append(suiteDoc.Tests, doc)
-	// 			continue
-	// 		}
-	// 	}
-	// 	rootTestsByRun[test.RunID] = append(rootTestsByRun[test.RunID], doc)
-	// }
-
-	// docByRunID := make(map[string]*m.TestRun, len(runs))
-	// for _, run := range runs {
-	// 	docByRunID[run.ID] = buildRun(run)
-	// }
-	// for runID, doc := range docByRunID {
-	// 	doc.Suites = rootSuiteDocsByRun[runID]
-	// 	doc.Tests = rootTestsByRun[runID]
-	// }
-
-	// ordered := make([]*m.TestRun, 0, len(runIDs))
-	// for _, runID := range runIDs {
-	// 	if doc, ok := docByRunID[runID]; ok {
-	// 		ordered = append(ordered, doc)
-	// 	}
-	// }
-
 	return runs, nil
 }
 
@@ -450,166 +375,12 @@ func (r *PostgresRepository) applyRunListFilter(ctx context.Context, query *gorm
 	return query, nil
 }
 
-// func buildRun(run m.TestRun) *m.TestRun {
-// 	return &m.TestRun{
-// 		ID:          run.ID,
-// 		Name:        run.Name,
-// 		Description: run.Description,
-// 		Status:      run.Status,
-// 		Metadata:    cloneMetadata(run.Metadata),
-// 		Duration:    run.Duration,
-// 		TotalTests:  run.TotalTests,
-// 		InitiatedBy: run.InitiatedBy,
-// 		ProjectName: run.ProjectName,
-// 		StartTime:   run.StartTime,
-// 		EndTime:     run.EndTime,
-// 		CreatedAt:   run.CreatedAt,
-// 		UpdatedAt:   run.UpdatedAt,
-// 		Suites:      []*m.Suite{},
-// 		Tests:       []*m.Test{},
-// 	}
-// }
-
-// func buildSuite(suite m.Suite) *m.Suite {
-// 	parentSuiteID := ""
-// 	if suite.ParentSuiteID != nil {
-// 		parentSuiteID = *suite.ParentSuiteID
-// 	}
-// 	return &m.Suite{
-// 		ID:              suiteExternalID(suite),
-// 		RunID:           suite.RunID,
-// 		ParentSuiteID:   suiteParentExternalID(suite, parentSuiteID),
-// 		Name:            suite.Name,
-// 		Description:     suite.Description,
-// 		Status:          suite.Status,
-// 		Metadata:        cloneMetadata(suite.Metadata),
-// 		Duration:        suite.Duration,
-// 		Location:        suite.Location,
-// 		Type:            suite.Type,
-// 		TestSuiteSpecID: suite.TestSuiteSpecID,
-// 		InitiatedBy:     suite.InitiatedBy,
-// 		ProjectName:     suite.ProjectName,
-// 		Author:          suite.Author,
-// 		Owner:           suite.Owner,
-// 		TestCaseIDs:     append([]string(nil), suite.TestCaseIDs...),
-// 		SubSuiteIDs:     append([]string(nil), suite.SubSuiteIDs...),
-// 		Tags:            append([]string(nil), suite.Tags...),
-// 		StartTime:       suite.StartTime,
-// 		EndTime:         suite.EndTime,
-// 		CreatedAt:       suite.CreatedAt,
-// 		UpdatedAt:       suite.UpdatedAt,
-// 		Suites:          []*m.Suite{},
-// 		Tests:           []*m.Test{},
-// 	}
-// }
-
-// func buildTest(test m.Test, attempts []m.TestAttempt) *m.Test {
-// 	attemptDocs := make([]*m.TestAttempt, 0, len(attempts))
-// 	for _, attempt := range attempts {
-// 		attemptDocs = append(attemptDocs, buildAttemptDocument(attempt))
-// 	}
-// 	currentAttempt := selectCurrentAttemptDoc(attemptDocs, test.RetryIndex)
-
-// 	testDoc := &m.Test{
-// 		ID:          testExternalID(test),
-// 		Name:        test.Name,
-// 		Title:       test.Title,
-// 		Description: test.Description,
-// 		RunID:       test.RunID,
-// 		Status:      test.Status,
-// 		Metadata:    cloneMetadata(test.Metadata),
-// 		Tags:        append([]string(nil), test.Tags...),
-// 		Location:    test.Location,
-// 		RetryCount:  test.RetryCount,
-// 		RetryIndex:  test.RetryIndex,
-// 		Timeout:     test.Timeout,
-// 		Attempts:    attemptDocs,
-// 		CreatedAt:   test.CreatedAt,
-// 		UpdatedAt:   test.UpdatedAt,
-// 		StartTime:   test.StartTime,
-// 		EndTime:     test.EndTime,
-// 		Duration:    test.Duration,
-// 		Attachments: []map[string]interface{}{},
-// 		Failures:    []*m.TestFailureDocument{},
-// 		Errors:      []*m.TestErrorDocument{},
-// 		ErrorList:   []string{},
-// 		StdOut:      []*m.OutputDocument{},
-// 		StdErr:      []*m.OutputDocument{},
-// 		Steps:       []*m.StepDocument{},
-// 	}
-// 	if test.SuiteID != nil {
-// 		testDoc.SuiteID = suiteIDToExternal(*test.SuiteID)
-// 	}
-// 	if currentAttempt != nil {
-// 		testDoc.ErrorMessage = currentAttempt.ErrorMessage
-// 		testDoc.StackTrace = currentAttempt.StackTrace
-// 		testDoc.Attachments = cloneAttachmentMaps(currentAttempt.Attachments)
-// 		testDoc.Failures = cloneFailures(currentAttempt.Failures)
-// 		testDoc.Errors = cloneErrors(currentAttempt.Errors)
-// 		testDoc.ErrorList = append([]string(nil), currentAttempt.ErrorList...)
-// 		testDoc.StdOut = cloneOutputs(currentAttempt.StdOut)
-// 		testDoc.StdErr = cloneOutputs(currentAttempt.StdErr)
-// 		testDoc.Steps = cloneSteps(currentAttempt.Steps)
-// 	}
-// 	return testDoc
-// }
-
-// func buildAttempt(attempt m.TestAttempt) *m.TestAttempt {
-// 	steps := decodeAttemptSteps(attempt.Steps)
-// 	if attempt.StepsCount == 0 {
-// 		attempt.StepsCount = int32(len(steps))
-// 	}
-
-// 	return &m.TestAttempt{
-// 		RetryIndex:   attempt.AttemptIndex,
-// 		Steps:        steps,
-// 		StepsCount:   &attempt.StepsCount,
-// 		Status:       attempt.Status,
-// 		StartTime:    attempt.StartTime,
-// 		EndTime:      attempt.EndTime,
-// 		Duration:     attempt.Duration,
-// 		Attachments:  cloneAttachmentMaps(attempt.Attachments),
-// 		ErrorMessage: attempt.ErrorMessage,
-// 		StackTrace:   attempt.StackTrace,
-// 		ErrorList:    append([]string(nil), attempt.ErrorList...),
-// 		Failures:     cloneFailures(attempt.Failures),
-// 		Errors:       cloneErrors(attempt.Errors),
-// 		StdOut:       cloneOutputs(attempt.StdOut),
-// 		StdErr:       cloneOutputs(attempt.StdErr),
-// 		CreatedAt:    attempt.CreatedAt,
-// 		UpdatedAt:    attempt.UpdatedAt,
-// 	}
-// }
-
-func decodeAttemptSteps(raw *json.RawMessage) []*m.StepDocument {
-	if raw == nil || len(*raw) == 0 {
-		return []*m.StepDocument{}
-	}
-	var steps []*m.StepDocument
-	if err := json.Unmarshal(*raw, &steps); err != nil {
+func decodeAttemptSteps(raw *m.Step) []*m.StepDocument {
+	steps, err := m.StepDocumentsFromStep(raw)
+	if err != nil {
 		return []*m.StepDocument{}
 	}
 	return steps
-}
-
-func selectCurrentAttemptDoc(attempts []*m.TestAttempt, retryIndex *int32) *m.TestAttempt {
-	if len(attempts) == 0 {
-		return nil
-	}
-	if retryIndex != nil {
-		for _, attempt := range attempts {
-			if attempt.AttemptIndex == *retryIndex {
-				return attempt
-			}
-		}
-	}
-	latest := attempts[0]
-	for _, attempt := range attempts[1:] {
-		if attempt.AttemptIndex >= latest.AttemptIndex {
-			latest = attempt
-		}
-	}
-	return latest
 }
 
 func markerFromMetadata(metadata map[string]interface{}) (string, bool) {
