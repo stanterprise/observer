@@ -39,6 +39,15 @@ export function Badge({ status, className, showIcon = true }: BadgeProps) {
       icon: CheckCircle,
       label: "passed",
     },
+    FLAKY: {
+      colors: {
+        backgroundColor: "var(--status-warning-soft)",
+        borderColor: "var(--status-warning-border)",
+        color: "var(--status-warning)",
+      },
+      icon: AlertTriangle,
+      label: "flaky",
+    },
     FAILED: {
       colors: {
         backgroundColor: "var(--status-failure-soft)",

@@ -263,9 +263,7 @@ export function TestRunDetailPage() {
       if (selectedStatuses.size > 0) {
         const isFlaky = isFlakyTest(test);
         const matchesPassed =
-          selectedStatuses.has("PASSED") &&
-          test.status === "PASSED" &&
-          !isFlaky;
+          selectedStatuses.has("PASSED") && test.status === "PASSED";
         const matchesFlaky = selectedStatuses.has("FLAKY") && isFlaky;
         const matchesStandardStatus =
           test.status !== "PASSED" && selectedStatuses.has(test.status);
