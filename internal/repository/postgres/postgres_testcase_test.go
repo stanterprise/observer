@@ -555,7 +555,7 @@ func TestGetRuns_PreservesHistoricalRunsForRepeatedExternalTestID(t *testing.T) 
 		}
 	}
 
-	docs, _, err := repo.GetRuns(ctx, ListRunsFilter{}, 10, 0)
+	docs, _, err := repo.GetRuns(ctx, ListRunsFilter{}, 10, 0, true)
 	if err != nil {
 		t.Fatalf("GetRuns failed: %v", err)
 	}
@@ -627,7 +627,7 @@ func TestGetRun_PopulatesNestedSuitesTestsAndAttempts(t *testing.T) {
 		t.Fatalf("seed attempt: %v", err)
 	}
 
-	doc, err := repo.GetRun(ctx, run.ID)
+	doc, err := repo.GetRun(ctx, run.ID, true)
 	if err != nil {
 		t.Fatalf("GetRun failed: %v", err)
 	}

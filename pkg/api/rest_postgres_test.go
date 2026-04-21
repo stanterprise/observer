@@ -152,17 +152,9 @@ func TestPostgresHandleRunDetail(t *testing.T) {
 	if !ok || len(attempts) != 1 {
 		t.Fatalf("raw attempts = %+v, want 1 attempt", testMap["attempts"])
 	}
-	attemptMap, ok := attempts[0].(map[string]interface{})
+	_, ok = attempts[0].(map[string]interface{})
 	if !ok {
 		t.Fatalf("raw attempt payload = %+v, want object", attempts[0])
-	}
-	steps, ok := attemptMap["steps"].([]interface{})
-	if !ok || len(steps) != 1 {
-		t.Fatalf("raw attempt steps = %+v, want array with 1 step", attemptMap["steps"])
-	}
-	step, ok := steps[0].(map[string]interface{})
-	if !ok || step["title"] != "Step 1" {
-		t.Fatalf("raw step payload = %+v, want title Step 1", steps[0])
 	}
 
 	var response m.TestRun

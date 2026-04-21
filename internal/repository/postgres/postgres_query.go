@@ -64,7 +64,7 @@ func (r *PostgresRepository) ListRuns(ctx context.Context, filter ListRunsFilter
 	return runs, total, nil
 }
 
-func (r *PostgresRepository) GetRun(ctx context.Context, runID string) (*m.TestRun, error) {
+func (r *PostgresRepository) GetRun(ctx context.Context, runID string, includeSteps bool) (*m.TestRun, error) {
 	if err := repository.ValidateRunID(runID); err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (r *PostgresRepository) GetRun(ctx context.Context, runID string) (*m.TestR
 		return nil, err
 	}
 
-	runDocs, err := r.buildRuns(ctx, []string{runID})
+	runDocs, err := r.buildRuns(ctx, []string{runID}, includeSteps)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (r *PostgresRepository) GetRun(ctx context.Context, runID string) (*m.TestR
 	return runDocs[0], nil
 }
 
-func (r *PostgresRepository) GetRuns(ctx context.Context, filter ListRunsFilter, limit, offset int64) ([]*m.TestRun, int64, error) {
+func (r *PostgresRepository) GetRuns(ctx context.Context, filter ListRunsFilter, limit, offset int64, includeSteps bool) ([]*m.TestRun, int64, error) {
 	runs, total, err := r.ListRuns(ctx, filter, limit, offset)
 	if err != nil {
 		return nil, 0, err
@@ -97,7 +97,7 @@ func (r *PostgresRepository) GetRuns(ctx context.Context, filter ListRunsFilter,
 		runIDs = append(runIDs, run.ID)
 	}
 
-	docs, err := r.buildRuns(ctx, runIDs)
+	docs, err := r.buildRuns(ctx, runIDs, includeSteps)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -328,7 +328,7 @@ func (r *PostgresRepository) FindAttachmentByStorageKey(ctx context.Context, sto
 	return nil, nil
 }
 
-func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string) ([]*m.TestRun, error) {
+func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, includeSteps bool) ([]*m.TestRun, error) {
 	if len(runIDs) == 0 {
 		return []*m.TestRun{}, nil
 	}
@@ -364,6 +364,12 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string) ([]
 		Order("test_id asc, attempt_index asc").
 		Find(&attempts).Error; err != nil {
 		return nil, fmt.Errorf("load test attempts: %w", err)
+	}
+
+	if !includeSteps {
+		for i := range attempts {
+			attempts[i].Steps = nil
+		}
 	}
 
 	attemptsByTestID := make(map[string][]m.TestAttempt, len(attempts))
