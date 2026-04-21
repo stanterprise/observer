@@ -1,7 +1,13 @@
 import { Badge } from "@/components/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/Card";
 import type { TestStatus } from "@/types/common";
-import { CheckCircle, CircleDashed, CircleOff, XCircle } from "lucide-react";
+import {
+  CheckCircle,
+  CircleDashed,
+  Clock3,
+  CircleOff,
+  XCircle,
+} from "lucide-react";
 
 import type { TestRun } from "@/types/testRun";
 
@@ -15,17 +21,21 @@ export const SuiteTitleCard = ({
   overallStatus,
 }: ProgressBarProps) => {
   const stats = runDetail.statistics!;
-  const runningPendingCount =
-    stats.total -
-    stats.passed -
-    stats.failed -
-    stats.skipped -
-    stats.broken! -
-    stats.timedout! -
-    stats.interrupted!;
+  const totalTests = runDetail.totalTests ?? stats.total;
+  const runningPendingCount = (stats.running || 0) + (stats.pending || 0);
+  const notRunCount = stats.notRun || 0;
+  const unknownCount = stats.unknown || 0;
 
   const totalFailedTestsCounts =
     stats.failed + stats.broken! + stats.timedout! + stats.interrupted!;
+
+  const percentOfTotal = (count: number) => {
+    if (totalTests <= 0) {
+      return 0;
+    }
+
+    return (count / totalTests) * 100;
+  };
 
   return (
     <Card className="overflow-hidden border-(--stitch-outline)">
@@ -35,10 +45,10 @@ export const SuiteTitleCard = ({
           <div
             className="relative overflow-hidden bg-(--status-success) transition-all duration-500 ease-out"
             style={{
-              width: `${(stats.passed / runDetail.totalTests!) * 100}%`,
+              width: `${percentOfTotal(stats.passed)}%`,
             }}
             title={`${stats.passed} passed (${Math.round(
-              (stats.passed / runDetail.totalTests!) * 100,
+              percentOfTotal(stats.passed),
             )}%)`}
           >
             <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
@@ -48,10 +58,10 @@ export const SuiteTitleCard = ({
           <div
             className="bg-(--status-failure) transition-all duration-500 ease-out"
             style={{
-              width: `${(totalFailedTestsCounts / runDetail.totalTests!) * 100}%`,
+              width: `${percentOfTotal(totalFailedTestsCounts)}%`,
             }}
             title={`${totalFailedTestsCounts} failed (${Math.round(
-              (totalFailedTestsCounts / runDetail.totalTests!) * 100,
+              percentOfTotal(totalFailedTestsCounts),
             )}%)`}
           />
         )}
@@ -59,21 +69,43 @@ export const SuiteTitleCard = ({
           <div
             className="bg-(--status-neutral) transition-all duration-500 ease-out"
             style={{
-              width: `${(stats.skipped / runDetail.totalTests!) * 100}%`,
+              width: `${percentOfTotal(stats.skipped)}%`,
             }}
             title={`${stats.skipped} skipped (${Math.round(
-              (stats.skipped / runDetail.totalTests!) * 100,
+              percentOfTotal(stats.skipped),
             )}%)`}
           />
         )}
-        {stats.total > 0 && runningPendingCount > 0 && (
+        {totalTests > 0 && runningPendingCount > 0 && (
           <div
             className="animate-pulse bg-(--status-running) transition-all duration-500 ease-out"
             style={{
-              width: `${(runningPendingCount / runDetail.totalTests!) * 100}%`,
+              width: `${percentOfTotal(runningPendingCount)}%`,
             }}
             title={`${runningPendingCount} running/pending (${Math.round(
-              (runningPendingCount / runDetail.totalTests!) * 100,
+              percentOfTotal(runningPendingCount),
+            )}%)`}
+          />
+        )}
+        {totalTests > 0 && notRunCount > 0 && (
+          <div
+            className="bg-(--stitch-surface-highest) transition-all duration-500 ease-out"
+            style={{
+              width: `${percentOfTotal(notRunCount)}%`,
+            }}
+            title={`${notRunCount} not run (${Math.round(
+              percentOfTotal(notRunCount),
+            )}%)`}
+          />
+        )}
+        {totalTests > 0 && unknownCount > 0 && (
+          <div
+            className="bg-(--status-neutral-border) transition-all duration-500 ease-out"
+            style={{
+              width: `${percentOfTotal(unknownCount)}%`,
+            }}
+            title={`${unknownCount} unknown (${Math.round(
+              percentOfTotal(unknownCount),
             )}%)`}
           />
         )}
@@ -87,7 +119,7 @@ export const SuiteTitleCard = ({
             <div className="flex items-center gap-4 text-sm text-(--stitch-on-surface-muted)">
               <span className="font-medium">Total Tests:</span>
               <span className="font-bold text-(--stitch-on-surface)">
-                {runDetail.totalTests}
+                {totalTests}
               </span>
               {runDetail.createdAt && (
                 <>
@@ -115,7 +147,7 @@ export const SuiteTitleCard = ({
         </div>
       </CardHeader>
       <CardContent className="bg-(--stitch-surface-card)">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
           <div
             className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-[1.02] md:p-6"
             style={{
@@ -183,16 +215,36 @@ export const SuiteTitleCard = ({
               borderColor: "var(--status-running-border)",
             }}
           >
-            <CircleOff className="mb-3 h-8 w-8 text-(--status-running) transition-transform group-hover:scale-110 md:h-10 md:w-10" />
+            <Clock3 className="mb-3 h-8 w-8 text-(--status-running) transition-transform group-hover:scale-110 md:h-10 md:w-10" />
             <div className="mb-1 text-3xl font-bold text-(--status-running) md:text-4xl">
               {runningPendingCount}
             </div>
             <div className="text-xs font-medium uppercase tracking-wide text-(--stitch-on-surface) md:text-sm">
-              Pending
+              In Progress
             </div>
             {stats.total > 0 && (
               <div className="mt-1 text-xs font-semibold text-(--status-running)">
                 {Math.round((runningPendingCount / stats.total) * 100)}%
+              </div>
+            )}
+          </div>
+          <div
+            className="group flex cursor-default flex-col items-center rounded-xl border p-4 transition-all duration-200 hover:scale-[1.02] md:p-6"
+            style={{
+              backgroundColor: "var(--stitch-surface-low)",
+              borderColor: "var(--stitch-outline)",
+            }}
+          >
+            <CircleOff className="mb-3 h-8 w-8 text-(--stitch-on-surface-muted) transition-transform group-hover:scale-110 md:h-10 md:w-10" />
+            <div className="mb-1 text-3xl font-bold text-(--stitch-on-surface) md:text-4xl">
+              {notRunCount}
+            </div>
+            <div className="text-xs font-medium uppercase tracking-wide text-(--stitch-on-surface) md:text-sm">
+              Not Run
+            </div>
+            {stats.total > 0 && (
+              <div className="mt-1 text-xs font-semibold text-(--stitch-on-surface-muted)">
+                {Math.round((notRunCount / stats.total) * 100)}%
               </div>
             )}
           </div>

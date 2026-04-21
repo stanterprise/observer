@@ -74,6 +74,7 @@ type SuiteDocument struct {
 type AttemptDocument struct {
 	RetryIndex   int32                    `bson:"retry_index" json:"retryIndex"`
 	Steps        []*StepDocument          `bson:"steps,omitempty" json:"steps,omitempty"`
+	StepsCount   *int32                   `bson:"steps_count,omitempty" json:"stepsCount,omitempty"` // Optional count of steps for quick access
 	Status       string                   `bson:"status,omitempty" json:"status,omitempty"`
 	StartTime    *time.Time               `bson:"start_time,omitempty" json:"startTime,omitempty"`
 	EndTime      *time.Time               `bson:"end_time,omitempty" json:"endTime,omitempty"`

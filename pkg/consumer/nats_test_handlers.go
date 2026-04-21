@@ -182,6 +182,7 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 			}
 			if hasBuffer {
 				buffered = true
+				relationalAttempt.StepsCount = int32(len(steps))
 				rawSteps, err := marshalAttemptSteps(steps)
 				if err != nil {
 					if resetErr := c.bufferRepo.ResetActiveTestStepsFlushState(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex); resetErr != nil {
@@ -190,6 +191,7 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 					return fmt.Errorf("marshal attempt steps: %w", err)
 				}
 				relationalAttempt.Steps = rawSteps
+
 			}
 		}
 

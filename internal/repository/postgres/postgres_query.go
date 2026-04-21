@@ -364,6 +364,7 @@ func (r *PostgresRepository) buildRunDocuments(ctx context.Context, runIDs []str
 			return nil, fmt.Errorf("load test attempts: %w", err)
 		}
 		for _, attempt := range attempts {
+			attempt.Steps = nil // Steps can be large, we will decode them only for the current attempt of each test
 			attemptsByTest[attempt.TestID] = append(attemptsByTest[attempt.TestID], attempt)
 		}
 	}
@@ -554,9 +555,14 @@ func buildTestDocument(test m.Test, attempts []m.TestAttempt) *m.TestDocument {
 
 func buildAttemptDocument(attempt m.TestAttempt) *m.AttemptDocument {
 	steps := decodeAttemptSteps(attempt.Steps)
+	if attempt.StepsCount == 0 {
+		attempt.StepsCount = int32(len(steps))
+	}
+
 	return &m.AttemptDocument{
 		RetryIndex:   attempt.AttemptIndex,
 		Steps:        steps,
+		StepsCount:   &attempt.StepsCount,
 		Status:       attempt.Status,
 		StartTime:    attempt.StartTime,
 		EndTime:      attempt.EndTime,

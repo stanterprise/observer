@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
+import { useRefresh } from "@/lib/refresh";
 import type { TestStatus } from "@/types/common";
 import { ArrowLeft, AlertCircle, TrendingUp } from "lucide-react";
 import StepContainer from "./StepContainer";
@@ -18,6 +19,7 @@ interface TestDetailResponse {
 
 export function TestDetailPage() {
   const pollIntervalMs = config.pollingIntervalMs;
+  const { autoRefreshEnabled } = useRefresh();
   const { runId, testId } = useParams<{ runId: string; testId: string }>();
   const [testDetail, setTestDetail] = useState<TestDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,7 +72,7 @@ export function TestDetailPage() {
   }, [testId]);
 
   useEffect(() => {
-    if (!testId) return;
+    if (!testId || !autoRefreshEnabled) return;
     const intervalId = window.setInterval(() => {
       fetchTestDetail(testId, { silent: true });
     }, pollIntervalMs);
@@ -78,7 +80,7 @@ export function TestDetailPage() {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [testId, pollIntervalMs, runId]);
+  }, [testId, autoRefreshEnabled, pollIntervalMs, runId]);
 
   if (loading) {
     return (

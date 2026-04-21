@@ -21,6 +21,8 @@ export interface TestRun {
 }
 
 export interface RunStatistics {
+  pending: number;
+  notRun: number;
   total: number;
   passed: number;
   failed: number;

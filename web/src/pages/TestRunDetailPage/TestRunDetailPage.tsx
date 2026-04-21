@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
+import { useRefresh } from "@/lib/refresh";
 import {
   ArrowLeft,
   Play,
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { SuiteTitleCard } from "./SuiteTitleCard";
 import type { TestStatus } from "@/types/common";
 import { assembleSuiteHierarchy } from "../TestSuiteRunsPage/utils";
+import { getRunStatus } from "../TestSuiteRunsPage/utils";
 import type { Test } from "@/types/testCase";
 import type { TestSuite } from "@/types/testSuite";
 import TestSuiteRecord from "./TestSuiteRecord";
@@ -68,6 +70,8 @@ function computeStatistics(tests: Test[]) {
     failed: tests.filter((test) => test.status === "FAILED").length,
     skipped: tests.filter((test) => test.status === "SKIPPED").length,
     running: tests.filter((test) => test.status === "RUNNING").length,
+    pending: tests.filter((test) => test.status === "PENDING").length,
+    notRun: tests.filter((test) => test.status === "NOT_RUN").length,
     broken: tests.filter((test) => test.status === "BROKEN").length,
     timedout: tests.filter((test) => test.status === "TIMEDOUT").length,
     interrupted: tests.filter((test) => test.status === "INTERRUPTED").length,
@@ -99,6 +103,7 @@ function normalizeRunDetail(data: TestRun): TestRun {
 
 export function TestRunDetailPage() {
   const pollIntervalMs = config.pollingIntervalMs;
+  const { autoRefreshEnabled } = useRefresh();
   const { runId } = useParams<{ runId: string }>();
   const [runDetail, setRunDetail] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,7 +168,7 @@ export function TestRunDetailPage() {
   }, [runId, fetchRunDetail]);
 
   useEffect(() => {
-    if (!runId) return;
+    if (!runId || !autoRefreshEnabled) return;
     const intervalId = window.setInterval(() => {
       fetchRunDetail(runId, { silent: true });
     }, pollIntervalMs);
@@ -171,7 +176,7 @@ export function TestRunDetailPage() {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [runId, fetchRunDetail, pollIntervalMs]);
+  }, [runId, autoRefreshEnabled, fetchRunDetail, pollIntervalMs]);
 
   // Compute root suite hierarchy (must be computed before early returns)
   const rootSuite = useMemo(() => {
@@ -385,18 +390,7 @@ export function TestRunDetailPage() {
     );
   }
 
-  const overallStatus: TestStatus =
-    runDetail.statistics!.running && runDetail.statistics!.running > 0
-      ? "RUNNING"
-      : runDetail.statistics!.failed > 0
-        ? "FAILED"
-        : runDetail.statistics!.passed === runDetail.statistics!.total &&
-            runDetail.statistics!.total > 0
-          ? "PASSED"
-          : runDetail.statistics!.skipped === runDetail.statistics!.total &&
-              runDetail.statistics!.total > 0
-            ? "SKIPPED"
-            : "NOT_RUN";
+  const overallStatus: TestStatus = getRunStatus(runDetail);
   console.log(
     "Rendering run detail:",
     runDetail,
@@ -522,7 +516,7 @@ export function TestRunDetailPage() {
                         "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary)",
                         isHidden
                           ? "bg-(--stitch-surface-low) text-(--stitch-on-surface-subtle) border-(--stitch-outline) hover:bg-(--stitch-surface-highest)"
-                          : "bg-[var(--stitch-primary-soft)] text-(--stitch-primary) border-[var(--status-running-border)] hover:bg-[var(--stitch-primary-soft)]",
+                          : "bg-(--stitch-primary-soft) text-(--stitch-primary) border-(--status-running-border) hover:bg-(--stitch-primary-soft)",
                       )}
                       aria-label={`${
                         isHidden ? "Show" : "Hide"
