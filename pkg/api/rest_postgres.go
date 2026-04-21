@@ -20,7 +20,7 @@ type PostgresHandler struct {
 }
 
 type liveRunRepository interface {
-	GetTestRun(ctx context.Context, id string) (*m.TestRunDocument, error)
+	GetTestRun(ctx context.Context, id string) (*m.TestRun, error)
 }
 
 func NewPostgresHandler(repo *pgRepo.PostgresRepository, logger *slog.Logger) *PostgresHandler {
@@ -54,14 +54,14 @@ func (h *PostgresHandler) handleTests(w http.ResponseWriter, r *http.Request) {
 		ProjectName: r.URL.Query().Get("project"),
 	}
 	limit, offset := parseLimitOffset(r, 20)
-	docs, total, err := h.repo.GetRunDocuments(r.Context(), filter, limit, offset)
+	docs, total, err := h.repo.GetRuns(r.Context(), filter, limit, offset, false)
 	if err != nil {
 		h.logger.Error("failed to fetch test runs from postgres", "error", err)
 		h.internalError(w)
 		return
 	}
 
-	tests := make([]*m.TestDocument, 0)
+	tests := make([]*m.Test, 0)
 	for _, doc := range docs {
 		tests = append(tests, doc.Tests...)
 		for _, suite := range doc.Suites {
@@ -86,7 +86,7 @@ func (h *PostgresHandler) handleRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit, offset := parseLimitOffset(r, 50)
-	docs, _, err := h.repo.GetRunDocuments(r.Context(), pgRepo.ListRunsFilter{}, limit, offset)
+	docs, _, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{}, limit, offset, true)
 	if err != nil {
 		h.logger.Error("failed to fetch runs from postgres", "error", err)
 		h.internalError(w)
@@ -117,7 +117,7 @@ func (h *PostgresHandler) handleRunsStats(w http.ResponseWriter, r *http.Request
 	}
 
 	limit, offset := parseLimitOffset(r, 50)
-	docs, _, err := h.repo.GetRunDocuments(r.Context(), pgRepo.ListRunsFilter{}, limit, offset)
+	docs, _, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{}, limit, offset, false)
 	if err != nil {
 		h.logger.Error("failed to fetch run stats from postgres", "error", err)
 		h.internalError(w)
@@ -163,7 +163,7 @@ func (h *PostgresHandler) handleRunDetail(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	doc, err := h.repo.GetRunDocument(r.Context(), runID)
+	doc, err := h.repo.GetRun(r.Context(), runID, false)
 	if err != nil {
 		h.logger.Error("failed to fetch run from postgres", "run_id", runID, "error", err)
 		h.internalError(w)
@@ -184,7 +184,7 @@ func (h *PostgresHandler) handleTestDetailByRunAndTest(w http.ResponseWriter, r 
 		return
 	}
 
-	doc, err := h.repo.GetRunDocument(r.Context(), runID)
+	doc, err := h.repo.GetRun(r.Context(), runID, true)
 	if err != nil {
 		h.logger.Error("failed to fetch run from postgres", "run_id", runID, "error", err)
 		h.internalError(w)
@@ -291,7 +291,7 @@ func (h *PostgresHandler) handleMarkerStats(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	docs, total, err := h.repo.GetRunDocuments(r.Context(), pgRepo.ListRunsFilter{Marker: markerValue}, limit, 0)
+	docs, total, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{Marker: markerValue}, limit, 0, false)
 	if err != nil {
 		h.logger.Error("failed to fetch marker stats from postgres", "marker", markerValue, "error", err)
 		h.internalError(w)
@@ -446,8 +446,8 @@ func parseLimitOffset(r *http.Request, defaultLimit int64) (int64, int64) {
 	return limit, offset
 }
 
-func flattenRunTests(doc *m.TestRunDocument) []*m.TestDocument {
-	tests := make([]*m.TestDocument, 0, len(doc.Tests))
+func flattenRunTests(doc *m.TestRun) []*m.Test {
+	tests := make([]*m.Test, 0, len(doc.Tests))
 	tests = append(tests, doc.Tests...)
 	for _, suite := range doc.Suites {
 		collectSuiteTests(suite, &tests)
@@ -455,15 +455,15 @@ func flattenRunTests(doc *m.TestRunDocument) []*m.TestDocument {
 	return tests
 }
 
-func collectSuiteTests(suite *m.SuiteDocument, target *[]*m.TestDocument) {
+func collectSuiteTests(suite *m.Suite, target *[]*m.Test) {
 	*target = append(*target, suite.Tests...)
 	for _, nested := range suite.Suites {
 		collectSuiteTests(nested, target)
 	}
 }
 
-func findTestsInRun(doc *m.TestRunDocument, testID string) []*m.TestDocument {
-	found := make([]*m.TestDocument, 0, 1)
+func findTestsInRun(doc *m.TestRun, testID string) []*m.Test {
+	found := make([]*m.Test, 0, 1)
 	for _, test := range doc.Tests {
 		if test.ID == testID {
 			found = append(found, test)
@@ -479,7 +479,7 @@ func findTestsInRun(doc *m.TestRunDocument, testID string) []*m.TestDocument {
 	return found
 }
 
-func findTestsInSuite(suite *m.SuiteDocument, testID string, found *[]*m.TestDocument) {
+func findTestsInSuite(suite *m.Suite, testID string, found *[]*m.Test) {
 	for _, test := range suite.Tests {
 		if test.ID == testID {
 			*found = append(*found, test)
@@ -494,7 +494,7 @@ func findTestsInSuite(suite *m.SuiteDocument, testID string, found *[]*m.TestDoc
 	}
 }
 
-func (h *PostgresHandler) loadLiveRunningTestDetails(ctx context.Context, runID string, tests []*m.TestDocument) ([]*m.TestDocument, error) {
+func (h *PostgresHandler) loadLiveRunningTestDetails(ctx context.Context, runID string, tests []*m.Test) ([]*m.Test, error) {
 	if h.liveRunRepo == nil || !needsLiveRunningDetails(tests) {
 		return nil, nil
 	}
@@ -507,7 +507,7 @@ func (h *PostgresHandler) loadLiveRunningTestDetails(ctx context.Context, runID 
 		return nil, nil
 	}
 
-	liveTests := make([]*m.TestDocument, 0, len(tests))
+	liveTests := make([]*m.Test, 0, len(tests))
 	for _, test := range tests {
 		liveMatches := findTestsInRun(liveDoc, test.ID)
 		if len(liveMatches) == 0 {
@@ -520,7 +520,7 @@ func (h *PostgresHandler) loadLiveRunningTestDetails(ctx context.Context, runID 
 	return liveTests, nil
 }
 
-func needsLiveRunningDetails(tests []*m.TestDocument) bool {
+func needsLiveRunningDetails(tests []*m.Test) bool {
 	for _, test := range tests {
 		if test != nil && (test.Status == "RUNNING" || test.Status == "") {
 			return true
@@ -529,7 +529,7 @@ func needsLiveRunningDetails(tests []*m.TestDocument) bool {
 	return false
 }
 
-func mergeLiveRunningTestDetails(base, live *m.TestDocument) *m.TestDocument {
+func mergeLiveRunningTestDetails(base, live *m.Test) *m.Test {
 	if base == nil {
 		return live
 	}
@@ -559,38 +559,11 @@ func mergeLiveRunningTestDetails(base, live *m.TestDocument) *m.TestDocument {
 	if len(live.Attempts) > 0 {
 		merged.Attempts = live.Attempts
 	}
-	if len(live.Steps) > 0 {
-		merged.Steps = live.Steps
-	}
-	if len(live.Attachments) > 0 {
-		merged.Attachments = live.Attachments
-	}
-	if len(live.Failures) > 0 {
-		merged.Failures = live.Failures
-	}
-	if len(live.Errors) > 0 {
-		merged.Errors = live.Errors
-	}
-	if len(live.ErrorList) > 0 {
-		merged.ErrorList = live.ErrorList
-	}
-	if len(live.StdOut) > 0 {
-		merged.StdOut = live.StdOut
-	}
-	if len(live.StdErr) > 0 {
-		merged.StdErr = live.StdErr
-	}
-	if live.ErrorMessage != "" {
-		merged.ErrorMessage = live.ErrorMessage
-	}
-	if live.StackTrace != "" {
-		merged.StackTrace = live.StackTrace
-	}
 
 	return &merged
 }
 
-func buildTestStatistics(tests []*m.TestDocument) map[string]int {
+func buildTestStatistics(tests []*m.Test) map[string]int {
 	stats := map[string]int{
 		"total":       len(tests),
 		"passed":      0,
@@ -625,7 +598,7 @@ func buildTestStatistics(tests []*m.TestDocument) map[string]int {
 	return stats
 }
 
-func latestTestUpdate(tests []*m.TestDocument) time.Time {
+func latestTestUpdate(tests []*m.Test) time.Time {
 	var latest time.Time
 	for _, test := range tests {
 		if test != nil && test.UpdatedAt.After(latest) {

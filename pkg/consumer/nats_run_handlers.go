@@ -71,8 +71,8 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 		runMetadata[k] = v
 	}
 
-	// Convert protobuf entities to SuiteDocument models
-	suites := make([]m.SuiteDocument, 0, len(req.TestSuites))
+	// Convert protobuf entities to Suite models
+	suites := make([]m.Suite, 0, len(req.TestSuites))
 	for _, protoSuite := range req.TestSuites {
 		if protoSuite == nil {
 			continue
@@ -102,10 +102,10 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 			duration = &d
 		}
 
-		suite := m.SuiteDocument{
+		suite := m.Suite{
 			ID:            protoSuite.Id,
 			RunID:         protoSuite.RunId,
-			ParentSuiteID: protoSuite.ParentSuiteId,
+			ParentSuiteID: &protoSuite.ParentSuiteId,
 			Name:          protoSuite.Name,
 			Description:   protoSuite.Description,
 			Metadata:      md,
@@ -115,8 +115,8 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 			ProjectName:   protoSuite.Project,
 			Author:        protoSuite.Author,
 			Owner:         protoSuite.Owner,
-			TestCaseIds:   protoSuite.TestCaseIds,
-			SubSuiteIds:   protoSuite.SubSuiteIds,
+			TestCaseIDs:   protoSuite.TestCaseIds,
+			SubSuiteIDs:   protoSuite.SubSuiteIds,
 			StartTime:     startTime,
 			EndTime:       endTime,
 			Duration:      duration,

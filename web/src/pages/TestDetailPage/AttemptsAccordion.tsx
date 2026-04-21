@@ -39,18 +39,19 @@ export default function AttemptsAccordion({
       <CardContent>
         <div className="space-y-3">
           {attempts.map((attempt) => {
-            const isOpen = openAttempt === attempt.retryIndex;
+            const isOpen = openAttempt === attempt.attemptIndex;
             const attemptStatus = getAttemptStatus(attempt);
             const attemptSteps = attempt.steps || [];
+            const attemptStepsCount = attempt.stepsCount ?? attemptSteps.length;
 
             return (
               <div
-                key={attempt.retryIndex}
+                key={attempt.attemptIndex}
                 className="border border-(--stitch-outline) rounded-lg overflow-hidden"
               >
                 {/* Accordion Header */}
                 <button
-                  onClick={() => toggleAttempt(attempt.retryIndex)}
+                  onClick={() => toggleAttempt(attempt.attemptIndex)}
                   className="w-full flex items-center justify-between p-4 bg-(--stitch-surface-low) hover:bg-(--stitch-surface-low) transition-colors"
                 >
                   <div className="flex items-center gap-3">
@@ -62,17 +63,17 @@ export default function AttemptsAccordion({
                     <div className="text-left">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-(--stitch-on-surface)">
-                          Attempt {attempt.retryIndex + 1}
+                          Attempt {attempt.attemptIndex + 1}
                         </span>
-                        {attempt.retryIndex === test.retryIndex && (
+                        {attempt.attemptIndex === test.retryIndex && (
                           <span className="text-xs px-2 py-0.5 bg-(--stitch-primary-soft) text-(--stitch-primary) rounded-full font-medium">
                             Current
                           </span>
                         )}
                       </div>
                       <div className="text-sm text-(--stitch-on-surface-muted) mt-1">
-                        {attemptSteps.length} step
-                        {attemptSteps.length !== 1 ? "s" : ""}
+                        {attemptStepsCount} step
+                        {attemptStepsCount !== 1 ? "s" : ""}
                         {attempt.startTime && (
                           <span className="ml-2">
                             • Started{" "}
@@ -164,12 +165,12 @@ export default function AttemptsAccordion({
                     )}
 
                     {/* Steps */}
-                    {attemptSteps.length > 0 ? (
+                    {attemptStepsCount > 0 ? (
                       <StepContainer
                         test={{
                           id: test.id,
                           runId: test.runId,
-                          title: `Attempt ${attempt.retryIndex + 1}`,
+                          title: `Attempt ${attempt.attemptIndex + 1}`,
                           status: attemptStatus,
                           steps: attemptSteps.map((step) => ({
                             id: step.id,

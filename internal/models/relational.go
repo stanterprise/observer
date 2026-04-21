@@ -5,6 +5,61 @@ import (
 	"time"
 )
 
+type (
+	Step json.RawMessage
+)
+
+func (step Step) MarshalJSON() ([]byte, error) {
+	if len(step) == 0 {
+		return []byte("null"), nil
+	}
+	return []byte(step), nil
+}
+
+func (step *Step) UnmarshalJSON(data []byte) error {
+	if step == nil {
+		return nil
+	}
+	if data == nil {
+		*step = nil
+		return nil
+	}
+	copyData := make([]byte, len(data))
+	copy(copyData, data)
+	*step = Step(copyData)
+	return nil
+}
+
+func StepFromDocuments(steps []*StepDocument) (*Step, error) {
+	if steps == nil {
+		steps = []*StepDocument{}
+	}
+
+	raw, err := json.Marshal(steps)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := Step(raw)
+	return &payload, nil
+}
+
+func StepDocumentsFromStep(step *Step) ([]*StepDocument, error) {
+	if step == nil || len(*step) == 0 {
+		return []*StepDocument{}, nil
+	}
+
+	var steps []*StepDocument
+	if err := json.Unmarshal(*step, &steps); err != nil {
+		return nil, err
+	}
+	if steps == nil {
+		return []*StepDocument{}, nil
+	}
+
+	return steps, nil
+}
+
 // TestRun maps to the PostgreSQL runs table.
 // It intentionally mirrors TestRunDocument fields where practical.
 type TestRun struct {
@@ -22,9 +77,9 @@ type TestRun struct {
 	CreatedAt   time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
 	UpdatedAt   time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 
-	Shards []RunShard `gorm:"foreignKey:RunID;references:ID" json:"shards,omitempty"`
-	Suites []Suite    `gorm:"foreignKey:RunID;references:ID" json:"suites,omitempty"`
-	Tests  []Test     `gorm:"foreignKey:RunID;references:ID" json:"tests,omitempty"`
+	Shards []*RunShard `gorm:"foreignKey:RunID;references:ID" json:"shards,omitempty"`
+	Suites []*Suite    `gorm:"foreignKey:RunID;references:ID" json:"suites,omitempty"`
+	Tests  []*Test     `gorm:"foreignKey:RunID;references:ID" json:"tests,omitempty"`
 }
 
 func (TestRun) TableName() string {
@@ -74,8 +129,8 @@ type Suite struct {
 	CreatedAt       time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
 	UpdatedAt       time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 
-	Suites []Suite `gorm:"foreignKey:ParentSuiteID;references:ID" json:"suites,omitempty"`
-	Tests  []Test  `gorm:"foreignKey:SuiteID;references:ID" json:"tests,omitempty"`
+	Suites []*Suite `gorm:"foreignKey:ParentSuiteID;references:ID" json:"suites,omitempty"`
+	Tests  []*Test  `gorm:"foreignKey:SuiteID;references:ID" json:"tests,omitempty"`
 }
 
 func (Suite) TableName() string {
@@ -125,8 +180,8 @@ type TestAttempt struct {
 
 	// Steps holds the step array containing step trees serialized as jsonb.
 	// Go type is json.RawMessage (provisional — concrete typed decode at read time).
-	Steps      *json.RawMessage `gorm:"column:steps;type:jsonb" json:"steps,omitempty"`
-	StepsCount int32            `gorm:"column:steps_count" json:"stepsCount,omitempty"`
+	Steps      *Step `gorm:"column:steps;type:jsonb" json:"steps,omitempty"`
+	StepsCount int32 `gorm:"column:steps_count" json:"stepsCount,omitempty"`
 
 	Attachments  []map[string]interface{} `gorm:"column:attachments;type:jsonb;serializer:json" json:"attachments,omitempty"`
 	ErrorMessage string                   `gorm:"column:error_message;type:text" json:"errorMessage,omitempty"`

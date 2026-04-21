@@ -697,14 +697,14 @@ func (h *Hub) normalizeEventData(event *publisher.Event) ([]byte, error) {
 		if err := json.Unmarshal(event.Data, &req); err != nil {
 			return nil, fmt.Errorf("unmarshal test begin: %w", err)
 		}
-		modelData = protoToTestDocument(req.TestCase)
+		modelData = protoToTest(req.TestCase)
 
 	case publisher.EventTypeTestEnd:
 		var req events.TestEndEventRequest
 		if err := json.Unmarshal(event.Data, &req); err != nil {
 			return nil, fmt.Errorf("unmarshal test end: %w", err)
 		}
-		modelData = protoToTestDocument(req.TestCase)
+		modelData = protoToTest(req.TestCase)
 
 	case publisher.EventTypeStepBegin:
 		var req events.StepBeginEventRequest
