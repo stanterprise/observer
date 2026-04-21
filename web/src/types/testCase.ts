@@ -3,7 +3,7 @@ import type { TestStatus } from "./common";
 // Attempt represents a single test attempt/retry
 // Matches AttemptDocument from internal/models/document.go
 export interface Attempt {
-  retryIndex: number;
+  attemptIndex: number;
   steps?: Step[];
   stepsCount?: number;
   status?: TestStatus;

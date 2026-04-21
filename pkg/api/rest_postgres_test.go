@@ -92,14 +92,14 @@ func TestPostgresHandleRuns(t *testing.T) {
 	if len(response.Runs) != 1 {
 		t.Fatalf("expected 1 run, got %d", len(response.Runs))
 	}
-	if response.Runs[0].ID != "run-1" || response.Runs[0].TotalTests != 0 {
+	if response.Runs[0].ID != "run-1" || response.Runs[0].TotalTests != 2 {
 		t.Fatalf("unexpected run summary: %+v", response.Runs[0])
 	}
-	if got := int(response.Runs[0].Statistics["passed"].(float64)); got != 0 {
-		t.Fatalf("passed count = %d, want 0", got)
+	if got := int(response.Runs[0].Statistics["passed"].(float64)); got != 1 {
+		t.Fatalf("passed count = %d, want 1", got)
 	}
-	if got := int(response.Runs[0].Statistics["failed"].(float64)); got != 0 {
-		t.Fatalf("failed count = %d, want 0", got)
+	if got := int(response.Runs[0].Statistics["failed"].(float64)); got != 1 {
+		t.Fatalf("failed count = %d, want 1", got)
 	}
 }
 
@@ -108,10 +108,17 @@ func TestPostgresHandleRunDetail(t *testing.T) {
 	now := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
 	suiteID := "suite-1"
 	retryIndex := int32(0)
+	stepsPayload := stepPayload(t, []*m.StepDocument{{
+		ID:        "step-1",
+		Title:     "Step 1",
+		Status:    "PASSED",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}})
 	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Release", Status: "PASSED", CreatedAt: now, UpdatedAt: now})
 	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: now, UpdatedAt: now})
 	seedTests(t, db, m.Test{ID: "test-1", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test", Title: "Suite Test", Status: "PASSED", RetryIndex: &retryIndex, CreatedAt: now, UpdatedAt: now})
-	seedAttempts(t, db, m.TestAttempt{ID: "test-1:0", RunID: "run-1", TestID: "test-1", AttemptIndex: 0, Status: "PASSED", Attachments: []map[string]interface{}{{"name": "trace.txt", "storage": "inline", "content": "dGVzdA==", "content_encoding": "base64"}}, CreatedAt: now, UpdatedAt: now})
+	seedAttempts(t, db, m.TestAttempt{ID: "test-1:0", RunID: "run-1", TestID: "test-1", AttemptIndex: 0, Status: "PASSED", Steps: stepsPayload, Attachments: []map[string]interface{}{{"name": "trace.txt", "storage": "inline", "content": "dGVzdA==", "content_encoding": "base64"}}, CreatedAt: now, UpdatedAt: now})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/runs/run-1", nil)
 	rec := httptest.NewRecorder()
@@ -119,6 +126,43 @@ func TestPostgresHandleRunDetail(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("decode raw response: %v", err)
+	}
+	suites, ok := raw["suites"].([]interface{})
+	if !ok || len(suites) != 1 {
+		t.Fatalf("raw suites = %+v, want 1 suite", raw["suites"])
+	}
+	suiteMap, ok := suites[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("raw suite payload = %+v, want object", suites[0])
+	}
+	tests, ok := suiteMap["tests"].([]interface{})
+	if !ok || len(tests) != 1 {
+		t.Fatalf("raw suite tests = %+v, want 1 test", suiteMap["tests"])
+	}
+	testMap, ok := tests[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("raw test payload = %+v, want object", tests[0])
+	}
+	attempts, ok := testMap["attempts"].([]interface{})
+	if !ok || len(attempts) != 1 {
+		t.Fatalf("raw attempts = %+v, want 1 attempt", testMap["attempts"])
+	}
+	attemptMap, ok := attempts[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("raw attempt payload = %+v, want object", attempts[0])
+	}
+	steps, ok := attemptMap["steps"].([]interface{})
+	if !ok || len(steps) != 1 {
+		t.Fatalf("raw attempt steps = %+v, want array with 1 step", attemptMap["steps"])
+	}
+	step, ok := steps[0].(map[string]interface{})
+	if !ok || step["title"] != "Step 1" {
+		t.Fatalf("raw step payload = %+v, want title Step 1", steps[0])
 	}
 
 	var response m.TestRun

@@ -529,7 +529,7 @@ func stepPayload(t *testing.T, steps []*m.StepDocument) *m.Step {
 	return payload
 }
 
-func TestGetRunDocuments_PreservesHistoricalRunsForRepeatedExternalTestID(t *testing.T) {
+func TestGetRuns_PreservesHistoricalRunsForRepeatedExternalTestID(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
 	suiteRun1 := "run-1:suite:suite-123"
@@ -581,5 +581,79 @@ func TestGetRunDocuments_PreservesHistoricalRunsForRepeatedExternalTestID(t *tes
 	}
 	if trends[0].RunID != "run-2" || trends[1].RunID != "run-1" {
 		t.Fatalf("expected historical trend rows for both runs, got %+v", trends)
+	}
+}
+
+func TestGetRun_PopulatesNestedSuitesTestsAndAttempts(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	start := time.Date(2026, 4, 19, 10, 0, 0, 0, time.UTC)
+	childSuiteID := "run-123:suite:child"
+	rootSuiteID := "run-123:suite:root"
+
+	run := &m.TestRun{ID: "run-123", Name: "Run 123", Status: "FAILED", CreatedAt: start, UpdatedAt: start}
+	if err := repo.db.WithContext(ctx).Create(run).Error; err != nil {
+		t.Fatalf("seed run: %v", err)
+	}
+
+	rootSuite := &m.Suite{ID: rootSuiteID, RunID: run.ID, Name: "Root Suite", CreatedAt: start, UpdatedAt: start}
+	childSuite := &m.Suite{ID: childSuiteID, RunID: run.ID, ParentSuiteID: &rootSuiteID, Name: "Child Suite", CreatedAt: start.Add(time.Second), UpdatedAt: start.Add(time.Second)}
+	for _, suite := range []*m.Suite{rootSuite, childSuite} {
+		if err := repo.db.WithContext(ctx).Create(suite).Error; err != nil {
+			t.Fatalf("seed suite %s: %v", suite.ID, err)
+		}
+	}
+
+	rootTest := &m.Test{ID: "run-123:test:root", RunID: run.ID, SuiteID: &rootSuiteID, Name: "Root Test", Title: "Root Test", Status: "PASSED", CreatedAt: start, UpdatedAt: start}
+	nestedTest := &m.Test{ID: "run-123:test:nested", RunID: run.ID, SuiteID: &childSuiteID, Name: "Nested Test", Title: "Nested Test", Status: "FAILED", CreatedAt: start.Add(2 * time.Second), UpdatedAt: start.Add(2 * time.Second)}
+	for _, test := range []*m.Test{rootTest, nestedTest} {
+		if err := repo.db.WithContext(ctx).Create(test).Error; err != nil {
+			t.Fatalf("seed test %s: %v", test.ID, err)
+		}
+	}
+
+	attemptSteps := []*m.StepDocument{{ID: "step-1", Title: "Step 1", Status: "FAILED", CreatedAt: start, UpdatedAt: start}}
+	attempt := m.TestAttempt{
+		ID:           nestedTest.ID + ":0",
+		RunID:        run.ID,
+		TestID:       nestedTest.ID,
+		AttemptIndex: 0,
+		Status:       "FAILED",
+		Steps:        stepPayload(t, attemptSteps),
+		CreatedAt:    start,
+		UpdatedAt:    start,
+	}
+	if err := repo.db.WithContext(ctx).Create(&attempt).Error; err != nil {
+		t.Fatalf("seed attempt: %v", err)
+	}
+
+	doc, err := repo.GetRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("GetRun failed: %v", err)
+	}
+	if doc == nil {
+		t.Fatal("expected run document, got nil")
+	}
+	if len(doc.Suites) != 1 {
+		t.Fatalf("len(doc.Suites) = %d, want 1", len(doc.Suites))
+	}
+	if len(doc.Tests) != 0 {
+		t.Fatalf("doc.Tests = %+v, want no run-level tests", doc.Tests)
+	}
+	if len(doc.Suites[0].Tests) != 1 || doc.Suites[0].Tests[0].ID != rootTest.ID {
+		t.Fatalf("root suite tests = %+v, want root test %s", doc.Suites[0].Tests, rootTest.ID)
+	}
+	if len(doc.Suites[0].Suites) != 1 || doc.Suites[0].Suites[0].ID != childSuiteID {
+		t.Fatalf("root suite children = %+v, want child suite %s", doc.Suites[0].Suites, childSuiteID)
+	}
+	if len(doc.Suites[0].Suites[0].Tests) != 1 || doc.Suites[0].Suites[0].Tests[0].ID != nestedTest.ID {
+		t.Fatalf("child suite tests = %+v, want nested test %s", doc.Suites[0].Suites[0].Tests, nestedTest.ID)
+	}
+	if len(doc.Suites[0].Suites[0].Tests[0].Attempts) != 1 {
+		t.Fatalf("nested test attempts = %+v, want 1 attempt", doc.Suites[0].Suites[0].Tests[0].Attempts)
+	}
+	decoded := decodeAttemptSteps(doc.Suites[0].Suites[0].Tests[0].Attempts[0].Steps)
+	if len(decoded) != 1 || decoded[0].ID != "step-1" {
+		t.Fatalf("decoded attempt steps = %+v, want step-1", decoded)
 	}
 }

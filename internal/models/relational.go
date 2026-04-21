@@ -9,6 +9,27 @@ type (
 	Step json.RawMessage
 )
 
+func (step Step) MarshalJSON() ([]byte, error) {
+	if len(step) == 0 {
+		return []byte("null"), nil
+	}
+	return []byte(step), nil
+}
+
+func (step *Step) UnmarshalJSON(data []byte) error {
+	if step == nil {
+		return nil
+	}
+	if data == nil {
+		*step = nil
+		return nil
+	}
+	copyData := make([]byte, len(data))
+	copy(copyData, data)
+	*step = Step(copyData)
+	return nil
+}
+
 func StepFromDocuments(steps []*StepDocument) (*Step, error) {
 	if steps == nil {
 		steps = []*StepDocument{}

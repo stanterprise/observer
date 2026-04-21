@@ -64,7 +64,7 @@ func (r *PostgresRepository) ListRuns(ctx context.Context, filter ListRunsFilter
 	return runs, total, nil
 }
 
-func (r *PostgresRepository) GetRunDocument(ctx context.Context, runID string) (*m.TestRun, error) {
+func (r *PostgresRepository) GetRun(ctx context.Context, runID string) (*m.TestRun, error) {
 	if err := repository.ValidateRunID(runID); err != nil {
 		return nil, err
 	}
@@ -340,6 +340,79 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string) ([]
 
 	if len(runs) == 0 {
 		return []*m.TestRun{}, nil
+	}
+
+	var suites []*m.Suite
+	if err := r.db.WithContext(ctx).
+		Where("run_id IN ?", runIDs).
+		Order("created_at asc, id asc").
+		Find(&suites).Error; err != nil {
+		return nil, fmt.Errorf("load suites: %w", err)
+	}
+
+	var tests []*m.Test
+	if err := r.db.WithContext(ctx).
+		Where("run_id IN ?", runIDs).
+		Order("created_at asc, id asc").
+		Find(&tests).Error; err != nil {
+		return nil, fmt.Errorf("load tests: %w", err)
+	}
+
+	var attempts []m.TestAttempt
+	if err := r.db.WithContext(ctx).
+		Where("run_id IN ?", runIDs).
+		Order("test_id asc, attempt_index asc").
+		Find(&attempts).Error; err != nil {
+		return nil, fmt.Errorf("load test attempts: %w", err)
+	}
+
+	attemptsByTestID := make(map[string][]m.TestAttempt, len(attempts))
+	for _, attempt := range attempts {
+		attemptsByTestID[attempt.TestID] = append(attemptsByTestID[attempt.TestID], attempt)
+	}
+
+	runByID := make(map[string]*m.TestRun, len(runs))
+	for _, run := range runs {
+		run.Suites = nil
+		run.Tests = nil
+		runByID[run.ID] = run
+	}
+
+	suiteByID := make(map[string]*m.Suite, len(suites))
+	for _, suite := range suites {
+		suite.Suites = nil
+		suite.Tests = nil
+		suiteByID[suite.ID] = suite
+	}
+
+	for _, suite := range suites {
+		if suite.ParentSuiteID != nil {
+			if parent, ok := suiteByID[*suite.ParentSuiteID]; ok {
+				parent.Suites = append(parent.Suites, suite)
+				continue
+			}
+		}
+		if run, ok := runByID[suite.RunID]; ok {
+			run.Suites = append(run.Suites, suite)
+		}
+	}
+
+	for _, test := range tests {
+		if attachedAttempts, ok := attemptsByTestID[test.ID]; ok {
+			test.Attempts = attachedAttempts
+		} else {
+			test.Attempts = nil
+		}
+
+		if test.SuiteID != nil {
+			if suite, ok := suiteByID[*test.SuiteID]; ok {
+				suite.Tests = append(suite.Tests, test)
+				continue
+			}
+		}
+		if run, ok := runByID[test.RunID]; ok {
+			run.Tests = append(run.Tests, test)
+		}
 	}
 
 	return runs, nil

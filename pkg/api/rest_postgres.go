@@ -163,7 +163,7 @@ func (h *PostgresHandler) handleRunDetail(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	doc, err := h.repo.GetRunDocument(r.Context(), runID)
+	doc, err := h.repo.GetRun(r.Context(), runID)
 	if err != nil {
 		h.logger.Error("failed to fetch run from postgres", "run_id", runID, "error", err)
 		h.internalError(w)
@@ -184,7 +184,7 @@ func (h *PostgresHandler) handleTestDetailByRunAndTest(w http.ResponseWriter, r 
 		return
 	}
 
-	doc, err := h.repo.GetRunDocument(r.Context(), runID)
+	doc, err := h.repo.GetRun(r.Context(), runID)
 	if err != nil {
 		h.logger.Error("failed to fetch run from postgres", "run_id", runID, "error", err)
 		h.internalError(w)
