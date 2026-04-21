@@ -1,7 +1,7 @@
 import type { TestStatus } from "./common";
 
-// Attempt represents a single test attempt/retry
-// Matches AttemptDocument from internal/models/document.go
+// Attempt represents a single test attempt/retry.
+// Mirrors the current relational TestAttempt/API JSON shape used by the frontend.
 export interface Attempt {
   attemptIndex: number;
   steps?: Step[];
