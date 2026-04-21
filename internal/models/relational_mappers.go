@@ -25,7 +25,7 @@ func RunStartEventToTestRun(req *events.ReportRunStartEventRequest) (*TestRun, [
 	return &TestRun{
 		ID:         req.RunId,
 		Name:       req.Name,
-		Status:     "RUNNING",
+		Status:     "NOT_RUN",
 		TotalTests: req.TotalTests,
 		Metadata:   md,
 		CreatedAt:  now,

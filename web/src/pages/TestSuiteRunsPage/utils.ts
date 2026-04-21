@@ -60,6 +60,31 @@ function buildSuiteTree(
   };
 }
 
+export const getRunCompletionStatus = (
+  status: TestStatus,
+): TestStatus | "COMPLETED" => {
+  switch (status) {
+    case "PASSED":
+      return "COMPLETED";
+    case "FAILED":
+      return "COMPLETED";
+    case "SKIPPED":
+      return "COMPLETED";
+    case "BROKEN":
+      return "COMPLETED";
+    case "TIMEDOUT":
+      return "COMPLETED";
+    case "INTERRUPTED":
+      return "INTERRUPTED";
+    case "RUNNING":
+      return "RUNNING";
+    case "PENDING":
+      return "PENDING";
+    default:
+      return "UNKNOWN";
+  }
+};
+
 export const getRunStatus = (run: TestRun): TestStatus => {
   // Prioritize error states
   if (run.statistics) {

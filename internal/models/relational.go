@@ -125,7 +125,8 @@ type TestAttempt struct {
 
 	// Steps holds the step array containing step trees serialized as jsonb.
 	// Go type is json.RawMessage (provisional — concrete typed decode at read time).
-	Steps *json.RawMessage `gorm:"column:steps;type:jsonb" json:"steps,omitempty"`
+	Steps      *json.RawMessage `gorm:"column:steps;type:jsonb" json:"steps,omitempty"`
+	StepsCount int32            `gorm:"column:steps_count" json:"stepsCount,omitempty"`
 
 	Attachments  []map[string]interface{} `gorm:"column:attachments;type:jsonb;serializer:json" json:"attachments,omitempty"`
 	ErrorMessage string                   `gorm:"column:error_message;type:text" json:"errorMessage,omitempty"`

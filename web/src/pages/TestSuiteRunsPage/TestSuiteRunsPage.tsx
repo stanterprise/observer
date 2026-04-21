@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 
 import type { TestRun } from "@/types/testRun";
-import { getRunStatus } from "./utils";
+import { getRunCompletionStatus, getRunStatus } from "./utils";
+import type { TestStatus } from "@/types/common";
 
 export function TestSuiteRunsPage() {
   const pollIntervalMs = config.pollingIntervalMs;
@@ -541,6 +542,9 @@ export function TestSuiteRunsPage() {
                 <tbody className="bg-(--stitch-surface-card) divide-y divide-(--stitch-outline)">
                   {sortedRuns.map((run) => {
                     const status = getRunStatus(run);
+                    const runCompletionStatus = getRunCompletionStatus(
+                      run.status as TestStatus,
+                    );
                     return (
                       <tr
                         key={run.id}
@@ -581,11 +585,7 @@ export function TestSuiteRunsPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge
-                            status={
-                              status === "RUNNING" ? "RUNNING" : "COMPLETED"
-                            }
-                          />
+                          <Badge status={runCompletionStatus} />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {status !== "RUNNING" && <Badge status={status} />}
