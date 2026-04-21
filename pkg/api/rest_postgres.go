@@ -54,7 +54,7 @@ func (h *PostgresHandler) handleTests(w http.ResponseWriter, r *http.Request) {
 		ProjectName: r.URL.Query().Get("project"),
 	}
 	limit, offset := parseLimitOffset(r, 20)
-	docs, total, err := h.repo.GetRunDocuments(r.Context(), filter, limit, offset)
+	docs, total, err := h.repo.GetRuns(r.Context(), filter, limit, offset)
 	if err != nil {
 		h.logger.Error("failed to fetch test runs from postgres", "error", err)
 		h.internalError(w)
@@ -86,7 +86,7 @@ func (h *PostgresHandler) handleRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit, offset := parseLimitOffset(r, 50)
-	docs, _, err := h.repo.GetRunDocuments(r.Context(), pgRepo.ListRunsFilter{}, limit, offset)
+	docs, _, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{}, limit, offset)
 	if err != nil {
 		h.logger.Error("failed to fetch runs from postgres", "error", err)
 		h.internalError(w)
@@ -117,7 +117,7 @@ func (h *PostgresHandler) handleRunsStats(w http.ResponseWriter, r *http.Request
 	}
 
 	limit, offset := parseLimitOffset(r, 50)
-	docs, _, err := h.repo.GetRunDocuments(r.Context(), pgRepo.ListRunsFilter{}, limit, offset)
+	docs, _, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{}, limit, offset)
 	if err != nil {
 		h.logger.Error("failed to fetch run stats from postgres", "error", err)
 		h.internalError(w)
@@ -291,7 +291,7 @@ func (h *PostgresHandler) handleMarkerStats(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	docs, total, err := h.repo.GetRunDocuments(r.Context(), pgRepo.ListRunsFilter{Marker: markerValue}, limit, 0)
+	docs, total, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{Marker: markerValue}, limit, 0)
 	if err != nil {
 		h.logger.Error("failed to fetch marker stats from postgres", "marker", markerValue, "error", err)
 		h.internalError(w)

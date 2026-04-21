@@ -555,21 +555,21 @@ func TestGetRunDocuments_PreservesHistoricalRunsForRepeatedExternalTestID(t *tes
 		}
 	}
 
-	docs, _, err := repo.GetRunDocuments(ctx, ListRunsFilter{}, 10, 0)
+	docs, _, err := repo.GetRuns(ctx, ListRunsFilter{}, 10, 0)
 	if err != nil {
-		t.Fatalf("GetRunDocuments failed: %v", err)
+		t.Fatalf("GetRuns failed: %v", err)
 	}
 	if len(docs) != 2 {
 		t.Fatalf("expected 2 run documents, got %d", len(docs))
 	}
-	if len(docs[0].Suites) == 0 || len(docs[0].Suites[0].Tests) != 1 {
-		t.Fatalf("latest run missing test payload: %+v", docs[0].Suites)
+	if docs[0].ID != "run-2" || docs[1].ID != "run-1" {
+		t.Fatalf("expected runs ordered newest-first, got %q then %q", docs[0].ID, docs[1].ID)
 	}
-	if len(docs[1].Suites) == 0 || len(docs[1].Suites[0].Tests) != 1 {
-		t.Fatalf("historical run missing test payload: %+v", docs[1].Suites)
+	if docs[0].Name != "Run 2" || docs[1].Name != "Run 1" {
+		t.Fatalf("expected run names to be preserved, got %q and %q", docs[0].Name, docs[1].Name)
 	}
-	if docs[0].Suites[0].Tests[0].ID != "test-123" || docs[1].Suites[0].Tests[0].ID != "test-123" {
-		t.Fatalf("expected external test IDs in API payloads, got %+v and %+v", docs[0].Suites[0].Tests[0], docs[1].Suites[0].Tests[0])
+	if docs[0].Status != "FAILED" || docs[1].Status != "PASSED" {
+		t.Fatalf("expected run statuses to be preserved, got %q and %q", docs[0].Status, docs[1].Status)
 	}
 
 	trends, err := repo.GetTestTrends(ctx, "test-123", 10)
@@ -578,5 +578,8 @@ func TestGetRunDocuments_PreservesHistoricalRunsForRepeatedExternalTestID(t *tes
 	}
 	if len(trends) != 2 {
 		t.Fatalf("expected 2 trend rows, got %d", len(trends))
+	}
+	if trends[0].RunID != "run-2" || trends[1].RunID != "run-1" {
+		t.Fatalf("expected historical trend rows for both runs, got %+v", trends)
 	}
 }

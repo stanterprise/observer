@@ -83,7 +83,7 @@ func (r *PostgresRepository) GetRunDocument(ctx context.Context, runID string) (
 	return runDocs[0], nil
 }
 
-func (r *PostgresRepository) GetRunDocuments(ctx context.Context, filter ListRunsFilter, limit, offset int64) ([]*m.TestRun, int64, error) {
+func (r *PostgresRepository) GetRuns(ctx context.Context, filter ListRunsFilter, limit, offset int64) ([]*m.TestRun, int64, error) {
 	runs, total, err := r.ListRuns(ctx, filter, limit, offset)
 	if err != nil {
 		return nil, 0, err
