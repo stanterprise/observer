@@ -20,7 +20,7 @@ func convertMetadata(protoMeta map[string]string) map[string]interface{} {
 	return md
 }
 
-// protoToTestRunDocument converts ReportRunStartEventRequest to TestRunDocument
+// protoToTestRunDocument converts ReportRunStartEventRequest to models.TestRun
 // Only populates fields relevant for WebSocket streaming (omits CreatedAt/UpdatedAt)
 func protoToTestRunDocument(req *events.ReportRunStartEventRequest) *models.TestRun {
 	if req == nil {
