@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+type (
+	Step json.RawMessage
+)
+
 // TestRun maps to the PostgreSQL runs table.
 // It intentionally mirrors TestRunDocument fields where practical.
 type TestRun struct {
@@ -22,9 +26,9 @@ type TestRun struct {
 	CreatedAt   time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
 	UpdatedAt   time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 
-	Shards []RunShard `gorm:"foreignKey:RunID;references:ID" json:"shards,omitempty"`
-	Suites []Suite    `gorm:"foreignKey:RunID;references:ID" json:"suites,omitempty"`
-	Tests  []Test     `gorm:"foreignKey:RunID;references:ID" json:"tests,omitempty"`
+	Shards []*RunShard `gorm:"foreignKey:RunID;references:ID" json:"shards,omitempty"`
+	Suites []*Suite    `gorm:"foreignKey:RunID;references:ID" json:"suites,omitempty"`
+	Tests  []*Test     `gorm:"foreignKey:RunID;references:ID" json:"tests,omitempty"`
 }
 
 func (TestRun) TableName() string {
@@ -74,8 +78,8 @@ type Suite struct {
 	CreatedAt       time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
 	UpdatedAt       time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 
-	Suites []Suite `gorm:"foreignKey:ParentSuiteID;references:ID" json:"suites,omitempty"`
-	Tests  []Test  `gorm:"foreignKey:SuiteID;references:ID" json:"tests,omitempty"`
+	Suites []*Suite `gorm:"foreignKey:ParentSuiteID;references:ID" json:"suites,omitempty"`
+	Tests  []*Test  `gorm:"foreignKey:SuiteID;references:ID" json:"tests,omitempty"`
 }
 
 func (Suite) TableName() string {
@@ -125,8 +129,8 @@ type TestAttempt struct {
 
 	// Steps holds the step array containing step trees serialized as jsonb.
 	// Go type is json.RawMessage (provisional — concrete typed decode at read time).
-	Steps      *json.RawMessage `gorm:"column:steps;type:jsonb" json:"steps,omitempty"`
-	StepsCount int32            `gorm:"column:steps_count" json:"stepsCount,omitempty"`
+	Steps      *Step `gorm:"column:steps;type:jsonb" json:"steps,omitempty"`
+	StepsCount int32 `gorm:"column:steps_count" json:"stepsCount,omitempty"`
 
 	Attachments  []map[string]interface{} `gorm:"column:attachments;type:jsonb;serializer:json" json:"attachments,omitempty"`
 	ErrorMessage string                   `gorm:"column:error_message;type:text" json:"errorMessage,omitempty"`

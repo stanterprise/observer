@@ -21,8 +21,7 @@ type PageInfo struct {
 }
 
 // Query root type
-type Query struct {
-}
+type Query struct{}
 
 // Statistics for a test run
 type RunStats struct {
@@ -51,9 +50,9 @@ type TestCaseFilter struct {
 }
 
 // TestCaseRun connection for pagination
-type TestCaseRunConnection struct {
+type TestCaseConnection struct {
 	// List of test case runs
-	Nodes []*models.TestCaseRun `json:"nodes"`
+	Nodes []*models.Test `json:"nodes"`
 	// Pagination information
 	PageInfo *PageInfo `json:"pageInfo"`
 }

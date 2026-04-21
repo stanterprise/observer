@@ -43,11 +43,10 @@ type Config struct {
 type ResolverRoot interface {
 	Query() QueryResolver
 	StepRun() StepRunResolver
-	TestCaseRun() TestCaseRunResolver
+	Test() TestResolver
 }
 
-type DirectiveRoot struct {
-}
+type DirectiveRoot struct{}
 
 type ComplexityRoot struct {
 	PageInfo struct {
@@ -73,18 +72,18 @@ type ComplexityRoot struct {
 	}
 
 	StepRun struct {
-		CreatedAt     func(childComplexity int) int
-		Error         func(childComplexity int) int
-		ID            func(childComplexity int) int
-		Metadata      func(childComplexity int) int
-		RunID         func(childComplexity int) int
-		Status        func(childComplexity int) int
-		TestCase      func(childComplexity int) int
-		TestCaseRunID func(childComplexity int) int
-		UpdatedAt     func(childComplexity int) int
+		CreatedAt func(childComplexity int) int
+		Error     func(childComplexity int) int
+		ID        func(childComplexity int) int
+		Metadata  func(childComplexity int) int
+		RunID     func(childComplexity int) int
+		Status    func(childComplexity int) int
+		TestCase  func(childComplexity int) int
+		TestID    func(childComplexity int) int
+		UpdatedAt func(childComplexity int) int
 	}
 
-	TestCaseRun struct {
+	Test struct {
 		CreatedAt func(childComplexity int) int
 		Error     func(childComplexity int) int
 		ID        func(childComplexity int) int
@@ -96,30 +95,30 @@ type ComplexityRoot struct {
 		UpdatedAt func(childComplexity int) int
 	}
 
-	TestCaseRunConnection struct {
+	TestConnection struct {
 		Nodes    func(childComplexity int) int
 		PageInfo func(childComplexity int) int
 	}
 }
 
 type QueryResolver interface {
-	TestCase(ctx context.Context, id string) (*models.TestCaseRun, error)
-	TestCases(ctx context.Context, filter *model.TestCaseFilter, limit *int, offset *int) (*model.TestCaseRunConnection, error)
-	Step(ctx context.Context, id string) (*models.StepRun, error)
+	TestCase(ctx context.Context, id string) (*models.Test, error)
+	TestCases(ctx context.Context, filter *model.TestCaseFilter, limit *int, offset *int) (*model.TestCaseConnection, error)
+	Step(ctx context.Context, id string) (*models.Step, error)
 	TestRuns(ctx context.Context, limit *int, offset *int) ([]string, error)
 	RunStats(ctx context.Context, runID string) (*model.RunStats, error)
 }
 type StepRunResolver interface {
-	Metadata(ctx context.Context, obj *models.StepRun) (*string, error)
-	Error(ctx context.Context, obj *models.StepRun) (*string, error)
+	Metadata(ctx context.Context, obj *models.Step) (*string, error)
+	Error(ctx context.Context, obj *models.Step) (*string, error)
 
-	TestCase(ctx context.Context, obj *models.StepRun) (*models.TestCaseRun, error)
+	TestCase(ctx context.Context, obj *models.Step) (*models.Test, error)
 }
-type TestCaseRunResolver interface {
-	Metadata(ctx context.Context, obj *models.TestCaseRun) (*string, error)
-	Error(ctx context.Context, obj *models.TestCaseRun) (*string, error)
+type TestResolver interface {
+	Metadata(ctx context.Context, obj *models.Test) (*string, error)
+	Error(ctx context.Context, obj *models.Test) (*string, error)
 
-	Steps(ctx context.Context, obj *models.TestCaseRun) ([]*models.StepRun, error)
+	Steps(ctx context.Context, obj *models.Test) ([]*models.Step, error)
 }
 
 type executableSchema struct {
@@ -289,12 +288,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.StepRun.TestCase(childComplexity), true
-	case "StepRun.testCaseRunId":
-		if e.complexity.StepRun.TestCaseRunID == nil {
+	case "StepRun.TestId":
+		if e.complexity.StepRun.TestID == nil {
 			break
 		}
 
-		return e.complexity.StepRun.TestCaseRunID(childComplexity), true
+		return e.complexity.StepRun.TestID(childComplexity), true
 	case "StepRun.updatedAt":
 		if e.complexity.StepRun.UpdatedAt == nil {
 			break
@@ -302,73 +301,73 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.StepRun.UpdatedAt(childComplexity), true
 
-	case "TestCaseRun.createdAt":
-		if e.complexity.TestCaseRun.CreatedAt == nil {
+	case "Test.createdAt":
+		if e.complexity.Test.CreatedAt == nil {
 			break
 		}
 
-		return e.complexity.TestCaseRun.CreatedAt(childComplexity), true
-	case "TestCaseRun.error":
-		if e.complexity.TestCaseRun.Error == nil {
+		return e.complexity.Test.CreatedAt(childComplexity), true
+	case "Test.error":
+		if e.complexity.Test.Error == nil {
 			break
 		}
 
-		return e.complexity.TestCaseRun.Error(childComplexity), true
-	case "TestCaseRun.id":
-		if e.complexity.TestCaseRun.ID == nil {
+		return e.complexity.Test.Error(childComplexity), true
+	case "Test.id":
+		if e.complexity.Test.ID == nil {
 			break
 		}
 
-		return e.complexity.TestCaseRun.ID(childComplexity), true
-	case "TestCaseRun.metadata":
-		if e.complexity.TestCaseRun.Metadata == nil {
+		return e.complexity.Test.ID(childComplexity), true
+	case "Test.metadata":
+		if e.complexity.Test.Metadata == nil {
 			break
 		}
 
-		return e.complexity.TestCaseRun.Metadata(childComplexity), true
-	case "TestCaseRun.runId":
-		if e.complexity.TestCaseRun.RunID == nil {
+		return e.complexity.Test.Metadata(childComplexity), true
+	case "Test.runId":
+		if e.complexity.Test.RunID == nil {
 			break
 		}
 
-		return e.complexity.TestCaseRun.RunID(childComplexity), true
-	case "TestCaseRun.status":
-		if e.complexity.TestCaseRun.Status == nil {
+		return e.complexity.Test.RunID(childComplexity), true
+	case "Test.status":
+		if e.complexity.Test.Status == nil {
 			break
 		}
 
-		return e.complexity.TestCaseRun.Status(childComplexity), true
-	case "TestCaseRun.steps":
-		if e.complexity.TestCaseRun.Steps == nil {
+		return e.complexity.Test.Status(childComplexity), true
+	case "Test.steps":
+		if e.complexity.Test.Steps == nil {
 			break
 		}
 
-		return e.complexity.TestCaseRun.Steps(childComplexity), true
-	case "TestCaseRun.title":
-		if e.complexity.TestCaseRun.Title == nil {
+		return e.complexity.Test.Steps(childComplexity), true
+	case "Test.title":
+		if e.complexity.Test.Title == nil {
 			break
 		}
 
-		return e.complexity.TestCaseRun.Title(childComplexity), true
-	case "TestCaseRun.updatedAt":
-		if e.complexity.TestCaseRun.UpdatedAt == nil {
+		return e.complexity.Test.Title(childComplexity), true
+	case "Test.updatedAt":
+		if e.complexity.Test.UpdatedAt == nil {
 			break
 		}
 
-		return e.complexity.TestCaseRun.UpdatedAt(childComplexity), true
+		return e.complexity.Test.UpdatedAt(childComplexity), true
 
-	case "TestCaseRunConnection.nodes":
-		if e.complexity.TestCaseRunConnection.Nodes == nil {
+	case "TestConnection.nodes":
+		if e.complexity.TestConnection.Nodes == nil {
 			break
 		}
 
-		return e.complexity.TestCaseRunConnection.Nodes(childComplexity), true
-	case "TestCaseRunConnection.pageInfo":
-		if e.complexity.TestCaseRunConnection.PageInfo == nil {
+		return e.complexity.TestConnection.Nodes(childComplexity), true
+	case "TestConnection.pageInfo":
+		if e.complexity.TestConnection.PageInfo == nil {
 			break
 		}
 
-		return e.complexity.TestCaseRunConnection.PageInfo(childComplexity), true
+		return e.complexity.TestConnection.PageInfo(childComplexity), true
 
 	}
 	return 0, false
@@ -682,7 +681,7 @@ func (ec *executionContext) _Query_testCase(ctx context.Context, field graphql.C
 			return ec.resolvers.Query().TestCase(ctx, fc.Args["id"].(string))
 		},
 		nil,
-		ec.marshalOTestCaseRun2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTestCaseRun,
+		ec.marshalOTest2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTest,
 		true,
 		false,
 	)
@@ -697,25 +696,25 @@ func (ec *executionContext) fieldContext_Query_testCase(ctx context.Context, fie
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
-				return ec.fieldContext_TestCaseRun_id(ctx, field)
+				return ec.fieldContext_Test_id(ctx, field)
 			case "runId":
-				return ec.fieldContext_TestCaseRun_runId(ctx, field)
+				return ec.fieldContext_Test_runId(ctx, field)
 			case "title":
-				return ec.fieldContext_TestCaseRun_title(ctx, field)
+				return ec.fieldContext_Test_title(ctx, field)
 			case "status":
-				return ec.fieldContext_TestCaseRun_status(ctx, field)
+				return ec.fieldContext_Test_status(ctx, field)
 			case "metadata":
-				return ec.fieldContext_TestCaseRun_metadata(ctx, field)
+				return ec.fieldContext_Test_metadata(ctx, field)
 			case "error":
-				return ec.fieldContext_TestCaseRun_error(ctx, field)
+				return ec.fieldContext_Test_error(ctx, field)
 			case "createdAt":
-				return ec.fieldContext_TestCaseRun_createdAt(ctx, field)
+				return ec.fieldContext_Test_createdAt(ctx, field)
 			case "updatedAt":
-				return ec.fieldContext_TestCaseRun_updatedAt(ctx, field)
+				return ec.fieldContext_Test_updatedAt(ctx, field)
 			case "steps":
-				return ec.fieldContext_TestCaseRun_steps(ctx, field)
+				return ec.fieldContext_Test_steps(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type TestCaseRun", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type Test", field.Name)
 		},
 	}
 	defer func() {
@@ -743,7 +742,7 @@ func (ec *executionContext) _Query_testCases(ctx context.Context, field graphql.
 			return ec.resolvers.Query().TestCases(ctx, fc.Args["filter"].(*model.TestCaseFilter), fc.Args["limit"].(*int), fc.Args["offset"].(*int))
 		},
 		nil,
-		ec.marshalNTestCaseRunConnection2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋpkgᚋapiᚋgraphᚋmodelᚐTestCaseRunConnection,
+		ec.marshalNTestConnection2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋpkgᚋapiᚋgraphᚋmodelᚐTestConnection,
 		true,
 		true,
 	)
@@ -758,11 +757,11 @@ func (ec *executionContext) fieldContext_Query_testCases(ctx context.Context, fi
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "nodes":
-				return ec.fieldContext_TestCaseRunConnection_nodes(ctx, field)
+				return ec.fieldContext_TestConnection_nodes(ctx, field)
 			case "pageInfo":
-				return ec.fieldContext_TestCaseRunConnection_pageInfo(ctx, field)
+				return ec.fieldContext_TestConnection_pageInfo(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type TestCaseRunConnection", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type TestConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -808,8 +807,8 @@ func (ec *executionContext) fieldContext_Query_step(ctx context.Context, field g
 				return ec.fieldContext_StepRun_id(ctx, field)
 			case "runId":
 				return ec.fieldContext_StepRun_runId(ctx, field)
-			case "testCaseRunId":
-				return ec.fieldContext_StepRun_testCaseRunId(ctx, field)
+			case "TestId":
+				return ec.fieldContext_StepRun_TestId(ctx, field)
 			case "status":
 				return ec.fieldContext_StepRun_status(ctx, field)
 			case "metadata":
@@ -1276,14 +1275,14 @@ func (ec *executionContext) fieldContext_StepRun_runId(_ context.Context, field 
 	return fc, nil
 }
 
-func (ec *executionContext) _StepRun_testCaseRunId(ctx context.Context, field graphql.CollectedField, obj *models.StepRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _StepRun_TestId(ctx context.Context, field graphql.CollectedField, obj *models.StepRun) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_StepRun_testCaseRunId,
+		ec.fieldContext_StepRun_TestId,
 		func(ctx context.Context) (any, error) {
-			return obj.TestCaseRunID, nil
+			return obj.TestID, nil
 		},
 		nil,
 		ec.marshalNString2string,
@@ -1292,7 +1291,7 @@ func (ec *executionContext) _StepRun_testCaseRunId(ctx context.Context, field gr
 	)
 }
 
-func (ec *executionContext) fieldContext_StepRun_testCaseRunId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_StepRun_TestId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "StepRun",
 		Field:      field,
@@ -1460,7 +1459,7 @@ func (ec *executionContext) _StepRun_testCase(ctx context.Context, field graphql
 			return ec.resolvers.StepRun().TestCase(ctx, obj)
 		},
 		nil,
-		ec.marshalOTestCaseRun2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTestCaseRun,
+		ec.marshalOTest2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTest,
 		true,
 		false,
 	)
@@ -1475,36 +1474,36 @@ func (ec *executionContext) fieldContext_StepRun_testCase(_ context.Context, fie
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
-				return ec.fieldContext_TestCaseRun_id(ctx, field)
+				return ec.fieldContext_Test_id(ctx, field)
 			case "runId":
-				return ec.fieldContext_TestCaseRun_runId(ctx, field)
+				return ec.fieldContext_Test_runId(ctx, field)
 			case "title":
-				return ec.fieldContext_TestCaseRun_title(ctx, field)
+				return ec.fieldContext_Test_title(ctx, field)
 			case "status":
-				return ec.fieldContext_TestCaseRun_status(ctx, field)
+				return ec.fieldContext_Test_status(ctx, field)
 			case "metadata":
-				return ec.fieldContext_TestCaseRun_metadata(ctx, field)
+				return ec.fieldContext_Test_metadata(ctx, field)
 			case "error":
-				return ec.fieldContext_TestCaseRun_error(ctx, field)
+				return ec.fieldContext_Test_error(ctx, field)
 			case "createdAt":
-				return ec.fieldContext_TestCaseRun_createdAt(ctx, field)
+				return ec.fieldContext_Test_createdAt(ctx, field)
 			case "updatedAt":
-				return ec.fieldContext_TestCaseRun_updatedAt(ctx, field)
+				return ec.fieldContext_Test_updatedAt(ctx, field)
 			case "steps":
-				return ec.fieldContext_TestCaseRun_steps(ctx, field)
+				return ec.fieldContext_Test_steps(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type TestCaseRun", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type Test", field.Name)
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _TestCaseRun_id(ctx context.Context, field graphql.CollectedField, obj *models.TestCaseRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _Test_id(ctx context.Context, field graphql.CollectedField, obj *models.Test) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_TestCaseRun_id,
+		ec.fieldContext_Test_id,
 		func(ctx context.Context) (any, error) {
 			return obj.ID, nil
 		},
@@ -1515,9 +1514,9 @@ func (ec *executionContext) _TestCaseRun_id(ctx context.Context, field graphql.C
 	)
 }
 
-func (ec *executionContext) fieldContext_TestCaseRun_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Test_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "TestCaseRun",
+		Object:     "Test",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -1528,12 +1527,12 @@ func (ec *executionContext) fieldContext_TestCaseRun_id(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _TestCaseRun_runId(ctx context.Context, field graphql.CollectedField, obj *models.TestCaseRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _Test_runId(ctx context.Context, field graphql.CollectedField, obj *models.Test) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_TestCaseRun_runId,
+		ec.fieldContext_Test_runId,
 		func(ctx context.Context) (any, error) {
 			return obj.RunID, nil
 		},
@@ -1544,9 +1543,9 @@ func (ec *executionContext) _TestCaseRun_runId(ctx context.Context, field graphq
 	)
 }
 
-func (ec *executionContext) fieldContext_TestCaseRun_runId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Test_runId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "TestCaseRun",
+		Object:     "Test",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -1557,12 +1556,12 @@ func (ec *executionContext) fieldContext_TestCaseRun_runId(_ context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _TestCaseRun_title(ctx context.Context, field graphql.CollectedField, obj *models.TestCaseRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _Test_title(ctx context.Context, field graphql.CollectedField, obj *models.Test) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_TestCaseRun_title,
+		ec.fieldContext_Test_title,
 		func(ctx context.Context) (any, error) {
 			return obj.Title, nil
 		},
@@ -1573,9 +1572,9 @@ func (ec *executionContext) _TestCaseRun_title(ctx context.Context, field graphq
 	)
 }
 
-func (ec *executionContext) fieldContext_TestCaseRun_title(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Test_title(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "TestCaseRun",
+		Object:     "Test",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -1586,12 +1585,12 @@ func (ec *executionContext) fieldContext_TestCaseRun_title(_ context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _TestCaseRun_status(ctx context.Context, field graphql.CollectedField, obj *models.TestCaseRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _Test_status(ctx context.Context, field graphql.CollectedField, obj *models.Test) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_TestCaseRun_status,
+		ec.fieldContext_Test_status,
 		func(ctx context.Context) (any, error) {
 			return obj.Status, nil
 		},
@@ -1602,9 +1601,9 @@ func (ec *executionContext) _TestCaseRun_status(ctx context.Context, field graph
 	)
 }
 
-func (ec *executionContext) fieldContext_TestCaseRun_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Test_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "TestCaseRun",
+		Object:     "Test",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -1615,14 +1614,14 @@ func (ec *executionContext) fieldContext_TestCaseRun_status(_ context.Context, f
 	return fc, nil
 }
 
-func (ec *executionContext) _TestCaseRun_metadata(ctx context.Context, field graphql.CollectedField, obj *models.TestCaseRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _Test_metadata(ctx context.Context, field graphql.CollectedField, obj *models.Test) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_TestCaseRun_metadata,
+		ec.fieldContext_Test_metadata,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.TestCaseRun().Metadata(ctx, obj)
+			return ec.resolvers.Test().Metadata(ctx, obj)
 		},
 		nil,
 		ec.marshalOString2ᚖstring,
@@ -1631,9 +1630,9 @@ func (ec *executionContext) _TestCaseRun_metadata(ctx context.Context, field gra
 	)
 }
 
-func (ec *executionContext) fieldContext_TestCaseRun_metadata(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Test_metadata(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "TestCaseRun",
+		Object:     "Test",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
@@ -1644,14 +1643,14 @@ func (ec *executionContext) fieldContext_TestCaseRun_metadata(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _TestCaseRun_error(ctx context.Context, field graphql.CollectedField, obj *models.TestCaseRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _Test_error(ctx context.Context, field graphql.CollectedField, obj *models.Test) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_TestCaseRun_error,
+		ec.fieldContext_Test_error,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.TestCaseRun().Error(ctx, obj)
+			return ec.resolvers.Test().Error(ctx, obj)
 		},
 		nil,
 		ec.marshalOString2ᚖstring,
@@ -1660,9 +1659,9 @@ func (ec *executionContext) _TestCaseRun_error(ctx context.Context, field graphq
 	)
 }
 
-func (ec *executionContext) fieldContext_TestCaseRun_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Test_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "TestCaseRun",
+		Object:     "Test",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
@@ -1673,12 +1672,12 @@ func (ec *executionContext) fieldContext_TestCaseRun_error(_ context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _TestCaseRun_createdAt(ctx context.Context, field graphql.CollectedField, obj *models.TestCaseRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _Test_createdAt(ctx context.Context, field graphql.CollectedField, obj *models.Test) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_TestCaseRun_createdAt,
+		ec.fieldContext_Test_createdAt,
 		func(ctx context.Context) (any, error) {
 			return obj.CreatedAt, nil
 		},
@@ -1689,9 +1688,9 @@ func (ec *executionContext) _TestCaseRun_createdAt(ctx context.Context, field gr
 	)
 }
 
-func (ec *executionContext) fieldContext_TestCaseRun_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Test_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "TestCaseRun",
+		Object:     "Test",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -1702,12 +1701,12 @@ func (ec *executionContext) fieldContext_TestCaseRun_createdAt(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _TestCaseRun_updatedAt(ctx context.Context, field graphql.CollectedField, obj *models.TestCaseRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _Test_updatedAt(ctx context.Context, field graphql.CollectedField, obj *models.Test) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_TestCaseRun_updatedAt,
+		ec.fieldContext_Test_updatedAt,
 		func(ctx context.Context) (any, error) {
 			return obj.UpdatedAt, nil
 		},
@@ -1718,9 +1717,9 @@ func (ec *executionContext) _TestCaseRun_updatedAt(ctx context.Context, field gr
 	)
 }
 
-func (ec *executionContext) fieldContext_TestCaseRun_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Test_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "TestCaseRun",
+		Object:     "Test",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -1731,14 +1730,14 @@ func (ec *executionContext) fieldContext_TestCaseRun_updatedAt(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _TestCaseRun_steps(ctx context.Context, field graphql.CollectedField, obj *models.TestCaseRun) (ret graphql.Marshaler) {
+func (ec *executionContext) _Test_steps(ctx context.Context, field graphql.CollectedField, obj *models.Test) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_TestCaseRun_steps,
+		ec.fieldContext_Test_steps,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.TestCaseRun().Steps(ctx, obj)
+			return ec.resolvers.Test().Steps(ctx, obj)
 		},
 		nil,
 		ec.marshalNStepRun2ᚕᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐStepRunᚄ,
@@ -1747,9 +1746,9 @@ func (ec *executionContext) _TestCaseRun_steps(ctx context.Context, field graphq
 	)
 }
 
-func (ec *executionContext) fieldContext_TestCaseRun_steps(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Test_steps(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "TestCaseRun",
+		Object:     "Test",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
@@ -1759,8 +1758,8 @@ func (ec *executionContext) fieldContext_TestCaseRun_steps(_ context.Context, fi
 				return ec.fieldContext_StepRun_id(ctx, field)
 			case "runId":
 				return ec.fieldContext_StepRun_runId(ctx, field)
-			case "testCaseRunId":
-				return ec.fieldContext_StepRun_testCaseRunId(ctx, field)
+			case "TestId":
+				return ec.fieldContext_StepRun_TestId(ctx, field)
 			case "status":
 				return ec.fieldContext_StepRun_status(ctx, field)
 			case "metadata":
@@ -1780,61 +1779,61 @@ func (ec *executionContext) fieldContext_TestCaseRun_steps(_ context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _TestCaseRunConnection_nodes(ctx context.Context, field graphql.CollectedField, obj *model.TestCaseRunConnection) (ret graphql.Marshaler) {
+func (ec *executionContext) _TestConnection_nodes(ctx context.Context, field graphql.CollectedField, obj *model.TestConnection) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_TestCaseRunConnection_nodes,
+		ec.fieldContext_TestConnection_nodes,
 		func(ctx context.Context) (any, error) {
 			return obj.Nodes, nil
 		},
 		nil,
-		ec.marshalNTestCaseRun2ᚕᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTestCaseRunᚄ,
+		ec.marshalNTest2ᚕᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTestᚄ,
 		true,
 		true,
 	)
 }
 
-func (ec *executionContext) fieldContext_TestCaseRunConnection_nodes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_TestConnection_nodes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "TestCaseRunConnection",
+		Object:     "TestConnection",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
-				return ec.fieldContext_TestCaseRun_id(ctx, field)
+				return ec.fieldContext_Test_id(ctx, field)
 			case "runId":
-				return ec.fieldContext_TestCaseRun_runId(ctx, field)
+				return ec.fieldContext_Test_runId(ctx, field)
 			case "title":
-				return ec.fieldContext_TestCaseRun_title(ctx, field)
+				return ec.fieldContext_Test_title(ctx, field)
 			case "status":
-				return ec.fieldContext_TestCaseRun_status(ctx, field)
+				return ec.fieldContext_Test_status(ctx, field)
 			case "metadata":
-				return ec.fieldContext_TestCaseRun_metadata(ctx, field)
+				return ec.fieldContext_Test_metadata(ctx, field)
 			case "error":
-				return ec.fieldContext_TestCaseRun_error(ctx, field)
+				return ec.fieldContext_Test_error(ctx, field)
 			case "createdAt":
-				return ec.fieldContext_TestCaseRun_createdAt(ctx, field)
+				return ec.fieldContext_Test_createdAt(ctx, field)
 			case "updatedAt":
-				return ec.fieldContext_TestCaseRun_updatedAt(ctx, field)
+				return ec.fieldContext_Test_updatedAt(ctx, field)
 			case "steps":
-				return ec.fieldContext_TestCaseRun_steps(ctx, field)
+				return ec.fieldContext_Test_steps(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type TestCaseRun", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type Test", field.Name)
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _TestCaseRunConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.TestCaseRunConnection) (ret graphql.Marshaler) {
+func (ec *executionContext) _TestConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.TestConnection) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_TestCaseRunConnection_pageInfo,
+		ec.fieldContext_TestConnection_pageInfo,
 		func(ctx context.Context) (any, error) {
 			return obj.PageInfo, nil
 		},
@@ -1845,9 +1844,9 @@ func (ec *executionContext) _TestCaseRunConnection_pageInfo(ctx context.Context,
 	)
 }
 
-func (ec *executionContext) fieldContext_TestCaseRunConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_TestConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "TestCaseRunConnection",
+		Object:     "TestConnection",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -3636,8 +3635,8 @@ func (ec *executionContext) _StepRun(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
-		case "testCaseRunId":
-			out.Values[i] = ec._StepRun_testCaseRunId(ctx, field, obj)
+		case "TestId":
+			out.Values[i] = ec._StepRun_TestId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -3775,34 +3774,34 @@ func (ec *executionContext) _StepRun(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
-var testCaseRunImplementors = []string{"TestCaseRun"}
+var TestImplementors = []string{"Test"}
 
-func (ec *executionContext) _TestCaseRun(ctx context.Context, sel ast.SelectionSet, obj *models.TestCaseRun) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, testCaseRunImplementors)
+func (ec *executionContext) _Test(ctx context.Context, sel ast.SelectionSet, obj *models.Test) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, TestImplementors)
 
 	out := graphql.NewFieldSet(fields)
 	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("TestCaseRun")
+			out.Values[i] = graphql.MarshalString("Test")
 		case "id":
-			out.Values[i] = ec._TestCaseRun_id(ctx, field, obj)
+			out.Values[i] = ec._Test_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "runId":
-			out.Values[i] = ec._TestCaseRun_runId(ctx, field, obj)
+			out.Values[i] = ec._Test_runId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "title":
-			out.Values[i] = ec._TestCaseRun_title(ctx, field, obj)
+			out.Values[i] = ec._Test_title(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "status":
-			out.Values[i] = ec._TestCaseRun_status(ctx, field, obj)
+			out.Values[i] = ec._Test_status(ctx, field, obj)
 		case "metadata":
 			field := field
 
@@ -3812,7 +3811,7 @@ func (ec *executionContext) _TestCaseRun(ctx context.Context, sel ast.SelectionS
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._TestCaseRun_metadata(ctx, field, obj)
+				res = ec._Test_metadata(ctx, field, obj)
 				return res
 			}
 
@@ -3845,7 +3844,7 @@ func (ec *executionContext) _TestCaseRun(ctx context.Context, sel ast.SelectionS
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._TestCaseRun_error(ctx, field, obj)
+				res = ec._Test_error(ctx, field, obj)
 				return res
 			}
 
@@ -3870,12 +3869,12 @@ func (ec *executionContext) _TestCaseRun(ctx context.Context, sel ast.SelectionS
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "createdAt":
-			out.Values[i] = ec._TestCaseRun_createdAt(ctx, field, obj)
+			out.Values[i] = ec._Test_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "updatedAt":
-			out.Values[i] = ec._TestCaseRun_updatedAt(ctx, field, obj)
+			out.Values[i] = ec._Test_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -3888,7 +3887,7 @@ func (ec *executionContext) _TestCaseRun(ctx context.Context, sel ast.SelectionS
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._TestCaseRun_steps(ctx, field, obj)
+				res = ec._Test_steps(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -3938,24 +3937,24 @@ func (ec *executionContext) _TestCaseRun(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
-var testCaseRunConnectionImplementors = []string{"TestCaseRunConnection"}
+var TestConnectionImplementors = []string{"TestConnection"}
 
-func (ec *executionContext) _TestCaseRunConnection(ctx context.Context, sel ast.SelectionSet, obj *model.TestCaseRunConnection) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, testCaseRunConnectionImplementors)
+func (ec *executionContext) _TestConnection(ctx context.Context, sel ast.SelectionSet, obj *model.TestConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, TestConnectionImplementors)
 
 	out := graphql.NewFieldSet(fields)
 	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("TestCaseRunConnection")
+			out.Values[i] = graphql.MarshalString("TestConnection")
 		case "nodes":
-			out.Values[i] = ec._TestCaseRunConnection_nodes(ctx, field, obj)
+			out.Values[i] = ec._TestConnection_nodes(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "pageInfo":
-			out.Values[i] = ec._TestCaseRunConnection_pageInfo(ctx, field, obj)
+			out.Values[i] = ec._TestConnection_pageInfo(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -4475,7 +4474,7 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	return ret
 }
 
-func (ec *executionContext) marshalNTestCaseRun2ᚕᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTestCaseRunᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.TestCaseRun) graphql.Marshaler {
+func (ec *executionContext) marshalNTest2ᚕᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTestᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Test) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -4499,7 +4498,7 @@ func (ec *executionContext) marshalNTestCaseRun2ᚕᚖgithubᚗcomᚋstanterpris
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNTestCaseRun2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTestCaseRun(ctx, sel, v[i])
+			ret[i] = ec.marshalNTest2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTest(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -4519,28 +4518,28 @@ func (ec *executionContext) marshalNTestCaseRun2ᚕᚖgithubᚗcomᚋstanterpris
 	return ret
 }
 
-func (ec *executionContext) marshalNTestCaseRun2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTestCaseRun(ctx context.Context, sel ast.SelectionSet, v *models.TestCaseRun) graphql.Marshaler {
+func (ec *executionContext) marshalNTest2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTest(ctx context.Context, sel ast.SelectionSet, v *models.Test) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
-	return ec._TestCaseRun(ctx, sel, v)
+	return ec._Test(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNTestCaseRunConnection2githubᚗcomᚋstanterpriseᚋobserverᚋpkgᚋapiᚋgraphᚋmodelᚐTestCaseRunConnection(ctx context.Context, sel ast.SelectionSet, v model.TestCaseRunConnection) graphql.Marshaler {
-	return ec._TestCaseRunConnection(ctx, sel, &v)
+func (ec *executionContext) marshalNTestConnection2githubᚗcomᚋstanterpriseᚋobserverᚋpkgᚋapiᚋgraphᚋmodelᚐTestConnection(ctx context.Context, sel ast.SelectionSet, v model.TestConnection) graphql.Marshaler {
+	return ec._TestConnection(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNTestCaseRunConnection2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋpkgᚋapiᚋgraphᚋmodelᚐTestCaseRunConnection(ctx context.Context, sel ast.SelectionSet, v *model.TestCaseRunConnection) graphql.Marshaler {
+func (ec *executionContext) marshalNTestConnection2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋpkgᚋapiᚋgraphᚋmodelᚐTestConnection(ctx context.Context, sel ast.SelectionSet, v *model.TestConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
-	return ec._TestCaseRunConnection(ctx, sel, v)
+	return ec._TestConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v any) (time.Time, error) {
@@ -4912,11 +4911,11 @@ func (ec *executionContext) unmarshalOTestCaseFilter2ᚖgithubᚗcomᚋstanterpr
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOTestCaseRun2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTestCaseRun(ctx context.Context, sel ast.SelectionSet, v *models.TestCaseRun) graphql.Marshaler {
+func (ec *executionContext) marshalOTest2ᚖgithubᚗcomᚋstanterpriseᚋobserverᚋinternalᚋmodelsᚐTest(ctx context.Context, sel ast.SelectionSet, v *models.Test) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return ec._TestCaseRun(ctx, sel, v)
+	return ec._Test(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOTime2ᚖtimeᚐTime(ctx context.Context, v any) (*time.Time, error) {

@@ -77,7 +77,7 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 		attachments = append(attachments, attMap)
 	}
 
-	test := &m.TestDocument{
+	test := &m.Test{
 		ID:           req.TestCase.Id,
 		Name:         req.TestCase.Name,
 		Title:        req.TestCase.Name,
@@ -389,9 +389,9 @@ func (c *NATSConsumer) processAttachment(ctx context.Context, att *common.Attach
 	return attMap, nil
 }
 
-func marshalAttemptSteps(steps []*m.StepDocument) (*json.RawMessage, error) {
+func marshalAttemptSteps(steps []*m.Step) (*json.RawMessage, error) {
 	if steps == nil {
-		steps = []*m.StepDocument{}
+		steps = []*m.Step{}
 	}
 	raw, err := json.Marshal(steps)
 	if err != nil {
