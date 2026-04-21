@@ -25,6 +25,10 @@ import type { TestSuite } from "@/types/testSuite";
 import TestSuiteRecord from "./TestSuiteRecord";
 import type { TestRun } from "@/types/testRun";
 
+function isFlakyTest(test: Test): boolean {
+  return test.status === "PASSED" && (test.attempts?.length ?? 0) > 1;
+}
+
 function flattenSuiteTests(suites: TestSuite[]): Test[] {
   const flattened: Test[] = [];
 
@@ -257,7 +261,18 @@ export function TestRunDetailPage() {
 
       // Status filter
       if (selectedStatuses.size > 0) {
-        if (!selectedStatuses.has(test.status as TestStatus)) return false;
+        const isFlaky = isFlakyTest(test);
+        const matchesPassed =
+          selectedStatuses.has("PASSED") &&
+          test.status === "PASSED" &&
+          !isFlaky;
+        const matchesFlaky = selectedStatuses.has("FLAKY") && isFlaky;
+        const matchesStandardStatus =
+          test.status !== "PASSED" && selectedStatuses.has(test.status);
+
+        if (!matchesPassed && !matchesFlaky && !matchesStandardStatus) {
+          return false;
+        }
       }
 
       // Tag filter (test must have ALL selected tags)
@@ -581,6 +596,7 @@ export function TestRunDetailPage() {
                   {(
                     [
                       "PASSED",
+                      "FLAKY",
                       "FAILED",
                       "RUNNING",
                       "SKIPPED",
@@ -597,6 +613,9 @@ export function TestRunDetailPage() {
                       PASSED: isSelected
                         ? "bg-(--status-success-soft) border-(--status-success-border) text-(--status-success)"
                         : "bg-(--stitch-surface-card) border-(--status-success-border) text-(--status-success) hover:bg-(--status-success-soft)",
+                      FLAKY: isSelected
+                        ? "bg-(--status-warning-soft) border-(--status-warning-border) text-(--status-warning)"
+                        : "bg-(--stitch-surface-card) border-(--status-warning-border) text-(--status-warning) hover:bg-(--status-warning-soft)",
                       FAILED: isSelected
                         ? "bg-(--status-failure-soft) border-(--status-failure-border) text-(--status-failure)"
                         : "bg-(--stitch-surface-card) border-(--status-failure-border) text-(--status-failure) hover:bg-(--status-failure-soft)",

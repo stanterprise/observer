@@ -22,6 +22,7 @@ export const SuiteTitleCard = ({
 }: ProgressBarProps) => {
   const stats = runDetail.statistics!;
   const totalTests = runDetail.totalTests ?? stats.total;
+  const flakyCount = stats.flaky || 0;
   const runningPendingCount = (stats.running || 0) + (stats.pending || 0);
   const notRunCount = stats.notRun || 0;
   const unknownCount = stats.unknown || 0;
@@ -162,6 +163,11 @@ export const SuiteTitleCard = ({
             <div className="text-xs font-medium uppercase tracking-wide text-(--stitch-on-surface) md:text-sm">
               Passed
             </div>
+            {flakyCount > 0 && (
+              <div className="mt-2 inline-flex items-center rounded-full border border-(--status-warning-border) bg-(--status-warning-soft) px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-(--status-warning)">
+                Includes {flakyCount} flaky
+              </div>
+            )}
             {stats.total > 0 && (
               <div className="mt-1 text-xs font-semibold text-(--status-success)">
                 {Math.round((stats.passed / stats.total) * 100)}%
