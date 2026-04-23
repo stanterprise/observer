@@ -22,31 +22,35 @@ export default ({ test }: StepContainerProps) => {
 
   return (
     <div key={test.id}>
-      <div className="mb-5 rounded-xl bg-(--stitch-surface-low) p-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
+      <div className="mb-4 rounded-lg bg-(--stitch-surface-low) p-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-(--stitch-on-surface-subtle)">
                 Step Explorer
               </span>
-              <Badge status={test.status as TestStatus} />
+              <Badge
+                status={test.status as TestStatus}
+                showIcon={false}
+                className="px-2 py-0 text-[11px]"
+              />
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-(--stitch-on-surface-muted)">
-              <span className="rounded-full bg-(--stitch-surface-card) px-3 py-1 font-semibold text-(--stitch-on-surface)">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-(--stitch-on-surface-muted)">
+              <span className="rounded-full bg-(--stitch-surface-card) px-2.5 py-0.5 font-semibold text-(--stitch-on-surface)">
                 {totalStepCount} total
               </span>
               {totalStepCount !== topLevelStepCount && (
-                <span className="rounded-full bg-(--stitch-surface-card) px-3 py-1 font-medium text-(--stitch-on-surface-muted)">
+                <span className="rounded-full bg-(--stitch-surface-card) px-2.5 py-0.5 font-medium text-(--stitch-on-surface-muted)">
                   {topLevelStepCount} top-level
                 </span>
               )}
               {expandableStepCount > 0 && (
-                <span className="rounded-full bg-(--stitch-surface-card) px-3 py-1 font-medium text-(--stitch-on-surface-muted)">
+                <span className="rounded-full bg-(--stitch-surface-card) px-2.5 py-0.5 font-medium text-(--stitch-on-surface-muted)">
                   {expandableStepCount} expandable
                 </span>
               )}
             </div>
-            <p className="text-sm text-(--stitch-on-surface-subtle)">
+            <p className="text-xs text-(--stitch-on-surface-subtle)">
               {test.title && test.title !== test.id ? `${test.title} · ` : ""}
               Nested execution order with hooks, steps, and assertions.
             </p>
@@ -54,16 +58,16 @@ export default ({ test }: StepContainerProps) => {
           {hasStepsWithChildren && (
             <button
               onClick={() => setExpandAll(!expandAll)}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-(--stitch-surface-card) px-4 py-2 text-sm font-medium text-(--stitch-on-surface-muted) transition-colors hover:bg-(--stitch-surface-highest)"
+              className="inline-flex items-center justify-center gap-1.5 rounded-md bg-(--stitch-surface-card) px-3 py-1.5 text-xs font-medium text-(--stitch-on-surface-muted) transition-colors hover:bg-(--stitch-surface-highest)"
             >
               {expandAll ? (
                 <>
-                  <ChevronsRight className="h-4 w-4" />
+                  <ChevronsRight className="h-3.5 w-3.5" />
                   <span>Collapse All</span>
                 </>
               ) : (
                 <>
-                  <ChevronsDown className="h-4 w-4" />
+                  <ChevronsDown className="h-3.5 w-3.5" />
                   <span>Expand All</span>
                 </>
               )}
