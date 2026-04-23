@@ -153,7 +153,9 @@ const getDurationFromRangeNs = (startTime?: string, endTime?: string) => {
   return Math.max((endMs - startMs) * 1000000, 0);
 };
 
-const buildStepTimelineContext = (test: Pick<Test, "startTime" | "endTime" | "duration">) => {
+const buildStepTimelineContext = (
+  test: Pick<Test, "startTime" | "endTime" | "duration">,
+) => {
   const startTimeMs = parseTimestampMs(test.startTime);
   if (startTimeMs === undefined) return undefined;
 

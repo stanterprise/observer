@@ -282,13 +282,18 @@ function getTimelineMetrics(
   if (stepStartMs === undefined) return undefined;
 
   const stepDurationNs =
-    step.duration ?? getDurationFromRangeNs(step.startTime, step.updatedAt) ?? 0;
+    step.duration ??
+    getDurationFromRangeNs(step.startTime, step.updatedAt) ??
+    0;
 
   const relativeStartNs = Math.max(
     (stepStartMs - timelineContext.startTimeMs) * 1000000,
     0,
   );
-  const boundedStartNs = Math.min(relativeStartNs, timelineContext.totalDurationNs);
+  const boundedStartNs = Math.min(
+    relativeStartNs,
+    timelineContext.totalDurationNs,
+  );
 
   const availableDurationNs = Math.max(
     timelineContext.totalDurationNs - boundedStartNs,
