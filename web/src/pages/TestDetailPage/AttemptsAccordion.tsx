@@ -179,6 +179,9 @@ export default function AttemptsAccordion({
                           runId: test.runId,
                           title: `Attempt ${attempt.attemptIndex + 1}`,
                           status: attemptStatus,
+                          startTime: attempt.startTime,
+                          endTime: attempt.endTime,
+                          duration: attempt.duration,
                           steps: attemptSteps,
                         }}
                       />

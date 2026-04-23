@@ -235,6 +235,9 @@ export function TestDetailPage() {
             runId: test.runId,
             title: test.title || test.id,
             status: testStatus,
+            startTime: test.startTime,
+            endTime: test.endTime,
+            duration: test.duration,
             steps: legacySteps,
           }}
         />

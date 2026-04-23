@@ -4,7 +4,13 @@ import type { Test, Step as StepType } from "@/types/testCase";
 import type { TestStatus } from "@/types/common";
 import { Badge } from "@/components/Badge";
 import { Step } from "./Step";
-import { countExpandableSteps, countNestedSteps, getTestStatus } from "./utils";
+import {
+  buildStepTimelineContext,
+  countExpandableSteps,
+  countNestedSteps,
+  getTestStatus,
+  type StepTimelineContext,
+} from "./utils";
 
 type StepContainerProps = {
   test: Test;
@@ -13,6 +19,7 @@ type StepContainerProps = {
 export default ({ test }: StepContainerProps) => {
   const [expandAll, setExpandAll] = useState(false);
   const steps = buildStepHierarchies(test.steps ?? [], test.runId);
+  const timelineContext = buildStepTimelineContext(test);
   const { beforeHooks, mainSteps, afterHooks } = partitionRootSteps(steps);
   const totalStepCount = countNestedSteps(steps);
   const expandableStepCount = countExpandableSteps(steps);
@@ -113,6 +120,7 @@ export default ({ test }: StepContainerProps) => {
             description="Setup and fixture work that ran before the main test body."
             steps={beforeHooks}
             globalExpandAll={expandAll}
+            timelineContext={timelineContext}
             tone="muted"
           />
         )}
@@ -127,6 +135,7 @@ export default ({ test }: StepContainerProps) => {
             }
             steps={mainSteps.length > 0 ? mainSteps : steps}
             globalExpandAll={expandAll}
+            timelineContext={timelineContext}
             tone="primary"
           />
         )}
@@ -137,6 +146,7 @@ export default ({ test }: StepContainerProps) => {
             description="Cleanup and teardown work that ran after the main test body."
             steps={afterHooks}
             globalExpandAll={expandAll}
+            timelineContext={timelineContext}
             tone="muted"
           />
         )}
@@ -150,6 +160,7 @@ type StepSectionProps = {
   description: string;
   steps: StepType[];
   globalExpandAll: boolean;
+  timelineContext?: StepTimelineContext;
   tone: "primary" | "muted";
 };
 
@@ -158,6 +169,7 @@ function StepSection({
   description,
   steps,
   globalExpandAll,
+  timelineContext,
   tone,
 }: StepSectionProps) {
   const totalSteps = countNestedSteps(steps);
@@ -205,6 +217,7 @@ function StepSection({
             key={step.id}
             step={step}
             globalExpandAll={globalExpandAll}
+            timelineContext={timelineContext}
             depth={0}
           />
         ))}

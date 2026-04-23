@@ -11,15 +11,29 @@ import {
 import type { Step as StepType } from "@/types/testCase";
 import { Badge } from "@/components/Badge";
 import { ansiToHtml } from "@/utils/ansi";
-import { countNestedSteps, formatDuration, formatStepLocation } from "./utils";
+import {
+  countNestedSteps,
+  formatCompactDuration,
+  formatDuration,
+  formatStepLocation,
+  getDurationFromRangeNs,
+  parseTimestampMs,
+  type StepTimelineContext,
+} from "./utils";
 
 type StepProps = {
   step: StepType;
   globalExpandAll?: boolean;
   depth?: number;
+  timelineContext?: StepTimelineContext;
 };
 
-export const Step = ({ step, globalExpandAll, depth = 0 }: StepProps) => {
+export const Step = ({
+  step,
+  globalExpandAll,
+  depth = 0,
+  timelineContext,
+}: StepProps) => {
   const [isExpanded, setIsExpanded] = useState(globalExpandAll ?? false);
   const hasChildren = step.steps && step.steps.length > 0;
   const hasError = step.error || (step.errors && step.errors.length > 0);
@@ -36,6 +50,7 @@ export const Step = ({ step, globalExpandAll, depth = 0 }: StepProps) => {
   const errorValue = step.metadata?.error_value as string | undefined;
   const nestedStepCount = countNestedSteps(step.steps);
   const locationLabel = formatStepLocation(step.location);
+  const timelineMetrics = getTimelineMetrics(step, timelineContext);
   const surfaceClass =
     depth === 0
       ? "bg-(--stitch-surface-card)"
@@ -107,6 +122,32 @@ export const Step = ({ step, globalExpandAll, depth = 0 }: StepProps) => {
                   </span>
                 )}
               </div>
+
+              {timelineMetrics && (
+                <div
+                  className="mt-1.5 flex items-center gap-2 text-[10px] text-(--stitch-on-surface-subtle)"
+                  title={`${timelineMetrics.startLabel} into ${timelineMetrics.totalLabel} total, duration ${timelineMetrics.durationLabel}`}
+                >
+                  <span className="w-10 shrink-0 text-right font-mono">
+                    {timelineMetrics.startLabel}
+                  </span>
+                  <div className="relative h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-(--stitch-surface-highest)">
+                    <div
+                      className="absolute inset-y-0 rounded-full bg-(--stitch-primary)"
+                      style={{
+                        left: `${timelineMetrics.offsetPercent}%`,
+                        width: `${timelineMetrics.widthPercent}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="w-10 shrink-0 font-mono">
+                    {timelineMetrics.totalLabel}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-(--stitch-surface-card) px-1.5 py-0.5 font-mono text-(--stitch-on-surface-muted)">
+                    {timelineMetrics.durationLabel}
+                  </span>
+                </div>
+              )}
 
               <div className="mt-2 flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
@@ -221,6 +262,7 @@ export const Step = ({ step, globalExpandAll, depth = 0 }: StepProps) => {
               key={subStep.id}
               step={subStep}
               globalExpandAll={globalExpandAll}
+              timelineContext={timelineContext}
               depth={depth + 1}
             />
           ))}
@@ -229,3 +271,45 @@ export const Step = ({ step, globalExpandAll, depth = 0 }: StepProps) => {
     </div>
   );
 };
+
+function getTimelineMetrics(
+  step: StepType,
+  timelineContext?: StepTimelineContext,
+) {
+  if (!timelineContext) return undefined;
+
+  const stepStartMs = parseTimestampMs(step.startTime || step.createdAt);
+  if (stepStartMs === undefined) return undefined;
+
+  const stepDurationNs =
+    step.duration ?? getDurationFromRangeNs(step.startTime, step.updatedAt) ?? 0;
+
+  const relativeStartNs = Math.max(
+    (stepStartMs - timelineContext.startTimeMs) * 1000000,
+    0,
+  );
+  const boundedStartNs = Math.min(relativeStartNs, timelineContext.totalDurationNs);
+
+  const availableDurationNs = Math.max(
+    timelineContext.totalDurationNs - boundedStartNs,
+    0,
+  );
+  const boundedDurationNs = Math.min(stepDurationNs, availableDurationNs);
+
+  const rawOffsetPercent =
+    (boundedStartNs / timelineContext.totalDurationNs) * 100;
+  const rawWidthPercent =
+    (boundedDurationNs / timelineContext.totalDurationNs) * 100;
+  const widthPercent = Math.min(
+    Math.max(rawWidthPercent, 1.5),
+    Math.max(100 - rawOffsetPercent, 1.5),
+  );
+
+  return {
+    startLabel: formatCompactDuration(boundedStartNs) || "0ms",
+    durationLabel: formatCompactDuration(stepDurationNs) || "0ms",
+    totalLabel: timelineContext.totalDurationLabel,
+    offsetPercent: rawOffsetPercent,
+    widthPercent,
+  };
+}
