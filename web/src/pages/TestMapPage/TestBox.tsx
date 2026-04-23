@@ -103,7 +103,7 @@ type TooltipContent = {
   status: string;
   description?: string;
   duration?: string;
-  retries?: number;
+  attempts?: number;
   startedAt?: string;
   tags: string[];
 };
@@ -122,17 +122,14 @@ const TOOLTIP_OFFSET = 10;
 const getTooltipContent = (test: Test): TooltipContent => {
   const duration = formatDuration(test.duration);
   const startedAt = formatStartedAt(test.createdAt ?? test.startTime);
-  const retries = Math.max(
-    (test.attempts?.length ?? 0) - 1,
-    test.retryCount ?? 0,
-  );
+  const attempts = test.attempts?.length ? test.attempts.length - 1 : 0;
 
   return {
     title: test.title || test.id,
     status: getStatusLabel(test),
     description: test.description,
     duration: duration ?? undefined,
-    retries: retries > 0 ? retries : undefined,
+    attempts: attempts > 0 ? attempts : undefined,
     startedAt: startedAt ?? undefined,
     tags: test.tags ?? [],
   };
@@ -328,13 +325,13 @@ function TestBox({
                     </span>
                   </div>
                 )}
-                {tooltipContent.retries && (
+                {tooltipContent.attempts && (
                   <div>
                     <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--stitch-on-surface-subtle)]">
-                      Retries
+                      Attempts
                     </span>
                     <span className="text-[var(--stitch-on-surface)]">
-                      {tooltipContent.retries}
+                      {tooltipContent.attempts}
                     </span>
                   </div>
                 )}
