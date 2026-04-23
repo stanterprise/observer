@@ -225,6 +225,24 @@ export function TestDetailPage() {
         legacySteps={legacySteps}
       />
 
+      {/* Test Execution Steps - Attempts Accordion */}
+      {hasAttempts ? (
+        <AttemptsAccordion test={test} attempts={attempts} />
+      ) : (
+        <StepContainer
+          test={{
+            id: test.id,
+            runId: test.runId,
+            title: test.title || test.id,
+            status: testStatus,
+            startTime: test.startTime,
+            endTime: test.endTime,
+            duration: test.duration,
+            steps: legacySteps,
+          }}
+        />
+      )}
+
       {attachments.length > 0 && (
         <AttachmentsCard
           attachments={attachments}
@@ -286,39 +304,6 @@ export function TestDetailPage() {
               )}
           </div>
         </div>
-      )}
-
-      {/* Test Execution Steps - Attempts Accordion */}
-      {hasAttempts ? (
-        <AttemptsAccordion test={test} attempts={attempts} />
-      ) : (
-        <StepContainer
-          test={{
-            id: test.id,
-            runId: test.runId,
-            title: test.title || test.id,
-            status: testStatus,
-            steps: legacySteps.map((step) => ({
-              id: step.id,
-              runId: step.runId || test.runId,
-              testCaseRunId: step.testCaseRunId,
-              parentStepId:
-                step.parentStepId && step.parentStepId !== ""
-                  ? step.parentStepId
-                  : undefined,
-              status: step.status,
-              category: step.category,
-              title: step.title,
-              startedAt: step.startTime || step.createdAt,
-              finishedAt: step.updatedAt,
-              error: step.error,
-              errors: step.errors,
-              metadata: step.metadata,
-              duration: step.duration,
-              location: step.location,
-            })),
-          }}
-        />
       )}
     </div>
   );

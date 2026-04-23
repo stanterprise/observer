@@ -1,10 +1,26 @@
 import { apiUrl } from "@/lib/config";
 import type { TestStatus } from "@/types/common";
+import type { Step, Test } from "@/types/testCase";
+
+export type StepTimelineContext = {
+  startTimeMs: number;
+  totalDurationNs: number;
+  totalDurationLabel: string;
+};
 
 // Utility function to format duration
 const formatDuration = (nanoseconds?: number) => {
   if (!nanoseconds) return "N/A";
   const milliseconds = nanoseconds / 1000000;
+  if (milliseconds < 1000) return `${milliseconds.toFixed(0)}ms`;
+  return `${(milliseconds / 1000).toFixed(2)}s`;
+};
+
+const formatCompactDuration = (nanoseconds?: number | null) => {
+  if (nanoseconds === undefined || nanoseconds === null) return undefined;
+  const milliseconds = nanoseconds / 1000000;
+  if (milliseconds === 0) return "0ms";
+  if (milliseconds < 10) return `${milliseconds.toFixed(1)}ms`;
   if (milliseconds < 1000) return `${milliseconds.toFixed(0)}ms`;
   return `${(milliseconds / 1000).toFixed(2)}s`;
 };
@@ -101,11 +117,73 @@ function getTestStatus(status: string | number | undefined): TestStatus {
   if (upperStatus === "PENDING") return "PENDING";
   return upperStatus as TestStatus;
 }
+
+const countNestedSteps = (steps?: Step[]): number => {
+  return (steps || []).reduce(
+    (sum, step) => sum + 1 + countNestedSteps(step.steps),
+    0,
+  );
+};
+
+const countExpandableSteps = (steps?: Step[]): number => {
+  return (steps || []).reduce((sum, step) => {
+    const childCount = step.steps && step.steps.length > 0 ? 1 : 0;
+    return sum + childCount + countExpandableSteps(step.steps);
+  }, 0);
+};
+
+const formatStepLocation = (location?: string) => {
+  if (!location) return undefined;
+  const normalized = location.replace(/\\/g, "/");
+  const lastSlash = normalized.lastIndexOf("/");
+  return lastSlash >= 0 ? normalized.slice(lastSlash + 1) : normalized;
+};
+
+const parseTimestampMs = (timestamp?: string) => {
+  if (!timestamp) return undefined;
+  const parsed = Date.parse(timestamp);
+  if (Number.isNaN(parsed)) return undefined;
+  return parsed;
+};
+
+const getDurationFromRangeNs = (startTime?: string, endTime?: string) => {
+  const startMs = parseTimestampMs(startTime);
+  const endMs = parseTimestampMs(endTime);
+  if (startMs === undefined || endMs === undefined) return undefined;
+  return Math.max((endMs - startMs) * 1000000, 0);
+};
+
+const buildStepTimelineContext = (
+  test: Pick<Test, "startTime" | "endTime" | "duration">,
+) => {
+  const startTimeMs = parseTimestampMs(test.startTime);
+  if (startTimeMs === undefined) return undefined;
+
+  const totalDurationNs =
+    test.duration ?? getDurationFromRangeNs(test.startTime, test.endTime);
+
+  if (totalDurationNs === undefined || totalDurationNs <= 0) return undefined;
+
+  return {
+    startTimeMs,
+    totalDurationNs,
+    totalDurationLabel:
+      formatCompactDuration(totalDurationNs) || formatDuration(totalDurationNs),
+  } satisfies StepTimelineContext;
+};
+
 export {
+  buildStepTimelineContext,
+  countExpandableSteps,
+  countNestedSteps,
+  formatCompactDuration,
+  formatStepLocation,
   formatDuration,
   formatBytes,
+  getDurationFromRangeNs,
   getAttachmentUrl,
   getInlineMediaUrl,
   decodeInlineContent,
   getTestStatus,
+  parseTimestampMs,
 };
