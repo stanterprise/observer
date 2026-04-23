@@ -1,17 +1,25 @@
 import { Card, CardContent } from "@/components/Card";
 import { TagList } from "@/components/TagList";
 import { useState, useEffect } from "react";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronDown,
+  Clock3,
+  Layers3,
+  MapPin,
+} from "lucide-react";
 import type { Step as StepType } from "@/types/testCase";
 import { Badge } from "@/components/Badge";
 import { ansiToHtml } from "@/utils/ansi";
+import { countNestedSteps, formatDuration, formatStepLocation } from "./utils";
 
 type StepProps = {
   step: StepType;
   globalExpandAll?: boolean;
+  depth?: number;
 };
 
-export const Step = ({ step, globalExpandAll }: StepProps) => {
+export const Step = ({ step, globalExpandAll, depth = 0 }: StepProps) => {
   const [isExpanded, setIsExpanded] = useState(globalExpandAll ?? false);
   const hasChildren = step.steps && step.steps.length > 0;
   const hasError = step.error || (step.errors && step.errors.length > 0);
@@ -26,6 +34,15 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
   const errorSnippet = step.metadata?.error_snippet as string | undefined;
   const errorLocation = step.metadata?.error_location as string | undefined;
   const errorValue = step.metadata?.error_value as string | undefined;
+  const nestedStepCount = countNestedSteps(step.steps);
+  const locationLabel = formatStepLocation(step.location);
+  const surfaceClass =
+    depth === 0
+      ? "bg-(--stitch-surface-card)"
+      : depth === 1
+        ? "bg-(--stitch-surface-low)"
+        : "bg-(--stitch-surface-highest)";
+  const categoryLabel = step.category || step.type;
 
   // Update local state when global state changes
   useEffect(() => {
@@ -33,37 +50,92 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
   }, [globalExpandAll]);
 
   return (
-    <div>
-      <Card className="mb-4">
+    <div className={depth > 0 ? "relative pl-6" : undefined}>
+      {depth > 0 && (
+        <div
+          aria-hidden="true"
+          className="absolute bottom-0 left-2 top-0 w-px bg-(--stitch-outline)"
+        />
+      )}
+      <Card className={`mb-3 rounded-xl ${surfaceClass}`}>
         <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-3 mb-2">
-                {hasChildren && (
-                  <button
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="p-0 hover:bg-(--stitch-surface-low) rounded transition-colors"
-                    aria-label={
-                      isExpanded ? "Collapse substeps" : "Expand substeps"
-                    }
-                  >
-                    {isExpanded ? (
-                      <ChevronDown className="w-5 h-5 text-(--stitch-on-surface-muted)" />
-                    ) : (
-                      <ChevronRight className="w-5 h-5 text-(--stitch-on-surface-muted)" />
-                    )}
-                  </button>
-                )}
+          <div className="flex gap-3">
+            <div className="pt-1">
+              {hasChildren ? (
+                <button
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-(--stitch-surface-card) text-(--stitch-on-surface-muted) transition-colors hover:bg-(--stitch-surface-highest)"
+                  aria-label={
+                    isExpanded ? "Collapse substeps" : "Expand substeps"
+                  }
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center">
+                  <div className="h-2.5 w-2.5 rounded-full bg-(--stitch-surface-highest)" />
+                </div>
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge status={step.status || "UNKNOWN"} />
-                <h3 className="text-base font-medium text-(--stitch-on-surface) truncate">
-                  {step.title || step.id}
-                </h3>
+                {categoryLabel && (
+                  <span className="inline-flex items-center rounded-full bg-(--stitch-surface-card) px-2.5 py-1 text-xs font-medium text-(--stitch-on-surface-muted)">
+                    {categoryLabel}
+                  </span>
+                )}
+                {step.duration !== undefined && step.duration > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-(--stitch-surface-card) px-2.5 py-1 text-xs font-medium text-(--stitch-on-surface-muted)">
+                    <Clock3 className="h-3.5 w-3.5" />
+                    {formatDuration(step.duration)}
+                  </span>
+                )}
+                {hasChildren && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-(--stitch-surface-card) px-2.5 py-1 text-xs font-medium text-(--stitch-on-surface-muted)">
+                    <Layers3 className="h-3.5 w-3.5" />
+                    {nestedStepCount} nested
+                  </span>
+                )}
               </div>
+
+              <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
+                  <h3 className="text-base font-semibold text-(--stitch-on-surface) wrap-break-word">
+                    {step.title || step.id}
+                  </h3>
+                  {locationLabel && (
+                    <p className="mt-1 inline-flex items-center gap-1 text-xs text-(--stitch-on-surface-subtle)">
+                      <MapPin className="h-3.5 w-3.5" />
+                      <span className="font-mono">{locationLabel}</span>
+                    </p>
+                  )}
+                </div>
+
+                {depth > 0 && (
+                  <span className="rounded-full bg-(--stitch-surface-card) px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-(--stitch-on-surface-subtle)">
+                    Level {depth + 1}
+                  </span>
+                )}
+              </div>
+
+              {step.description && (
+                <p className="mt-2 text-sm text-(--stitch-on-surface-muted) wrap-break-word">
+                  {step.description}
+                </p>
+              )}
+
               {step.tags && step.tags.length > 0 && (
-                <div className="mt-2 ml-8">
+                <div className="mt-3">
                   <TagList tags={step.tags} />
                 </div>
               )}
+
               {shouldShowError && (
                 <div className="mt-4 p-3 bg-(--status-failure-soft) border border-(--status-failure-border) rounded space-y-2">
                   <p className="text-sm font-semibold text-(--status-failure)">
@@ -145,12 +217,13 @@ export const Step = ({ step, globalExpandAll }: StepProps) => {
         </CardContent>
       </Card>
       {hasChildren && isExpanded && (
-        <div className="pl-6 border-l-2 border-(--stitch-outline)">
+        <div className="ml-4 space-y-3">
           {step.steps?.map((subStep) => (
             <Step
               key={subStep.id}
               step={subStep}
               globalExpandAll={globalExpandAll}
+              depth={depth + 1}
             />
           ))}
         </div>

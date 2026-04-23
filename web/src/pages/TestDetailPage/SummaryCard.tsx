@@ -3,15 +3,15 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { TagList } from "@/components/TagList";
 import type { TestStatus } from "@/types/common";
-import type { Attempt, Test } from "@/types/testCase";
-import { formatDuration } from "./utils";
+import type { Attempt, Test, Step } from "@/types/testCase";
+import { countNestedSteps, formatDuration } from "./utils";
 
 type SummaryCardProps = {
   test: Test;
   testStatus: TestStatus;
   hasAttempts?: boolean;
   attempts: Attempt[];
-  legacySteps: any[];
+  legacySteps: Step[];
 };
 
 export default function SummaryCard({
@@ -21,6 +21,20 @@ export default function SummaryCard({
   attempts,
   legacySteps,
 }: SummaryCardProps) {
+  const totalSteps = hasAttempts
+    ? attempts.reduce(
+        (sum, attempt) => sum + countNestedSteps(attempt.steps || []),
+        0,
+      )
+    : countNestedSteps(legacySteps);
+  const topLevelSteps = hasAttempts
+    ? attempts.reduce(
+        (sum, attempt) =>
+          sum + (attempt.stepsCount ?? attempt.steps?.length ?? 0),
+        0,
+      )
+    : legacySteps.length;
+
   return (
     <Card>
       <CardHeader>
@@ -29,7 +43,9 @@ export default function SummaryCard({
             <CardTitle className="text-xl mb-2 wrap-break-word">
               {test.title || test.id}
             </CardTitle>
-            <p className="text-sm text-(--stitch-on-surface-subtle) font-mono">{test.id}</p>
+            <p className="text-sm text-(--stitch-on-surface-subtle) font-mono">
+              {test.id}
+            </p>
           </div>
           <Badge
             status={testStatus}
@@ -45,13 +61,17 @@ export default function SummaryCard({
             </h3>
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between items-start">
-                <dt className="text-(--stitch-on-surface-muted) font-medium">Test ID:</dt>
+                <dt className="text-(--stitch-on-surface-muted) font-medium">
+                  Test ID:
+                </dt>
                 <dd className="font-mono text-(--stitch-on-surface) text-right break-all ml-4">
                   {test.id}
                 </dd>
               </div>
               <div className="flex justify-between items-start">
-                <dt className="text-(--stitch-on-surface-muted) font-medium">Run ID:</dt>
+                <dt className="text-(--stitch-on-surface-muted) font-medium">
+                  Run ID:
+                </dt>
                 <dd className="text-right ml-4">
                   <Link
                     to={`/suite_runs/${test.runId}`}
@@ -62,14 +82,18 @@ export default function SummaryCard({
                 </dd>
               </div>
               <div className="flex justify-between items-start">
-                <dt className="text-(--stitch-on-surface-muted) font-medium">Duration:</dt>
+                <dt className="text-(--stitch-on-surface-muted) font-medium">
+                  Duration:
+                </dt>
                 <dd className="text-(--stitch-on-surface) font-semibold text-right ml-4">
                   {formatDuration(test.duration)}
                 </dd>
               </div>
               {test.retryCount !== undefined && test.retryCount > 0 && (
                 <div className="flex justify-between items-start">
-                  <dt className="text-(--stitch-on-surface-muted) font-medium">Retries:</dt>
+                  <dt className="text-(--stitch-on-surface-muted) font-medium">
+                    Retries:
+                  </dt>
                   <dd className="text-(--stitch-on-surface) text-right ml-4">
                     {test.retryIndex !== undefined
                       ? `${test.retryIndex} / ${test.retryCount}`
@@ -79,7 +103,9 @@ export default function SummaryCard({
               )}
               {test.timeout !== undefined && (
                 <div className="flex justify-between items-start">
-                  <dt className="text-(--stitch-on-surface-muted) font-medium">Timeout:</dt>
+                  <dt className="text-(--stitch-on-surface-muted) font-medium">
+                    Timeout:
+                  </dt>
                   <dd className="text-(--stitch-on-surface) text-right ml-4">
                     {test.timeout}ms
                   </dd>
@@ -93,31 +119,44 @@ export default function SummaryCard({
             </h3>
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between items-start">
-                <dt className="text-(--stitch-on-surface-muted) font-medium">Started:</dt>
+                <dt className="text-(--stitch-on-surface-muted) font-medium">
+                  Started:
+                </dt>
                 <dd className="text-(--stitch-on-surface) text-right ml-4">
                   {new Date(test.createdAt!).toLocaleString()}
                 </dd>
               </div>
               <div className="flex justify-between items-start">
-                <dt className="text-(--stitch-on-surface-muted) font-medium">Last Updated:</dt>
+                <dt className="text-(--stitch-on-surface-muted) font-medium">
+                  Last Updated:
+                </dt>
                 <dd className="text-(--stitch-on-surface) text-right ml-4">
                   {new Date(test.updatedAt!).toLocaleString()}
                 </dd>
               </div>
               <div className="flex justify-between items-start">
-                <dt className="text-(--stitch-on-surface-muted) font-medium">Total Steps:</dt>
+                <dt className="text-(--stitch-on-surface-muted) font-medium">
+                  Total Steps:
+                </dt>
                 <dd className="text-(--stitch-on-surface) font-semibold text-right ml-4">
-                  {hasAttempts
-                    ? attempts.reduce(
-                        (sum, attempt) => sum + (attempt.steps?.length || 0),
-                        0,
-                      )
-                    : legacySteps.length}
+                  {totalSteps}
                 </dd>
               </div>
+              {totalSteps !== topLevelSteps && (
+                <div className="flex justify-between items-start">
+                  <dt className="text-(--stitch-on-surface-muted) font-medium">
+                    Top-level Steps:
+                  </dt>
+                  <dd className="text-(--stitch-on-surface) font-semibold text-right ml-4">
+                    {topLevelSteps}
+                  </dd>
+                </div>
+              )}
               {hasAttempts && attempts.length > 1 && (
                 <div className="flex justify-between items-start">
-                  <dt className="text-(--stitch-on-surface-muted) font-medium">Total Attempts:</dt>
+                  <dt className="text-(--stitch-on-surface-muted) font-medium">
+                    Total Attempts:
+                  </dt>
                   <dd className="text-(--stitch-on-surface) font-semibold text-right ml-4">
                     {attempts.length}
                   </dd>

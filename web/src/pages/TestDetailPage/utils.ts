@@ -1,5 +1,6 @@
 import { apiUrl } from "@/lib/config";
 import type { TestStatus } from "@/types/common";
+import type { Step } from "@/types/testCase";
 
 // Utility function to format duration
 const formatDuration = (nanoseconds?: number) => {
@@ -101,7 +102,32 @@ function getTestStatus(status: string | number | undefined): TestStatus {
   if (upperStatus === "PENDING") return "PENDING";
   return upperStatus as TestStatus;
 }
+
+const countNestedSteps = (steps?: Step[]): number => {
+  return (steps || []).reduce(
+    (sum, step) => sum + 1 + countNestedSteps(step.steps),
+    0,
+  );
+};
+
+const countExpandableSteps = (steps?: Step[]): number => {
+  return (steps || []).reduce((sum, step) => {
+    const childCount = step.steps && step.steps.length > 0 ? 1 : 0;
+    return sum + childCount + countExpandableSteps(step.steps);
+  }, 0);
+};
+
+const formatStepLocation = (location?: string) => {
+  if (!location) return undefined;
+  const normalized = location.replace(/\\/g, "/");
+  const lastSlash = normalized.lastIndexOf("/");
+  return lastSlash >= 0 ? normalized.slice(lastSlash + 1) : normalized;
+};
+
 export {
+  countExpandableSteps,
+  countNestedSteps,
+  formatStepLocation,
   formatDuration,
   formatBytes,
   getAttachmentUrl,

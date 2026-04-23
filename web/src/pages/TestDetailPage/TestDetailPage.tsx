@@ -298,25 +298,7 @@ export function TestDetailPage() {
             runId: test.runId,
             title: test.title || test.id,
             status: testStatus,
-            steps: legacySteps.map((step) => ({
-              id: step.id,
-              runId: step.runId || test.runId,
-              testCaseRunId: step.testCaseRunId,
-              parentStepId:
-                step.parentStepId && step.parentStepId !== ""
-                  ? step.parentStepId
-                  : undefined,
-              status: step.status,
-              category: step.category,
-              title: step.title,
-              startedAt: step.startTime || step.createdAt,
-              finishedAt: step.updatedAt,
-              error: step.error,
-              errors: step.errors,
-              metadata: step.metadata,
-              duration: step.duration,
-              location: step.location,
-            })),
+            steps: legacySteps,
           }}
         />
       )}

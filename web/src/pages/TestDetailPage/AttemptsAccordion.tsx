@@ -5,7 +5,7 @@ import type { TestStatus } from "@/types/common";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import StepContainer from "./StepContainer";
 import type { Attempt, Test } from "@/types/testCase";
-import { getTestStatus, formatDuration } from "./utils";
+import { getTestStatus, formatDuration, countNestedSteps } from "./utils";
 
 // Helper component for rendering attempts in an accordion
 export default function AttemptsAccordion({
@@ -42,7 +42,9 @@ export default function AttemptsAccordion({
             const isOpen = openAttempt === attempt.attemptIndex;
             const attemptStatus = getAttemptStatus(attempt);
             const attemptSteps = attempt.steps || [];
-            const attemptStepsCount = attempt.stepsCount ?? attemptSteps.length;
+            const attemptTopLevelCount =
+              attempt.stepsCount ?? attemptSteps.length;
+            const attemptStepsCount = countNestedSteps(attemptSteps);
 
             return (
               <div
@@ -72,8 +74,13 @@ export default function AttemptsAccordion({
                         )}
                       </div>
                       <div className="text-sm text-(--stitch-on-surface-muted) mt-1">
-                        {attemptStepsCount} step
+                        {attemptStepsCount} total step
                         {attemptStepsCount !== 1 ? "s" : ""}
+                        {attemptStepsCount !== attemptTopLevelCount && (
+                          <span className="ml-2">
+                            • {attemptTopLevelCount} top-level
+                          </span>
+                        )}
                         {attempt.startTime && (
                           <span className="ml-2">
                             • Started{" "}
@@ -165,32 +172,14 @@ export default function AttemptsAccordion({
                     )}
 
                     {/* Steps */}
-                    {attemptStepsCount > 0 ? (
+                    {attemptTopLevelCount > 0 ? (
                       <StepContainer
                         test={{
                           id: test.id,
                           runId: test.runId,
                           title: `Attempt ${attempt.attemptIndex + 1}`,
                           status: attemptStatus,
-                          steps: attemptSteps.map((step) => ({
-                            id: step.id,
-                            runId: step.runId || test.runId,
-                            testCaseRunId: step.testCaseRunId,
-                            parentStepId:
-                              step.parentStepId && step.parentStepId !== ""
-                                ? step.parentStepId
-                                : undefined,
-                            status: getTestStatus(step.status),
-                            category: step.category,
-                            title: step.title,
-                            startedAt: step.startTime || step.createdAt,
-                            finishedAt: step.updatedAt,
-                            error: (step as any).error,
-                            errors: (step as any).errors,
-                            metadata: (step as any).metadata,
-                            duration: (step as any).duration,
-                            location: (step as any).location,
-                          })),
+                          steps: attemptSteps,
                         }}
                       />
                     ) : (
