@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { Test } from "@/types/testCase";
 import type { TestStatus } from "@/types/common";
@@ -8,128 +8,150 @@ const isFlaky = (test: Test): boolean => {
   return test.status === "PASSED" && (test.attempts?.length ?? 0) > 1;
 };
 
-// Helper to get color for test status including flaky
-const getTestStatusColor = (test: Test): string => {
-  if (isFlaky(test)) {
-    return "bg-[var(--status-warning-soft)] border-[var(--status-warning-border)]";
-  }
-
-  const statusColors: Record<TestStatus, string> = {
-    PASSED:
-      "bg-[var(--status-success-soft)] border-[var(--status-success-border)]",
-    FLAKY:
-      "bg-[var(--status-warning-soft)] border-[var(--status-warning-border)]",
-    FAILED:
-      "bg-[var(--status-failure-soft)] border-[var(--status-failure-border)]",
-    SKIPPED:
-      "bg-[var(--status-neutral-soft)] border-[var(--status-neutral-border)]",
-    RUNNING:
-      "bg-[var(--status-running-soft)] border-[var(--status-running-border)]",
-    PENDING:
-      "bg-[var(--status-warning-soft)] border-[var(--status-warning-border)]",
-    BROKEN:
-      "bg-[var(--status-broken-soft)] border-[var(--status-broken-border)]",
-    TIMEDOUT:
-      "bg-[var(--status-timedout-soft)] border-[var(--status-timedout-border)]",
-    INTERRUPTED:
-      "bg-[var(--status-interrupted-soft)] border-[var(--status-interrupted-border)]",
-    NOT_RUN:
-      "bg-[var(--status-neutral-soft)] border-[var(--status-neutral-border)]",
-    UNKNOWN:
-      "bg-[var(--status-neutral-soft)] border-[var(--status-neutral-border)]",
-  };
-
-  return statusColors[test.status] || statusColors.UNKNOWN;
+const ACCENT_COLORS: Record<TestStatus | "FLAKY_RETRY", string> = {
+  PASSED: "var(--status-success)",
+  FLAKY: "var(--stitch-tertiary)",
+  FLAKY_RETRY: "var(--stitch-tertiary)",
+  FAILED: "var(--status-failure)",
+  SKIPPED: "var(--status-neutral)",
+  RUNNING: "var(--status-running)",
+  PENDING: "var(--status-warning)",
+  BROKEN: "var(--status-broken)",
+  TIMEDOUT: "var(--status-timedout)",
+  INTERRUPTED: "var(--status-interrupted)",
+  NOT_RUN: "var(--status-neutral)",
+  UNKNOWN: "var(--status-neutral)",
 };
 
-// Get human-readable status label
+const getTestAccentColor = (test: Test): string => {
+  if (isFlaky(test)) {
+    return ACCENT_COLORS.FLAKY_RETRY;
+  }
+  return ACCENT_COLORS[test.status] ?? ACCENT_COLORS.UNKNOWN;
+};
+
+const formatDuration = (nanoseconds?: number): string | null => {
+  if (!nanoseconds) {
+    return null;
+  }
+
+  const milliseconds = nanoseconds / 1_000_000;
+  if (milliseconds < 1000) {
+    return `${milliseconds.toFixed(0)}ms`;
+  }
+
+  return `${(milliseconds / 1000).toFixed(2)}s`;
+};
+
+const formatStartedAt = (value?: string): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  return new Date(value).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+export type TestMapDensity = "comfortable" | "compact" | "dense" | "ultra";
+
 const getStatusLabel = (test: Test): string => {
   if (isFlaky(test)) {
     return "Flaky";
   }
-  return (
-    test.status.charAt(0) + test.status.slice(1).toLowerCase().replace("_", " ")
+
+  return test.status
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+};
+
+const buildTooltipText = (test: Test): string => {
+  const duration = formatDuration(test.duration);
+  const startedAt = formatStartedAt(test.createdAt ?? test.startTime);
+  const retryCount = Math.max(
+    (test.attempts?.length ?? 0) - 1,
+    test.retryCount ?? 0,
   );
+
+  const lines = [test.title || test.id, `Status: ${getStatusLabel(test)}`];
+
+  if (test.description) {
+    lines.push(`Description: ${test.description}`);
+  }
+  if (duration) {
+    lines.push(`Duration: ${duration}`);
+  }
+  if (retryCount > 0) {
+    lines.push(`Retries: ${retryCount}`);
+  }
+  if (startedAt) {
+    lines.push(`Started: ${startedAt}`);
+  }
+  if (test.tags && test.tags.length > 0) {
+    lines.push(`Tags: ${test.tags.join(", ")}`);
+  }
+
+  return lines.join("\n");
 };
 
 interface TestBoxProps {
   test: Test;
   isHighlighted: boolean;
-  isFaded: boolean; // New prop for fading non-highlighted tests
+  isFaded: boolean;
   onClick: () => void;
-  width: number; // Width in pixels
-  height: number; // Height in pixels
+  density: TestMapDensity;
+  width: number;
+  height: number;
 }
 
-export default function TestBox({
+function TestBox({
   test,
   isHighlighted,
   isFaded,
   onClick,
+  density,
   width,
   height,
 }: TestBoxProps) {
-  const [showTooltip, setShowTooltip] = useState(false);
-  const colorClass = getTestStatusColor(test);
-
-  // Scale border width based on height (1px for small, 2px for large)
-  const borderWidth = height < 24 ? 1 : 2;
+  const accentColor = useMemo(() => getTestAccentColor(test), [test]);
+  const tooltipText = useMemo(() => buildTooltipText(test), [test]);
+  const isMicro = width <= 8 || height <= 8;
+  const isTiny = width <= 14 || height <= 12;
+  const borderRadius = isMicro
+    ? "2px"
+    : isTiny
+      ? "3px"
+      : density === "comfortable"
+        ? "6px"
+        : "4px";
 
   return (
-    <div className="relative">
-      <div
-        className={cn(
-          "rounded cursor-pointer transition-all duration-200",
-          colorClass,
-          isHighlighted && "ring-2 ring-blue-300 scale-110",
-          !isHighlighted && "hover:scale-105 hover:shadow-md",
-        )}
-        style={{
-          width: `${width}px`,
-          height: `${height}px`,
-          borderWidth: `${borderWidth}px`,
-          opacity: isFaded ? 0.25 : 1, // Apply fading when isFaded is true
-        }}
-        onClick={onClick}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onClick();
-          }
-        }}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        role="button"
-        tabIndex={0}
-        aria-label={`Test: ${test.title}`}
-      />
-      {showTooltip && (
-        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-[var(--stitch-surface-highest)] text-[var(--stitch-on-surface)] text-xs rounded-lg shadow-xl pointer-events-none">
-          <div className="font-semibold mb-1 truncate">{test.title}</div>
-          <div className="space-y-1 text-[var(--stitch-on-surface-muted)]">
-            <div>
-              Status:{" "}
-              <span className="font-medium text-[var(--stitch-on-surface)]">
-                {getStatusLabel(test)}
-              </span>
-            </div>
-            {test.duration && (
-              <div>Duration: {(test.duration / 1_000_000).toFixed(2)}ms</div>
-            )}
-            {test.tags && test.tags.length > 0 && (
-              <div>Tags: {test.tags.join(", ")}</div>
-            )}
-            {isFlaky(test) && (
-              <div className="text-[var(--status-warning)]">
-                ⚠️ Passed with {test.attempts?.length ?? 0} attempts
-              </div>
-            )}
-          </div>
-          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
-            <div className="border-4 border-transparent border-t-[var(--stitch-surface-highest)]" />
-          </div>
-        </div>
+    <button
+      type="button"
+      title={tooltipText}
+      aria-label={tooltipText}
+      className={cn(
+        "block transition-all duration-150",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stitch-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--stitch-background)]",
+        isHighlighted && "ring-1 ring-[var(--stitch-primary)]/80",
       )}
-    </div>
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+        borderRadius,
+        backgroundColor: accentColor,
+        border: `1px solid ${accentColor}`,
+        opacity: isFaded ? 0.22 : 0.9,
+        boxShadow: isHighlighted
+          ? "0 0 0 1px var(--stitch-primary), 0 0 0 2px color-mix(in srgb, var(--stitch-primary) 18%, transparent)"
+          : undefined,
+      }}
+      onClick={onClick}
+    />
   );
 }
+
+export default memo(TestBox);
