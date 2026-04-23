@@ -13,12 +13,17 @@ type StepContainerProps = {
 export default ({ test }: StepContainerProps) => {
   const [expandAll, setExpandAll] = useState(false);
   const steps = buildStepHierarchies(test.steps ?? [], test.runId);
+  const { beforeHooks, mainSteps, afterHooks } = partitionRootSteps(steps);
   const totalStepCount = countNestedSteps(steps);
   const expandableStepCount = countExpandableSteps(steps);
   const topLevelStepCount = steps.length;
+  const beforeHookCount = countNestedSteps(beforeHooks);
+  const mainStepCount = countNestedSteps(mainSteps);
+  const afterHookCount = countNestedSteps(afterHooks);
   const hasStepsWithChildren = steps.some(
     (step) => step.steps && step.steps.length > 0,
   );
+  const hasHookSections = beforeHooks.length > 0 || afterHooks.length > 0;
 
   return (
     <div key={test.id}>
@@ -39,6 +44,21 @@ export default ({ test }: StepContainerProps) => {
               <span className="rounded-full bg-(--stitch-surface-card) px-2.5 py-0.5 font-semibold text-(--stitch-on-surface)">
                 {totalStepCount} total
               </span>
+              {hasHookSections && mainSteps.length > 0 && (
+                <span className="rounded-full bg-(--stitch-surface-card) px-2.5 py-0.5 font-semibold text-(--stitch-on-surface)">
+                  {mainStepCount} body
+                </span>
+              )}
+              {beforeHooks.length > 0 && (
+                <span className="rounded-full bg-(--stitch-surface-card) px-2.5 py-0.5 font-medium text-(--stitch-on-surface-muted)">
+                  {beforeHookCount} before
+                </span>
+              )}
+              {afterHooks.length > 0 && (
+                <span className="rounded-full bg-(--stitch-surface-card) px-2.5 py-0.5 font-medium text-(--stitch-on-surface-muted)">
+                  {afterHookCount} after
+                </span>
+              )}
               {totalStepCount !== topLevelStepCount && (
                 <span className="rounded-full bg-(--stitch-surface-card) px-2.5 py-0.5 font-medium text-(--stitch-on-surface-muted)">
                   {topLevelStepCount} top-level
@@ -52,7 +72,9 @@ export default ({ test }: StepContainerProps) => {
             </div>
             <p className="text-xs text-(--stitch-on-surface-subtle)">
               {test.title && test.title !== test.id ? `${test.title} · ` : ""}
-              Nested execution order with hooks, steps, and assertions.
+              {hasHookSections
+                ? "Hooks are separated from the main test flow while preserving nested execution order."
+                : "Nested execution order with hooks, steps, and assertions."}
             </p>
           </div>
           {hasStepsWithChildren && (
@@ -83,12 +105,113 @@ export default ({ test }: StepContainerProps) => {
           </div>
         )}
       </div>
-      {steps.map((step) => (
-        <Step key={step.id} step={step} globalExpandAll={expandAll} depth={0} />
-      ))}
+
+      <div className="space-y-4">
+        {beforeHooks.length > 0 && (
+          <StepSection
+            title="Before Hooks"
+            description="Setup and fixture work that ran before the main test body."
+            steps={beforeHooks}
+            globalExpandAll={expandAll}
+            tone="muted"
+          />
+        )}
+
+        {(mainSteps.length > 0 || !hasHookSections) && (
+          <StepSection
+            title={hasHookSections ? "Test Body" : "Steps"}
+            description={
+              hasHookSections
+                ? "The main execution path for the test itself."
+                : "Execution order for this test, including nested steps and assertions."
+            }
+            steps={mainSteps.length > 0 ? mainSteps : steps}
+            globalExpandAll={expandAll}
+            tone="primary"
+          />
+        )}
+
+        {afterHooks.length > 0 && (
+          <StepSection
+            title="After Hooks"
+            description="Cleanup and teardown work that ran after the main test body."
+            steps={afterHooks}
+            globalExpandAll={expandAll}
+            tone="muted"
+          />
+        )}
+      </div>
     </div>
   );
 };
+
+type StepSectionProps = {
+  title: string;
+  description: string;
+  steps: StepType[];
+  globalExpandAll: boolean;
+  tone: "primary" | "muted";
+};
+
+function StepSection({
+  title,
+  description,
+  steps,
+  globalExpandAll,
+  tone,
+}: StepSectionProps) {
+  const totalSteps = countNestedSteps(steps);
+  const topLevelSteps = steps.length;
+
+  return (
+    <section
+      className={
+        tone === "primary"
+          ? "rounded-xl bg-(--stitch-surface-card) p-3 ring-1 ring-(--stitch-outline)"
+          : "rounded-xl bg-(--stitch-surface-low) p-3"
+      }
+    >
+      <div className="mb-3 flex flex-col gap-1.5 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-1">
+          <h3
+            className={
+              tone === "primary"
+                ? "text-sm font-semibold text-(--stitch-on-surface)"
+                : "text-xs font-semibold uppercase tracking-[0.16em] text-(--stitch-on-surface-subtle)"
+            }
+          >
+            {title}
+          </h3>
+          <p className="text-xs text-(--stitch-on-surface-subtle)">
+            {description}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-(--stitch-on-surface-muted)">
+          <span className="rounded-full bg-(--stitch-surface-card) px-2.5 py-0.5 font-semibold text-(--stitch-on-surface)">
+            {totalSteps} total
+          </span>
+          {totalSteps !== topLevelSteps && (
+            <span className="rounded-full bg-(--stitch-surface-card) px-2.5 py-0.5 font-medium text-(--stitch-on-surface-muted)">
+              {topLevelSteps} top-level
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div>
+        {steps.map((step) => (
+          <Step
+            key={step.id}
+            step={step}
+            globalExpandAll={globalExpandAll}
+            depth={0}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function buildStepHierarchies(
   steps: StepType[],
@@ -177,4 +300,36 @@ function sortStepTree(steps: StepType[]): StepType[] {
       ...step,
       steps: step.steps ? sortStepTree(step.steps) : [],
     }));
+}
+
+function partitionRootSteps(steps: StepType[]) {
+  const firstMainIndex = steps.findIndex((step) => !isHookStep(step));
+
+  if (firstMainIndex === -1) {
+    return {
+      beforeHooks: steps,
+      mainSteps: [] as StepType[],
+      afterHooks: [] as StepType[],
+    };
+  }
+
+  let lastMainIndex = firstMainIndex;
+  for (let index = steps.length - 1; index >= firstMainIndex; index -= 1) {
+    if (!isHookStep(steps[index])) {
+      lastMainIndex = index;
+      break;
+    }
+  }
+
+  return {
+    beforeHooks: steps.slice(0, firstMainIndex),
+    mainSteps: steps.slice(firstMainIndex, lastMainIndex + 1),
+    afterHooks: steps.slice(lastMainIndex + 1),
+  };
+}
+
+function isHookStep(step: StepType): boolean {
+  const category = step.category?.toLowerCase();
+  const type = step.type?.toLowerCase();
+  return category === "hook" || type === "hook";
 }

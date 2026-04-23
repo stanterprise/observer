@@ -225,6 +225,21 @@ export function TestDetailPage() {
         legacySteps={legacySteps}
       />
 
+      {/* Test Execution Steps - Attempts Accordion */}
+      {hasAttempts ? (
+        <AttemptsAccordion test={test} attempts={attempts} />
+      ) : (
+        <StepContainer
+          test={{
+            id: test.id,
+            runId: test.runId,
+            title: test.title || test.id,
+            status: testStatus,
+            steps: legacySteps,
+          }}
+        />
+      )}
+
       {attachments.length > 0 && (
         <AttachmentsCard
           attachments={attachments}
@@ -286,21 +301,6 @@ export function TestDetailPage() {
               )}
           </div>
         </div>
-      )}
-
-      {/* Test Execution Steps - Attempts Accordion */}
-      {hasAttempts ? (
-        <AttemptsAccordion test={test} attempts={attempts} />
-      ) : (
-        <StepContainer
-          test={{
-            id: test.id,
-            runId: test.runId,
-            title: test.title || test.id,
-            status: testStatus,
-            steps: legacySteps,
-          }}
-        />
       )}
     </div>
   );
