@@ -15,7 +15,6 @@ require (
 	github.com/stanterprise/proto-go v0.1.0
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/mongodb v0.40.0
-	github.com/testcontainers/testcontainers-go/modules/nats v0.40.0
 	github.com/vektah/gqlparser/v2 v2.5.31
 	go.mongodb.org/mongo-driver v1.17.3
 	google.golang.org/grpc v1.75.1
