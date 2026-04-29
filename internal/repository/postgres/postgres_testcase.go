@@ -194,6 +194,62 @@ func aggregateTestAttemptStatuses(attempts []m.TestAttempt, fallback string) str
 	return latest.Status
 }
 
+func latestExecutionAttemptSet(attempts []m.TestAttempt) ([]m.TestAttempt, string) {
+	if len(attempts) == 0 {
+		return nil, ""
+	}
+
+	type executionWindow struct {
+		executionID string
+		attempts    []m.TestAttempt
+		latestAt    time.Time
+	}
+
+	windows := make(map[string]*executionWindow, len(attempts))
+	order := make([]string, 0, len(attempts))
+	for _, attempt := range attempts {
+		executionID := normalizeRepositoryExecutionID(attempt.ExecutionID)
+		window, ok := windows[executionID]
+		if !ok {
+			window = &executionWindow{executionID: executionID}
+			windows[executionID] = window
+			order = append(order, executionID)
+		}
+		window.attempts = append(window.attempts, attempt)
+
+		candidate := latestAttemptTimestamp(attempt)
+		if candidate.After(window.latestAt) {
+			window.latestAt = candidate
+		}
+	}
+
+	selected := windows[order[0]]
+	for _, executionID := range order[1:] {
+		window := windows[executionID]
+		if window.latestAt.After(selected.latestAt) {
+			selected = window
+		}
+	}
+
+	return selected.attempts, selected.executionID
+}
+
+func latestAttemptTimestamp(attempt m.TestAttempt) time.Time {
+	if !attempt.UpdatedAt.IsZero() {
+		return attempt.UpdatedAt
+	}
+	if attempt.EndTime != nil {
+		return *attempt.EndTime
+	}
+	if attempt.StartTime != nil {
+		return *attempt.StartTime
+	}
+	if !attempt.CreatedAt.IsZero() {
+		return attempt.CreatedAt
+	}
+	return time.Time{}
+}
+
 // AppendTestFailure adds a failure document to the specified test attempt.
 func (r *PostgresRepository) AppendTestFailure(ctx context.Context, runID, executionID, testID string, attemptIndex int32, failure *m.TestFailureDocument) error {
 	if err := repository.ValidateRunID(runID); err != nil {

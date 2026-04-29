@@ -445,6 +445,144 @@ func TestAggregateTestAttemptStatuses(t *testing.T) {
 	}
 }
 
+func TestLatestExecutionAttemptSet_SelectsMostRecentExecution(t *testing.T) {
+	earlier := time.Date(2026, 4, 29, 4, 0, 0, 0, time.UTC)
+	later := earlier.Add(10 * time.Second)
+	attempts := []m.TestAttempt{
+		{ExecutionID: "exec-a", AttemptIndex: 0, Status: "PASSED", UpdatedAt: earlier},
+		{ExecutionID: "exec-b", AttemptIndex: 0, Status: "FAILED", UpdatedAt: later},
+	}
+
+	selected, executionID := latestExecutionAttemptSet(attempts)
+	if executionID != "exec-b" {
+		t.Fatalf("executionID = %q, want exec-b", executionID)
+	}
+	if len(selected) != 1 || selected[0].ExecutionID != "exec-b" {
+		t.Fatalf("selected attempts = %+v, want exec-b only", selected)
+	}
+}
+
+func TestFinalizeTestEnd_LaterExecutionOverridesEarlierExecutionStatus(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	suiteID := "run-123:suite:suite-123"
+	firstStart := time.Date(2026, 4, 29, 4, 10, 0, 0, time.UTC)
+	firstEnd := firstStart.Add(2 * time.Second)
+	secondStart := firstStart.Add(10 * time.Second)
+	secondEnd := secondStart.Add(2 * time.Second)
+
+	firstTest := &m.Test{
+		ID:             "run-123:test:test-execution-aware",
+		RunID:          "run-123",
+		ExternalTestID: "test-execution-aware",
+		SuiteID:        &suiteID,
+		Name:           "Execution Aware",
+		Title:          "Execution Aware",
+		Status:         "PASSED",
+		StartTime:      &firstStart,
+		EndTime:        &firstEnd,
+		RetryCount:     int32Ptr(0),
+		RetryIndex:     int32Ptr(0),
+	}
+	firstAttempt := &m.TestAttempt{
+		ID:           firstTest.ID + ":execution:exec-a:attempt:0",
+		RunID:        firstTest.RunID,
+		ExecutionID:  "exec-a",
+		TestID:       firstTest.ID,
+		AttemptIndex: 0,
+		Status:       "PASSED",
+		StartTime:    &firstStart,
+		EndTime:      &firstEnd,
+	}
+	if err := repo.UpsertTestBegin(ctx, firstTest, firstAttempt); err != nil {
+		t.Fatalf("UpsertTestBegin(exec-a) failed: %v", err)
+	}
+	if err := repo.FinalizeTestEnd(ctx, firstTest, firstAttempt); err != nil {
+		t.Fatalf("FinalizeTestEnd(exec-a) failed: %v", err)
+	}
+
+	secondTest := &m.Test{
+		ID:             firstTest.ID,
+		RunID:          firstTest.RunID,
+		ExternalTestID: firstTest.ExternalTestID,
+		SuiteID:        &suiteID,
+		Name:           firstTest.Name,
+		Title:          firstTest.Title,
+		Status:         "FAILED",
+		StartTime:      &secondStart,
+		EndTime:        &secondEnd,
+		RetryCount:     int32Ptr(0),
+		RetryIndex:     int32Ptr(0),
+	}
+	secondAttempt := &m.TestAttempt{
+		ID:           secondTest.ID + ":execution:exec-b:attempt:0",
+		RunID:        secondTest.RunID,
+		ExecutionID:  "exec-b",
+		TestID:       secondTest.ID,
+		AttemptIndex: 0,
+		Status:       "FAILED",
+		StartTime:    &secondStart,
+		EndTime:      &secondEnd,
+	}
+	if err := repo.UpsertTestBegin(ctx, secondTest, secondAttempt); err != nil {
+		t.Fatalf("UpsertTestBegin(exec-b) failed: %v", err)
+	}
+	if err := repo.FinalizeTestEnd(ctx, secondTest, secondAttempt); err != nil {
+		t.Fatalf("FinalizeTestEnd(exec-b) failed: %v", err)
+	}
+
+	var storedTest m.Test
+	if err := repo.db.WithContext(ctx).First(&storedTest, "id = ?", firstTest.ID).Error; err != nil {
+		t.Fatalf("load stored test: %v", err)
+	}
+	if storedTest.Status != "FAILED" {
+		t.Fatalf("storedTest.Status = %q, want FAILED", storedTest.Status)
+	}
+	if storedTest.EndTime == nil || !storedTest.EndTime.Equal(secondEnd) {
+		t.Fatalf("storedTest.EndTime = %v, want %v", storedTest.EndTime, secondEnd)
+	}
+}
+
+func TestGetRun_HydratesLatestExecutionStatusFromAttempts(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	start := time.Date(2026, 4, 29, 4, 20, 0, 0, time.UTC)
+	firstEnd := start.Add(2 * time.Second)
+	secondStart := start.Add(10 * time.Second)
+	secondEnd := secondStart.Add(2 * time.Second)
+	rootSuiteID := "run-123:suite:root"
+	testID := "run-123:test:test-hydrated"
+
+	if err := repo.db.WithContext(ctx).Create(&m.TestRun{ID: "run-123", Name: "Run 123", Status: "FAILED", CreatedAt: start, UpdatedAt: secondEnd}).Error; err != nil {
+		t.Fatalf("seed run: %v", err)
+	}
+	if err := repo.db.WithContext(ctx).Create(&m.Suite{ID: rootSuiteID, RunID: "run-123", Name: "Root", CreatedAt: start, UpdatedAt: secondEnd}).Error; err != nil {
+		t.Fatalf("seed suite: %v", err)
+	}
+	if err := repo.db.WithContext(ctx).Create(&m.Test{ID: testID, RunID: "run-123", ExternalTestID: "test-hydrated", SuiteID: &rootSuiteID, Name: "Hydrated", Title: "Hydrated", Status: "PASSED", CreatedAt: start, UpdatedAt: secondEnd}).Error; err != nil {
+		t.Fatalf("seed test: %v", err)
+	}
+	for _, attempt := range []m.TestAttempt{
+		{ID: testID + ":execution:exec-a:attempt:0", RunID: "run-123", ExecutionID: "exec-a", TestID: testID, AttemptIndex: 0, Status: "PASSED", StartTime: &start, EndTime: &firstEnd, CreatedAt: start, UpdatedAt: firstEnd},
+		{ID: testID + ":execution:exec-b:attempt:0", RunID: "run-123", ExecutionID: "exec-b", TestID: testID, AttemptIndex: 0, Status: "FAILED", StartTime: &secondStart, EndTime: &secondEnd, CreatedAt: secondStart, UpdatedAt: secondEnd},
+	} {
+		if err := repo.db.WithContext(ctx).Create(&attempt).Error; err != nil {
+			t.Fatalf("seed attempt %s: %v", attempt.ID, err)
+		}
+	}
+
+	doc, err := repo.GetRun(ctx, "run-123", false)
+	if err != nil {
+		t.Fatalf("GetRun failed: %v", err)
+	}
+	if doc == nil || len(doc.Suites) != 1 || len(doc.Suites[0].Tests) != 1 {
+		t.Fatalf("unexpected run payload: %+v", doc)
+	}
+	if got := doc.Suites[0].Tests[0].Status; got != "FAILED" {
+		t.Fatalf("hydrated test status = %q, want FAILED", got)
+	}
+}
+
 func TestAppendTestFailureAndError(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()

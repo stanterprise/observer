@@ -86,38 +86,8 @@ func (r *PostgresRepository) UpsertRunStartSuites(ctx context.Context, suites []
 			if err := repository.ValidateRunID(suite.RunID); err != nil {
 				return err
 			}
-			suite.CreatedAt = now
-			suite.UpdatedAt = now
-
-			result := tx.
-				Where(m.Suite{ID: suite.ID}).
-				Assign(m.Suite{
-					RunID:           suite.RunID,
-					ExternalSuiteID: suite.ExternalSuiteID,
-					ParentSuiteID:   suite.ParentSuiteID,
-					Name:            suite.Name,
-					Description:     suite.Description,
-					Status:          suite.Status,
-					Metadata:        suite.Metadata,
-					Duration:        suite.Duration,
-					Location:        suite.Location,
-					Type:            suite.Type,
-					TestSuiteSpecID: suite.TestSuiteSpecID,
-					InitiatedBy:     suite.InitiatedBy,
-					ProjectName:     suite.ProjectName,
-					Author:          suite.Author,
-					Owner:           suite.Owner,
-					TestCaseIDs:     suite.TestCaseIDs,
-					SubSuiteIDs:     suite.SubSuiteIDs,
-					Tags:            suite.Tags,
-					StartTime:       suite.StartTime,
-					EndTime:         suite.EndTime,
-					UpdatedAt:       now,
-					CreatedAt:       now,
-				}).
-				FirstOrCreate(suite)
-			if result.Error != nil {
-				return fmt.Errorf("upsert run start suite %s: %w", suite.ID, result.Error)
+			if err := upsertRunStartSuite(tx, suite, now); err != nil {
+				return err
 			}
 		}
 
@@ -140,34 +110,8 @@ func (r *PostgresRepository) UpsertRunStartTests(ctx context.Context, tests []*m
 			if err := repository.ValidateRunID(test.RunID); err != nil {
 				return err
 			}
-			test.CreatedAt = now
-			test.UpdatedAt = now
-
-			result := tx.
-				Where(m.Test{ID: test.ID}).
-				Assign(m.Test{
-					RunID:          test.RunID,
-					ExternalTestID: test.ExternalTestID,
-					SuiteID:        test.SuiteID,
-					Name:           test.Name,
-					Title:          test.Title,
-					Description:    test.Description,
-					Status:         test.Status,
-					StartTime:      test.StartTime,
-					EndTime:        test.EndTime,
-					Duration:       test.Duration,
-					Metadata:       test.Metadata,
-					Tags:           test.Tags,
-					Location:       test.Location,
-					RetryCount:     test.RetryCount,
-					RetryIndex:     test.RetryIndex,
-					Timeout:        test.Timeout,
-					UpdatedAt:      now,
-					CreatedAt:      now,
-				}).
-				FirstOrCreate(test)
-			if result.Error != nil {
-				return fmt.Errorf("upsert run start test %s: %w", test.ID, result.Error)
+			if err := upsertRunStartTest(tx, test, now); err != nil {
+				return err
 			}
 		}
 
@@ -250,4 +194,177 @@ func mergeRunStartTotalTests(existing, incoming int32, sharded bool) int32 {
 		return existing
 	}
 	return existing + incoming
+}
+
+func upsertRunStartSuite(tx *gorm.DB, suite *m.Suite, now time.Time) error {
+	var stored m.Suite
+	err := tx.Where("id = ?", suite.ID).First(&stored).Error
+	if err != nil {
+		if err != gorm.ErrRecordNotFound {
+			return fmt.Errorf("load run start suite %s: %w", suite.ID, err)
+		}
+
+		create := *suite
+		create.CreatedAt = now
+		create.UpdatedAt = now
+		if err := tx.Create(&create).Error; err != nil {
+			return fmt.Errorf("create run start suite %s: %w", suite.ID, err)
+		}
+		return nil
+	}
+
+	if suite.RunID != "" {
+		stored.RunID = suite.RunID
+	}
+	if suite.ExternalSuiteID != "" {
+		stored.ExternalSuiteID = suite.ExternalSuiteID
+	}
+	if suite.ParentSuiteID != nil {
+		stored.ParentSuiteID = suite.ParentSuiteID
+	}
+	if suite.Name != "" {
+		stored.Name = suite.Name
+	}
+	if suite.Description != "" {
+		stored.Description = suite.Description
+	}
+	stored.Status = mergeRunStartEntityStatus(stored.Status, suite.Status)
+	if len(suite.Metadata) > 0 {
+		stored.Metadata = mergeRunStartMetadata(stored.Metadata, suite.Metadata)
+	}
+	if suite.Duration != nil {
+		stored.Duration = cloneInt64Ptr(suite.Duration)
+	}
+	if suite.Location != "" {
+		stored.Location = suite.Location
+	}
+	if suite.Type != "" {
+		stored.Type = suite.Type
+	}
+	if suite.TestSuiteSpecID != "" {
+		stored.TestSuiteSpecID = suite.TestSuiteSpecID
+	}
+	if suite.InitiatedBy != "" {
+		stored.InitiatedBy = suite.InitiatedBy
+	}
+	if suite.ProjectName != "" {
+		stored.ProjectName = suite.ProjectName
+	}
+	if suite.Author != "" {
+		stored.Author = suite.Author
+	}
+	if suite.Owner != "" {
+		stored.Owner = suite.Owner
+	}
+	if len(suite.TestCaseIDs) > 0 {
+		stored.TestCaseIDs = append([]string(nil), suite.TestCaseIDs...)
+	}
+	if len(suite.SubSuiteIDs) > 0 {
+		stored.SubSuiteIDs = append([]string(nil), suite.SubSuiteIDs...)
+	}
+	if len(suite.Tags) > 0 {
+		stored.Tags = append([]string(nil), suite.Tags...)
+	}
+	if suite.StartTime != nil && (stored.StartTime == nil || suite.StartTime.Before(*stored.StartTime)) {
+		stored.StartTime = cloneTimePtr(suite.StartTime)
+	}
+	if suite.EndTime != nil && (stored.EndTime == nil || suite.EndTime.After(*stored.EndTime)) {
+		stored.EndTime = cloneTimePtr(suite.EndTime)
+	}
+	stored.UpdatedAt = now
+
+	if err := tx.Save(&stored).Error; err != nil {
+		return fmt.Errorf("update run start suite %s: %w", suite.ID, err)
+	}
+	return nil
+}
+
+func upsertRunStartTest(tx *gorm.DB, test *m.Test, now time.Time) error {
+	var stored m.Test
+	err := tx.Where("id = ?", test.ID).First(&stored).Error
+	if err != nil {
+		if err != gorm.ErrRecordNotFound {
+			return fmt.Errorf("load run start test %s: %w", test.ID, err)
+		}
+
+		create := *test
+		create.CreatedAt = now
+		create.UpdatedAt = now
+		if err := tx.Create(&create).Error; err != nil {
+			return fmt.Errorf("create run start test %s: %w", test.ID, err)
+		}
+		return nil
+	}
+
+	if test.RunID != "" {
+		stored.RunID = test.RunID
+	}
+	if test.ExternalTestID != "" {
+		stored.ExternalTestID = test.ExternalTestID
+	}
+	if test.SuiteID != nil {
+		stored.SuiteID = test.SuiteID
+	}
+	if test.Name != "" {
+		stored.Name = test.Name
+	}
+	if test.Title != "" {
+		stored.Title = test.Title
+	}
+	if test.Description != "" {
+		stored.Description = test.Description
+	}
+	stored.Status = mergeRunStartEntityStatus(stored.Status, test.Status)
+	if test.StartTime != nil && (stored.StartTime == nil || test.StartTime.Before(*stored.StartTime)) {
+		stored.StartTime = cloneTimePtr(test.StartTime)
+	}
+	if test.EndTime != nil && (stored.EndTime == nil || test.EndTime.After(*stored.EndTime)) {
+		stored.EndTime = cloneTimePtr(test.EndTime)
+	}
+	if test.Duration != nil {
+		stored.Duration = cloneInt64Ptr(test.Duration)
+	}
+	if len(test.Metadata) > 0 {
+		stored.Metadata = mergeRunStartMetadata(stored.Metadata, test.Metadata)
+	}
+	if len(test.Tags) > 0 {
+		stored.Tags = append([]string(nil), test.Tags...)
+	}
+	if test.Location != "" {
+		stored.Location = test.Location
+	}
+	if test.RetryCount != nil {
+		stored.RetryCount = test.RetryCount
+	}
+	if test.RetryIndex != nil {
+		stored.RetryIndex = test.RetryIndex
+	}
+	if test.Timeout != nil {
+		stored.Timeout = test.Timeout
+	}
+	stored.UpdatedAt = now
+
+	if err := tx.Save(&stored).Error; err != nil {
+		return fmt.Errorf("update run start test %s: %w", test.ID, err)
+	}
+	return nil
+}
+
+func mergeRunStartEntityStatus(existing, incoming string) string {
+	if incoming == "" {
+		return existing
+	}
+	if isRunStartPlaceholderStatus(incoming) && !isRunStartPlaceholderStatus(existing) {
+		return existing
+	}
+	return incoming
+}
+
+func isRunStartPlaceholderStatus(status string) bool {
+	switch status {
+	case "", "NOT_RUN", "UNKNOWN":
+		return true
+	default:
+		return false
+	}
 }

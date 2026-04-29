@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
 	"gorm.io/driver/sqlite"
@@ -135,6 +136,74 @@ func TestUpsertRunStartSuitesAndTests(t *testing.T) {
 	}
 	if storedTest.Metadata["test"] != "meta" {
 		t.Fatalf("storedTest.Metadata = %+v, want test metadata", storedTest.Metadata)
+	}
+}
+
+func TestUpsertRunStartTests_PreservesTerminalStateAndAddsUniqueTests(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	start := time.Date(2026, 4, 29, 3, 35, 1, 0, time.UTC)
+	end := start.Add(2 * time.Second)
+	suiteID := "run-123:suite:suite-123"
+
+	existing := m.Test{
+		ID:             "run-123:test:test-a",
+		RunID:          "run-123",
+		ExternalTestID: "test-a",
+		SuiteID:        &suiteID,
+		Name:           "Test A",
+		Title:          "Test A",
+		Status:         "PASSED",
+		StartTime:      &start,
+		EndTime:        &end,
+		Duration:       int64Ptr(int64((2 * time.Second).Nanoseconds())),
+		CreatedAt:      start,
+		UpdatedAt:      end,
+	}
+	if err := repo.db.WithContext(ctx).Create(&existing).Error; err != nil {
+		t.Fatalf("seed existing test: %v", err)
+	}
+
+	if err := repo.UpsertRunStartTests(ctx, []*m.Test{
+		{
+			ID:             existing.ID,
+			RunID:          existing.RunID,
+			ExternalTestID: existing.ExternalTestID,
+			SuiteID:        &suiteID,
+			Name:           existing.Name,
+			Title:          existing.Title,
+			Status:         "NOT_RUN",
+		},
+		{
+			ID:             "run-123:test:test-b",
+			RunID:          "run-123",
+			ExternalTestID: "test-b",
+			SuiteID:        &suiteID,
+			Name:           "Test B",
+			Title:          "Test B",
+			Status:         "NOT_RUN",
+		},
+	}); err != nil {
+		t.Fatalf("UpsertRunStartTests failed: %v", err)
+	}
+
+	var storedExisting m.Test
+	if err := repo.db.WithContext(ctx).First(&storedExisting, "id = ?", existing.ID).Error; err != nil {
+		t.Fatalf("load existing test: %v", err)
+	}
+	if storedExisting.Status != "PASSED" {
+		t.Fatalf("storedExisting.Status = %q, want PASSED", storedExisting.Status)
+	}
+	if storedExisting.EndTime == nil || !storedExisting.EndTime.Equal(end) {
+		t.Fatalf("storedExisting.EndTime = %v, want %v", storedExisting.EndTime, end)
+	}
+
+	var count int64
+	if err := repo.db.WithContext(ctx).Model(&m.Test{}).Where("run_id = ?", "run-123").Count(&count).Error; err != nil {
+		t.Fatalf("count run tests: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("count = %d, want 2", count)
 	}
 }
 

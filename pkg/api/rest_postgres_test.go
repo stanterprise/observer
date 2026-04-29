@@ -275,6 +275,115 @@ func TestPostgresHandleRunDetail_RecomputesInflatedTotalTestsFromAttachedTests(t
 	}
 }
 
+func TestPostgresHandleRuns_DerivesStatisticsFromAttemptStatusWhenTestWasResetToNotRun(t *testing.T) {
+	handler, db := setupPostgresHandler(t)
+	now := time.Date(2026, 4, 29, 3, 35, 1, 0, time.UTC)
+	suiteID := "suite-1"
+	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Logical Aggregate", Status: "PASSED", CreatedAt: now, UpdatedAt: now})
+	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: now, UpdatedAt: now})
+	seedTests(t, db, m.Test{ID: "test-1", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test", Title: "Suite Test", Status: "NOT_RUN", CreatedAt: now, UpdatedAt: now})
+	seedAttempts(t, db, m.TestAttempt{ID: "test-1:execution:exec-a:attempt:0", RunID: "run-1", ExecutionID: "exec-a", TestID: "test-1", AttemptIndex: 0, Status: "PASSED", CreatedAt: now, UpdatedAt: now})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs", nil)
+	rec := httptest.NewRecorder()
+	handler.handleRuns(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var response struct {
+		Runs []struct {
+			Status     string                 `json:"status"`
+			Statistics map[string]interface{} `json:"statistics"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(response.Runs) != 1 {
+		t.Fatalf("expected 1 run, got %d", len(response.Runs))
+	}
+	if got := int(response.Runs[0].Statistics["passed"].(float64)); got != 1 {
+		t.Fatalf("passed count = %d, want 1", got)
+	}
+	if got := int(response.Runs[0].Statistics["unknown"].(float64)); got != 0 {
+		t.Fatalf("unknown count = %d, want 0", got)
+	}
+}
+
+func TestPostgresHandleRunDetail_DerivesNestedTestStatusFromAttemptStatusWhenTestWasResetToNotRun(t *testing.T) {
+	handler, db := setupPostgresHandler(t)
+	now := time.Date(2026, 4, 29, 3, 35, 1, 0, time.UTC)
+	suiteID := "suite-1"
+	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Logical Aggregate", Status: "PASSED", CreatedAt: now, UpdatedAt: now})
+	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: now, UpdatedAt: now})
+	seedTests(t, db, m.Test{ID: "test-1", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test", Title: "Suite Test", Status: "NOT_RUN", CreatedAt: now, UpdatedAt: now})
+	seedAttempts(t, db, m.TestAttempt{ID: "test-1:execution:exec-a:attempt:0", RunID: "run-1", ExecutionID: "exec-a", TestID: "test-1", AttemptIndex: 0, Status: "PASSED", CreatedAt: now, UpdatedAt: now})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/run-1", nil)
+	rec := httptest.NewRecorder()
+	handler.handleRunDetail(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var response m.TestRun
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(response.Suites) != 1 || len(response.Suites[0].Tests) != 1 {
+		t.Fatalf("unexpected suites payload: %+v", response.Suites)
+	}
+	if response.Suites[0].Tests[0].Status != "PASSED" {
+		t.Fatalf("nested test status = %q, want PASSED", response.Suites[0].Tests[0].Status)
+	}
+}
+
+func TestPostgresHandleRuns_UsesLatestExecutionStatusForRepeatedLogicalTest(t *testing.T) {
+	handler, db := setupPostgresHandler(t)
+	firstStart := time.Date(2026, 4, 29, 4, 30, 0, 0, time.UTC)
+	firstEnd := firstStart.Add(2 * time.Second)
+	secondStart := firstStart.Add(10 * time.Second)
+	secondEnd := secondStart.Add(2 * time.Second)
+	suiteID := "suite-1"
+
+	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Logical Aggregate", Status: "FAILED", CreatedAt: firstStart, UpdatedAt: secondEnd})
+	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: firstStart, UpdatedAt: secondEnd})
+	seedTests(t, db, m.Test{ID: "test-1", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test", Title: "Suite Test", Status: "PASSED", CreatedAt: firstStart, UpdatedAt: secondEnd})
+	seedAttempts(t, db,
+		m.TestAttempt{ID: "test-1:execution:exec-a:attempt:0", RunID: "run-1", ExecutionID: "exec-a", TestID: "test-1", AttemptIndex: 0, Status: "PASSED", StartTime: &firstStart, EndTime: &firstEnd, CreatedAt: firstStart, UpdatedAt: firstEnd},
+		m.TestAttempt{ID: "test-1:execution:exec-b:attempt:0", RunID: "run-1", ExecutionID: "exec-b", TestID: "test-1", AttemptIndex: 0, Status: "FAILED", StartTime: &secondStart, EndTime: &secondEnd, CreatedAt: secondStart, UpdatedAt: secondEnd},
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs", nil)
+	rec := httptest.NewRecorder()
+	handler.handleRuns(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var response struct {
+		Runs []struct {
+			Statistics map[string]interface{} `json:"statistics"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(response.Runs) != 1 {
+		t.Fatalf("expected 1 run, got %d", len(response.Runs))
+	}
+	if got := int(response.Runs[0].Statistics["failed"].(float64)); got != 1 {
+		t.Fatalf("failed count = %d, want 1", got)
+	}
+	if got := int(response.Runs[0].Statistics["passed"].(float64)); got != 0 {
+		t.Fatalf("passed count = %d, want 0", got)
+	}
+}
+
 func TestPostgresLoadLiveRunningTestDetails_UsesLiveRunningDetailRepo(t *testing.T) {
 	handler := NewPostgresHandler(nil, nil)
 	now := time.Date(2026, 4, 19, 15, 0, 0, 0, time.UTC)

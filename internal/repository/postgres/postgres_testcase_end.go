@@ -62,7 +62,7 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 		}
 
 		var attempts []m.TestAttempt
-		if err := tx.Where("test_id = ?", test.ID).Find(&attempts).Error; err != nil {
+		if err := tx.Where("test_id = ? AND execution_id = ?", test.ID, attempt.ExecutionID).Find(&attempts).Error; err != nil {
 			return fmt.Errorf("load test attempts: %w", err)
 		}
 
