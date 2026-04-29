@@ -33,6 +33,28 @@ func RunStartEventToTestRun(req *events.ReportRunStartEventRequest) (*TestRun, [
 	}, suites
 }
 
+// RunStartEventToRunExecution maps a run-start event to an execution-scoped row.
+func RunStartEventToRunExecution(req *events.ReportRunStartEventRequest) *RunExecution {
+	if req == nil {
+		return nil
+	}
+
+	now := time.Now()
+	executionID := normalizeExecutionID(req.ExecutionId)
+
+	return &RunExecution{
+		ID:          buildRunExecutionID(req.RunId, executionID),
+		RunID:       req.RunId,
+		ExecutionID: executionID,
+		Name:        req.Name,
+		Status:      "RUNNING",
+		Metadata:    stringMapToInterfaceMap(req.Metadata),
+		TotalTests:  req.TotalTests,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+}
+
 // RunStartEventToTests maps embedded test cases in a run-start payload to relational test rows.
 func RunStartEventToTests(req *events.ReportRunStartEventRequest) []*Test {
 	if req == nil {
@@ -57,8 +79,9 @@ func RunStartEventToRunShard(req *events.ReportRunStartEventRequest) *RunShard {
 	now := time.Now()
 
 	return &RunShard{
-		ID:                 buildRunShardID(req.RunId, shardIndex),
+		ID:                 buildRunShardID(req.RunId, req.ExecutionId, shardIndex),
 		RunID:              req.RunId,
+		ExecutionID:        normalizeExecutionID(req.ExecutionId),
 		ShardIndex:         shardIndex,
 		ShardCountExpected: shardCount,
 		Status:             "RUNNING",
@@ -95,6 +118,37 @@ func RunEndEventToTestRun(req *events.TestRunEndEventRequest) TestRun {
 	return fields
 }
 
+// RunEndEventToRunExecution maps a run-end event to an execution-scoped update.
+func RunEndEventToRunExecution(req *events.TestRunEndEventRequest) *RunExecution {
+	if req == nil {
+		return nil
+	}
+
+	now := time.Now()
+	executionID := normalizeExecutionID(req.ExecutionId)
+	execution := &RunExecution{
+		ID:          buildRunExecutionID(req.RunId, executionID),
+		RunID:       req.RunId,
+		ExecutionID: executionID,
+		Status:      req.FinalStatus.String(),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if req.StartTime != nil {
+		t := req.StartTime.AsTime()
+		execution.StartTime = &t
+	}
+	if req.Duration != nil {
+		d := req.Duration.AsDuration().Nanoseconds()
+		execution.Duration = &d
+	}
+	end := now
+	execution.EndTime = &end
+
+	return execution
+}
+
 // RunEndEventToRunShard maps run-level shard metadata in a terminal event to a RunShard row.
 // Returns nil when the run is not sharded or shard metadata is incomplete.
 func RunEndEventToRunShard(req *events.TestRunEndEventRequest) *RunShard {
@@ -109,8 +163,9 @@ func RunEndEventToRunShard(req *events.TestRunEndEventRequest) *RunShard {
 
 	now := time.Now()
 	shard := &RunShard{
-		ID:                 buildRunShardID(req.RunId, shardIndex),
+		ID:                 buildRunShardID(req.RunId, req.ExecutionId, shardIndex),
 		RunID:              req.RunId,
+		ExecutionID:        normalizeExecutionID(req.ExecutionId),
 		ShardIndex:         shardIndex,
 		ShardCountExpected: shardCount,
 		Status:             req.FinalStatus.String(),
@@ -211,8 +266,9 @@ func TestCaseRunToRelationalAttempt(protoTest *entities.TestCaseRun, attachments
 	}
 
 	return &TestAttempt{
-		ID:           buildTestAttemptID(buildTestRowID(protoTest.RunId, protoTest.Id), attemptIndex),
+		ID:           buildTestAttemptID(buildTestRowID(protoTest.RunId, protoTest.Id), protoTest.ExecutionId, attemptIndex),
 		RunID:        protoTest.RunId,
+		ExecutionID:  normalizeExecutionID(protoTest.ExecutionId),
 		TestID:       buildTestRowID(protoTest.RunId, protoTest.Id),
 		AttemptIndex: attemptIndex,
 		Status:       protoTest.Status.String(),
@@ -428,8 +484,20 @@ func firstInt32Metadata(metadata map[string]string, keys ...string) *int32 {
 	return nil
 }
 
-func buildRunShardID(runID string, shardIndex *int32) string {
-	return runID + ":" + fmt.Sprintf("%d", *shardIndex)
+func buildRunExecutionID(runID, executionID string) string {
+	executionID = normalizeExecutionID(executionID)
+	if executionID == "" {
+		return fmt.Sprintf("%s:execution:legacy", runID)
+	}
+	return fmt.Sprintf("%s:execution:%s", runID, executionID)
+}
+
+func buildRunShardID(runID, executionID string, shardIndex *int32) string {
+	executionID = normalizeExecutionID(executionID)
+	if executionID == "" {
+		return runID + ":" + fmt.Sprintf("%d", *shardIndex)
+	}
+	return fmt.Sprintf("%s:execution:%s:shard:%d", runID, executionID, *shardIndex)
 }
 
 func buildSuiteRowID(runID, externalSuiteID string) string {
@@ -440,6 +508,14 @@ func buildTestRowID(runID, externalTestID string) string {
 	return fmt.Sprintf("%s:test:%s", runID, externalTestID)
 }
 
-func buildTestAttemptID(testID string, attemptIndex int32) string {
-	return fmt.Sprintf("%s:%d", testID, attemptIndex)
+func buildTestAttemptID(testID, executionID string, attemptIndex int32) string {
+	executionID = normalizeExecutionID(executionID)
+	if executionID == "" {
+		return fmt.Sprintf("%s:%d", testID, attemptIndex)
+	}
+	return fmt.Sprintf("%s:execution:%s:attempt:%d", testID, executionID, attemptIndex)
+}
+
+func normalizeExecutionID(executionID string) string {
+	return strings.TrimSpace(executionID)
 }

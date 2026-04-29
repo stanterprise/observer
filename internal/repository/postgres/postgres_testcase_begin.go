@@ -31,10 +31,15 @@ func (r *PostgresRepository) UpsertTestBegin(ctx context.Context, test *m.Test, 
 	now := time.Now()
 	test.CreatedAt = now
 	test.UpdatedAt = now
+	attempt.ExecutionID = normalizeRepositoryExecutionID(attempt.ExecutionID)
 	attempt.CreatedAt = now
 	attempt.UpdatedAt = now
 	if attempt.ID == "" {
-		attempt.ID = fmt.Sprintf("%s:%d", test.ID, attempt.AttemptIndex)
+		if attempt.ExecutionID == "" {
+			attempt.ID = fmt.Sprintf("%s:%d", test.ID, attempt.AttemptIndex)
+		} else {
+			attempt.ID = fmt.Sprintf("%s:execution:%s:attempt:%d", test.ID, attempt.ExecutionID, attempt.AttemptIndex)
+		}
 	}
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {

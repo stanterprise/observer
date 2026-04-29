@@ -295,6 +295,7 @@ func setupPostgresHandler(t *testing.T) (*PostgresHandler, *gorm.DB) {
 func modelsForPostgresHandlerTests() []interface{} {
 	return []interface{}{
 		&m.TestRun{},
+		&m.RunExecution{},
 		&m.RunShard{},
 		&m.Suite{},
 		&m.Test{},

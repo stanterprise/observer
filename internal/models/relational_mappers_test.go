@@ -44,6 +44,35 @@ func TestRunStartEventToRunShard(t *testing.T) {
 	}
 }
 
+func TestRunStartEventToRunExecution(t *testing.T) {
+	req := &events.ReportRunStartEventRequest{
+		RunId:       "run-123",
+		ExecutionId: "exec-123",
+		Name:        "Composite Run",
+		TotalTests:  7,
+		Metadata: map[string]string{
+			"worker": "a",
+		},
+	}
+
+	execution := RunStartEventToRunExecution(req)
+	if execution == nil {
+		t.Fatal("expected run execution")
+	}
+	if execution.ID != "run-123:execution:exec-123" {
+		t.Fatalf("ID = %q, want run-123:execution:exec-123", execution.ID)
+	}
+	if execution.ExecutionID != "exec-123" {
+		t.Fatalf("ExecutionID = %q, want exec-123", execution.ExecutionID)
+	}
+	if execution.TotalTests != 7 {
+		t.Fatalf("TotalTests = %d, want 7", execution.TotalTests)
+	}
+	if execution.Status != "RUNNING" {
+		t.Fatalf("Status = %q, want RUNNING", execution.Status)
+	}
+}
+
 func TestRunEndEventToRunShard(t *testing.T) {
 	start := time.Date(2026, 4, 18, 9, 30, 0, 0, time.UTC)
 	req := &events.TestRunEndEventRequest{
@@ -77,6 +106,37 @@ func TestRunEndEventToRunShard(t *testing.T) {
 		t.Fatalf("StartTime = %v, want %v", shard.StartTime, start)
 	}
 	if shard.EndTime == nil {
+		t.Fatal("expected EndTime to be set")
+	}
+}
+
+func TestRunEndEventToRunExecution(t *testing.T) {
+	start := time.Date(2026, 4, 18, 9, 30, 0, 0, time.UTC)
+	req := &events.TestRunEndEventRequest{
+		RunId:       "run-123",
+		ExecutionId: "exec-123",
+		FinalStatus: common.TestStatus_FAILED,
+		StartTime:   timestamppb.New(start),
+		Duration:    durationpb.New(5 * time.Second),
+	}
+
+	execution := RunEndEventToRunExecution(req)
+	if execution == nil {
+		t.Fatal("expected run execution")
+	}
+	if execution.ID != "run-123:execution:exec-123" {
+		t.Fatalf("ID = %q, want run-123:execution:exec-123", execution.ID)
+	}
+	if execution.Status != common.TestStatus_FAILED.String() {
+		t.Fatalf("Status = %q, want %q", execution.Status, common.TestStatus_FAILED.String())
+	}
+	if execution.StartTime == nil || !execution.StartTime.Equal(start) {
+		t.Fatalf("StartTime = %v, want %v", execution.StartTime, start)
+	}
+	if execution.Duration == nil || *execution.Duration != int64((5*time.Second).Nanoseconds()) {
+		t.Fatalf("Duration = %v, want %d", execution.Duration, int64((5 * time.Second).Nanoseconds()))
+	}
+	if execution.EndTime == nil {
 		t.Fatal("expected EndTime to be set")
 	}
 }
@@ -271,6 +331,32 @@ func TestTestCaseRunToRelationalTest(t *testing.T) {
 	}
 }
 
+func TestTestCaseRunToRelationalAttempt_UsesExecutionAwareIdentity(t *testing.T) {
+	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+	req := &entities.TestCaseRun{
+		Id:          "test-123",
+		RunId:       "run-123",
+		ExecutionId: "exec-123",
+		Status:      common.TestStatus_RUNNING,
+		StartTime:   timestamppb.New(start),
+		RetryIndex:  1,
+	}
+
+	attempt := TestCaseRunToRelationalAttempt(req, nil)
+	if attempt == nil {
+		t.Fatal("expected relational attempt mapping")
+	}
+	if attempt.ExecutionID != "exec-123" {
+		t.Fatalf("ExecutionID = %q, want exec-123", attempt.ExecutionID)
+	}
+	if attempt.ID != "run-123:test:test-123:execution:exec-123:attempt:1" {
+		t.Fatalf("ID = %q, want execution-aware attempt id", attempt.ID)
+	}
+	if attempt.TestID != buildTestRowID("run-123", "test-123") {
+		t.Fatalf("TestID = %q, want %q", attempt.TestID, buildTestRowID("run-123", "test-123"))
+	}
+}
+
 func TestTestCaseRunToRelationalAttempt(t *testing.T) {
 	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
 	req := &entities.TestCaseRun{
@@ -289,8 +375,8 @@ func TestTestCaseRunToRelationalAttempt(t *testing.T) {
 	if attempt == nil {
 		t.Fatal("expected relational attempt mapping")
 	}
-	if attempt.ID != buildTestAttemptID(buildTestRowID("run-123", "test-123"), 2) {
-		t.Fatalf("ID = %q, want %s", attempt.ID, buildTestAttemptID(buildTestRowID("run-123", "test-123"), 2))
+	if attempt.ID != buildTestAttemptID(buildTestRowID("run-123", "test-123"), "", 2) {
+		t.Fatalf("ID = %q, want %s", attempt.ID, buildTestAttemptID(buildTestRowID("run-123", "test-123"), "", 2))
 	}
 	if attempt.TestID != buildTestRowID("run-123", "test-123") {
 		t.Fatalf("TestID = %q, want %s", attempt.TestID, buildTestRowID("run-123", "test-123"))

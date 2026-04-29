@@ -93,6 +93,7 @@ type deferredStepEvent struct {
 	eventType   publisher.EventType
 	data        json.RawMessage
 	runID       string
+	executionID string
 	testID      string
 	retryIndex  int32
 	queuedAt    time.Time
@@ -419,17 +420,18 @@ func (c *NATSConsumer) shouldDeferStepEvent(err error) bool {
 }
 
 func (c *NATSConsumer) deferStepEvent(event publisher.Event, cause error) error {
-	runID, testID, retryIndex, err := extractStepIdentity(event)
+	runID, executionID, testID, retryIndex, err := extractStepIdentity(event)
 	if err != nil {
 		return err
 	}
 
-	key := deferredQueueKey(runID, testID, retryIndex)
+	key := deferredQueueKey(runID, executionID, testID, retryIndex)
 	c.deferMu.Lock()
 	deferred := deferredStepEvent{
 		eventType:   event.Type,
 		data:        event.Data,
 		runID:       runID,
+		executionID: executionID,
 		testID:      testID,
 		retryIndex:  retryIndex,
 		queuedAt:    time.Now(),
@@ -447,6 +449,7 @@ func (c *NATSConsumer) deferStepEvent(event publisher.Event, cause error) error 
 	c.logger.Warn("deferred orphan step event",
 		"type", event.Type,
 		"run_id", runID,
+		"execution_id", executionID,
 		"test_id", testID,
 		"retry_index", retryIndex,
 		"pending_for_key", pendingCount,
@@ -455,8 +458,8 @@ func (c *NATSConsumer) deferStepEvent(event publisher.Event, cause error) error 
 	return nil
 }
 
-func (c *NATSConsumer) replayDeferredStepsForTest(ctx context.Context, runID, testID string, retryIndex int32) {
-	key := deferredQueueKey(runID, testID, retryIndex)
+func (c *NATSConsumer) replayDeferredStepsForTest(ctx context.Context, runID, executionID, testID string, retryIndex int32) {
+	key := deferredQueueKey(runID, executionID, testID, retryIndex)
 
 	c.deferMu.Lock()
 	events := c.deferQueue[key]
@@ -469,6 +472,7 @@ func (c *NATSConsumer) replayDeferredStepsForTest(ctx context.Context, runID, te
 
 	c.logger.Info("replaying deferred step events",
 		"run_id", runID,
+		"execution_id", executionID,
 		"test_id", testID,
 		"retry_index", retryIndex,
 		"count", len(events))
@@ -481,6 +485,7 @@ func (c *NATSConsumer) replayDeferredStepsForTest(ctx context.Context, runID, te
 		if now.Sub(deferred.queuedAt) > c.deferCfg.ttl {
 			c.logger.Warn("dropping deferred step event after TTL",
 				"run_id", deferred.runID,
+				"execution_id", deferred.executionID,
 				"test_id", deferred.testID,
 				"retry_index", deferred.retryIndex,
 				"type", deferred.eventType,
@@ -508,6 +513,7 @@ func (c *NATSConsumer) replayDeferredStepsForTest(ctx context.Context, runID, te
 		if deferred.attempts >= c.deferCfg.maxAttempts {
 			c.logger.Error("deferred step event exceeded max attempts",
 				"run_id", deferred.runID,
+				"execution_id", deferred.executionID,
 				"test_id", deferred.testID,
 				"retry_index", deferred.retryIndex,
 				"type", deferred.eventType,
@@ -538,33 +544,33 @@ func (c *NATSConsumer) replayDeferredStepsForTest(ctx context.Context, runID, te
 	})
 }
 
-func extractStepIdentity(event publisher.Event) (runID string, testID string, retryIndex int32, err error) {
+func extractStepIdentity(event publisher.Event) (runID string, executionID string, testID string, retryIndex int32, err error) {
 	switch event.Type {
 	case publisher.EventTypeStepBegin:
 		var req events.StepBeginEventRequest
 		if unmarshalErr := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(event.Data, &req); unmarshalErr != nil {
-			return "", "", 0, fmt.Errorf("parse step begin for defer queue: %w", unmarshalErr)
+			return "", "", "", 0, fmt.Errorf("parse step begin for defer queue: %w", unmarshalErr)
 		}
 		if req.Step == nil {
-			return "", "", 0, fmt.Errorf("parse step begin for defer queue: step is nil")
+			return "", "", "", 0, fmt.Errorf("parse step begin for defer queue: step is nil")
 		}
-		return req.Step.RunId, extractTestID(req.Step.TestCaseId, req.Step.RunId), req.Step.RetryIndex, nil
+		return req.Step.RunId, req.Step.ExecutionId, extractTestID(req.Step.TestCaseId, req.Step.RunId), req.Step.RetryIndex, nil
 	case publisher.EventTypeStepEnd:
 		var req events.StepEndEventRequest
 		if unmarshalErr := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(event.Data, &req); unmarshalErr != nil {
-			return "", "", 0, fmt.Errorf("parse step end for defer queue: %w", unmarshalErr)
+			return "", "", "", 0, fmt.Errorf("parse step end for defer queue: %w", unmarshalErr)
 		}
 		if req.Step == nil {
-			return "", "", 0, fmt.Errorf("parse step end for defer queue: step is nil")
+			return "", "", "", 0, fmt.Errorf("parse step end for defer queue: step is nil")
 		}
-		return req.Step.RunId, extractTestID(req.Step.TestCaseId, req.Step.RunId), req.Step.RetryIndex, nil
+		return req.Step.RunId, req.Step.ExecutionId, extractTestID(req.Step.TestCaseId, req.Step.RunId), req.Step.RetryIndex, nil
 	default:
-		return "", "", 0, fmt.Errorf("not a step event: %s", event.Type)
+		return "", "", "", 0, fmt.Errorf("not a step event: %s", event.Type)
 	}
 }
 
-func deferredQueueKey(runID, testID string, retryIndex int32) string {
-	return runID + "::" + testID + "::" + strconv.Itoa(int(retryIndex))
+func deferredQueueKey(runID, executionID, testID string, retryIndex int32) string {
+	return runID + "::" + executionID + "::" + testID + "::" + strconv.Itoa(int(retryIndex))
 }
 
 func (c *NATSConsumer) incrementIntegrity(runID string, mutate func(ri *runIntegrity)) {

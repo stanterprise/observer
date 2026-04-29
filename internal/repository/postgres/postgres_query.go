@@ -223,6 +223,9 @@ func (r *PostgresRepository) DeleteRuns(ctx context.Context, runIDs []string) (i
 		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.RunShard{}).Error; err != nil {
 			return fmt.Errorf("delete run shards: %w", err)
 		}
+		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.RunExecution{}).Error; err != nil {
+			return fmt.Errorf("delete run executions: %w", err)
+		}
 
 		result := tx.Where("id IN ?", runIDs).Delete(&m.TestRun{})
 		if result.Error != nil {
@@ -358,6 +361,14 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 		return nil, fmt.Errorf("load tests: %w", err)
 	}
 
+	var executions []*m.RunExecution
+	if err := r.db.WithContext(ctx).
+		Where("run_id IN ?", runIDs).
+		Order("created_at asc, id asc").
+		Find(&executions).Error; err != nil {
+		return nil, fmt.Errorf("load run executions: %w", err)
+	}
+
 	var attempts []m.TestAttempt
 	if err := r.db.WithContext(ctx).
 		Where("run_id IN ?", runIDs).
@@ -379,9 +390,16 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 
 	runByID := make(map[string]*m.TestRun, len(runs))
 	for _, run := range runs {
+		run.Executions = nil
 		run.Suites = nil
 		run.Tests = nil
 		runByID[run.ID] = run
+	}
+
+	for _, execution := range executions {
+		if run, ok := runByID[execution.RunID]; ok {
+			run.Executions = append(run.Executions, execution)
+		}
 	}
 
 	suiteByID := make(map[string]*m.Suite, len(suites))

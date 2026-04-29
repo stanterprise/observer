@@ -52,6 +52,10 @@ func ConnectPostgres(dsn string, logger *slog.Logger) (*PostgresConnection, erro
 		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
+	if err := reconcileLegacyExecutionIDColumns(db); err != nil {
+		return nil, fmt.Errorf("postgres legacy execution_id backfill: %w", err)
+	}
+
 	// Apply schema migrations so all tables exist in the correct state.
 	if err := db.AutoMigrate(models.ModelsForMigration()...); err != nil {
 		return nil, fmt.Errorf("postgres auto-migrate: %w", err)
@@ -90,4 +94,32 @@ func (p *PostgresConnection) Close() error {
 		return fmt.Errorf("get underlying sql.DB for close: %w", err)
 	}
 	return sqlDB.Close()
+}
+
+func reconcileLegacyExecutionIDColumns(db *gorm.DB) error {
+	if db == nil {
+		return fmt.Errorf("gorm db is nil")
+	}
+
+	targets := []struct {
+		table  string
+		column string
+	}{
+		{table: "run_shards", column: "execution_id"},
+		{table: "test_attempts", column: "execution_id"},
+	}
+
+	migrator := db.Migrator()
+	for _, target := range targets {
+		if !migrator.HasTable(target.table) || !migrator.HasColumn(target.table, target.column) {
+			continue
+		}
+
+		query := fmt.Sprintf(`UPDATE "%s" SET "%s" = '' WHERE "%s" IS NULL`, target.table, target.column, target.column)
+		if err := db.Exec(query).Error; err != nil {
+			return fmt.Errorf("backfill %s.%s: %w", target.table, target.column, err)
+		}
+	}
+
+	return nil
 }

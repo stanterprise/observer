@@ -96,3 +96,29 @@ func TestBuildAggregatedRunFromShards(t *testing.T) {
 		t.Fatalf("Duration = %v, want %d", run.Duration, finishLater.Sub(start).Nanoseconds())
 	}
 }
+
+func TestBuildAggregatedRunFromExecutions(t *testing.T) {
+	start := time.Date(2026, 4, 18, 10, 0, 0, 0, time.UTC)
+	finish := start.Add(5 * time.Minute)
+	finishLater := finish.Add(2 * time.Minute)
+
+	run, ok := buildAggregatedRunFromExecutions("run-123", []m.RunExecution{
+		{RunID: "run-123", ExecutionID: "exec-a", Status: "PASSED", TotalTests: 3, StartTime: &start, EndTime: &finish},
+		{RunID: "run-123", ExecutionID: "exec-b", Status: "FAILED", TotalTests: 5, StartTime: &finish, EndTime: &finishLater},
+	}, time.Now())
+	if !ok {
+		t.Fatal("expected aggregated run")
+	}
+	if run.TotalTests != 8 {
+		t.Fatalf("TotalTests = %d, want 8", run.TotalTests)
+	}
+	if run.Status != "FAILED" {
+		t.Fatalf("Status = %q, want FAILED", run.Status)
+	}
+	if run.StartTime == nil || !run.StartTime.Equal(start) {
+		t.Fatalf("StartTime = %v, want %v", run.StartTime, start)
+	}
+	if run.EndTime == nil || !run.EndTime.Equal(finishLater) {
+		t.Fatalf("EndTime = %v, want %v", run.EndTime, finishLater)
+	}
+}

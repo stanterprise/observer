@@ -138,6 +138,37 @@ func TestUpsertRunStartSuitesAndTests(t *testing.T) {
 	}
 }
 
+func TestUpsertRunExecutionStartAggregatesLogicalRun(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+
+	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ExecutionID: "exec-a", Name: "A", Status: "RUNNING", TotalTests: 3}); err != nil {
+		t.Fatalf("UpsertRunExecutionStart(exec-a) failed: %v", err)
+	}
+	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ExecutionID: "exec-b", Name: "B", Status: "RUNNING", TotalTests: 5}); err != nil {
+		t.Fatalf("UpsertRunExecutionStart(exec-b) failed: %v", err)
+	}
+
+	var storedRun m.TestRun
+	if err := repo.db.WithContext(ctx).First(&storedRun, "id = ?", "run-123").Error; err != nil {
+		t.Fatalf("load stored run: %v", err)
+	}
+	if storedRun.TotalTests != 8 {
+		t.Fatalf("storedRun.TotalTests = %d, want 8", storedRun.TotalTests)
+	}
+	if storedRun.Status != "RUNNING" {
+		t.Fatalf("storedRun.Status = %q, want RUNNING", storedRun.Status)
+	}
+
+	var executionCount int64
+	if err := repo.db.WithContext(ctx).Model(&m.RunExecution{}).Where("run_id = ?", "run-123").Count(&executionCount).Error; err != nil {
+		t.Fatalf("count run executions: %v", err)
+	}
+	if executionCount != 2 {
+		t.Fatalf("executionCount = %d, want 2", executionCount)
+	}
+}
+
 func newSQLitePostgresRepository(t *testing.T) *PostgresRepository {
 	t.Helper()
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
@@ -154,6 +185,7 @@ func newSQLitePostgresRepository(t *testing.T) *PostgresRepository {
 func modelsForSQLiteMigration() []interface{} {
 	return []interface{}{
 		&m.TestRun{},
+		&m.RunExecution{},
 		&m.RunShard{},
 		&m.Suite{},
 		&m.Test{},

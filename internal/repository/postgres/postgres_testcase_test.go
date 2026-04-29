@@ -466,6 +466,7 @@ func TestAppendTestFailureAndError(t *testing.T) {
 	attempt := &m.TestAttempt{
 		ID:           "run-123:test:test-123:0",
 		RunID:        "run-123",
+		ExecutionID:  "",
 		TestID:       "run-123:test:test-123",
 		AttemptIndex: 0,
 		Status:       "FAILED",
@@ -482,7 +483,7 @@ func TestAppendTestFailureAndError(t *testing.T) {
 		Timestamp:      &failureTime,
 		Attachments:    []map[string]interface{}{{"name": "failure.txt"}},
 	}
-	if err := repo.AppendTestFailure(ctx, "run-123", "test-123", 0, failure); err != nil {
+	if err := repo.AppendTestFailure(ctx, "run-123", "", "test-123", 0, failure); err != nil {
 		t.Fatalf("AppendTestFailure failed: %v", err)
 	}
 
@@ -493,7 +494,7 @@ func TestAppendTestFailureAndError(t *testing.T) {
 		Timestamp:    &errorTime,
 		Attachments:  []map[string]interface{}{{"name": "error.txt"}},
 	}
-	if err := repo.AppendTestError(ctx, "run-123", "test-123", 0, errorDoc); err != nil {
+	if err := repo.AppendTestError(ctx, "run-123", "", "test-123", 0, errorDoc); err != nil {
 		t.Fatalf("AppendTestError failed: %v", err)
 	}
 
@@ -512,6 +513,41 @@ func TestAppendTestFailureAndError(t *testing.T) {
 	}
 	if len(storedAttempt.Errors[0].Attachments) != 1 || storedAttempt.Errors[0].Attachments[0]["name"] != "error.txt" {
 		t.Fatalf("stored error attachments = %+v, want error.txt", storedAttempt.Errors[0].Attachments)
+	}
+}
+
+func TestUpsertTestBeginSeparatesAttemptsByExecutionID(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	suiteID := "run-123:suite:suite-123"
+	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+
+	test := &m.Test{
+		ID:             "run-123:test:test-123",
+		RunID:          "run-123",
+		ExternalTestID: "test-123",
+		SuiteID:        &suiteID,
+		Name:           "My Test",
+		Title:          "My Test",
+		Status:         "RUNNING",
+		StartTime:      &start,
+	}
+	firstAttempt := &m.TestAttempt{ID: "run-123:test:test-123:execution:exec-a:attempt:0", RunID: "run-123", ExecutionID: "exec-a", TestID: "run-123:test:test-123", AttemptIndex: 0, Status: "RUNNING", StartTime: &start}
+	secondAttempt := &m.TestAttempt{ID: "run-123:test:test-123:execution:exec-b:attempt:0", RunID: "run-123", ExecutionID: "exec-b", TestID: "run-123:test:test-123", AttemptIndex: 0, Status: "RUNNING", StartTime: &start}
+
+	if err := repo.UpsertTestBegin(ctx, test, firstAttempt); err != nil {
+		t.Fatalf("UpsertTestBegin(firstAttempt) failed: %v", err)
+	}
+	if err := repo.UpsertTestBegin(ctx, test, secondAttempt); err != nil {
+		t.Fatalf("UpsertTestBegin(secondAttempt) failed: %v", err)
+	}
+
+	var count int64
+	if err := repo.db.WithContext(ctx).Model(&m.TestAttempt{}).Where("test_id = ?", test.ID).Count(&count).Error; err != nil {
+		t.Fatalf("count execution-scoped attempts: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("count = %d, want 2", count)
 	}
 }
 
