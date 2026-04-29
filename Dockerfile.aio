@@ -146,6 +146,9 @@ RUN sed 's/\${API_BACKEND_HOST}/localhost/g; s/\${API_BACKEND_PORT}/8080/g' \
     sed -i 's|/usr/share/nginx/html|/var/www/html|g' /etc/nginx/nginx.conf && \
     rm -f /etc/nginx/nginx.conf.template /etc/nginx/sites-enabled/default
 
+# Copy the shared NATS config used by distributed mode.
+COPY nats-server.conf /etc/nats/nats-server.conf
+
 # Copy s6-overlay service definitions
 COPY docker/s6-overlay/s6-rc.d /etc/s6-overlay/s6-rc.d/
 
