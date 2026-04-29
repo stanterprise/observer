@@ -369,6 +369,14 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 		return nil, fmt.Errorf("load run executions: %w", err)
 	}
 
+	var shards []m.RunShard
+	if err := r.db.WithContext(ctx).
+		Where("run_id IN ?", runIDs).
+		Order("created_at asc, id asc").
+		Find(&shards).Error; err != nil {
+		return nil, fmt.Errorf("load run shards: %w", err)
+	}
+
 	var attempts []m.TestAttempt
 	if err := r.db.WithContext(ctx).
 		Where("run_id IN ?", runIDs).
@@ -399,6 +407,19 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 	for _, execution := range executions {
 		if run, ok := runByID[execution.RunID]; ok {
 			run.Executions = append(run.Executions, execution)
+		}
+	}
+
+	shardsByRunID := make(map[string][]m.RunShard, len(runIDs))
+	for _, shard := range shards {
+		shardsByRunID[shard.RunID] = append(shardsByRunID[shard.RunID], shard)
+	}
+	for runID, run := range runByID {
+		if shardAggregate, ok := buildLogicalRunAggregateFromShards(runID, shardsByRunID[runID], run.TotalTests, run.UpdatedAt); ok {
+			run.Status = shardAggregate.Status
+			run.StartTime = shardAggregate.StartTime
+			run.EndTime = shardAggregate.EndTime
+			run.Duration = shardAggregate.Duration
 		}
 	}
 
@@ -439,7 +460,48 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 		}
 	}
 
+	for _, run := range runByID {
+		if actualTotalTests := countRunTests(run); actualTotalTests > 0 {
+			run.TotalTests = actualTotalTests
+		}
+	}
+
 	return runs, nil
+}
+
+func countRunTests(run *m.TestRun) int32 {
+	if run == nil {
+		return 0
+	}
+
+	seen := make(map[string]struct{})
+	for _, test := range run.Tests {
+		if test == nil || test.ID == "" {
+			continue
+		}
+		seen[test.ID] = struct{}{}
+	}
+	for _, suite := range run.Suites {
+		collectSuiteTestIDs(suite, seen)
+	}
+
+	return int32(len(seen))
+}
+
+func collectSuiteTestIDs(suite *m.Suite, seen map[string]struct{}) {
+	if suite == nil {
+		return
+	}
+
+	for _, test := range suite.Tests {
+		if test == nil || test.ID == "" {
+			continue
+		}
+		seen[test.ID] = struct{}{}
+	}
+	for _, nested := range suite.Suites {
+		collectSuiteTestIDs(nested, seen)
+	}
 }
 
 func (r *PostgresRepository) applyRunListFilter(ctx context.Context, query *gorm.DB, filter ListRunsFilter) (*gorm.DB, error) {

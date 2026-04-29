@@ -151,6 +151,20 @@ func allRunShardsFinished(shards []m.RunShard, expectedCount int32) bool {
 	return finishedCount >= expectedCount
 }
 
+func allPersistedRunShardsFinished(shards []m.RunShard) bool {
+	if len(shards) == 0 {
+		return false
+	}
+
+	for _, shard := range shards {
+		if shard.EndTime == nil {
+			return false
+		}
+	}
+
+	return true
+}
+
 func buildAggregatedRunFromShards(runID string, shards []m.RunShard, now time.Time) (*m.TestRun, bool) {
 	if len(shards) == 0 {
 		return nil, false
