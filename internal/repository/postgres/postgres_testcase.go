@@ -106,7 +106,7 @@ func upsertRelationalTest(tx *gorm.DB, test *m.Test, now time.Time) error {
 
 func upsertRelationalTestAttempt(tx *gorm.DB, attempt *m.TestAttempt, now time.Time) error {
 	var stored m.TestAttempt
-	err := tx.Where("test_id = ? AND execution_id = ? AND attempt_index = ?", attempt.TestID, normalizeRepositoryExecutionID(attempt.ExecutionID), attempt.AttemptIndex).First(&stored).Error
+	err := tx.Where("test_id = ? AND execution_id = ? AND attempt_index = ?", attempt.TestID, attempt.ExecutionID, attempt.AttemptIndex).First(&stored).Error
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("load relational test attempt: %w", err)
@@ -114,7 +114,7 @@ func upsertRelationalTestAttempt(tx *gorm.DB, attempt *m.TestAttempt, now time.T
 		create := m.TestAttempt{
 			ID:           attempt.ID,
 			RunID:        attempt.RunID,
-			ExecutionID:  normalizeRepositoryExecutionID(attempt.ExecutionID),
+			ExecutionID:  attempt.ExecutionID,
 			TestID:       attempt.TestID,
 			AttemptIndex: attempt.AttemptIndex,
 			Status:       attempt.Status,
@@ -140,7 +140,7 @@ func upsertRelationalTestAttempt(tx *gorm.DB, attempt *m.TestAttempt, now time.T
 	if attempt.RunID != "" {
 		stored.RunID = attempt.RunID
 	}
-	stored.ExecutionID = normalizeRepositoryExecutionID(attempt.ExecutionID)
+	stored.ExecutionID = attempt.ExecutionID
 	if attempt.Status != "" {
 		stored.Status = attempt.Status
 	}
@@ -208,7 +208,7 @@ func latestExecutionAttemptSet(attempts []m.TestAttempt) ([]m.TestAttempt, strin
 	windows := make(map[string]*executionWindow, len(attempts))
 	order := make([]string, 0, len(attempts))
 	for _, attempt := range attempts {
-		executionID := normalizeRepositoryExecutionID(attempt.ExecutionID)
+		executionID := attempt.ExecutionID
 		window, ok := windows[executionID]
 		if !ok {
 			window = &executionWindow{executionID: executionID}
@@ -273,9 +273,9 @@ func (r *PostgresRepository) AppendTestFailure(ctx context.Context, runID, execu
 		}
 
 		var attempt m.TestAttempt
-		if err := tx.Where("run_id = ? AND execution_id = ? AND test_id = ? AND attempt_index = ?", runID, normalizeRepositoryExecutionID(executionID), internalTestID, attemptIndex).First(&attempt).Error; err != nil {
+		if err := tx.Where("run_id = ? AND execution_id = ? AND test_id = ? AND attempt_index = ?", runID, executionID, internalTestID, attemptIndex).First(&attempt).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				return fmt.Errorf("test attempt not found: runID=%s, executionID=%s, testID=%s, attemptIndex=%d", runID, normalizeRepositoryExecutionID(executionID), testID, attemptIndex)
+				return fmt.Errorf("test attempt not found: runID=%s, executionID=%s, testID=%s, attemptIndex=%d", runID, executionID, testID, attemptIndex)
 			}
 			return fmt.Errorf("load test attempt for failure: %w", err)
 		}
@@ -296,7 +296,7 @@ func (r *PostgresRepository) AppendTestFailure(ctx context.Context, runID, execu
 		return err
 	}
 
-	r.logger.Info("test failure appended", "run_id", runID, "execution_id", normalizeRepositoryExecutionID(executionID), "test_id", testID, "attempt_index", attemptIndex)
+	r.logger.Info("test failure appended", "run_id", runID, "execution_id", executionID, "test_id", testID, "attempt_index", attemptIndex)
 	return nil
 }
 
@@ -323,9 +323,9 @@ func (r *PostgresRepository) AppendTestError(ctx context.Context, runID, executi
 		}
 
 		var attempt m.TestAttempt
-		if err := tx.Where("run_id = ? AND execution_id = ? AND test_id = ? AND attempt_index = ?", runID, normalizeRepositoryExecutionID(executionID), internalTestID, attemptIndex).First(&attempt).Error; err != nil {
+		if err := tx.Where("run_id = ? AND execution_id = ? AND test_id = ? AND attempt_index = ?", runID, executionID, internalTestID, attemptIndex).First(&attempt).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				return fmt.Errorf("test attempt not found: runID=%s, executionID=%s, testID=%s, attemptIndex=%d", runID, normalizeRepositoryExecutionID(executionID), testID, attemptIndex)
+				return fmt.Errorf("test attempt not found: runID=%s, executionID=%s, testID=%s, attemptIndex=%d", runID, executionID, testID, attemptIndex)
 			}
 			return fmt.Errorf("load test attempt for error: %w", err)
 		}
@@ -346,7 +346,7 @@ func (r *PostgresRepository) AppendTestError(ctx context.Context, runID, executi
 		return err
 	}
 
-	r.logger.Info("test error appended", "run_id", runID, "execution_id", normalizeRepositoryExecutionID(executionID), "test_id", testID, "attempt_index", attemptIndex)
+	r.logger.Info("test error appended", "run_id", runID, "execution_id", executionID, "test_id", testID, "attempt_index", attemptIndex)
 	return nil
 }
 

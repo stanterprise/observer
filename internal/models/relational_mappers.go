@@ -193,7 +193,7 @@ func TestCaseRunToRelationalTest(protoTest *entities.TestCaseRun) *Test {
 
 	var suiteID *string
 	if protoTest.TestSuiteId != "" {
-		internalSuiteID := buildSuiteRowID(protoTest.RunId, protoTest.TestSuiteId)
+		internalSuiteID := protoTest.TestSuiteId
 		suiteID = &internalSuiteID
 	}
 
@@ -216,7 +216,7 @@ func TestCaseRunToRelationalTest(protoTest *entities.TestCaseRun) *Test {
 	}
 
 	return &Test{
-		ID:             buildTestRowID(protoTest.RunId, protoTest.Id),
+		ID:             protoTest.Id,
 		RunID:          protoTest.RunId,
 		ExternalTestID: protoTest.Id,
 		SuiteID:        suiteID,
@@ -266,10 +266,10 @@ func TestCaseRunToRelationalAttempt(protoTest *entities.TestCaseRun, attachments
 	}
 
 	return &TestAttempt{
-		ID:           buildTestAttemptID(buildTestRowID(protoTest.RunId, protoTest.Id), protoTest.ExecutionId, attemptIndex),
+		ID:           buildTestAttemptID(protoTest.Id, protoTest.ExecutionId, attemptIndex),
 		RunID:        protoTest.RunId,
 		ExecutionID:  normalizeExecutionID(protoTest.ExecutionId),
-		TestID:       buildTestRowID(protoTest.RunId, protoTest.Id),
+		TestID:       protoTest.Id,
 		AttemptIndex: attemptIndex,
 		Status:       protoTest.Status.String(),
 		StartTime:    startTime,
@@ -320,7 +320,7 @@ func flattenSingleSuite(protoSuite *entities.TestSuiteRun) []*Suite {
 	metadata := stringMapToInterfaceMap(protoSuite.Metadata)
 	var parentSuiteID *string
 	if protoSuite.ParentSuiteId != "" {
-		internalParentSuiteID := buildSuiteRowID(protoSuite.RunId, protoSuite.ParentSuiteId)
+		internalParentSuiteID := protoSuite.ParentSuiteId
 		parentSuiteID = &internalParentSuiteID
 	}
 
@@ -343,7 +343,7 @@ func flattenSingleSuite(protoSuite *entities.TestSuiteRun) []*Suite {
 	}
 
 	suite := &Suite{
-		ID:              buildSuiteRowID(protoSuite.RunId, protoSuite.Id),
+		ID:              protoSuite.Id,
 		RunID:           protoSuite.RunId,
 		ExternalSuiteID: protoSuite.Id,
 		ParentSuiteID:   parentSuiteID,
@@ -397,10 +397,10 @@ func flattenTestsForSuite(protoSuite *entities.TestSuiteRun) []*Test {
 		metadata := stringMapToInterfaceMap(protoTest.Metadata)
 		var suiteID *string
 		if protoTest.TestSuiteId != "" {
-			internalSuiteID := buildSuiteRowID(protoTest.RunId, protoTest.TestSuiteId)
+			internalSuiteID := protoTest.TestSuiteId
 			suiteID = &internalSuiteID
 		} else if protoSuite.Id != "" {
-			internalSuiteID := buildSuiteRowID(protoTest.RunId, protoSuite.Id)
+			internalSuiteID := protoSuite.Id
 			suiteID = &internalSuiteID
 		}
 
@@ -427,7 +427,7 @@ func flattenTestsForSuite(protoSuite *entities.TestSuiteRun) []*Test {
 		timeout := &protoTest.Timeout
 
 		test := &Test{
-			ID:             buildTestRowID(protoTest.RunId, protoTest.Id),
+			ID:             protoTest.Id,
 			RunID:          protoTest.RunId,
 			ExternalTestID: protoTest.Id,
 			SuiteID:        suiteID,
@@ -498,14 +498,6 @@ func buildRunShardID(runID, executionID string, shardIndex *int32) string {
 		return runID + ":" + fmt.Sprintf("%d", *shardIndex)
 	}
 	return fmt.Sprintf("%s:execution:%s:shard:%d", runID, executionID, *shardIndex)
-}
-
-func buildSuiteRowID(runID, externalSuiteID string) string {
-	return fmt.Sprintf("%s:suite:%s", runID, externalSuiteID)
-}
-
-func buildTestRowID(runID, externalTestID string) string {
-	return fmt.Sprintf("%s:test:%s", runID, externalTestID)
 }
 
 func buildTestAttemptID(testID, executionID string, attemptIndex int32) string {
