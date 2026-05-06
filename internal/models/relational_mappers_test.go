@@ -13,7 +13,8 @@ import (
 
 func TestRunStartEventToRunShard(t *testing.T) {
 	req := &events.ReportRunStartEventRequest{
-		RunId: "run-123",
+		RunId:       "run-123",
+		ExecutionId: "exec-123",
 		Metadata: map[string]string{
 			"shard.current": "2",
 			"shard.total":   "5",
@@ -30,8 +31,8 @@ func TestRunStartEventToRunShard(t *testing.T) {
 	if shard.ShardIndex == nil || *shard.ShardIndex != 2 {
 		t.Fatalf("ShardIndex = %v, want 2", shard.ShardIndex)
 	}
-	if shard.ID != "run-123:2" {
-		t.Fatalf("ID = %q, want run-123:2", shard.ID)
+	if shard.ID != "run-123:exec-123:2" {
+		t.Fatalf("ID = %q, want run-123:exec-123:2", shard.ID)
 	}
 	if shard.ShardCountExpected == nil || *shard.ShardCountExpected != 5 {
 		t.Fatalf("ShardCountExpected = %v, want 5", shard.ShardCountExpected)
@@ -59,8 +60,8 @@ func TestRunStartEventToRunExecution(t *testing.T) {
 	if execution == nil {
 		t.Fatal("expected run execution")
 	}
-	if execution.ID != "run-123:execution:exec-123" {
-		t.Fatalf("ID = %q, want run-123:execution:exec-123", execution.ID)
+	if execution.ID != "exec-123" {
+		t.Fatalf("ID = %q, want exec-123", execution.ID)
 	}
 	if execution.ExecutionID != "exec-123" {
 		t.Fatalf("ExecutionID = %q, want exec-123", execution.ExecutionID)
@@ -77,6 +78,7 @@ func TestRunEndEventToRunShard(t *testing.T) {
 	start := time.Date(2026, 4, 18, 9, 30, 0, 0, time.UTC)
 	req := &events.TestRunEndEventRequest{
 		RunId:       "run-123",
+		ExecutionId: "exec-123",
 		FinalStatus: common.TestStatus_PASSED,
 		StartTime:   timestamppb.New(start),
 		Duration:    durationpb.New(5 * time.Second),
@@ -93,8 +95,8 @@ func TestRunEndEventToRunShard(t *testing.T) {
 	if shard.ShardIndex == nil || *shard.ShardIndex != 3 {
 		t.Fatalf("ShardIndex = %v, want 3", shard.ShardIndex)
 	}
-	if shard.ID != "run-123:3" {
-		t.Fatalf("ID = %q, want run-123:3", shard.ID)
+	if shard.ID != "run-123:exec-123:3" {
+		t.Fatalf("ID = %q, want run-123:exec-123:3", shard.ID)
 	}
 	if shard.ShardCountExpected == nil || *shard.ShardCountExpected != 7 {
 		t.Fatalf("ShardCountExpected = %v, want 7", shard.ShardCountExpected)
@@ -124,8 +126,8 @@ func TestRunEndEventToRunExecution(t *testing.T) {
 	if execution == nil {
 		t.Fatal("expected run execution")
 	}
-	if execution.ID != "run-123:execution:exec-123" {
-		t.Fatalf("ID = %q, want run-123:execution:exec-123", execution.ID)
+	if execution.ID != "exec-123" {
+		t.Fatalf("ID = %q, want exec-123", execution.ID)
 	}
 	if execution.Status != common.TestStatus_FAILED.String() {
 		t.Fatalf("Status = %q, want %q", execution.Status, common.TestStatus_FAILED.String())
