@@ -198,7 +198,7 @@ func mergeRunStartTotalTests(existing, incoming int32, sharded bool) int32 {
 
 func upsertRunStartSuite(tx *gorm.DB, suite *m.Suite, now time.Time) error {
 	var stored m.Suite
-	err := tx.Where("id = ?", suite.ID).First(&stored).Error
+	err := tx.Where("run_id = ? AND id = ?", suite.RunID, suite.ID).First(&stored).Error
 	if err != nil {
 		if err != gorm.ErrRecordNotFound {
 			return fmt.Errorf("load run start suite %s: %w", suite.ID, err)
@@ -281,7 +281,7 @@ func upsertRunStartSuite(tx *gorm.DB, suite *m.Suite, now time.Time) error {
 
 func upsertRunStartTest(tx *gorm.DB, test *m.Test, now time.Time) error {
 	var stored m.Test
-	err := tx.Where("id = ?", test.ID).First(&stored).Error
+	err := tx.Where("run_id = ? AND id = ?", test.RunID, test.ID).First(&stored).Error
 	if err != nil {
 		if err != gorm.ErrRecordNotFound {
 			return fmt.Errorf("load run start test %s: %w", test.ID, err)

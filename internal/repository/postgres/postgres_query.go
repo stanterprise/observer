@@ -393,7 +393,8 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 
 	attemptsByTestID := make(map[string][]m.TestAttempt, len(attempts))
 	for _, attempt := range attempts {
-		attemptsByTestID[attempt.TestID] = append(attemptsByTestID[attempt.TestID], attempt)
+		key := runScopedEntityKey(attempt.RunID, attempt.TestID)
+		attemptsByTestID[key] = append(attemptsByTestID[key], attempt)
 	}
 
 	runByID := make(map[string]*m.TestRun, len(runs))
@@ -427,12 +428,12 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 	for _, suite := range suites {
 		suite.Suites = nil
 		suite.Tests = nil
-		suiteByID[suite.ID] = suite
+		suiteByID[runScopedEntityKey(suite.RunID, suite.ID)] = suite
 	}
 
 	for _, suite := range suites {
 		if suite.ParentSuiteID != nil {
-			if parent, ok := suiteByID[*suite.ParentSuiteID]; ok {
+			if parent, ok := suiteByID[runScopedEntityKey(suite.RunID, *suite.ParentSuiteID)]; ok {
 				parent.Suites = append(parent.Suites, suite)
 				continue
 			}
@@ -443,7 +444,7 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 	}
 
 	for _, test := range tests {
-		if attachedAttempts, ok := attemptsByTestID[test.ID]; ok {
+		if attachedAttempts, ok := attemptsByTestID[runScopedEntityKey(test.RunID, test.ID)]; ok {
 			test.Attempts = attachedAttempts
 			hydrateTestFromAttempts(test)
 		} else {
@@ -451,7 +452,7 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 		}
 
 		if test.SuiteID != nil {
-			if suite, ok := suiteByID[*test.SuiteID]; ok {
+			if suite, ok := suiteByID[runScopedEntityKey(test.RunID, *test.SuiteID)]; ok {
 				suite.Tests = append(suite.Tests, test)
 				continue
 			}
@@ -468,6 +469,10 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 	}
 
 	return runs, nil
+}
+
+func runScopedEntityKey(runID, entityID string) string {
+	return runID + ":" + entityID
 }
 
 func hydrateTestFromAttempts(test *m.Test) {

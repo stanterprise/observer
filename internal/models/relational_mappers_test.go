@@ -149,6 +149,25 @@ func TestRunStartEventToRunShardWithoutMetadata(t *testing.T) {
 	}
 }
 
+func TestSuiteRunToRelationalSuite(t *testing.T) {
+	suite := SuiteRunToRelationalSuite(&entities.TestSuiteRun{
+		Id:            "suite-123",
+		RunId:         "run-123",
+		ParentSuiteId: "parent-1",
+		Name:          "Suite",
+		Project:       "chromium",
+	})
+	if suite == nil {
+		t.Fatal("expected suite mapping")
+	}
+	if suite.ID != "suite-123" || suite.RunID != "run-123" {
+		t.Fatalf("suite = %+v, want suite-123/run-123", suite)
+	}
+	if suite.ParentSuiteID == nil || *suite.ParentSuiteID != "parent-1" {
+		t.Fatalf("suite.ParentSuiteID = %v, want parent-1", suite.ParentSuiteID)
+	}
+}
+
 func TestRunStartEventToRunShardRequiresShardCount(t *testing.T) {
 	req := &events.ReportRunStartEventRequest{
 		RunId: "run-123",
@@ -351,7 +370,7 @@ func TestTestCaseRunToRelationalAttempt_UsesExecutionAwareIdentity(t *testing.T)
 	if attempt.ExecutionID != "exec-123" {
 		t.Fatalf("ExecutionID = %q, want exec-123", attempt.ExecutionID)
 	}
-	if attempt.ID != "test-123:exec-123:1" {
+	if attempt.ID != "run-123:test-123:exec-123:1" {
 		t.Fatalf("ID = %q, want execution-aware attempt id", attempt.ID)
 	}
 	if attempt.TestID != "test-123" {
@@ -377,8 +396,8 @@ func TestTestCaseRunToRelationalAttempt(t *testing.T) {
 	if attempt == nil {
 		t.Fatal("expected relational attempt mapping")
 	}
-	if attempt.ID != BuildTestAttemptID("test-123", "", 2) {
-		t.Fatalf("ID = %q, want %s", attempt.ID, BuildTestAttemptID("test-123", "", 2))
+	if attempt.ID != BuildTestAttemptID("run-123", "test-123", "", 2) {
+		t.Fatalf("ID = %q, want %s", attempt.ID, BuildTestAttemptID("run-123", "test-123", "", 2))
 	}
 	if attempt.TestID != "test-123" {
 		t.Fatalf("TestID = %q, want %s", attempt.TestID, "test-123")

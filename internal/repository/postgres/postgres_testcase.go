@@ -13,13 +13,16 @@ import (
 
 func upsertRelationalTest(tx *gorm.DB, test *m.Test, now time.Time) error {
 	var stored m.Test
-	err := tx.Where("id = ?", test.ID).First(&stored).Error
+	err := tx.Where("run_id = ? AND id = ?", test.RunID, test.ID).First(&stored).Error
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("load relational test: %w", err)
 		}
 		if test.SuiteID == nil {
 			return fmt.Errorf("suite id is required for new relational test")
+		}
+		if err := ensureRelationalSuiteExists(tx, test.RunID, *test.SuiteID, now); err != nil {
+			return err
 		}
 		create := m.Test{
 			ID:             test.ID,
@@ -104,9 +107,34 @@ func upsertRelationalTest(tx *gorm.DB, test *m.Test, now time.Time) error {
 	return nil
 }
 
+func ensureRelationalSuiteExists(tx *gorm.DB, runID, suiteID string, now time.Time) error {
+	var stored m.Suite
+	err := tx.Where("run_id = ? AND id = ?", runID, suiteID).First(&stored).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("load relational suite: %w", err)
+	}
+
+	placeholder := m.Suite{
+		ID:              suiteID,
+		RunID:           runID,
+		ExternalSuiteID: suiteID,
+		Status:          "RUNNING",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	if err := tx.Create(&placeholder).Error; err != nil {
+		return fmt.Errorf("create placeholder suite: %w", err)
+	}
+
+	return nil
+}
+
 func upsertRelationalTestAttempt(tx *gorm.DB, attempt *m.TestAttempt, now time.Time) error {
 	var stored m.TestAttempt
-	err := tx.Where("test_id = ? AND execution_id = ? AND attempt_index = ?", attempt.TestID, attempt.ExecutionID, attempt.AttemptIndex).First(&stored).Error
+	err := tx.Where("run_id = ? AND test_id = ? AND execution_id = ? AND attempt_index = ?", attempt.RunID, attempt.TestID, attempt.ExecutionID, attempt.AttemptIndex).First(&stored).Error
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("load relational test attempt: %w", err)
@@ -286,7 +314,7 @@ func (r *PostgresRepository) AppendTestFailure(ctx context.Context, runID, execu
 			return fmt.Errorf("append relational test failure: %w", err)
 		}
 
-		if err := tx.Model(&m.Test{}).Where("id = ?", internalTestID).Update("updated_at", now).Error; err != nil {
+		if err := tx.Model(&m.Test{}).Where("run_id = ? AND id = ?", runID, internalTestID).Update("updated_at", now).Error; err != nil {
 			return fmt.Errorf("touch relational test after failure: %w", err)
 		}
 
@@ -336,7 +364,7 @@ func (r *PostgresRepository) AppendTestError(ctx context.Context, runID, executi
 			return fmt.Errorf("append relational test error: %w", err)
 		}
 
-		if err := tx.Model(&m.Test{}).Where("id = ?", internalTestID).Update("updated_at", now).Error; err != nil {
+		if err := tx.Model(&m.Test{}).Where("run_id = ? AND id = ?", runID, internalTestID).Update("updated_at", now).Error; err != nil {
 			return fmt.Errorf("touch relational test after error: %w", err)
 		}
 

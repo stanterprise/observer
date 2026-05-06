@@ -272,9 +272,17 @@ func buildAggregatedRunFromExecutions(runID string, executions []m.RunExecution,
 		startedAt  *time.Time
 		finishedAt *time.Time
 		totalTests int32
+		sharded    bool
 	)
 	for _, execution := range executions {
-		totalTests += execution.TotalTests
+		if isShardedRunStart(execution.Metadata) {
+			sharded = true
+			if execution.TotalTests > totalTests {
+				totalTests = execution.TotalTests
+			}
+		} else {
+			totalTests += execution.TotalTests
+		}
 		if execution.StartTime != nil && (startedAt == nil || execution.StartTime.Before(*startedAt)) {
 			t := *execution.StartTime
 			startedAt = &t
@@ -289,6 +297,13 @@ func buildAggregatedRunFromExecutions(runID string, executions []m.RunExecution,
 	if startedAt != nil && finishedAt != nil {
 		d := finishedAt.Sub(*startedAt).Nanoseconds()
 		duration = &d
+	}
+	if sharded && totalTests == 0 {
+		for _, execution := range executions {
+			if execution.TotalTests > totalTests {
+				totalTests = execution.TotalTests
+			}
+		}
 	}
 
 	return &m.TestRun{
@@ -356,7 +371,7 @@ func aggregateRunExecutionStatuses(executions []m.RunExecution) string {
 
 func loadRunExecution(tx *gorm.DB, runID, executionID string) (*m.RunExecution, error) {
 	var execution m.RunExecution
-	err := tx.Where("run_id = ? AND execution_id = ?", runID, executionID).First(&execution).Error
+	err := tx.Where("run_id = ? AND id = ?", runID, executionID).First(&execution).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil

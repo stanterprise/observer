@@ -37,8 +37,8 @@ func TestMergeRunStartMetadata(t *testing.T) {
 }
 
 func TestMergeRunStartTotalTests(t *testing.T) {
-	if got := mergeRunStartTotalTests(10, 5, true); got != 15 {
-		t.Fatalf("mergeRunStartTotalTests(sharded) = %d, want 15", got)
+	if got := mergeRunStartTotalTests(10, 5, true); got != 10 {
+		t.Fatalf("mergeRunStartTotalTests(sharded) = %d, want 10", got)
 	}
 	if got := mergeRunStartTotalTests(10, 5, false); got != 5 {
 		t.Fatalf("mergeRunStartTotalTests(non-sharded) = %d, want 5", got)
@@ -78,8 +78,8 @@ func TestUpsertRunStart_ShardedMergesMetadataAndTotals(t *testing.T) {
 	if err := repo.db.WithContext(ctx).First(&stored, "id = ?", "run-123").Error; err != nil {
 		t.Fatalf("load stored run: %v", err)
 	}
-	if stored.TotalTests != 8 {
-		t.Fatalf("stored.TotalTests = %d, want 8", stored.TotalTests)
+	if stored.TotalTests != 5 {
+		t.Fatalf("stored.TotalTests = %d, want 5", stored.TotalTests)
 	}
 	if stored.Metadata["shard.current"] != "2" {
 		t.Fatalf("stored.Metadata[shard.current] = %v, want 2", stored.Metadata["shard.current"])
@@ -235,6 +235,28 @@ func TestUpsertRunExecutionStartAggregatesLogicalRun(t *testing.T) {
 	}
 	if executionCount != 2 {
 		t.Fatalf("executionCount = %d, want 2", executionCount)
+	}
+}
+
+func TestUpsertRunExecutionStart_SharedShardedTotalsUseLogicalCount(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	mdA := map[string]interface{}{"shard.total": "2", "shard.current": "1"}
+	mdB := map[string]interface{}{"shard.total": "2", "shard.current": "2"}
+
+	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ID: "exec-a", Name: "A", Status: "RUNNING", TotalTests: 5, Metadata: mdA}); err != nil {
+		t.Fatalf("UpsertRunExecutionStart(exec-a) failed: %v", err)
+	}
+	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ID: "exec-b", Name: "B", Status: "RUNNING", TotalTests: 5, Metadata: mdB}); err != nil {
+		t.Fatalf("UpsertRunExecutionStart(exec-b) failed: %v", err)
+	}
+
+	var storedRun m.TestRun
+	if err := repo.db.WithContext(ctx).First(&storedRun, "id = ?", "run-123").Error; err != nil {
+		t.Fatalf("load stored run: %v", err)
+	}
+	if storedRun.TotalTests != 5 {
+		t.Fatalf("storedRun.TotalTests = %d, want 5", storedRun.TotalTests)
 	}
 }
 

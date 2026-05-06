@@ -55,6 +55,9 @@ func ConnectPostgres(dsn string, logger *slog.Logger) (*PostgresConnection, erro
 	if err := reconcileLegacyExecutionIDColumns(db); err != nil {
 		return nil, fmt.Errorf("postgres legacy execution_id backfill: %w", err)
 	}
+	if err := reconcileLegacyAttemptIndexes(db); err != nil {
+		return nil, fmt.Errorf("postgres legacy attempt index reconciliation: %w", err)
+	}
 
 	// Apply schema migrations so all tables exist in the correct state.
 	if err := db.AutoMigrate(models.ModelsForMigration()...); err != nil {
@@ -119,6 +122,25 @@ func reconcileLegacyExecutionIDColumns(db *gorm.DB) error {
 		if err := db.Exec(query).Error; err != nil {
 			return fmt.Errorf("backfill %s.%s: %w", target.table, target.column, err)
 		}
+	}
+
+	return nil
+}
+
+func reconcileLegacyAttemptIndexes(db *gorm.DB) error {
+	if db == nil {
+		return fmt.Errorf("gorm db is nil")
+	}
+
+	migrator := db.Migrator()
+	if !migrator.HasTable("test_attempts") {
+		return nil
+	}
+	if !migrator.HasIndex(&models.TestAttempt{}, "ux_attempts_test_execution_attempt_index") {
+		return nil
+	}
+	if err := migrator.DropIndex(&models.TestAttempt{}, "ux_attempts_test_execution_attempt_index"); err != nil {
+		return fmt.Errorf("drop legacy test_attempts unique index: %w", err)
 	}
 
 	return nil

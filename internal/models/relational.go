@@ -91,7 +91,7 @@ func (TestRun) TableName() string {
 // execution-scoped state beneath a logical run.
 type RunExecution struct {
 	ID         string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID      string                 `gorm:"column:run_id;type:text;not null;index:idx_run_executions_run_status,priority:1;uniqueIndex:ux_run_executions_run_id_execution_id,priority:1" json:"runId"`
+	RunID      string                 `gorm:"column:run_id;type:text;not null;index:idx_run_executions_run_status,priority:1" json:"runId"`
 	Name       string                 `gorm:"column:name;type:text" json:"name,omitempty"`
 	Status     string                 `gorm:"column:status;type:text;index:idx_run_executions_run_status,priority:3" json:"status,omitempty"`
 	Metadata   map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
@@ -192,10 +192,10 @@ func (Test) TableName() string {
 // Steps are stored on the attempt row as requested.
 type TestAttempt struct {
 	ID           string     `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID        string     `gorm:"column:run_id;primaryKey;type:text;not null;index:idx_attempts_run_id" json:"runId,omitempty"`
-	ExecutionID  string     `gorm:"column:execution_id;primaryKey;type:text;not null;default:'';index:idx_attempts_execution_id;uniqueIndex:ux_attempts_test_execution_attempt_index,priority:2" json:"executionId,omitempty"`
-	TestID       string     `gorm:"column:test_id;type:text;not null;index:idx_attempts_test_attempt,priority:1;uniqueIndex:ux_attempts_test_execution_attempt_index,priority:1" json:"testId"`
-	AttemptIndex int32      `gorm:"column:attempt_index;not null;index:idx_attempts_test_attempt,priority:2;uniqueIndex:ux_attempts_test_execution_attempt_index,priority:3" json:"attemptIndex"`
+	RunID        string     `gorm:"column:run_id;type:text;not null;index:idx_attempts_run_id;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:1" json:"runId,omitempty"`
+	ExecutionID  string     `gorm:"column:execution_id;type:text;not null;default:'';index:idx_attempts_execution_id;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:3" json:"executionId,omitempty"`
+	TestID       string     `gorm:"column:test_id;type:text;not null;index:idx_attempts_test_attempt,priority:1;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:2" json:"testId"`
+	AttemptIndex int32      `gorm:"column:attempt_index;not null;index:idx_attempts_test_attempt,priority:2;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:4" json:"attemptIndex"`
 	Status       string     `gorm:"column:status;type:text;index:idx_attempts_status_finished_at,priority:1" json:"status,omitempty"`
 	StartTime    *time.Time `gorm:"column:started_at" json:"startTime,omitempty"`
 	EndTime      *time.Time `gorm:"column:finished_at;index:idx_attempts_status_finished_at,priority:2" json:"endTime,omitempty"`

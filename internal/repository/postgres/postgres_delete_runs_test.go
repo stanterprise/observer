@@ -32,7 +32,7 @@ func TestDeleteRuns_RemovesRunGraph(t *testing.T) {
 
 	seedRelationalDeleteData(t, repo,
 		&m.TestRun{ID: "run-keep", Name: "Keep", CreatedAt: now, UpdatedAt: now},
-		&m.RunExecution{ID: "exec-1", RunID: "run-keep", Status: "PASSED", CreatedAt: now, UpdatedAt: now},
+		&m.RunExecution{ID: "exec-keep-1", RunID: "run-keep", Status: "PASSED", CreatedAt: now, UpdatedAt: now},
 		&m.RunShard{ID: "run-keep:1", RunID: "run-keep", CreatedAt: now, UpdatedAt: now},
 	)
 

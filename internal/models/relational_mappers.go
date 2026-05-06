@@ -264,7 +264,7 @@ func TestCaseRunToRelationalAttempt(protoTest *entities.TestCaseRun, attachments
 	}
 
 	return &TestAttempt{
-		ID:           BuildTestAttemptID(protoTest.Id, protoTest.ExecutionId, attemptIndex),
+		ID:           BuildTestAttemptID(protoTest.RunId, protoTest.Id, protoTest.ExecutionId, attemptIndex),
 		RunID:        protoTest.RunId,
 		ExecutionID:  protoTest.ExecutionId,
 		TestID:       protoTest.Id,
@@ -307,6 +307,14 @@ func flattenSuiteRuns(protoSuites []*entities.TestSuiteRun) []*Suite {
 		suites = append(suites, flattenSingleSuite(protoSuite)...)
 	}
 	return suites
+}
+
+func SuiteRunToRelationalSuite(protoSuite *entities.TestSuiteRun) *Suite {
+	suites := flattenSingleSuite(protoSuite)
+	if len(suites) == 0 {
+		return nil
+	}
+	return suites[0]
 }
 
 func flattenSingleSuite(protoSuite *entities.TestSuiteRun) []*Suite {
@@ -486,6 +494,6 @@ func BuildRunShardID(runID, executionID string, shardIndex *int32) string {
 	return fmt.Sprintf("%s:%s:%d", runID, executionID, *shardIndex)
 }
 
-func BuildTestAttemptID(testID, executionID string, attemptIndex int32) string {
-	return fmt.Sprintf("%s:%s:%d", testID, executionID, attemptIndex)
+func BuildTestAttemptID(runID, testID, executionID string, attemptIndex int32) string {
+	return fmt.Sprintf("%s:%s:%s:%d", runID, testID, executionID, attemptIndex)
 }

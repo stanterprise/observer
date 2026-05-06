@@ -34,7 +34,7 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 	attempt.ExecutionID = normalizeRepositoryExecutionID(attempt.ExecutionID)
 	attempt.CreatedAt = now
 	attempt.UpdatedAt = now
-	attempt.ID = m.BuildTestAttemptID(test.ID, attempt.ExecutionID, attempt.AttemptIndex)
+	attempt.ID = m.BuildTestAttemptID(test.RunID, test.ID, attempt.ExecutionID, attempt.AttemptIndex)
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := upsertRelationalTest(tx, test, now); err != nil {
@@ -45,7 +45,7 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 		}
 		if attempt.Steps != nil {
 			if err := tx.Model(&m.TestAttempt{}).
-				Where("test_id = ? AND execution_id = ? AND attempt_index = ?", attempt.TestID, attempt.ExecutionID, attempt.AttemptIndex).
+				Where("run_id = ? AND test_id = ? AND execution_id = ? AND attempt_index = ?", attempt.RunID, attempt.TestID, attempt.ExecutionID, attempt.AttemptIndex).
 				Updates(map[string]interface{}{
 					"steps":       attempt.Steps,
 					"steps_count": attempt.StepsCount,
@@ -56,7 +56,7 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 		}
 
 		var attempts []m.TestAttempt
-		if err := tx.Where("test_id = ? AND execution_id = ?", test.ID, attempt.ExecutionID).Find(&attempts).Error; err != nil {
+		if err := tx.Where("run_id = ? AND test_id = ? AND execution_id = ?", test.RunID, test.ID, attempt.ExecutionID).Find(&attempts).Error; err != nil {
 			return fmt.Errorf("load test attempts: %w", err)
 		}
 
@@ -77,7 +77,7 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 			updates["duration"] = *test.Duration
 		}
 
-		if err := tx.Model(&m.Test{}).Where("id = ?", test.ID).Updates(updates).Error; err != nil {
+		if err := tx.Model(&m.Test{}).Where("run_id = ? AND id = ?", test.RunID, test.ID).Updates(updates).Error; err != nil {
 			return fmt.Errorf("finalize relational test: %w", err)
 		}
 

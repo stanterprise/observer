@@ -52,8 +52,117 @@ func TestUpsertTestBeginUsesRawProtobufIDs(t *testing.T) {
 	if err := repo.db.WithContext(ctx).Where("test_id = ? AND execution_id = ? AND attempt_index = ?", "test-123", "exec-123", 0).First(&storedAttempt).Error; err != nil {
 		t.Fatalf("load stored attempt: %v", err)
 	}
-	if storedAttempt.ID != "test-123:exec-123:0" {
-		t.Fatalf("stored attempt id = %q, want test-123:exec-123:0", storedAttempt.ID)
+	if storedAttempt.ID != "run-123:test-123:exec-123:0" {
+		t.Fatalf("stored attempt id = %q, want run-123:test-123:exec-123:0", storedAttempt.ID)
+	}
+}
+
+func TestUpsertTestBeginKeepsSameRawTestIDInSeparateRuns(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	firstSuiteID := "suite-run-1"
+	secondSuiteID := "suite-run-2"
+	start := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
+
+	firstTest := &m.Test{
+		ID:             "test-123",
+		RunID:          "run-1",
+		ExternalTestID: "test-123",
+		SuiteID:        &firstSuiteID,
+		Name:           "Run 1 Test",
+		Title:          "Run 1 Test",
+		Status:         "RUNNING",
+		StartTime:      &start,
+	}
+	firstAttempt := &m.TestAttempt{
+		RunID:        "run-1",
+		ExecutionID:  "exec-1",
+		TestID:       "test-123",
+		AttemptIndex: 0,
+		Status:       "RUNNING",
+		StartTime:    &start,
+	}
+
+	secondStart := start.Add(time.Minute)
+	secondTest := &m.Test{
+		ID:             "test-123",
+		RunID:          "run-2",
+		ExternalTestID: "test-123",
+		SuiteID:        &secondSuiteID,
+		Name:           "Run 2 Test",
+		Title:          "Run 2 Test",
+		Status:         "RUNNING",
+		StartTime:      &secondStart,
+	}
+	secondAttempt := &m.TestAttempt{
+		RunID:        "run-2",
+		ExecutionID:  "exec-2",
+		TestID:       "test-123",
+		AttemptIndex: 0,
+		Status:       "RUNNING",
+		StartTime:    &secondStart,
+	}
+
+	if err := repo.UpsertTestBegin(ctx, firstTest, firstAttempt); err != nil {
+		t.Fatalf("UpsertTestBegin(first) failed: %v", err)
+	}
+	if err := repo.UpsertTestBegin(ctx, secondTest, secondAttempt); err != nil {
+		t.Fatalf("UpsertTestBegin(second) failed: %v", err)
+	}
+
+	var tests []m.Test
+	if err := repo.db.WithContext(ctx).Order("run_id asc").Find(&tests).Error; err != nil {
+		t.Fatalf("list tests: %v", err)
+	}
+	if len(tests) != 2 {
+		t.Fatalf("len(tests) = %d, want 2", len(tests))
+	}
+	if tests[0].RunID != "run-1" || tests[1].RunID != "run-2" {
+		t.Fatalf("stored run ids = [%s %s], want [run-1 run-2]", tests[0].RunID, tests[1].RunID)
+	}
+
+	var attempts []m.TestAttempt
+	if err := repo.db.WithContext(ctx).Order("run_id asc").Find(&attempts).Error; err != nil {
+		t.Fatalf("list attempts: %v", err)
+	}
+	if len(attempts) != 2 {
+		t.Fatalf("len(attempts) = %d, want 2", len(attempts))
+	}
+	if attempts[0].RunID != "run-1" || attempts[1].RunID != "run-2" {
+		t.Fatalf("stored attempt run ids = [%s %s], want [run-1 run-2]", attempts[0].RunID, attempts[1].RunID)
+	}
+}
+
+func TestUpsertTestBeginKeepsSameRawTestIDInSeparateRunsWithoutExecutionID(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	firstSuiteID := "suite-run-1"
+	secondSuiteID := "suite-run-2"
+	start := time.Date(2026, 5, 5, 12, 30, 0, 0, time.UTC)
+
+	for _, test := range []*m.Test{
+		{ID: "test-123", RunID: "run-1", ExternalTestID: "test-123", SuiteID: &firstSuiteID, Name: "Run 1 Test", Title: "Run 1 Test", Status: "RUNNING", StartTime: &start},
+		{ID: "test-123", RunID: "run-2", ExternalTestID: "test-123", SuiteID: &secondSuiteID, Name: "Run 2 Test", Title: "Run 2 Test", Status: "RUNNING", StartTime: &start},
+	} {
+		attempt := &m.TestAttempt{
+			RunID:        test.RunID,
+			ExecutionID:  "",
+			TestID:       test.ID,
+			AttemptIndex: 0,
+			Status:       "RUNNING",
+			StartTime:    test.StartTime,
+		}
+		if err := repo.UpsertTestBegin(ctx, test, attempt); err != nil {
+			t.Fatalf("UpsertTestBegin(%s) failed: %v", test.RunID, err)
+		}
+	}
+
+	var attempts []m.TestAttempt
+	if err := repo.db.WithContext(ctx).Order("run_id asc").Find(&attempts).Error; err != nil {
+		t.Fatalf("list attempts: %v", err)
+	}
+	if len(attempts) != 2 {
+		t.Fatalf("len(attempts) = %d, want 2", len(attempts))
 	}
 }
 
@@ -111,6 +220,37 @@ func TestUpsertTestBeginCreatesTestAndAttempt(t *testing.T) {
 	}
 	if len(storedAttempt.Attachments) != 1 || storedAttempt.Attachments[0]["name"] != "stdout.txt" {
 		t.Fatalf("stored attempt attachments = %+v, want stdout.txt", storedAttempt.Attachments)
+	}
+}
+
+func TestUpsertTestBeginCreatesPlaceholderSuiteWhenMissing(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	suiteID := "suite-missing"
+	start := time.Date(2026, 5, 6, 3, 0, 0, 0, time.UTC)
+
+	test := &m.Test{
+		ID:             "test-123",
+		RunID:          "run-123",
+		ExternalTestID: "test-123",
+		SuiteID:        &suiteID,
+		Name:           "My Test",
+		Title:          "My Test",
+		Status:         "RUNNING",
+		StartTime:      &start,
+	}
+	attempt := &m.TestAttempt{RunID: "run-123", TestID: "test-123", AttemptIndex: 0, Status: "RUNNING", StartTime: &start}
+
+	if err := repo.UpsertTestBegin(ctx, test, attempt); err != nil {
+		t.Fatalf("UpsertTestBegin failed: %v", err)
+	}
+
+	var suite m.Suite
+	if err := repo.db.WithContext(ctx).Where("run_id = ? AND id = ?", "run-123", suiteID).First(&suite).Error; err != nil {
+		t.Fatalf("load placeholder suite: %v", err)
+	}
+	if suite.ExternalSuiteID != suiteID {
+		t.Fatalf("suite.ExternalSuiteID = %q, want %q", suite.ExternalSuiteID, suiteID)
 	}
 }
 
@@ -743,6 +883,11 @@ func int64Ptr(value int64) *int64 {
 	return &converted
 }
 
+func strPtr(value string) *string {
+	converted := value
+	return &converted
+}
+
 func stepPayload(t *testing.T, steps []*m.StepDocument) *m.Step {
 	t.Helper()
 	payload, err := m.StepFromDocuments(steps)
@@ -804,6 +949,62 @@ func TestGetRuns_PreservesHistoricalRunsForRepeatedExternalTestID(t *testing.T) 
 	}
 	if trends[0].RunID != "run-2" || trends[1].RunID != "run-1" {
 		t.Fatalf("expected historical trend rows for both runs, got %+v", trends)
+	}
+}
+
+func TestGetRuns_AssociatesRawSuiteAndTestIDsPerRun(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	start := time.Date(2026, 5, 5, 13, 0, 0, 0, time.UTC)
+
+	for _, run := range []m.TestRun{
+		{ID: "run-1", Name: "Run 1", Status: "PASSED", CreatedAt: start, UpdatedAt: start},
+		{ID: "run-2", Name: "Run 2", Status: "FAILED", CreatedAt: start.Add(time.Minute), UpdatedAt: start.Add(time.Minute)},
+	} {
+		if err := repo.db.WithContext(ctx).Create(&run).Error; err != nil {
+			t.Fatalf("seed run %s: %v", run.ID, err)
+		}
+	}
+
+	for _, suite := range []m.Suite{
+		{ID: "suite-123", RunID: "run-1", ExternalSuiteID: "suite-123", Name: "Suite 1", CreatedAt: start, UpdatedAt: start},
+		{ID: "suite-123", RunID: "run-2", ExternalSuiteID: "suite-123", Name: "Suite 2", CreatedAt: start.Add(time.Minute), UpdatedAt: start.Add(time.Minute)},
+	} {
+		if err := repo.db.WithContext(ctx).Create(&suite).Error; err != nil {
+			t.Fatalf("seed suite %s/%s: %v", suite.RunID, suite.ID, err)
+		}
+	}
+
+	for _, test := range []m.Test{
+		{ID: "test-123", RunID: "run-1", ExternalTestID: "test-123", SuiteID: strPtr("suite-123"), Name: "Test 1", Title: "Test 1", Status: "PASSED", CreatedAt: start, UpdatedAt: start},
+		{ID: "test-123", RunID: "run-2", ExternalTestID: "test-123", SuiteID: strPtr("suite-123"), Name: "Test 2", Title: "Test 2", Status: "FAILED", CreatedAt: start.Add(time.Minute), UpdatedAt: start.Add(time.Minute)},
+	} {
+		if err := repo.db.WithContext(ctx).Create(&test).Error; err != nil {
+			t.Fatalf("seed test %s/%s: %v", test.RunID, test.ID, err)
+		}
+	}
+
+	docs, _, err := repo.GetRuns(ctx, ListRunsFilter{}, 10, 0, false)
+	if err != nil {
+		t.Fatalf("GetRuns failed: %v", err)
+	}
+	if len(docs) != 2 {
+		t.Fatalf("len(docs) = %d, want 2", len(docs))
+	}
+
+	for _, doc := range docs {
+		if len(doc.Suites) != 1 {
+			t.Fatalf("run %s suites = %+v, want exactly 1 suite", doc.ID, doc.Suites)
+		}
+		if len(doc.Suites[0].Tests) != 1 {
+			t.Fatalf("run %s suite tests = %+v, want exactly 1 test", doc.ID, doc.Suites[0].Tests)
+		}
+		if doc.Suites[0].RunID != doc.ID {
+			t.Fatalf("run %s suite run_id = %s, want %s", doc.ID, doc.Suites[0].RunID, doc.ID)
+		}
+		if doc.Suites[0].Tests[0].RunID != doc.ID {
+			t.Fatalf("run %s test run_id = %s, want %s", doc.ID, doc.Suites[0].Tests[0].RunID, doc.ID)
+		}
 	}
 }
 
