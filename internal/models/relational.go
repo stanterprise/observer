@@ -90,18 +90,17 @@ func (TestRun) TableName() string {
 // RunExecution maps to the PostgreSQL run_executions table and captures
 // execution-scoped state beneath a logical run.
 type RunExecution struct {
-	ID          string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID       string                 `gorm:"column:run_id;type:text;not null;index:idx_run_executions_run_status,priority:1;uniqueIndex:ux_run_executions_run_id_execution_id,priority:1" json:"runId"`
-	ExecutionID string                 `gorm:"column:execution_id;type:text;not null;default:'';uniqueIndex:ux_run_executions_run_id_execution_id,priority:2;index:idx_run_executions_run_status,priority:2" json:"executionId"`
-	Name        string                 `gorm:"column:name;type:text" json:"name,omitempty"`
-	Status      string                 `gorm:"column:status;type:text;index:idx_run_executions_run_status,priority:3" json:"status,omitempty"`
-	Metadata    map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
-	TotalTests  int32                  `gorm:"column:total_tests" json:"totalTests,omitempty"`
-	StartTime   *time.Time             `gorm:"column:started_at;index:idx_run_executions_started_at" json:"startTime,omitempty"`
-	EndTime     *time.Time             `gorm:"column:finished_at" json:"endTime,omitempty"`
-	Duration    *int64                 `gorm:"column:duration" json:"duration,omitempty"`
-	CreatedAt   time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
-	UpdatedAt   time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
+	ID         string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
+	RunID      string                 `gorm:"column:run_id;type:text;not null;index:idx_run_executions_run_status,priority:1;uniqueIndex:ux_run_executions_run_id_execution_id,priority:1" json:"runId"`
+	Name       string                 `gorm:"column:name;type:text" json:"name,omitempty"`
+	Status     string                 `gorm:"column:status;type:text;index:idx_run_executions_run_status,priority:3" json:"status,omitempty"`
+	Metadata   map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
+	TotalTests int32                  `gorm:"column:total_tests" json:"totalTests,omitempty"`
+	StartTime  *time.Time             `gorm:"column:started_at;index:idx_run_executions_started_at" json:"startTime,omitempty"`
+	EndTime    *time.Time             `gorm:"column:finished_at" json:"endTime,omitempty"`
+	Duration   *int64                 `gorm:"column:duration" json:"duration,omitempty"`
+	CreatedAt  time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
+	UpdatedAt  time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 }
 
 func (RunExecution) TableName() string {
@@ -129,7 +128,7 @@ func (RunShard) TableName() string {
 // Suite maps to the PostgreSQL suites table.
 type Suite struct {
 	ID              string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID           string                 `gorm:"column:run_id;type:text;not null;index:idx_suites_run_id;index:idx_suites_run_status,priority:1" json:"runId,omitempty"`
+	RunID           string                 `gorm:"column:run_id;primaryKey;type:text;not null;index:idx_suites_run_id;index:idx_suites_run_status,priority:1" json:"runId,omitempty"`
 	ExternalSuiteID string                 `gorm:"column:external_suite_id;type:text;index:idx_suites_run_external_suite_id,priority:2" json:"externalSuiteId,omitempty"`
 	ParentSuiteID   *string                `gorm:"column:parent_suite_id;type:text" json:"parentSuiteId,omitempty"`
 	Name            string                 `gorm:"column:name;type:text" json:"name,omitempty"`
@@ -163,7 +162,7 @@ func (Suite) TableName() string {
 // Test maps to the PostgreSQL tests table.
 type Test struct {
 	ID             string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID          string                 `gorm:"column:run_id;type:text;not null;index:idx_tests_run_id" json:"runId,omitempty"`
+	RunID          string                 `gorm:"column:run_id;primaryKey;type:text;not null;index:idx_tests_run_id" json:"runId,omitempty"`
 	ExternalTestID string                 `gorm:"column:external_test_id;type:text;index:idx_tests_suite_external_test_id,priority:2;index:idx_tests_run_external_test_id,priority:2" json:"externalTestId,omitempty"`
 	SuiteID        *string                `gorm:"column:suite_id;type:text;not null;index:idx_tests_suite_status,priority:1" json:"suiteId,omitempty"`
 	Name           string                 `gorm:"column:name;type:text" json:"name,omitempty"`
@@ -193,8 +192,8 @@ func (Test) TableName() string {
 // Steps are stored on the attempt row as requested.
 type TestAttempt struct {
 	ID           string     `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID        string     `gorm:"column:run_id;type:text;not null;index:idx_attempts_run_id" json:"runId,omitempty"`
-	ExecutionID  string     `gorm:"column:execution_id;type:text;not null;default:'';index:idx_attempts_execution_id;uniqueIndex:ux_attempts_test_execution_attempt_index,priority:2" json:"executionId,omitempty"`
+	RunID        string     `gorm:"column:run_id;primaryKey;type:text;not null;index:idx_attempts_run_id" json:"runId,omitempty"`
+	ExecutionID  string     `gorm:"column:execution_id;primaryKey;type:text;not null;default:'';index:idx_attempts_execution_id;uniqueIndex:ux_attempts_test_execution_attempt_index,priority:2" json:"executionId,omitempty"`
 	TestID       string     `gorm:"column:test_id;type:text;not null;index:idx_attempts_test_attempt,priority:1;uniqueIndex:ux_attempts_test_execution_attempt_index,priority:1" json:"testId"`
 	AttemptIndex int32      `gorm:"column:attempt_index;not null;index:idx_attempts_test_attempt,priority:2;uniqueIndex:ux_attempts_test_execution_attempt_index,priority:3" json:"attemptIndex"`
 	Status       string     `gorm:"column:status;type:text;index:idx_attempts_status_finished_at,priority:1" json:"status,omitempty"`

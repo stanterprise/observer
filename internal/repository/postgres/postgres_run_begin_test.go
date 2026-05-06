@@ -211,10 +211,10 @@ func TestUpsertRunExecutionStartAggregatesLogicalRun(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
 
-	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ExecutionID: "exec-a", Name: "A", Status: "RUNNING", TotalTests: 3}); err != nil {
+	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ID: "exec-a", Name: "A", Status: "RUNNING", TotalTests: 3}); err != nil {
 		t.Fatalf("UpsertRunExecutionStart(exec-a) failed: %v", err)
 	}
-	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ExecutionID: "exec-b", Name: "B", Status: "RUNNING", TotalTests: 5}); err != nil {
+	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ID: "exec-b", Name: "B", Status: "RUNNING", TotalTests: 5}); err != nil {
 		t.Fatalf("UpsertRunExecutionStart(exec-b) failed: %v", err)
 	}
 

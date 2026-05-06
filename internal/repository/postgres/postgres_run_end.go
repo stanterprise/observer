@@ -235,15 +235,14 @@ func buildAggregatedExecutionFromShards(runID, executionID string, shards []m.Ru
 	}
 
 	return &m.RunExecution{
-		ID:          runExecutionRowID(runID, executionID),
-		RunID:       runID,
-		ExecutionID: normalizeRepositoryExecutionID(executionID),
-		Status:      status,
-		StartTime:   startedAt,
-		EndTime:     finishedAt,
-		Duration:    duration,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:        executionID,
+		RunID:     runID,
+		Status:    status,
+		StartTime: startedAt,
+		EndTime:   finishedAt,
+		Duration:  duration,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}, true
 }
 

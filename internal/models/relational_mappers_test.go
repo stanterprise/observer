@@ -63,8 +63,8 @@ func TestRunStartEventToRunExecution(t *testing.T) {
 	if execution.ID != "exec-123" {
 		t.Fatalf("ID = %q, want exec-123", execution.ID)
 	}
-	if execution.ExecutionID != "exec-123" {
-		t.Fatalf("ExecutionID = %q, want exec-123", execution.ExecutionID)
+	if execution.ID != "exec-123" {
+		t.Fatalf("ID = %q, want exec-123", execution.ID)
 	}
 	if execution.TotalTests != 7 {
 		t.Fatalf("TotalTests = %d, want 7", execution.TotalTests)

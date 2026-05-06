@@ -38,7 +38,7 @@ func (r *PostgresRepository) UpsertRunExecutionStart(ctx context.Context, execut
 		return err
 	}
 
-	r.logger.Info("run execution upserted", "run_id", execution.RunID, "execution_id", normalizeRepositoryExecutionID(execution.ExecutionID))
+	r.logger.Info("run execution upserted", "run_id", execution.RunID, "execution_id", normalizeRepositoryExecutionID(execution.ID))
 	return nil
 }
 
@@ -69,31 +69,29 @@ func (r *PostgresRepository) FinalizeRunExecutionEnd(ctx context.Context, execut
 		return err
 	}
 
-	r.logger.Info("run execution finalized", "run_id", execution.RunID, "execution_id", normalizeRepositoryExecutionID(execution.ExecutionID), "status", execution.Status)
+	r.logger.Info("run execution finalized", "run_id", execution.RunID, "execution_id", normalizeRepositoryExecutionID(execution.ID), "status", execution.Status)
 	return nil
 }
 
 func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Time) error {
-	stored, err := loadRunExecution(tx, execution.RunID, execution.ExecutionID)
+	stored, err := loadRunExecution(tx, execution.RunID, execution.ID)
 	if err != nil {
 		return err
 	}
 
-	executionID := normalizeRepositoryExecutionID(execution.ExecutionID)
 	if stored == nil {
 		create := m.RunExecution{
-			ID:          runExecutionRowID(execution.RunID, executionID),
-			RunID:       execution.RunID,
-			ExecutionID: executionID,
-			Name:        execution.Name,
-			Status:      execution.Status,
-			Metadata:    execution.Metadata,
-			TotalTests:  execution.TotalTests,
-			StartTime:   cloneTimePtr(execution.StartTime),
-			EndTime:     cloneTimePtr(execution.EndTime),
-			Duration:    cloneInt64Ptr(execution.Duration),
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			ID:         execution.ID,
+			RunID:      execution.RunID,
+			Name:       execution.Name,
+			Status:     execution.Status,
+			Metadata:   execution.Metadata,
+			TotalTests: execution.TotalTests,
+			StartTime:  cloneTimePtr(execution.StartTime),
+			EndTime:    cloneTimePtr(execution.EndTime),
+			Duration:   cloneInt64Ptr(execution.Duration),
+			CreatedAt:  now,
+			UpdatedAt:  now,
 		}
 		if create.Status == "" {
 			create.Status = "RUNNING"
@@ -138,26 +136,25 @@ func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Ti
 }
 
 func upsertRunExecutionEnd(tx *gorm.DB, execution *m.RunExecution, now time.Time) error {
-	stored, err := loadRunExecution(tx, execution.RunID, execution.ExecutionID)
+	stored, err := loadRunExecution(tx, execution.RunID, execution.ID)
 	if err != nil {
 		return err
 	}
 
-	executionID := normalizeRepositoryExecutionID(execution.ExecutionID)
 	if stored == nil {
 		create := m.RunExecution{
-			ID:          runExecutionRowID(execution.RunID, executionID),
-			RunID:       execution.RunID,
-			ExecutionID: executionID,
-			Name:        execution.Name,
-			Status:      execution.Status,
-			Metadata:    execution.Metadata,
-			TotalTests:  execution.TotalTests,
-			StartTime:   cloneTimePtr(execution.StartTime),
-			EndTime:     cloneTimePtr(execution.EndTime),
-			Duration:    cloneInt64Ptr(execution.Duration),
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			ID:    execution.ID,
+			RunID: execution.RunID,
+
+			Name:       execution.Name,
+			Status:     execution.Status,
+			Metadata:   execution.Metadata,
+			TotalTests: execution.TotalTests,
+			StartTime:  cloneTimePtr(execution.StartTime),
+			EndTime:    cloneTimePtr(execution.EndTime),
+			Duration:   cloneInt64Ptr(execution.Duration),
+			CreatedAt:  now,
+			UpdatedAt:  now,
 		}
 		if create.EndTime == nil {
 			create.EndTime = &now
@@ -359,7 +356,7 @@ func aggregateRunExecutionStatuses(executions []m.RunExecution) string {
 
 func loadRunExecution(tx *gorm.DB, runID, executionID string) (*m.RunExecution, error) {
 	var execution m.RunExecution
-	err := tx.Where("run_id = ? AND execution_id = ?", runID, normalizeRepositoryExecutionID(executionID)).First(&execution).Error
+	err := tx.Where("run_id = ? AND execution_id = ?", runID, executionID).First(&execution).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil

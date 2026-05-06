@@ -109,8 +109,8 @@ func TestPostgresHandleRuns_LogicalRunWithMultipleExecutionsReturnsSingleRow(t *
 
 	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
 	seedRunExecutions(t, db,
-		m.RunExecution{ID: "run-1:execution:exec-a", RunID: "run-1", ExecutionID: "exec-a", Name: "Logical Aggregate", Status: "RUNNING", TotalTests: 3, CreatedAt: now, UpdatedAt: now},
-		m.RunExecution{ID: "run-1:execution:exec-b", RunID: "run-1", ExecutionID: "exec-b", Name: "Logical Aggregate", Status: "RUNNING", TotalTests: 5, CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)},
+		m.RunExecution{ID: "exec-a", RunID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", TotalTests: 3, CreatedAt: now, UpdatedAt: now},
+		m.RunExecution{ID: "exec-b", RunID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", TotalTests: 5, CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)},
 	)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/runs", nil)
@@ -148,8 +148,8 @@ func TestPostgresHandleRuns_UsesShardCompletionForDisplayedRunStatus(t *testing.
 
 	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
 	seedRunExecutions(t, db,
-		m.RunExecution{ID: "run-1:execution:exec-a", RunID: "run-1", ExecutionID: "exec-a", Status: "RUNNING", TotalTests: 3, CreatedAt: now, UpdatedAt: now},
-		m.RunExecution{ID: "run-1:execution:exec-b", RunID: "run-1", ExecutionID: "exec-b", Status: "RUNNING", TotalTests: 5, CreatedAt: now, UpdatedAt: now},
+		m.RunExecution{ID: "exec-a", RunID: "run-1", Status: "RUNNING", TotalTests: 3, CreatedAt: now, UpdatedAt: now},
+		m.RunExecution{ID: "exec-b", RunID: "run-1", Status: "RUNNING", TotalTests: 5, CreatedAt: now, UpdatedAt: now},
 	)
 	seedRunShards(t, db,
 		m.RunShard{ID: "run-1:exec-a:1", RunID: "run-1", ExecutionID: "exec-a", ShardIndex: &shardOne, ShardCountExpected: &shardTwo, Status: "FAILED", StartTime: &start, EndTime: &finish, CreatedAt: now, UpdatedAt: now},

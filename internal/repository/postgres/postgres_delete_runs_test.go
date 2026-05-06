@@ -21,7 +21,7 @@ func TestDeleteRuns_RemovesRunGraph(t *testing.T) {
 
 	seedRelationalDeleteData(t, repo,
 		&m.TestRun{ID: runID, Name: "Run 123", CreatedAt: now, UpdatedAt: now},
-		&m.RunExecution{ID: runID + ":execution:exec-1", RunID: runID, ExecutionID: "exec-1", Status: "PASSED", CreatedAt: now, UpdatedAt: now},
+		&m.RunExecution{ID: "exec-1", RunID: runID, Status: "PASSED", CreatedAt: now, UpdatedAt: now},
 		&m.RunShard{ID: runID + ":1", RunID: runID, CreatedAt: now, UpdatedAt: now},
 		&m.Suite{ID: parentSuiteID, RunID: runID, ExternalSuiteID: "root", Name: "Root", CreatedAt: now, UpdatedAt: now},
 		&m.Suite{ID: childSuiteID, RunID: runID, ExternalSuiteID: "child", ParentSuiteID: &parentSuiteID, Name: "Child", CreatedAt: now, UpdatedAt: now},
@@ -32,7 +32,7 @@ func TestDeleteRuns_RemovesRunGraph(t *testing.T) {
 
 	seedRelationalDeleteData(t, repo,
 		&m.TestRun{ID: "run-keep", Name: "Keep", CreatedAt: now, UpdatedAt: now},
-		&m.RunExecution{ID: "run-keep:execution:exec-1", RunID: "run-keep", ExecutionID: "exec-1", Status: "PASSED", CreatedAt: now, UpdatedAt: now},
+		&m.RunExecution{ID: "exec-1", RunID: "run-keep", Status: "PASSED", CreatedAt: now, UpdatedAt: now},
 		&m.RunShard{ID: "run-keep:1", RunID: "run-keep", CreatedAt: now, UpdatedAt: now},
 	)
 

@@ -42,15 +42,15 @@ func RunStartEventToRunExecution(req *events.ReportRunStartEventRequest) *RunExe
 	now := time.Now()
 
 	return &RunExecution{
-		ID:          req.ExecutionId,
-		RunID:       req.RunId,
-		ExecutionID: req.ExecutionId,
-		Name:        req.Name,
-		Status:      "RUNNING",
-		Metadata:    stringMapToInterfaceMap(req.Metadata),
-		TotalTests:  req.TotalTests,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:    req.ExecutionId,
+		RunID: req.RunId,
+
+		Name:       req.Name,
+		Status:     "RUNNING",
+		Metadata:   stringMapToInterfaceMap(req.Metadata),
+		TotalTests: req.TotalTests,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 }
 
@@ -126,12 +126,11 @@ func RunEndEventToRunExecution(req *events.TestRunEndEventRequest) *RunExecution
 	now := time.Now()
 
 	execution := &RunExecution{
-		ID:          req.ExecutionId,
-		RunID:       req.RunId,
-		ExecutionID: req.ExecutionId,
-		Status:      req.FinalStatus.String(),
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:        req.ExecutionId,
+		RunID:     req.RunId,
+		Status:    req.FinalStatus.String(),
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 
 	if req.StartTime != nil {
