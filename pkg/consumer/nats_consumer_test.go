@@ -55,7 +55,7 @@ func TestShouldDeferStepEvent(t *testing.T) {
 func TestEnsureRelationalTestSuiteIDUsesRawSuiteID(t *testing.T) {
 	relationalTest := &m.Test{ID: "test-123", RunID: "run-123"}
 
-	ensureRelationalTestSuiteID(relationalTest, "run-123", "suite-123")
+	ensureRelationalTestSuiteID(relationalTest, "suite-123")
 
 	if relationalTest.SuiteID == nil {
 		t.Fatal("SuiteID was not assigned")

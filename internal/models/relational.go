@@ -91,7 +91,7 @@ func (TestRun) TableName() string {
 // execution-scoped state beneath a logical run.
 type RunExecution struct {
 	ID         string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID      string                 `gorm:"column:run_id;type:text;not null;index:idx_run_executions_run_status,priority:1" json:"runId"`
+	RunID      string                 `gorm:"column:run_id;type:text;not null;primaryKey;index:idx_run_executions_run_status,priority:1" json:"runId"`
 	Name       string                 `gorm:"column:name;type:text" json:"name,omitempty"`
 	Status     string                 `gorm:"column:status;type:text;index:idx_run_executions_run_status,priority:3" json:"status,omitempty"`
 	Metadata   map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`

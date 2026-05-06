@@ -15,7 +15,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func ensureRelationalTestSuiteID(relationalTest *m.Test, runID, suiteID string) {
+func ensureRelationalTestSuiteID(relationalTest *m.Test, suiteID string) {
 	if relationalTest == nil || relationalTest.SuiteID != nil {
 		return
 	}
@@ -68,7 +68,7 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 	executionID := req.TestCase.ExecutionId
 	suiteID := req.TestCase.TestSuiteId
 	relationalTest := m.TestCaseRunToRelationalTest(req.TestCase)
-	ensureRelationalTestSuiteID(relationalTest, runID, suiteID)
+	ensureRelationalTestSuiteID(relationalTest, suiteID)
 	relationalAttempt := m.TestCaseRunToRelationalAttempt(req.TestCase, attachments)
 	if c.pgRepo.IsConfigured() {
 		if err := c.pgRepo.UpsertTestBegin(ctx, relationalTest, relationalAttempt); err != nil {
@@ -132,7 +132,7 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 	runID := req.TestCase.RunId
 	executionID := req.TestCase.ExecutionId
 	relationalTest := m.TestCaseRunToRelationalTest(req.TestCase)
-	ensureRelationalTestSuiteID(relationalTest, runID, req.TestCase.TestSuiteId)
+	ensureRelationalTestSuiteID(relationalTest, req.TestCase.TestSuiteId)
 	relationalAttempt := m.TestCaseRunToRelationalAttempt(req.TestCase, attachments)
 
 	if c.pgRepo.IsConfigured() {
