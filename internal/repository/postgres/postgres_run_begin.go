@@ -135,9 +135,9 @@ func (r *PostgresRepository) UpsertRunShardStart(ctx context.Context, shard *m.R
 	}
 
 	now := time.Now()
-	if shard.ID == "" {
-		shard.ID = fmt.Sprintf("%s:%s:%d", shard.RunID, normalizeRepositoryExecutionID(shard.ExecutionID), *shard.ShardIndex)
-	}
+
+	shard.ID = m.BuildRunShardID(shard.RunID, shard.ExecutionID, shard.ShardIndex)
+
 	if shard.StartTime == nil {
 		shard.StartTime = &now
 	}
@@ -145,10 +145,10 @@ func (r *PostgresRepository) UpsertRunShardStart(ctx context.Context, shard *m.R
 	shard.UpdatedAt = now
 
 	result := r.db.WithContext(ctx).
-		Where(m.RunShard{RunID: shard.RunID, ExecutionID: normalizeRepositoryExecutionID(shard.ExecutionID), ShardIndex: shard.ShardIndex}).
+		Where(m.RunShard{RunID: shard.RunID, ExecutionID: shard.ExecutionID, ShardIndex: shard.ShardIndex}).
 		Assign(m.RunShard{
 			ID:                 shard.ID,
-			ExecutionID:        normalizeRepositoryExecutionID(shard.ExecutionID),
+			ExecutionID:        shard.ExecutionID,
 			ShardIndex:         shard.ShardIndex,
 			ShardCountExpected: shard.ShardCountExpected,
 			Status:             shard.Status,
@@ -162,7 +162,7 @@ func (r *PostgresRepository) UpsertRunShardStart(ctx context.Context, shard *m.R
 		return fmt.Errorf("upsert run shard start: %w", result.Error)
 	}
 
-	r.logger.Info("run shard upserted", "run_id", shard.RunID, "execution_id", normalizeRepositoryExecutionID(shard.ExecutionID), "shard_index", *shard.ShardIndex)
+	r.logger.Info("run shard upserted", "run_id", shard.RunID, "execution_id", shard.ExecutionID, "shard_index", *shard.ShardIndex)
 	return nil
 }
 

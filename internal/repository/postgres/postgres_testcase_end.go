@@ -31,7 +31,7 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 	now := time.Now()
 	test.CreatedAt = now
 	test.UpdatedAt = now
-	attempt.ExecutionID = normalizeRepositoryExecutionID(attempt.ExecutionID)
+
 	attempt.CreatedAt = now
 	attempt.UpdatedAt = now
 	attempt.ID = m.BuildTestAttemptID(test.RunID, test.ID, attempt.ExecutionID, attempt.AttemptIndex)

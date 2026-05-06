@@ -151,8 +151,8 @@ type Suite struct {
 	CreatedAt       time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
 	UpdatedAt       time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 
-	Suites []*Suite `gorm:"foreignKey:ParentSuiteID;references:ID" json:"suites,omitempty"`
-	Tests  []*Test  `gorm:"foreignKey:SuiteID;references:ID" json:"tests,omitempty"`
+	Suites []*Suite `gorm:"foreignKey:ParentSuiteID,RunID;references:ID,RunID" json:"suites,omitempty"`
+	Tests  []*Test  `gorm:"foreignKey:SuiteID,RunID;references:ID,RunID" json:"tests,omitempty"`
 }
 
 func (Suite) TableName() string {
@@ -181,7 +181,7 @@ type Test struct {
 	CreatedAt      time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
 	UpdatedAt      time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 
-	Attempts []TestAttempt `gorm:"foreignKey:TestID;references:ID" json:"attempts,omitempty"`
+	Attempts []TestAttempt `gorm:"foreignKey:TestID,RunID;references:ID,RunID" json:"attempts,omitempty"`
 }
 
 func (Test) TableName() string {

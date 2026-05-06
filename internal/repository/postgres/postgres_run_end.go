@@ -72,9 +72,9 @@ func (r *PostgresRepository) FinalizeRunShardEnd(ctx context.Context, shard *m.R
 	}
 
 	now := time.Now()
-	if shard.ID == "" {
-		shard.ID = fmt.Sprintf("%s:%s:%d", shard.RunID, normalizeRepositoryExecutionID(shard.ExecutionID), *shard.ShardIndex)
-	}
+
+	shard.ID = m.BuildRunShardID(shard.RunID, shard.ExecutionID, shard.ShardIndex)
+
 	if shard.EndTime == nil {
 		shard.EndTime = &now
 	}
@@ -84,10 +84,10 @@ func (r *PostgresRepository) FinalizeRunShardEnd(ctx context.Context, shard *m.R
 	var parentRunFinalized bool
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		result := tx.
-			Where(m.RunShard{RunID: shard.RunID, ExecutionID: normalizeRepositoryExecutionID(shard.ExecutionID), ShardIndex: shard.ShardIndex}).
+			Where(m.RunShard{RunID: shard.RunID, ExecutionID: shard.ExecutionID, ShardIndex: shard.ShardIndex}).
 			Assign(m.RunShard{
 				ID:                 shard.ID,
-				ExecutionID:        normalizeRepositoryExecutionID(shard.ExecutionID),
+				ExecutionID:        shard.ExecutionID,
 				ShardIndex:         shard.ShardIndex,
 				ShardCountExpected: shard.ShardCountExpected,
 				Status:             shard.Status,
@@ -104,7 +104,7 @@ func (r *PostgresRepository) FinalizeRunShardEnd(ctx context.Context, shard *m.R
 
 		var shards []m.RunShard
 		if err := tx.
-			Where("run_id = ? AND execution_id = ?", shard.RunID, normalizeRepositoryExecutionID(shard.ExecutionID)).
+			Where("run_id = ? AND execution_id = ?", shard.RunID, shard.ExecutionID).
 			Find(&shards).Error; err != nil {
 			return fmt.Errorf("load run shards: %w", err)
 		}
@@ -113,7 +113,7 @@ func (r *PostgresRepository) FinalizeRunShardEnd(ctx context.Context, shard *m.R
 			return nil
 		}
 
-		execution, ok := buildAggregatedExecutionFromShards(shard.RunID, normalizeRepositoryExecutionID(shard.ExecutionID), shards, now)
+		execution, ok := buildAggregatedExecutionFromShards(shard.RunID, shard.ExecutionID, shards, now)
 		if !ok {
 			return nil
 		}
@@ -132,7 +132,7 @@ func (r *PostgresRepository) FinalizeRunShardEnd(ctx context.Context, shard *m.R
 		return false, err
 	}
 
-	r.logger.Info("run shard finalized", "run_id", shard.RunID, "execution_id", normalizeRepositoryExecutionID(shard.ExecutionID), "shard_index", *shard.ShardIndex, "status", shard.Status, "parent_run_finalized", parentRunFinalized)
+	r.logger.Info("run shard finalized", "run_id", shard.RunID, "execution_id", shard.ExecutionID, "shard_index", *shard.ShardIndex, "status", shard.Status, "parent_run_finalized", parentRunFinalized)
 	return parentRunFinalized, nil
 }
 

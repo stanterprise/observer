@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
@@ -38,7 +37,7 @@ func (r *PostgresRepository) UpsertRunExecutionStart(ctx context.Context, execut
 		return err
 	}
 
-	r.logger.Info("run execution upserted", "run_id", execution.RunID, "execution_id", normalizeRepositoryExecutionID(execution.ID))
+	r.logger.Info("run execution upserted", "run_id", execution.RunID, "execution_id", execution.ID)
 	return nil
 }
 
@@ -69,7 +68,7 @@ func (r *PostgresRepository) FinalizeRunExecutionEnd(ctx context.Context, execut
 		return err
 	}
 
-	r.logger.Info("run execution finalized", "run_id", execution.RunID, "execution_id", normalizeRepositoryExecutionID(execution.ID), "status", execution.Status)
+	r.logger.Info("run execution finalized", "run_id", execution.RunID, "execution_id", execution.ID, "status", execution.Status)
 	return nil
 }
 
@@ -379,18 +378,6 @@ func loadRunExecution(tx *gorm.DB, runID, executionID string) (*m.RunExecution, 
 		return nil, fmt.Errorf("load run execution: %w", err)
 	}
 	return &execution, nil
-}
-
-func runExecutionRowID(runID, executionID string) string {
-	executionID = normalizeRepositoryExecutionID(executionID)
-	if executionID == "" {
-		return fmt.Sprintf("%s:execution:legacy", runID)
-	}
-	return fmt.Sprintf("%s:execution:%s", runID, executionID)
-}
-
-func normalizeRepositoryExecutionID(executionID string) string {
-	return strings.TrimSpace(executionID)
 }
 
 func cloneTimePtr(input *time.Time) *time.Time {
