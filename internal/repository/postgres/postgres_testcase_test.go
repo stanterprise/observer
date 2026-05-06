@@ -8,6 +8,55 @@ import (
 	m "github.com/stanterprise/observer/internal/models"
 )
 
+func TestUpsertTestBeginUsesRawProtobufIDs(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	suiteID := "suite-123"
+	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+
+	test := &m.Test{
+		ID:             "test-123",
+		RunID:          "run-123",
+		ExternalTestID: "test-123",
+		SuiteID:        &suiteID,
+		Name:           "My Test",
+		Title:          "My Test",
+		Status:         "RUNNING",
+		StartTime:      &start,
+	}
+	attempt := &m.TestAttempt{
+		RunID:        "run-123",
+		ExecutionID:  "exec-123",
+		TestID:       "test-123",
+		AttemptIndex: 0,
+		Status:       "RUNNING",
+		StartTime:    &start,
+	}
+
+	if err := repo.UpsertTestBegin(ctx, test, attempt); err != nil {
+		t.Fatalf("UpsertTestBegin failed: %v", err)
+	}
+
+	var storedTest m.Test
+	if err := repo.db.WithContext(ctx).First(&storedTest, "id = ?", "test-123").Error; err != nil {
+		t.Fatalf("load stored test: %v", err)
+	}
+	if storedTest.ExternalTestID != "test-123" {
+		t.Fatalf("stored external test id = %q, want test-123", storedTest.ExternalTestID)
+	}
+	if storedTest.SuiteID == nil || *storedTest.SuiteID != suiteID {
+		t.Fatalf("stored suite id = %v, want %s", storedTest.SuiteID, suiteID)
+	}
+
+	var storedAttempt m.TestAttempt
+	if err := repo.db.WithContext(ctx).Where("test_id = ? AND execution_id = ? AND attempt_index = ?", "test-123", "exec-123", 0).First(&storedAttempt).Error; err != nil {
+		t.Fatalf("load stored attempt: %v", err)
+	}
+	if storedAttempt.ID != "test-123:exec-123:0" {
+		t.Fatalf("stored attempt id = %q, want test-123:exec-123:0", storedAttempt.ID)
+	}
+}
+
 func TestUpsertTestBeginCreatesTestAndAttempt(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()

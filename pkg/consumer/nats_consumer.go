@@ -416,7 +416,9 @@ func (c *NATSConsumer) shouldDeferStepEvent(err error) bool {
 		return false
 	}
 	errMsg := strings.ToLower(err.Error())
-	return strings.Contains(errMsg, "parent test not found") || strings.Contains(errMsg, "step not found")
+	return strings.Contains(errMsg, "parent test not found") ||
+		strings.Contains(errMsg, "active step buffer not found") ||
+		strings.Contains(errMsg, "step not found")
 }
 
 func (c *NATSConsumer) deferStepEvent(event publisher.Event, cause error) error {

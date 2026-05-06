@@ -375,8 +375,8 @@ func TestTestCaseRunToRelationalAttempt(t *testing.T) {
 	if attempt == nil {
 		t.Fatal("expected relational attempt mapping")
 	}
-	if attempt.ID != buildTestAttemptID("test-123", "", 2) {
-		t.Fatalf("ID = %q, want %s", attempt.ID, buildTestAttemptID("test-123", "", 2))
+	if attempt.ID != BuildTestAttemptID("test-123", "", 2) {
+		t.Fatalf("ID = %q, want %s", attempt.ID, BuildTestAttemptID("test-123", "", 2))
 	}
 	if attempt.TestID != "test-123" {
 		t.Fatalf("TestID = %q, want %s", attempt.TestID, "test-123")

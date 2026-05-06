@@ -20,13 +20,9 @@ func ensureRelationalTestSuiteID(relationalTest *m.Test, runID, suiteID string) 
 		return
 	}
 	if suiteID == "" {
-		suiteID = runID
-	}
-	if runID == "" || suiteID == "" {
 		return
 	}
-	internalSuiteID := fmt.Sprintf("%s:suite:%s", runID, suiteID)
-	relationalTest.SuiteID = &internalSuiteID
+	relationalTest.SuiteID = &suiteID
 }
 
 // handleTestBegin processes a test begin event

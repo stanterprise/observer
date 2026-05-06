@@ -32,9 +32,7 @@ func (r *PostgresRepository) UpsertTestBegin(ctx context.Context, test *m.Test, 
 	test.UpdatedAt = now
 	attempt.CreatedAt = now
 	attempt.UpdatedAt = now
-	if attempt.ID == "" {
-		attempt.ID = fmt.Sprintf("%s:execution:%s:attempt:%d", test.ID, attempt.ExecutionID, attempt.AttemptIndex)
-	}
+	attempt.ID = m.BuildTestAttemptID(test.ID, attempt.ExecutionID, attempt.AttemptIndex)
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := upsertRelationalTest(tx, test, now); err != nil {
