@@ -79,7 +79,7 @@ CREATE TABLE suites (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT suites_pkey PRIMARY KEY (id, run_id),
     CONSTRAINT fk_runs_suites FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE,
-    CONSTRAINT fk_suites_suites FOREIGN KEY (parent_suite_id, run_id) REFERENCES suites(id, run_id) ON DELETE SET NULL
+    CONSTRAINT fk_suites_suites FOREIGN KEY (parent_suite_id, run_id) REFERENCES suites(id, run_id)
 );
 
 CREATE INDEX idx_suites_run_id ON suites (run_id);
@@ -108,7 +108,7 @@ CREATE TABLE tests (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT tests_pkey PRIMARY KEY (id, run_id),
     CONSTRAINT fk_runs_tests FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE,
-    CONSTRAINT fk_suites_tests FOREIGN KEY (suite_id, run_id) REFERENCES suites(id, run_id) ON DELETE CASCADE
+    CONSTRAINT fk_suites_tests FOREIGN KEY (suite_id, run_id) REFERENCES suites(id, run_id)
 );
 
 CREATE INDEX idx_tests_run_id ON tests (run_id);
@@ -139,7 +139,7 @@ CREATE TABLE test_attempts (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_runs_attempts FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE,
-    CONSTRAINT fk_tests_attempts FOREIGN KEY (test_id, run_id) REFERENCES tests(id, run_id) ON DELETE CASCADE
+    CONSTRAINT fk_tests_attempts FOREIGN KEY (test_id, run_id) REFERENCES tests(id, run_id)
 );
 
 CREATE INDEX idx_attempts_run_id ON test_attempts (run_id);
