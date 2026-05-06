@@ -179,7 +179,7 @@ func reconcileLegacyAttemptIndexes(db *gorm.DB) error {
 
 func validatePostgresConfig(cfg PostgresConfig) error {
 	if cfg.EnableAutoMigrate && cfg.Env != "local" {
-		return fmt.Errorf("AutoMigrate must not be enabled outside local development")
+		return fmt.Errorf("AutoMigrate must not be enabled outside local development; set ENV=local or ENABLE_AUTO_MIGRATE=false")
 	}
 	return nil
 }

@@ -63,6 +63,7 @@ func newMigrator(dsn string) (*migrate.Migrate, error) {
 		return nil, fmt.Errorf("open postgres sql db: %w", err)
 	}
 
+	// Use the default postgres migrate driver configuration for the public schema.
 	targetDriver, err := postgresdriver.WithInstance(db, &postgresdriver.Config{})
 	if err != nil {
 		_ = db.Close()

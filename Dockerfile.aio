@@ -159,7 +159,7 @@ COPY nats-server.conf /etc/nats/nats-server.conf
 # Copy s6-overlay service definitions
 COPY docker/s6-overlay/s6-rc.d /etc/s6-overlay/s6-rc.d/
 
-# Make s6 service scripts executable
+# Make s6 service scripts executable (run: long-running services, up: oneshot initialization)
 RUN find /etc/s6-overlay/s6-rc.d -type f \( -name "run" -o -name "up" \) -exec chmod +x {} \;
 
 # Create data directories and Nginx runtime directories with proper permissions
