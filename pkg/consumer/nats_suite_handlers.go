@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/stanterprise/observer/internal/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -34,10 +35,16 @@ func (c *NATSConsumer) handleSuiteBegin(ctx context.Context, data json.RawMessag
 	for k, v := range req.Suite.Metadata {
 		md[k] = v
 	}
+	_ = md
 
-	// startTime, endTime, duration removed (unused)
-
-	// TODO: Implement Postgres UpsertSuiteBegin if needed, or remove if not required.
+	if c.pgRepo.IsConfigured() {
+		relationalSuite := models.SuiteRunToRelationalSuite(req.Suite)
+		if relationalSuite != nil {
+			if err := c.pgRepo.UpsertSuite(ctx, relationalSuite); err != nil {
+				return fmt.Errorf("upsert relational suite begin: %w", err)
+			}
+		}
+	}
 	return nil
 }
 
@@ -60,5 +67,13 @@ func (c *NATSConsumer) handleSuiteEnd(ctx context.Context, data json.RawMessage)
 		"status", req.Suite.Status)
 
 	// TODO: Implement Postgres UpsertSuiteEnd if needed, or remove if not required.
+	if c.pgRepo.IsConfigured() {
+		relationalSuite := models.SuiteRunToRelationalSuite(req.Suite)
+		if relationalSuite != nil {
+			if err := c.pgRepo.UpsertSuite(ctx, relationalSuite); err != nil {
+				return fmt.Errorf("upsert relational suite end: %w", err)
+			}
+		}
+	}
 	return nil
 }

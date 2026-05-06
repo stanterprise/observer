@@ -16,6 +16,7 @@ type TestRunDocument struct {
 // The owning TestRunDocument keys this object by test id in ActiveTestSteps.
 type ActiveTestStepsDocument struct {
 	TestID         string          `bson:"test_id" json:"testId"`
+	ExecutionID    string          `bson:"execution_id,omitempty" json:"executionId,omitempty"`
 	RetryIndex     int32           `bson:"retry_index" json:"retryIndex"`
 	Status         string          `bson:"status,omitempty" json:"status,omitempty"`
 	Steps          []*StepDocument `bson:"steps,omitempty" json:"steps,omitempty"`
@@ -33,6 +34,7 @@ type ActiveTestStepsDocument struct {
 type LiveStepBufferDocument struct {
 	ID             string          `bson:"_id" json:"id"`
 	RunID          string          `bson:"run_id" json:"runId"`
+	ExecutionID    string          `bson:"execution_id,omitempty" json:"executionId,omitempty"`
 	TestID         string          `bson:"test_id" json:"testId"`
 	AttemptIndex   int32           `bson:"attempt_index" json:"attemptIndex"`
 	Status         string          `bson:"status,omitempty" json:"status,omitempty"`
@@ -49,6 +51,7 @@ type LiveStepBufferDocument struct {
 type StepDocument struct {
 	ID            string                 `bson:"id" json:"id"`
 	RunID         string                 `bson:"run_id,omitempty" json:"runId,omitempty"`
+	ExecutionID   string                 `bson:"execution_id,omitempty" json:"executionId,omitempty"`
 	TestCaseRunID string                 `bson:"test_case_run_id,omitempty" json:"testCaseRunId,omitempty"`
 	ParentStepID  string                 `bson:"parent_step_id,omitempty" json:"parentStepId,omitempty"`
 	Title         string                 `bson:"title,omitempty" json:"title,omitempty"`

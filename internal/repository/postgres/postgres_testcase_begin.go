@@ -6,7 +6,6 @@ import (
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
-	"github.com/stanterprise/observer/internal/repository"
 	"gorm.io/gorm"
 )
 
@@ -18,8 +17,8 @@ func (r *PostgresRepository) UpsertTestBegin(ctx context.Context, test *m.Test, 
 	if attempt == nil {
 		return fmt.Errorf("test attempt is nil")
 	}
-	if err := repository.ValidateRunID(test.RunID); err != nil {
-		return err
+	if test.RunID == "" {
+		return fmt.Errorf("test run id is required")
 	}
 	if test.ID == "" {
 		return fmt.Errorf("test id is required")
@@ -33,9 +32,7 @@ func (r *PostgresRepository) UpsertTestBegin(ctx context.Context, test *m.Test, 
 	test.UpdatedAt = now
 	attempt.CreatedAt = now
 	attempt.UpdatedAt = now
-	if attempt.ID == "" {
-		attempt.ID = fmt.Sprintf("%s:%d", test.ID, attempt.AttemptIndex)
-	}
+	attempt.ID = m.BuildTestAttemptID(test.RunID, test.ID, attempt.ExecutionID, attempt.AttemptIndex)
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := upsertRelationalTest(tx, test, now); err != nil {

@@ -15,18 +15,14 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func ensureRelationalTestSuiteID(relationalTest *m.Test, runID, suiteID string) {
+func ensureRelationalTestSuiteID(relationalTest *m.Test, suiteID string) {
 	if relationalTest == nil || relationalTest.SuiteID != nil {
 		return
 	}
 	if suiteID == "" {
-		suiteID = runID
-	}
-	if runID == "" || suiteID == "" {
 		return
 	}
-	internalSuiteID := fmt.Sprintf("%s:suite:%s", runID, suiteID)
-	relationalTest.SuiteID = &internalSuiteID
+	relationalTest.SuiteID = &suiteID
 }
 
 // handleTestBegin processes a test begin event
@@ -46,6 +42,7 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 	c.logger.Info("test start",
 		"id", req.TestCase.Id,
 		"run_id", req.TestCase.RunId,
+		"execution_id", req.TestCase.ExecutionId,
 		"title", req.TestCase.Name)
 
 	var startTime *time.Time
@@ -68,9 +65,10 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 	// runID identifies the document
 	// TestSuiteRunId is the parent suite containing this test
 	runID := req.TestCase.RunId
+	executionID := req.TestCase.ExecutionId
 	suiteID := req.TestCase.TestSuiteId
 	relationalTest := m.TestCaseRunToRelationalTest(req.TestCase)
-	ensureRelationalTestSuiteID(relationalTest, runID, suiteID)
+	ensureRelationalTestSuiteID(relationalTest, suiteID)
 	relationalAttempt := m.TestCaseRunToRelationalAttempt(req.TestCase, attachments)
 	if c.pgRepo.IsConfigured() {
 		if err := c.pgRepo.UpsertTestBegin(ctx, relationalTest, relationalAttempt); err != nil {
@@ -79,7 +77,7 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 	}
 
 	if c.bufferRepo != nil {
-		if err := c.bufferRepo.SyncActiveTestSteps(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex, startTime); err != nil {
+		if err := c.bufferRepo.SyncActiveTestSteps(ctx, runID, executionID, req.TestCase.Id, req.TestCase.RetryIndex, startTime); err != nil {
 			return fmt.Errorf("sync active test steps: %w", err)
 		}
 	}
@@ -88,14 +86,14 @@ func (c *NATSConsumer) handleTestBegin(ctx context.Context, data json.RawMessage
 	// blocked by a large backlog and can be acked within JetStream AckWait.
 	testID := req.TestCase.Id
 	retryIndex := req.TestCase.RetryIndex
-	go func(runID, testID string, retryIndex int32) {
+	go func(runID, executionID, testID string, retryIndex int32) {
 		replayCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		c.replayDeferredStepsForTest(replayCtx, runID, testID, retryIndex)
-	}(runID, testID, retryIndex)
+		c.replayDeferredStepsForTest(replayCtx, runID, executionID, testID, retryIndex)
+	}(runID, executionID, testID, retryIndex)
 	// Schedule additional delayed sweeps to catch step.end events that arrive
 	// out-of-order after test.begin but before step.begin creates the step.
-	c.scheduleDeferredStepReplaySweep(runID, req.TestCase.Id, req.TestCase.RetryIndex)
+	c.scheduleDeferredStepReplaySweep(runID, executionID, req.TestCase.Id, req.TestCase.RetryIndex)
 	return nil
 }
 
@@ -116,6 +114,7 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 	c.logger.Info("test finish",
 		"id", req.TestCase.Id,
 		"run_id", req.TestCase.RunId,
+		"execution_id", req.TestCase.ExecutionId,
 		"status", req.TestCase.Status,
 		"retry_index", req.TestCase.RetryIndex)
 
@@ -131,14 +130,15 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 	}
 
 	runID := req.TestCase.RunId
+	executionID := req.TestCase.ExecutionId
 	relationalTest := m.TestCaseRunToRelationalTest(req.TestCase)
-	ensureRelationalTestSuiteID(relationalTest, runID, req.TestCase.TestSuiteId)
+	ensureRelationalTestSuiteID(relationalTest, req.TestCase.TestSuiteId)
 	relationalAttempt := m.TestCaseRunToRelationalAttempt(req.TestCase, attachments)
 
 	if c.pgRepo.IsConfigured() {
 		buffered := false
 		if c.bufferRepo != nil {
-			steps, hasBuffer, err := c.bufferRepo.PrepareActiveTestStepsFlush(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex)
+			steps, hasBuffer, err := c.bufferRepo.PrepareActiveTestStepsFlush(ctx, runID, executionID, req.TestCase.Id, req.TestCase.RetryIndex)
 			if err != nil {
 				return fmt.Errorf("prepare active test steps flush: %w", err)
 			}
@@ -147,7 +147,7 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 				relationalAttempt.StepsCount = int32(len(steps))
 				rawSteps, err := m.StepFromDocuments(steps)
 				if err != nil {
-					if resetErr := c.bufferRepo.ResetActiveTestStepsFlushState(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex); resetErr != nil {
+					if resetErr := c.bufferRepo.ResetActiveTestStepsFlushState(ctx, runID, executionID, req.TestCase.Id, req.TestCase.RetryIndex); resetErr != nil {
 						c.logger.Warn("failed to reset active test step buffer after marshal error", "run_id", runID, "test_id", req.TestCase.Id, "retry_index", req.TestCase.RetryIndex, "error", resetErr)
 					}
 					return fmt.Errorf("marshal attempt steps: %w", err)
@@ -159,7 +159,7 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 
 		if err := c.pgRepo.FinalizeTestEnd(ctx, relationalTest, relationalAttempt); err != nil {
 			if buffered && c.bufferRepo != nil {
-				if resetErr := c.bufferRepo.ResetActiveTestStepsFlushState(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex); resetErr != nil {
+				if resetErr := c.bufferRepo.ResetActiveTestStepsFlushState(ctx, runID, executionID, req.TestCase.Id, req.TestCase.RetryIndex); resetErr != nil {
 					c.logger.Warn("failed to reset active test step buffer after postgres failure", "run_id", runID, "test_id", req.TestCase.Id, "retry_index", req.TestCase.RetryIndex, "error", resetErr)
 				}
 			}
@@ -167,7 +167,7 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 		}
 
 		if buffered && c.bufferRepo != nil {
-			if err := c.bufferRepo.DeleteActiveTestSteps(ctx, runID, req.TestCase.Id, req.TestCase.RetryIndex); err != nil {
+			if err := c.bufferRepo.DeleteActiveTestSteps(ctx, runID, executionID, req.TestCase.Id, req.TestCase.RetryIndex); err != nil {
 				return fmt.Errorf("delete active test steps after flush: %w", err)
 			}
 		}
@@ -226,7 +226,7 @@ func (c *NATSConsumer) handleTestFailure(ctx context.Context, data json.RawMessa
 	// Use Postgres only
 	retryIndex := int32(0)
 	if c.pgRepo.IsConfigured() {
-		if err := c.pgRepo.AppendTestFailure(ctx, req.RunId, req.TestId, retryIndex, &failure); err != nil {
+		if err := c.pgRepo.AppendTestFailure(ctx, req.RunId, req.ExecutionId, req.TestId, retryIndex, &failure); err != nil {
 			return fmt.Errorf("append relational test failure: %w", err)
 		}
 	}
@@ -283,7 +283,7 @@ func (c *NATSConsumer) handleTestError(ctx context.Context, data json.RawMessage
 	// Use Postgres only
 	retryIndex := int32(0)
 	if c.pgRepo.IsConfigured() {
-		if err := c.pgRepo.AppendTestError(ctx, req.RunId, req.TestId, retryIndex, &errorDoc); err != nil {
+		if err := c.pgRepo.AppendTestError(ctx, req.RunId, req.ExecutionId, req.TestId, retryIndex, &errorDoc); err != nil {
 			return fmt.Errorf("append relational test error: %w", err)
 		}
 	}
@@ -356,7 +356,7 @@ func (c *NATSConsumer) processAttachment(ctx context.Context, att *common.Attach
 // out-of-order case where step.end arrives after test.begin but before
 // step.begin has created the step: the step.end is deferred, but no further
 // test.begin will arrive to trigger another replay after step.begin runs.
-func (c *NATSConsumer) scheduleDeferredStepReplaySweep(runID, testID string, retryIndex int32) {
+func (c *NATSConsumer) scheduleDeferredStepReplaySweep(runID, executionID, testID string, retryIndex int32) {
 	delays := []time.Duration{
 		100 * time.Millisecond,
 		250 * time.Millisecond,
@@ -368,7 +368,7 @@ func (c *NATSConsumer) scheduleDeferredStepReplaySweep(runID, testID string, ret
 			<-time.After(delay)
 
 			attemptCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			c.replayDeferredStepsForTest(attemptCtx, runID, testID, retryIndex)
+			c.replayDeferredStepsForTest(attemptCtx, runID, executionID, testID, retryIndex)
 			cancel()
 		}
 	}()

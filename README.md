@@ -120,15 +120,19 @@ This builds:
 ```bash
 # Start infrastructure services
 make mongodb-up    # Start MongoDB
+docker compose up -d postgres
 make nats-up       # Start NATS
 
 # Ingestion (stateless, publishes to NATS)
 NATS_URL='nats://localhost:4222' ./bin/ingestion
 
-# API (requires MongoDB)
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' ./bin/api
+# API (requires PostgreSQL)
+POSTGRES_DSN='postgres://observer:password@localhost:5432/observer?sslmode=disable' \
+NATS_URL='nats://localhost:4222' \
+./bin/api
 
-# Processor (requires MongoDB)
+# Processor (requires PostgreSQL and MongoDB)
+POSTGRES_DSN='postgres://observer:password@localhost:5432/observer?sslmode=disable' \
 MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' ./bin/processor
 ```
 
@@ -222,7 +226,8 @@ make docker-buildx-aio      # Fast cached builds
 
 | Variable        | Default                 | Description                                  |
 | --------------- | ----------------------- | -------------------------------------------- |
-| `MONGODB_URI`   | -                       | MongoDB connection string (required)         |
+| `POSTGRES_DSN` | -                       | PostgreSQL connection string for relational writes |
+| `MONGODB_URI`   | -                       | MongoDB connection string for live step buffering |
 | `NATS_URL`      | `nats://localhost:4222` | NATS server URL                              |
 | `NATS_STREAM`   | `tests_events`          | JetStream stream name                        |
 | `NATS_CONSUMER` | `processor`             | Durable consumer name for JetStream consumer |
@@ -232,7 +237,7 @@ make docker-buildx-aio      # Fast cached builds
 | Variable           | Default        | Description                                   |
 | ------------------ | -------------- | --------------------------------------------- |
 | `PORT`             | `8080`         | HTTP listening port                           |
-| `MONGODB_URI`      | -              | MongoDB connection string (required)          |
+| `POSTGRES_DSN`     | -              | PostgreSQL connection string (required)       |
 | `NATS_URL`         | -              | NATS server URL (optional, for WebSocket)     |
 | `NATS_STREAM`      | `tests_events` | JetStream stream name for WebSocket relay     |
 | `NATS_WS_CONSUMER` | `websocket`    | Consumer name for WebSocket NATS subscription |

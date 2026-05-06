@@ -58,17 +58,6 @@ export function Layout() {
                 Test Runs
               </Link>
               <Link
-                to="/suite_runs/raw-messages"
-                className={cn(
-                  "px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  isActive("/suite_runs/raw-messages")
-                    ? "bg-(--stitch-primary-soft) text-(--stitch-primary)"
-                    : "text-(--stitch-on-surface-muted) hover:text-(--stitch-on-surface) hover:bg-(--stitch-surface-low)",
-                )}
-              >
-                Raw Messages
-              </Link>
-              <Link
                 to="/markers"
                 className={cn(
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",
@@ -78,17 +67,6 @@ export function Layout() {
                 )}
               >
                 Markers
-              </Link>
-              <Link
-                to="/style-guide"
-                className={cn(
-                  "px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  isActive("/style-guide")
-                    ? "bg-(--stitch-primary-soft) text-(--stitch-primary)"
-                    : "text-(--stitch-on-surface-muted) hover:text-(--stitch-on-surface) hover:bg-(--stitch-surface-low)",
-                )}
-              >
-                Style Guide
               </Link>
               <button
                 type="button"

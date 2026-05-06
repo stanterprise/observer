@@ -52,6 +52,7 @@ func (c *NATSConsumer) handleStepBegin(ctx context.Context, data json.RawMessage
 	step := &m.StepDocument{
 		ID:            req.Step.Id,
 		RunID:         req.Step.RunId,
+		ExecutionID:   req.Step.ExecutionId,
 		TestCaseRunID: req.Step.TestCaseId,
 		ParentStepID:  req.Step.ParentStepId,
 		Title:         req.Step.Title,
@@ -74,10 +75,11 @@ func (c *NATSConsumer) handleStepBegin(ctx context.Context, data json.RawMessage
 	}
 
 	runID := req.Step.RunId
+	executionID := req.Step.ExecutionId
 	testID := extractTestID(req.Step.TestCaseId, req.Step.RunId)
 	retryIndex := req.Step.RetryIndex
 	if c.bufferRepo != nil {
-		if err := c.bufferRepo.UpsertStepBegin(ctx, runID, step, testID, retryIndex); err != nil {
+		if err := c.bufferRepo.UpsertStepBegin(ctx, runID, executionID, step, testID, retryIndex); err != nil {
 			return err
 		}
 	}
@@ -85,7 +87,7 @@ func (c *NATSConsumer) handleStepBegin(ctx context.Context, data json.RawMessage
 	// After the step is created, schedule deferred replay sweeps so any
 	// step.end events that arrived out-of-order (deferred while waiting for
 	// this step to exist) are applied promptly.
-	c.scheduleDeferredStepReplaySweep(runID, testID, retryIndex)
+	c.scheduleDeferredStepReplaySweep(runID, executionID, testID, retryIndex)
 	return nil
 }
 
@@ -110,6 +112,7 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 
 	testID := extractTestID(req.Step.TestCaseId, req.Step.RunId)
 	runID := req.Step.RunId
+	executionID := req.Step.ExecutionId
 	retryIndex := req.Step.RetryIndex
 
 	// Convert metadata (including error metadata from Playwright reporter)
@@ -131,7 +134,7 @@ func (c *NATSConsumer) handleStepEnd(ctx context.Context, data json.RawMessage) 
 	}
 
 	if c.bufferRepo != nil {
-		if err := c.bufferRepo.UpsertStepEnd(ctx, runID, req.Step.Id, testID, retryIndex, statusToString(req.Step.Status), metadata, errorMsg, errors, duration); err != nil {
+		if err := c.bufferRepo.UpsertStepEnd(ctx, runID, executionID, req.Step.Id, testID, retryIndex, statusToString(req.Step.Status), metadata, errorMsg, errors, duration); err != nil {
 			return err
 		}
 	}

@@ -25,6 +25,35 @@ import type { TestSuite } from "@/types/testSuite";
 import TestSuiteRecord from "./TestSuiteRecord";
 import type { TestRun } from "@/types/testRun";
 
+const inFlightRunDetailRequests = new Map<string, Promise<TestRun>>();
+
+type FetchRunDetailOptions = {
+  silent?: boolean;
+  shouldIgnore?: () => boolean;
+};
+
+async function fetchRunDetailData(id: string): Promise<TestRun> {
+  const existingRequest = inFlightRunDetailRequests.get(id);
+  if (existingRequest) {
+    return existingRequest;
+  }
+
+  const request = fetch(apiUrl(`/runs/${id}`))
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to fetch run details: ${response.statusText}`);
+      }
+
+      return normalizeRunDetail(await response.json());
+    })
+    .finally(() => {
+      inFlightRunDetailRequests.delete(id);
+    });
+
+  inFlightRunDetailRequests.set(id, request);
+  return request;
+}
+
 function isFlakyTest(test: Test): boolean {
   return test.status === "PASSED" && (test.attempts?.length ?? 0) > 1;
 }
@@ -124,30 +153,33 @@ export function TestRunDetailPage() {
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
 
   const fetchRunDetail = useCallback(
-    async (id: string, options?: { silent?: boolean }) => {
+    async (id: string, options?: FetchRunDetailOptions) => {
       const silent = options?.silent ?? false;
+      const shouldIgnore = options?.shouldIgnore ?? (() => false);
+
       try {
         if (!silent) {
           setLoading(true);
         }
-        const response = await fetch(apiUrl(`/runs/${id}`));
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch run details: ${response.statusText}`,
-          );
+        const data = await fetchRunDetailData(id);
+
+        if (shouldIgnore()) {
+          return;
         }
-        const data = normalizeRunDetail(await response.json());
-        console.log("Fetched run details:", data);
 
         setRunDetail(data);
         setError(null);
       } catch (err) {
+        if (shouldIgnore()) {
+          return;
+        }
+
         console.error("Error fetching run details:", err);
         setError(
           err instanceof Error ? err.message : "Failed to fetch run details",
         );
       } finally {
-        if (!silent) {
+        if (!silent && !shouldIgnore()) {
           setLoading(false);
         }
       }
@@ -167,17 +199,33 @@ export function TestRunDetailPage() {
 
   useEffect(() => {
     if (runId) {
-      fetchRunDetail(runId);
+      let cancelled = false;
+
+      void fetchRunDetail(runId, {
+        shouldIgnore: () => cancelled,
+      });
+
+      return () => {
+        cancelled = true;
+      };
     }
+
+    return undefined;
   }, [runId, fetchRunDetail]);
 
   useEffect(() => {
     if (!runId || !autoRefreshEnabled) return;
+
+    let cancelled = false;
     const intervalId = window.setInterval(() => {
-      fetchRunDetail(runId, { silent: true });
+      void fetchRunDetail(runId, {
+        silent: true,
+        shouldIgnore: () => cancelled,
+      });
     }, pollIntervalMs);
 
     return () => {
+      cancelled = true;
       window.clearInterval(intervalId);
     };
   }, [runId, autoRefreshEnabled, fetchRunDetail, pollIntervalMs]);

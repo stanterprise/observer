@@ -13,7 +13,8 @@ import (
 
 func TestRunStartEventToRunShard(t *testing.T) {
 	req := &events.ReportRunStartEventRequest{
-		RunId: "run-123",
+		RunId:       "run-123",
+		ExecutionId: "exec-123",
 		Metadata: map[string]string{
 			"shard.current": "2",
 			"shard.total":   "5",
@@ -30,8 +31,8 @@ func TestRunStartEventToRunShard(t *testing.T) {
 	if shard.ShardIndex == nil || *shard.ShardIndex != 2 {
 		t.Fatalf("ShardIndex = %v, want 2", shard.ShardIndex)
 	}
-	if shard.ID != "run-123:2" {
-		t.Fatalf("ID = %q, want run-123:2", shard.ID)
+	if shard.ID != "run-123:exec-123:2" {
+		t.Fatalf("ID = %q, want run-123:exec-123:2", shard.ID)
 	}
 	if shard.ShardCountExpected == nil || *shard.ShardCountExpected != 5 {
 		t.Fatalf("ShardCountExpected = %v, want 5", shard.ShardCountExpected)
@@ -44,10 +45,40 @@ func TestRunStartEventToRunShard(t *testing.T) {
 	}
 }
 
+func TestRunStartEventToRunExecution(t *testing.T) {
+	req := &events.ReportRunStartEventRequest{
+		RunId:       "run-123",
+		ExecutionId: "exec-123",
+		Name:        "Composite Run",
+		TotalTests:  7,
+		Metadata: map[string]string{
+			"worker": "a",
+		},
+	}
+
+	execution := RunStartEventToRunExecution(req)
+	if execution == nil {
+		t.Fatal("expected run execution")
+	}
+	if execution.ID != "exec-123" {
+		t.Fatalf("ID = %q, want exec-123", execution.ID)
+	}
+	if execution.ID != "exec-123" {
+		t.Fatalf("ID = %q, want exec-123", execution.ID)
+	}
+	if execution.TotalTests != 7 {
+		t.Fatalf("TotalTests = %d, want 7", execution.TotalTests)
+	}
+	if execution.Status != "RUNNING" {
+		t.Fatalf("Status = %q, want RUNNING", execution.Status)
+	}
+}
+
 func TestRunEndEventToRunShard(t *testing.T) {
 	start := time.Date(2026, 4, 18, 9, 30, 0, 0, time.UTC)
 	req := &events.TestRunEndEventRequest{
 		RunId:       "run-123",
+		ExecutionId: "exec-123",
 		FinalStatus: common.TestStatus_PASSED,
 		StartTime:   timestamppb.New(start),
 		Duration:    durationpb.New(5 * time.Second),
@@ -64,8 +95,8 @@ func TestRunEndEventToRunShard(t *testing.T) {
 	if shard.ShardIndex == nil || *shard.ShardIndex != 3 {
 		t.Fatalf("ShardIndex = %v, want 3", shard.ShardIndex)
 	}
-	if shard.ID != "run-123:3" {
-		t.Fatalf("ID = %q, want run-123:3", shard.ID)
+	if shard.ID != "run-123:exec-123:3" {
+		t.Fatalf("ID = %q, want run-123:exec-123:3", shard.ID)
 	}
 	if shard.ShardCountExpected == nil || *shard.ShardCountExpected != 7 {
 		t.Fatalf("ShardCountExpected = %v, want 7", shard.ShardCountExpected)
@@ -81,9 +112,59 @@ func TestRunEndEventToRunShard(t *testing.T) {
 	}
 }
 
+func TestRunEndEventToRunExecution(t *testing.T) {
+	start := time.Date(2026, 4, 18, 9, 30, 0, 0, time.UTC)
+	req := &events.TestRunEndEventRequest{
+		RunId:       "run-123",
+		ExecutionId: "exec-123",
+		FinalStatus: common.TestStatus_FAILED,
+		StartTime:   timestamppb.New(start),
+		Duration:    durationpb.New(5 * time.Second),
+	}
+
+	execution := RunEndEventToRunExecution(req)
+	if execution == nil {
+		t.Fatal("expected run execution")
+	}
+	if execution.ID != "exec-123" {
+		t.Fatalf("ID = %q, want exec-123", execution.ID)
+	}
+	if execution.Status != common.TestStatus_FAILED.String() {
+		t.Fatalf("Status = %q, want %q", execution.Status, common.TestStatus_FAILED.String())
+	}
+	if execution.StartTime == nil || !execution.StartTime.Equal(start) {
+		t.Fatalf("StartTime = %v, want %v", execution.StartTime, start)
+	}
+	if execution.Duration == nil || *execution.Duration != int64((5*time.Second).Nanoseconds()) {
+		t.Fatalf("Duration = %v, want %d", execution.Duration, int64((5 * time.Second).Nanoseconds()))
+	}
+	if execution.EndTime == nil {
+		t.Fatal("expected EndTime to be set")
+	}
+}
+
 func TestRunStartEventToRunShardWithoutMetadata(t *testing.T) {
 	if shard := RunStartEventToRunShard(&events.ReportRunStartEventRequest{RunId: "run-123"}); shard != nil {
 		t.Fatalf("expected nil shard, got %+v", shard)
+	}
+}
+
+func TestSuiteRunToRelationalSuite(t *testing.T) {
+	suite := SuiteRunToRelationalSuite(&entities.TestSuiteRun{
+		Id:            "suite-123",
+		RunId:         "run-123",
+		ParentSuiteId: "parent-1",
+		Name:          "Suite",
+		Project:       "chromium",
+	})
+	if suite == nil {
+		t.Fatal("expected suite mapping")
+	}
+	if suite.ID != "suite-123" || suite.RunID != "run-123" {
+		t.Fatalf("suite = %+v, want suite-123/run-123", suite)
+	}
+	if suite.ParentSuiteID == nil || *suite.ParentSuiteID != "parent-1" {
+		t.Fatalf("suite.ParentSuiteID = %v, want parent-1", suite.ParentSuiteID)
 	}
 }
 
@@ -148,8 +229,8 @@ func TestRunStartEventToTestRun_FlattensSuitesAndUsesSuiteMetadata(t *testing.T)
 	if suites[0].ParentSuiteID != nil {
 		t.Fatalf("root suite parent should be nil, got %v", *suites[0].ParentSuiteID)
 	}
-	if suites[1].ParentSuiteID == nil || *suites[1].ParentSuiteID != buildSuiteRowID("run-123", "suite-root") {
-		t.Fatalf("child suite parent = %v, want %s", suites[1].ParentSuiteID, buildSuiteRowID("run-123", "suite-root"))
+	if suites[1].ParentSuiteID == nil || *suites[1].ParentSuiteID != "suite-root" {
+		t.Fatalf("child suite parent = %v, want %s", suites[1].ParentSuiteID, "suite-root")
 	}
 	if suites[1].Metadata["suite_level"] != "child" {
 		t.Fatalf("child suite metadata = %+v, want child metadata", suites[1].Metadata)
@@ -198,8 +279,8 @@ func TestRunStartEventToTests_FlattensNestedTests(t *testing.T) {
 	if len(tests) != 2 {
 		t.Fatalf("len(tests) = %d, want 2", len(tests))
 	}
-	if tests[0].SuiteID == nil || *tests[0].SuiteID != buildSuiteRowID("run-123", "suite-root") {
-		t.Fatalf("root test suiteID = %v, want %s", tests[0].SuiteID, buildSuiteRowID("run-123", "suite-root"))
+	if tests[0].SuiteID == nil || *tests[0].SuiteID != "suite-root" {
+		t.Fatalf("root test suiteID = %v, want %s", tests[0].SuiteID, "suite-root")
 	}
 	if tests[0].Metadata["test_level"] != "root" {
 		t.Fatalf("root test metadata = %+v, want test metadata", tests[0].Metadata)
@@ -210,8 +291,8 @@ func TestRunStartEventToTests_FlattensNestedTests(t *testing.T) {
 	if tests[0].RetryIndex == nil || *tests[0].RetryIndex != 0 {
 		t.Fatalf("root test retryIndex = %v, want 0", tests[0].RetryIndex)
 	}
-	if tests[1].SuiteID == nil || *tests[1].SuiteID != buildSuiteRowID("run-123", "suite-child") {
-		t.Fatalf("child test suiteID = %v, want %s", tests[1].SuiteID, buildSuiteRowID("run-123", "suite-child"))
+	if tests[1].SuiteID == nil || *tests[1].SuiteID != "suite-child" {
+		t.Fatalf("child test suiteID = %v, want %s", tests[1].SuiteID, "suite-child")
 	}
 }
 
@@ -242,14 +323,14 @@ func TestTestCaseRunToRelationalTest(t *testing.T) {
 	if test == nil {
 		t.Fatal("expected relational test mapping")
 	}
-	if test.ID != buildTestRowID("run-123", "test-123") || test.RunID != "run-123" {
+	if test.ID != "test-123" || test.RunID != "run-123" {
 		t.Fatalf("unexpected identity mapping: %+v", test)
 	}
 	if test.ExternalTestID != "test-123" {
 		t.Fatalf("ExternalTestID = %q, want test-123", test.ExternalTestID)
 	}
-	if test.SuiteID == nil || *test.SuiteID != buildSuiteRowID("run-123", "suite-123") {
-		t.Fatalf("SuiteID = %v, want %s", test.SuiteID, buildSuiteRowID("run-123", "suite-123"))
+	if test.SuiteID == nil || *test.SuiteID != "suite-123" {
+		t.Fatalf("SuiteID = %v, want %s", test.SuiteID, "suite-123")
 	}
 	if test.Status != common.TestStatus_RUNNING.String() {
 		t.Fatalf("Status = %q, want %q", test.Status, common.TestStatus_RUNNING.String())
@@ -271,6 +352,32 @@ func TestTestCaseRunToRelationalTest(t *testing.T) {
 	}
 }
 
+func TestTestCaseRunToRelationalAttempt_UsesExecutionAwareIdentity(t *testing.T) {
+	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+	req := &entities.TestCaseRun{
+		Id:          "test-123",
+		RunId:       "run-123",
+		ExecutionId: "exec-123",
+		Status:      common.TestStatus_RUNNING,
+		StartTime:   timestamppb.New(start),
+		RetryIndex:  1,
+	}
+
+	attempt := TestCaseRunToRelationalAttempt(req, nil)
+	if attempt == nil {
+		t.Fatal("expected relational attempt mapping")
+	}
+	if attempt.ExecutionID != "exec-123" {
+		t.Fatalf("ExecutionID = %q, want exec-123", attempt.ExecutionID)
+	}
+	if attempt.ID != "run-123:test-123:exec-123:1" {
+		t.Fatalf("ID = %q, want execution-aware attempt id", attempt.ID)
+	}
+	if attempt.TestID != "test-123" {
+		t.Fatalf("TestID = %q, want %q", attempt.TestID, "test-123")
+	}
+}
+
 func TestTestCaseRunToRelationalAttempt(t *testing.T) {
 	start := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
 	req := &entities.TestCaseRun{
@@ -289,11 +396,11 @@ func TestTestCaseRunToRelationalAttempt(t *testing.T) {
 	if attempt == nil {
 		t.Fatal("expected relational attempt mapping")
 	}
-	if attempt.ID != buildTestAttemptID(buildTestRowID("run-123", "test-123"), 2) {
-		t.Fatalf("ID = %q, want %s", attempt.ID, buildTestAttemptID(buildTestRowID("run-123", "test-123"), 2))
+	if attempt.ID != BuildTestAttemptID("run-123", "test-123", "", 2) {
+		t.Fatalf("ID = %q, want %s", attempt.ID, BuildTestAttemptID("run-123", "test-123", "", 2))
 	}
-	if attempt.TestID != buildTestRowID("run-123", "test-123") {
-		t.Fatalf("TestID = %q, want %s", attempt.TestID, buildTestRowID("run-123", "test-123"))
+	if attempt.TestID != "test-123" {
+		t.Fatalf("TestID = %q, want %s", attempt.TestID, "test-123")
 	}
 	if attempt.AttemptIndex != 2 {
 		t.Fatalf("AttemptIndex = %d, want 2", attempt.AttemptIndex)

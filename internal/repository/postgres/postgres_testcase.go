@@ -11,18 +11,18 @@ import (
 	"gorm.io/gorm"
 )
 
-
-
-
 func upsertRelationalTest(tx *gorm.DB, test *m.Test, now time.Time) error {
 	var stored m.Test
-	err := tx.Where("id = ?", test.ID).First(&stored).Error
+	err := tx.Where("run_id = ? AND id = ?", test.RunID, test.ID).First(&stored).Error
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("load relational test: %w", err)
 		}
 		if test.SuiteID == nil {
 			return fmt.Errorf("suite id is required for new relational test")
+		}
+		if err := ensureRelationalSuiteExists(tx, test.RunID, *test.SuiteID, now); err != nil {
+			return err
 		}
 		create := m.Test{
 			ID:             test.ID,
@@ -107,9 +107,34 @@ func upsertRelationalTest(tx *gorm.DB, test *m.Test, now time.Time) error {
 	return nil
 }
 
+func ensureRelationalSuiteExists(tx *gorm.DB, runID, suiteID string, now time.Time) error {
+	var stored m.Suite
+	err := tx.Where("run_id = ? AND id = ?", runID, suiteID).First(&stored).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("load relational suite: %w", err)
+	}
+
+	placeholder := m.Suite{
+		ID:              suiteID,
+		RunID:           runID,
+		ExternalSuiteID: suiteID,
+		Status:          "RUNNING",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	if err := tx.Create(&placeholder).Error; err != nil {
+		return fmt.Errorf("create placeholder suite: %w", err)
+	}
+
+	return nil
+}
+
 func upsertRelationalTestAttempt(tx *gorm.DB, attempt *m.TestAttempt, now time.Time) error {
 	var stored m.TestAttempt
-	err := tx.Where("test_id = ? AND attempt_index = ?", attempt.TestID, attempt.AttemptIndex).First(&stored).Error
+	err := tx.Where("run_id = ? AND test_id = ? AND execution_id = ? AND attempt_index = ?", attempt.RunID, attempt.TestID, attempt.ExecutionID, attempt.AttemptIndex).First(&stored).Error
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("load relational test attempt: %w", err)
@@ -117,6 +142,7 @@ func upsertRelationalTestAttempt(tx *gorm.DB, attempt *m.TestAttempt, now time.T
 		create := m.TestAttempt{
 			ID:           attempt.ID,
 			RunID:        attempt.RunID,
+			ExecutionID:  attempt.ExecutionID,
 			TestID:       attempt.TestID,
 			AttemptIndex: attempt.AttemptIndex,
 			Status:       attempt.Status,
@@ -142,6 +168,7 @@ func upsertRelationalTestAttempt(tx *gorm.DB, attempt *m.TestAttempt, now time.T
 	if attempt.RunID != "" {
 		stored.RunID = attempt.RunID
 	}
+	stored.ExecutionID = attempt.ExecutionID
 	if attempt.Status != "" {
 		stored.Status = attempt.Status
 	}
@@ -195,8 +222,64 @@ func aggregateTestAttemptStatuses(attempts []m.TestAttempt, fallback string) str
 	return latest.Status
 }
 
+func latestExecutionAttemptSet(attempts []m.TestAttempt) ([]m.TestAttempt, string) {
+	if len(attempts) == 0 {
+		return nil, ""
+	}
+
+	type executionWindow struct {
+		executionID string
+		attempts    []m.TestAttempt
+		latestAt    time.Time
+	}
+
+	windows := make(map[string]*executionWindow, len(attempts))
+	order := make([]string, 0, len(attempts))
+	for _, attempt := range attempts {
+		executionID := attempt.ExecutionID
+		window, ok := windows[executionID]
+		if !ok {
+			window = &executionWindow{executionID: executionID}
+			windows[executionID] = window
+			order = append(order, executionID)
+		}
+		window.attempts = append(window.attempts, attempt)
+
+		candidate := latestAttemptTimestamp(attempt)
+		if candidate.After(window.latestAt) {
+			window.latestAt = candidate
+		}
+	}
+
+	selected := windows[order[0]]
+	for _, executionID := range order[1:] {
+		window := windows[executionID]
+		if window.latestAt.After(selected.latestAt) {
+			selected = window
+		}
+	}
+
+	return selected.attempts, selected.executionID
+}
+
+func latestAttemptTimestamp(attempt m.TestAttempt) time.Time {
+	if !attempt.UpdatedAt.IsZero() {
+		return attempt.UpdatedAt
+	}
+	if attempt.EndTime != nil {
+		return *attempt.EndTime
+	}
+	if attempt.StartTime != nil {
+		return *attempt.StartTime
+	}
+	if !attempt.CreatedAt.IsZero() {
+		return attempt.CreatedAt
+	}
+	return time.Time{}
+}
+
 // AppendTestFailure adds a failure document to the specified test attempt.
-func (r *PostgresRepository) AppendTestFailure(ctx context.Context, runID, testID string, attemptIndex int32, failure *m.TestFailureDocument) error {
+func (r *PostgresRepository) AppendTestFailure(ctx context.Context, runID, executionID, testID string, attemptIndex int32, failure *m.TestFailureDocument) error {
 	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
@@ -218,9 +301,9 @@ func (r *PostgresRepository) AppendTestFailure(ctx context.Context, runID, testI
 		}
 
 		var attempt m.TestAttempt
-		if err := tx.Where("run_id = ? AND test_id = ? AND attempt_index = ?", runID, internalTestID, attemptIndex).First(&attempt).Error; err != nil {
+		if err := tx.Where("run_id = ? AND execution_id = ? AND test_id = ? AND attempt_index = ?", runID, executionID, internalTestID, attemptIndex).First(&attempt).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				return fmt.Errorf("test attempt not found: runID=%s, testID=%s, attemptIndex=%d", runID, testID, attemptIndex)
+				return fmt.Errorf("test attempt not found: runID=%s, executionID=%s, testID=%s, attemptIndex=%d", runID, executionID, testID, attemptIndex)
 			}
 			return fmt.Errorf("load test attempt for failure: %w", err)
 		}
@@ -231,7 +314,7 @@ func (r *PostgresRepository) AppendTestFailure(ctx context.Context, runID, testI
 			return fmt.Errorf("append relational test failure: %w", err)
 		}
 
-		if err := tx.Model(&m.Test{}).Where("id = ?", internalTestID).Update("updated_at", now).Error; err != nil {
+		if err := tx.Model(&m.Test{}).Where("run_id = ? AND id = ?", runID, internalTestID).Update("updated_at", now).Error; err != nil {
 			return fmt.Errorf("touch relational test after failure: %w", err)
 		}
 
@@ -241,12 +324,12 @@ func (r *PostgresRepository) AppendTestFailure(ctx context.Context, runID, testI
 		return err
 	}
 
-	r.logger.Info("test failure appended", "run_id", runID, "test_id", testID, "attempt_index", attemptIndex)
+	r.logger.Info("test failure appended", "run_id", runID, "execution_id", executionID, "test_id", testID, "attempt_index", attemptIndex)
 	return nil
 }
 
 // AppendTestError adds an error document to the specified test attempt.
-func (r *PostgresRepository) AppendTestError(ctx context.Context, runID, testID string, attemptIndex int32, errorDoc *m.TestErrorDocument) error {
+func (r *PostgresRepository) AppendTestError(ctx context.Context, runID, executionID, testID string, attemptIndex int32, errorDoc *m.TestErrorDocument) error {
 	if err := repository.ValidateRunID(runID); err != nil {
 		return err
 	}
@@ -268,9 +351,9 @@ func (r *PostgresRepository) AppendTestError(ctx context.Context, runID, testID 
 		}
 
 		var attempt m.TestAttempt
-		if err := tx.Where("run_id = ? AND test_id = ? AND attempt_index = ?", runID, internalTestID, attemptIndex).First(&attempt).Error; err != nil {
+		if err := tx.Where("run_id = ? AND execution_id = ? AND test_id = ? AND attempt_index = ?", runID, executionID, internalTestID, attemptIndex).First(&attempt).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				return fmt.Errorf("test attempt not found: runID=%s, testID=%s, attemptIndex=%d", runID, testID, attemptIndex)
+				return fmt.Errorf("test attempt not found: runID=%s, executionID=%s, testID=%s, attemptIndex=%d", runID, executionID, testID, attemptIndex)
 			}
 			return fmt.Errorf("load test attempt for error: %w", err)
 		}
@@ -281,7 +364,7 @@ func (r *PostgresRepository) AppendTestError(ctx context.Context, runID, testID 
 			return fmt.Errorf("append relational test error: %w", err)
 		}
 
-		if err := tx.Model(&m.Test{}).Where("id = ?", internalTestID).Update("updated_at", now).Error; err != nil {
+		if err := tx.Model(&m.Test{}).Where("run_id = ? AND id = ?", runID, internalTestID).Update("updated_at", now).Error; err != nil {
 			return fmt.Errorf("touch relational test after error: %w", err)
 		}
 
@@ -291,7 +374,7 @@ func (r *PostgresRepository) AppendTestError(ctx context.Context, runID, testID 
 		return err
 	}
 
-	r.logger.Info("test error appended", "run_id", runID, "test_id", testID, "attempt_index", attemptIndex)
+	r.logger.Info("test error appended", "run_id", runID, "execution_id", executionID, "test_id", testID, "attempt_index", attemptIndex)
 	return nil
 }
 

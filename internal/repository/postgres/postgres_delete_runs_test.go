@@ -21,6 +21,7 @@ func TestDeleteRuns_RemovesRunGraph(t *testing.T) {
 
 	seedRelationalDeleteData(t, repo,
 		&m.TestRun{ID: runID, Name: "Run 123", CreatedAt: now, UpdatedAt: now},
+		&m.RunExecution{ID: "exec-1", RunID: runID, Status: "PASSED", CreatedAt: now, UpdatedAt: now},
 		&m.RunShard{ID: runID + ":1", RunID: runID, CreatedAt: now, UpdatedAt: now},
 		&m.Suite{ID: parentSuiteID, RunID: runID, ExternalSuiteID: "root", Name: "Root", CreatedAt: now, UpdatedAt: now},
 		&m.Suite{ID: childSuiteID, RunID: runID, ExternalSuiteID: "child", ParentSuiteID: &parentSuiteID, Name: "Child", CreatedAt: now, UpdatedAt: now},
@@ -31,6 +32,7 @@ func TestDeleteRuns_RemovesRunGraph(t *testing.T) {
 
 	seedRelationalDeleteData(t, repo,
 		&m.TestRun{ID: "run-keep", Name: "Keep", CreatedAt: now, UpdatedAt: now},
+		&m.RunExecution{ID: "exec-keep-1", RunID: "run-keep", Status: "PASSED", CreatedAt: now, UpdatedAt: now},
 		&m.RunShard{ID: "run-keep:1", RunID: "run-keep", CreatedAt: now, UpdatedAt: now},
 	)
 
@@ -43,6 +45,7 @@ func TestDeleteRuns_RemovesRunGraph(t *testing.T) {
 	}
 
 	assertCountForRun(t, repo, &m.TestRun{}, "id", runID, 0)
+	assertCountForRun(t, repo, &m.RunExecution{}, "run_id", runID, 0)
 	assertCountForRun(t, repo, &m.RunShard{}, "run_id", runID, 0)
 	assertCountForRun(t, repo, &m.Suite{}, "run_id", runID, 0)
 	assertCountForRun(t, repo, &m.Test{}, "run_id", runID, 0)
@@ -50,6 +53,7 @@ func TestDeleteRuns_RemovesRunGraph(t *testing.T) {
 	assertCountForRun(t, repo, &m.Attachment{}, "run_id", runID, 0)
 
 	assertCountForRun(t, repo, &m.TestRun{}, "id", "run-keep", 1)
+	assertCountForRun(t, repo, &m.RunExecution{}, "run_id", "run-keep", 1)
 	assertCountForRun(t, repo, &m.RunShard{}, "run_id", "run-keep", 1)
 }
 

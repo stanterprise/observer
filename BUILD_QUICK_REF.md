@@ -10,14 +10,16 @@ make build-all
 
 ```bash
 make mongo-up
+docker compose up -d postgres
 make nats-up
 
 NATS_URL=nats://localhost:4222 ./bin/ingestion
 
+POSTGRES_DSN='postgres://observer:password@localhost:5432/observer?sslmode=disable' \
 MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
 NATS_URL=nats://localhost:4222 ./bin/processor
 
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+POSTGRES_DSN='postgres://observer:password@localhost:5432/observer?sslmode=disable' \
 NATS_URL=nats://localhost:4222 ./bin/api
 ```
 

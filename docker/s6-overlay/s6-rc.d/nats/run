@@ -1,2 +1,2 @@
 #!/command/with-contenv sh
-exec nats-server -js -m 8222
+exec nats-server -c /etc/nats/nats-server.conf

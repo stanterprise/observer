@@ -72,9 +72,9 @@ func (r *PostgresRepository) FinalizeRunShardEnd(ctx context.Context, shard *m.R
 	}
 
 	now := time.Now()
-	if shard.ID == "" {
-		shard.ID = fmt.Sprintf("%s:%d", shard.RunID, *shard.ShardIndex)
-	}
+
+	shard.ID = m.BuildRunShardID(shard.RunID, shard.ExecutionID, shard.ShardIndex)
+
 	if shard.EndTime == nil {
 		shard.EndTime = &now
 	}
@@ -84,9 +84,10 @@ func (r *PostgresRepository) FinalizeRunShardEnd(ctx context.Context, shard *m.R
 	var parentRunFinalized bool
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		result := tx.
-			Where(m.RunShard{RunID: shard.RunID, ShardIndex: shard.ShardIndex}).
+			Where(m.RunShard{RunID: shard.RunID, ExecutionID: shard.ExecutionID, ShardIndex: shard.ShardIndex}).
 			Assign(m.RunShard{
 				ID:                 shard.ID,
+				ExecutionID:        shard.ExecutionID,
 				ShardIndex:         shard.ShardIndex,
 				ShardCountExpected: shard.ShardCountExpected,
 				Status:             shard.Status,
@@ -103,7 +104,7 @@ func (r *PostgresRepository) FinalizeRunShardEnd(ctx context.Context, shard *m.R
 
 		var shards []m.RunShard
 		if err := tx.
-			Where("run_id = ?", shard.RunID).
+			Where("run_id = ? AND execution_id = ?", shard.RunID, shard.ExecutionID).
 			Find(&shards).Error; err != nil {
 			return fmt.Errorf("load run shards: %w", err)
 		}
@@ -112,24 +113,16 @@ func (r *PostgresRepository) FinalizeRunShardEnd(ctx context.Context, shard *m.R
 			return nil
 		}
 
-		parentRun, ok := buildAggregatedRunFromShards(shard.RunID, shards, now)
+		execution, ok := buildAggregatedExecutionFromShards(shard.RunID, shard.ExecutionID, shards, now)
 		if !ok {
 			return nil
 		}
 
-		result = tx.
-			Where(m.TestRun{ID: parentRun.ID}).
-			Assign(m.TestRun{
-				Status:    parentRun.Status,
-				StartTime: parentRun.StartTime,
-				EndTime:   parentRun.EndTime,
-				Duration:  parentRun.Duration,
-				UpdatedAt: now,
-				CreatedAt: now,
-			}).
-			FirstOrCreate(parentRun)
-		if result.Error != nil {
-			return fmt.Errorf("finalize parent run from shards: %w", result.Error)
+		if err := upsertRunExecutionEnd(tx, execution, now); err != nil {
+			return fmt.Errorf("finalize run execution from shards: %w", err)
+		}
+		if err := refreshLogicalRunAggregate(tx, shard.RunID, now); err != nil {
+			return err
 		}
 
 		parentRunFinalized = true
@@ -139,7 +132,7 @@ func (r *PostgresRepository) FinalizeRunShardEnd(ctx context.Context, shard *m.R
 		return false, err
 	}
 
-	r.logger.Info("run shard finalized", "run_id", shard.RunID, "shard_index", *shard.ShardIndex, "status", shard.Status, "parent_run_finalized", parentRunFinalized)
+	r.logger.Info("run shard finalized", "run_id", shard.RunID, "execution_id", shard.ExecutionID, "shard_index", *shard.ShardIndex, "status", shard.Status, "parent_run_finalized", parentRunFinalized)
 	return parentRunFinalized, nil
 }
 
@@ -156,6 +149,20 @@ func allRunShardsFinished(shards []m.RunShard, expectedCount int32) bool {
 	}
 
 	return finishedCount >= expectedCount
+}
+
+func allPersistedRunShardsFinished(shards []m.RunShard) bool {
+	if len(shards) == 0 {
+		return false
+	}
+
+	for _, shard := range shards {
+		if shard.EndTime == nil {
+			return false
+		}
+	}
+
+	return true
 }
 
 func buildAggregatedRunFromShards(runID string, shards []m.RunShard, now time.Time) (*m.TestRun, bool) {
@@ -189,6 +196,47 @@ func buildAggregatedRunFromShards(runID string, shards []m.RunShard, now time.Ti
 
 	return &m.TestRun{
 		ID:        runID,
+		Status:    status,
+		StartTime: startedAt,
+		EndTime:   finishedAt,
+		Duration:  duration,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, true
+}
+
+func buildAggregatedExecutionFromShards(runID, executionID string, shards []m.RunShard, now time.Time) (*m.RunExecution, bool) {
+	if len(shards) == 0 {
+		return nil, false
+	}
+
+	status := aggregateRunShardStatuses(shards)
+	if status == "" {
+		return nil, false
+	}
+
+	var startedAt *time.Time
+	var finishedAt *time.Time
+	for _, shard := range shards {
+		if shard.StartTime != nil && (startedAt == nil || shard.StartTime.Before(*startedAt)) {
+			t := *shard.StartTime
+			startedAt = &t
+		}
+		if shard.EndTime != nil && (finishedAt == nil || shard.EndTime.After(*finishedAt)) {
+			t := *shard.EndTime
+			finishedAt = &t
+		}
+	}
+
+	var duration *int64
+	if startedAt != nil && finishedAt != nil {
+		d := finishedAt.Sub(*startedAt).Nanoseconds()
+		duration = &d
+	}
+
+	return &m.RunExecution{
+		ID:        executionID,
+		RunID:     runID,
 		Status:    status,
 		StartTime: startedAt,
 		EndTime:   finishedAt,

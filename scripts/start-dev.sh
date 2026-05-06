@@ -14,21 +14,24 @@ echo -e "${GREEN}Starting Observer Services...${NC}"
 echo -e "${YELLOW}1. Starting MongoDB...${NC}"
 make mongo-up
 
-echo -e "${YELLOW}2. Starting NATS...${NC}"
+echo -e "${YELLOW}2. Starting PostgreSQL...${NC}"
+docker compose up -d postgres
+
+echo -e "${YELLOW}3. Starting NATS...${NC}"
 make nats-up
 
 # Wait for services to be ready
-echo -e "${YELLOW}3. Waiting for services to be ready...${NC}"
+echo -e "${YELLOW}4. Waiting for services to be ready...${NC}"
 sleep 5
 
 # Build binaries if they don't exist
 if [ ! -f "bin/ingestion" ] || [ ! -f "bin/processor" ] || [ ! -f "bin/api" ]; then
-    echo -e "${YELLOW}4. Building binaries...${NC}"
+	 echo -e "${YELLOW}5. Building binaries...${NC}"
     make build-all
 fi
 
 # Start services in background
-echo -e "${YELLOW}5. Starting Ingestion service...${NC}"
+echo -e "${YELLOW}6. Starting Ingestion service...${NC}"
 NATS_URL='nats://localhost:4222' \
     ./bin/ingestion > /tmp/observer-ingestion.log 2>&1 &
 INGESTION_PID=$!
@@ -36,7 +39,8 @@ echo "Ingestion PID: $INGESTION_PID"
 
 sleep 2
 
-echo -e "${YELLOW}6. Starting Processor service...${NC}"
+echo -e "${YELLOW}7. Starting Processor service...${NC}"
+POSTGRES_DSN='postgres://observer:password@localhost:5432/observer?sslmode=disable' \
 MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
 NATS_URL='nats://localhost:4222' \
     ./bin/processor > /tmp/observer-processor.log 2>&1 &
@@ -45,8 +49,8 @@ echo "Processor PID: $PROCESSOR_PID"
 
 sleep 2
 
-echo -e "${YELLOW}7. Starting API service...${NC}"
-MONGODB_URI='mongodb://root:password@localhost:27017/observer?authSource=admin' \
+echo -e "${YELLOW}8. Starting API service...${NC}"
+POSTGRES_DSN='postgres://observer:password@localhost:5432/observer?sslmode=disable' \
 NATS_URL='nats://localhost:4222' \
     ./bin/api > /tmp/observer-api.log 2>&1 &
 API_PID=$!
@@ -60,6 +64,7 @@ echo ""
 echo "Service Status:"
 echo "  Ingestion: http://localhost:50051 (gRPC)"
 echo "  API:       http://localhost:8080"
+echo "  Postgres:  localhost:5432"
 echo "  NATS:      http://localhost:8222 (monitoring)"
 echo ""
 echo "Logs:"
@@ -69,7 +74,7 @@ echo "  API:       tail -f /tmp/observer-api.log"
 echo ""
 echo "To stop services:"
 echo "  kill $INGESTION_PID $PROCESSOR_PID $API_PID"
-echo "  make mongo-down nats-down"
+echo "  make mongo-down nats-down && docker compose stop postgres"
 echo ""
 echo "To start Web UI:"
 echo "  cd web && npm run dev"

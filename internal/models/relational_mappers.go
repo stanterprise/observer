@@ -33,6 +33,27 @@ func RunStartEventToTestRun(req *events.ReportRunStartEventRequest) (*TestRun, [
 	}, suites
 }
 
+// RunStartEventToRunExecution maps a run-start event to an execution-scoped row.
+func RunStartEventToRunExecution(req *events.ReportRunStartEventRequest) *RunExecution {
+	if req == nil {
+		return nil
+	}
+
+	now := time.Now()
+
+	return &RunExecution{
+		ID:    req.ExecutionId,
+		RunID: req.RunId,
+
+		Name:       req.Name,
+		Status:     "RUNNING",
+		Metadata:   stringMapToInterfaceMap(req.Metadata),
+		TotalTests: req.TotalTests,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+}
+
 // RunStartEventToTests maps embedded test cases in a run-start payload to relational test rows.
 func RunStartEventToTests(req *events.ReportRunStartEventRequest) []*Test {
 	if req == nil {
@@ -57,8 +78,9 @@ func RunStartEventToRunShard(req *events.ReportRunStartEventRequest) *RunShard {
 	now := time.Now()
 
 	return &RunShard{
-		ID:                 buildRunShardID(req.RunId, shardIndex),
+		ID:                 BuildRunShardID(req.RunId, req.ExecutionId, shardIndex),
 		RunID:              req.RunId,
+		ExecutionID:        req.ExecutionId,
 		ShardIndex:         shardIndex,
 		ShardCountExpected: shardCount,
 		Status:             "RUNNING",
@@ -95,6 +117,36 @@ func RunEndEventToTestRun(req *events.TestRunEndEventRequest) TestRun {
 	return fields
 }
 
+// RunEndEventToRunExecution maps a run-end event to an execution-scoped update.
+func RunEndEventToRunExecution(req *events.TestRunEndEventRequest) *RunExecution {
+	if req == nil {
+		return nil
+	}
+
+	now := time.Now()
+
+	execution := &RunExecution{
+		ID:        req.ExecutionId,
+		RunID:     req.RunId,
+		Status:    req.FinalStatus.String(),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	if req.StartTime != nil {
+		t := req.StartTime.AsTime()
+		execution.StartTime = &t
+	}
+	if req.Duration != nil {
+		d := req.Duration.AsDuration().Nanoseconds()
+		execution.Duration = &d
+	}
+	end := now
+	execution.EndTime = &end
+
+	return execution
+}
+
 // RunEndEventToRunShard maps run-level shard metadata in a terminal event to a RunShard row.
 // Returns nil when the run is not sharded or shard metadata is incomplete.
 func RunEndEventToRunShard(req *events.TestRunEndEventRequest) *RunShard {
@@ -109,8 +161,9 @@ func RunEndEventToRunShard(req *events.TestRunEndEventRequest) *RunShard {
 
 	now := time.Now()
 	shard := &RunShard{
-		ID:                 buildRunShardID(req.RunId, shardIndex),
+		ID:                 BuildRunShardID(req.RunId, req.ExecutionId, shardIndex),
 		RunID:              req.RunId,
+		ExecutionID:        req.ExecutionId,
 		ShardIndex:         shardIndex,
 		ShardCountExpected: shardCount,
 		Status:             req.FinalStatus.String(),
@@ -138,7 +191,7 @@ func TestCaseRunToRelationalTest(protoTest *entities.TestCaseRun) *Test {
 
 	var suiteID *string
 	if protoTest.TestSuiteId != "" {
-		internalSuiteID := buildSuiteRowID(protoTest.RunId, protoTest.TestSuiteId)
+		internalSuiteID := protoTest.TestSuiteId
 		suiteID = &internalSuiteID
 	}
 
@@ -161,7 +214,7 @@ func TestCaseRunToRelationalTest(protoTest *entities.TestCaseRun) *Test {
 	}
 
 	return &Test{
-		ID:             buildTestRowID(protoTest.RunId, protoTest.Id),
+		ID:             protoTest.Id,
 		RunID:          protoTest.RunId,
 		ExternalTestID: protoTest.Id,
 		SuiteID:        suiteID,
@@ -211,9 +264,10 @@ func TestCaseRunToRelationalAttempt(protoTest *entities.TestCaseRun, attachments
 	}
 
 	return &TestAttempt{
-		ID:           buildTestAttemptID(buildTestRowID(protoTest.RunId, protoTest.Id), attemptIndex),
+		ID:           BuildTestAttemptID(protoTest.RunId, protoTest.Id, protoTest.ExecutionId, attemptIndex),
 		RunID:        protoTest.RunId,
-		TestID:       buildTestRowID(protoTest.RunId, protoTest.Id),
+		ExecutionID:  protoTest.ExecutionId,
+		TestID:       protoTest.Id,
 		AttemptIndex: attemptIndex,
 		Status:       protoTest.Status.String(),
 		StartTime:    startTime,
@@ -255,6 +309,14 @@ func flattenSuiteRuns(protoSuites []*entities.TestSuiteRun) []*Suite {
 	return suites
 }
 
+func SuiteRunToRelationalSuite(protoSuite *entities.TestSuiteRun) *Suite {
+	suites := flattenSingleSuite(protoSuite)
+	if len(suites) == 0 {
+		return nil
+	}
+	return suites[0]
+}
+
 func flattenSingleSuite(protoSuite *entities.TestSuiteRun) []*Suite {
 	if protoSuite == nil {
 		return nil
@@ -264,7 +326,7 @@ func flattenSingleSuite(protoSuite *entities.TestSuiteRun) []*Suite {
 	metadata := stringMapToInterfaceMap(protoSuite.Metadata)
 	var parentSuiteID *string
 	if protoSuite.ParentSuiteId != "" {
-		internalParentSuiteID := buildSuiteRowID(protoSuite.RunId, protoSuite.ParentSuiteId)
+		internalParentSuiteID := protoSuite.ParentSuiteId
 		parentSuiteID = &internalParentSuiteID
 	}
 
@@ -287,7 +349,7 @@ func flattenSingleSuite(protoSuite *entities.TestSuiteRun) []*Suite {
 	}
 
 	suite := &Suite{
-		ID:              buildSuiteRowID(protoSuite.RunId, protoSuite.Id),
+		ID:              protoSuite.Id,
 		RunID:           protoSuite.RunId,
 		ExternalSuiteID: protoSuite.Id,
 		ParentSuiteID:   parentSuiteID,
@@ -341,10 +403,10 @@ func flattenTestsForSuite(protoSuite *entities.TestSuiteRun) []*Test {
 		metadata := stringMapToInterfaceMap(protoTest.Metadata)
 		var suiteID *string
 		if protoTest.TestSuiteId != "" {
-			internalSuiteID := buildSuiteRowID(protoTest.RunId, protoTest.TestSuiteId)
+			internalSuiteID := protoTest.TestSuiteId
 			suiteID = &internalSuiteID
 		} else if protoSuite.Id != "" {
-			internalSuiteID := buildSuiteRowID(protoTest.RunId, protoSuite.Id)
+			internalSuiteID := protoSuite.Id
 			suiteID = &internalSuiteID
 		}
 
@@ -371,7 +433,7 @@ func flattenTestsForSuite(protoSuite *entities.TestSuiteRun) []*Test {
 		timeout := &protoTest.Timeout
 
 		test := &Test{
-			ID:             buildTestRowID(protoTest.RunId, protoTest.Id),
+			ID:             protoTest.Id,
 			RunID:          protoTest.RunId,
 			ExternalTestID: protoTest.Id,
 			SuiteID:        suiteID,
@@ -428,18 +490,10 @@ func firstInt32Metadata(metadata map[string]string, keys ...string) *int32 {
 	return nil
 }
 
-func buildRunShardID(runID string, shardIndex *int32) string {
-	return runID + ":" + fmt.Sprintf("%d", *shardIndex)
+func BuildRunShardID(runID, executionID string, shardIndex *int32) string {
+	return fmt.Sprintf("%s:%s:%d", runID, executionID, *shardIndex)
 }
 
-func buildSuiteRowID(runID, externalSuiteID string) string {
-	return fmt.Sprintf("%s:suite:%s", runID, externalSuiteID)
-}
-
-func buildTestRowID(runID, externalTestID string) string {
-	return fmt.Sprintf("%s:test:%s", runID, externalTestID)
-}
-
-func buildTestAttemptID(testID string, attemptIndex int32) string {
-	return fmt.Sprintf("%s:%d", testID, attemptIndex)
+func BuildTestAttemptID(runID, testID, executionID string, attemptIndex int32) string {
+	return fmt.Sprintf("%s:%s:%s:%d", runID, testID, executionID, attemptIndex)
 }
