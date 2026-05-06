@@ -130,3 +130,16 @@ NATS connection URL
 {{- .Values.externalNats.url }}
 {{- end }}
 {{- end }}
+
+{{/*
+PostgreSQL DSN
+*/}}
+{{- define "observer.postgres.dsn" -}}
+{{- $host := .Values.postgres.host | default "postgres" -}}
+{{- $port := .Values.postgres.port | default 5432 -}}
+{{- $username := .Values.postgres.username | default "observer" -}}
+{{- $password := .Values.postgres.password | default "password" -}}
+{{- $database := .Values.postgres.database | default "observer" -}}
+{{- $sslmode := .Values.postgres.sslmode | default "disable" -}}
+{{- printf "postgres://%s:%s@%s:%v/%s?sslmode=%s" ($username | urlquery) ($password | urlquery) $host $port ($database | urlquery) $sslmode -}}
+{{- end }}

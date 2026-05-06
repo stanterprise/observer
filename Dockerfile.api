@@ -17,15 +17,20 @@ RUN go mod download && go mod verify
 
 # Copy only necessary source files
 COPY cmd/api/ ./cmd/api/
+COPY cmd/migrate/ ./cmd/migrate/
+COPY migrations/ ./migrations/
 COPY pkg/ ./pkg/
 COPY internal/ ./internal/
 
-# Build API binary
+# Build API and migration binaries
 # TARGETARCH is automatically set by BuildKit for multi-platform builds
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build -ldflags='-w -s' \
-    -o /bin/api ./cmd/api
+    -o /bin/api ./cmd/api && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
+    go build -ldflags='-w -s' \
+    -o /bin/migrate ./cmd/migrate
 
 # ============================================================================
 # Runtime stage
@@ -37,6 +42,7 @@ RUN apk add --no-cache ca-certificates tzdata
 
 # Copy API binary from builder
 COPY --from=builder /bin/api /usr/local/bin/api
+COPY --from=builder /bin/migrate /usr/local/bin/migrate
 
 # Environment variables
 ENV PORT=8080

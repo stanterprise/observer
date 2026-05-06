@@ -9,6 +9,7 @@ APP_BIN := $(BIN_DIR)/observer
 INGESTION_BIN := $(BIN_DIR)/ingestion
 PROCESSOR_BIN := $(BIN_DIR)/processor
 API_BIN := $(BIN_DIR)/api
+MIGRATE_BIN := $(BIN_DIR)/migrate
 
 # Tooling
 PROTOC_GEN_GO := $(GOBIN)/protoc-gen-go
@@ -22,7 +23,7 @@ PROTOC_GEN_GO_VERSION ?= v1.36.6
 PROTOC_GEN_GO_GRPC_VERSION ?= v1.5.1
 GOLANGCI_LINT_VERSION ?= v1.60.3
 
-.PHONY: all help build build-all build-ingestion build-processor build-api run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache mongodb-up mongodb-down mongodb-logs mongodb-shell mongodb-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down docker-web-dev-down web-dev-mode helm-deps helm-lint helm-template helm-template-aio helm-template-prod helm-dry-run helm-dry-run-aio helm-dry-run-prod helm-test helm-validate FORCE
+.PHONY: all help build build-all build-ingestion build-processor build-api build-migrate run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache mongodb-up mongodb-down mongodb-logs mongodb-shell mongodb-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down docker-web-dev-down web-dev-mode helm-deps helm-lint helm-template helm-template-aio helm-template-prod helm-dry-run helm-dry-run-aio helm-dry-run-prod helm-test helm-validate FORCE
 
 .DEFAULT_GOAL := help
 
@@ -43,6 +44,10 @@ $(API_BIN): FORCE ## Build the api service binary
 	@mkdir -p $(BIN_DIR)
 	go build -o $(API_BIN) ./cmd/api
 
+$(MIGRATE_BIN): FORCE ## Build the postgres migration binary
+	@mkdir -p $(BIN_DIR)
+	go build -o $(MIGRATE_BIN) ./cmd/migrate
+
 FORCE:
 
 build-ingestion: $(INGESTION_BIN) ## Build ingestion service
@@ -51,7 +56,9 @@ build-processor: $(PROCESSOR_BIN) ## Build processor service
 
 build-api: $(API_BIN) ## Build api service
 
-build-all: $(INGESTION_BIN) $(PROCESSOR_BIN) $(API_BIN) ## Build all components
+build-migrate: $(MIGRATE_BIN) ## Build migration service
+
+build-all: $(INGESTION_BIN) $(PROCESSOR_BIN) $(API_BIN) $(MIGRATE_BIN) ## Build all components
 
 run: build ## Run the server using the built binary
 	./$(APP_BIN)

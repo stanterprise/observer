@@ -25,10 +25,14 @@ echo -e "${YELLOW}4. Waiting for services to be ready...${NC}"
 sleep 5
 
 # Build binaries if they don't exist
-if [ ! -f "bin/ingestion" ] || [ ! -f "bin/processor" ] || [ ! -f "bin/api" ]; then
-	 echo -e "${YELLOW}5. Building binaries...${NC}"
+if [ ! -f "bin/ingestion" ] || [ ! -f "bin/processor" ] || [ ! -f "bin/api" ] || [ ! -f "bin/migrate" ]; then
+ 	 echo -e "${YELLOW}5. Building binaries...${NC}"
     make build-all
 fi
+
+echo -e "${YELLOW}5a. Applying PostgreSQL migrations...${NC}"
+POSTGRES_DSN='postgres://observer:password@localhost:5432/observer?sslmode=disable' \
+    ./bin/migrate -action up
 
 # Start services in background
 echo -e "${YELLOW}6. Starting Ingestion service...${NC}"

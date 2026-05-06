@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS attachments;
+DROP TABLE IF EXISTS test_attempts;
+DROP TABLE IF EXISTS tests;
+DROP TABLE IF EXISTS suites;
+DROP TABLE IF EXISTS run_shards;
+DROP TABLE IF EXISTS run_executions;
+DROP TABLE IF EXISTS runs;

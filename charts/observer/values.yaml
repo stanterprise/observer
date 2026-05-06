@@ -178,6 +178,17 @@ distributed:
       API_BACKEND_HOST: observer-api
       API_BACKEND_PORT: "8080"
 
+postgres:
+  host: ""
+  port: 5432
+  username: observer
+  password: password
+  database: observer
+  sslmode: disable
+  migration:
+    enabled: true
+    backoffLimit: 3
+
 # MongoDB configuration
 mongodb:
   enabled: true

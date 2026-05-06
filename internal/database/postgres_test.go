@@ -11,6 +11,8 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	embeddedmigrations "github.com/stanterprise/observer/migrations"
 )
 
 func TestReconcileLegacyExecutionIDColumnsBackfillsNulls(t *testing.T) {
@@ -52,7 +54,17 @@ func TestReconcileLegacyExecutionIDColumnsBackfillsNulls(t *testing.T) {
 	}
 }
 
-func TestConnectPostgresMigratesCompositeSuiteAndTestRelations(t *testing.T) {
+func TestValidatePostgresConfigRejectsSharedDBAutoMigrate(t *testing.T) {
+	err := validatePostgresConfig(PostgresConfig{
+		Env:               "production",
+		EnableAutoMigrate: true,
+	})
+	if err == nil {
+		t.Fatal("expected shared database auto-migrate validation to fail")
+	}
+}
+
+func TestConnectPostgresWithMigratedSchemaKeepsCompositeSuiteAndTestRelations(t *testing.T) {
 	ctx := context.Background()
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
@@ -84,9 +96,13 @@ func TestConnectPostgresMigratesCompositeSuiteAndTestRelations(t *testing.T) {
 	dsn := fmt.Sprintf("postgres://observer:password@%s:%s/observer?sslmode=disable", host, port.Port())
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	connection, err := ConnectPostgres(dsn, logger)
+	if err := embeddedmigrations.Up(dsn); err != nil {
+		t.Fatalf("apply embedded migrations: %v", err)
+	}
+
+	connection, err := ConnectPostgresWithConfig(PostgresConfig{DSN: dsn}, logger)
 	if err != nil {
-		t.Fatalf("ConnectPostgres failed: %v", err)
+		t.Fatalf("ConnectPostgresWithConfig failed: %v", err)
 	}
 	defer connection.Close()
 

@@ -70,6 +70,23 @@ services:
       - observer-net
 
   # Processor service - Consumes events from NATS and writes to database
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: observer:api
+    container_name: observer-migrate
+    profiles: ["dist", "web-dev"]
+    restart: "no"
+    environment:
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-observer}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-observer}?sslmode=disable
+    command: ["/usr/local/bin/migrate", "-action", "up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - observer-net
+
   processor:
     build:
       context: .
@@ -97,6 +114,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "pgrep", "-f", "processor"]
       interval: 10s
@@ -163,6 +182,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
       interval: 10s
