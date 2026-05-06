@@ -17,7 +17,7 @@ func TestReconcileLegacyExecutionIDColumnsBackfillsNulls(t *testing.T) {
 		`CREATE TABLE run_shards (id text primary key, run_id text not null, shard_index integer, execution_id text)`,
 		`CREATE TABLE test_attempts (id text primary key, run_id text not null, test_id text not null, attempt_index integer not null, execution_id text)`,
 		`INSERT INTO run_shards (id, run_id, shard_index, execution_id) VALUES ('run-1:shard:1', 'run-1', 1, NULL)`,
-		`INSERT INTO test_attempts (id, run_id, test_id, attempt_index, execution_id) VALUES ('attempt-1', 'run-1', 'run-1:test:test-1', 0, NULL)`,
+		`INSERT INTO test_attempts (id, run_id, test_id, attempt_index, execution_id) VALUES ('attempt-1', 'run-1', 'test-1', 0, NULL)`,
 	}
 	for _, statement := range statements {
 		if err := db.Exec(statement).Error; err != nil {

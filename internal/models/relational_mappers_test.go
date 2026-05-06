@@ -349,7 +349,7 @@ func TestTestCaseRunToRelationalAttempt_UsesExecutionAwareIdentity(t *testing.T)
 	if attempt.ExecutionID != "exec-123" {
 		t.Fatalf("ExecutionID = %q, want exec-123", attempt.ExecutionID)
 	}
-	if attempt.ID != "run-123:test:test-123:execution:exec-123:attempt:1" {
+	if attempt.ID != "test-123:exec-123:1" {
 		t.Fatalf("ID = %q, want execution-aware attempt id", attempt.ID)
 	}
 	if attempt.TestID != "test-123" {

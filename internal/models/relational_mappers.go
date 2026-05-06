@@ -497,7 +497,7 @@ func buildRunShardID(runID, executionID string, shardIndex *int32) string {
 	if executionID == "" {
 		return runID + ":" + fmt.Sprintf("%d", *shardIndex)
 	}
-	return fmt.Sprintf("%s:execution:%s:shard:%d", runID, executionID, *shardIndex)
+	return fmt.Sprintf("%s:%s:%d", runID, executionID, *shardIndex)
 }
 
 func buildTestAttemptID(testID, executionID string, attemptIndex int32) string {
@@ -505,7 +505,7 @@ func buildTestAttemptID(testID, executionID string, attemptIndex int32) string {
 	if executionID == "" {
 		return fmt.Sprintf("%s:%d", testID, attemptIndex)
 	}
-	return fmt.Sprintf("%s:execution:%s:attempt:%d", testID, executionID, attemptIndex)
+	return fmt.Sprintf("%s:%s:%d", testID, executionID, attemptIndex)
 }
 
 func normalizeExecutionID(executionID string) string {
