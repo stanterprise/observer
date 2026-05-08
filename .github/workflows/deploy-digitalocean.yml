@@ -35,7 +35,7 @@ on:
       ssl_type:
         description: "SSL/TLS mode"
         required: false
-        default: "none"
+        default: "letsencrypt"
         type: choice
         options:
           - none

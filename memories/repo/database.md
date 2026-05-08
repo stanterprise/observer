@@ -1,1 +1,2 @@
 - Legacy MongoDB index `ttl_idx` on `live_step_buffers.ttl_at` with `expireAfterSeconds: 900` conflicts with the newer absolute TTL index `live_step_buffers_ttl_at_ttl` (`expireAfterSeconds: 0`). Startup should reconcile by dropping incompatible legacy TTL index definitions before creating required indexes.
+- `make web-dev-mode` can fail at `observer-migrate` if PostgreSQL has a dirty migration state (`Dirty database version X`). Local startup now supports auto-recovery by setting `MIGRATE_AUTO_FIX_DIRTY=true` so migrate can `Force(version)` and retry `up`.

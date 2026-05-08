@@ -108,6 +108,7 @@ services:
     restart: "no"
     environment:
       POSTGRES_DSN: postgres://${POSTGRES_USER:-observer}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-observer}?sslmode=disable
+      MIGRATE_AUTO_FIX_DIRTY: ${MIGRATE_AUTO_FIX_DIRTY:-false}
     command: ["/usr/local/bin/migrate", "-action", "up"]
     depends_on:
       postgres:

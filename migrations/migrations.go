@@ -33,6 +33,15 @@ func Down(dsn string) error {
 	})
 }
 
+func Force(dsn string, version int) error {
+	return run(dsn, func(m *migrate.Migrate) error {
+		if err := m.Force(version); err != nil {
+			return fmt.Errorf("force migration version %d: %w", version, err)
+		}
+		return nil
+	})
+}
+
 func run(dsn string, apply func(*migrate.Migrate) error) (err error) {
 	m, err := newMigrator(dsn)
 	if err != nil {

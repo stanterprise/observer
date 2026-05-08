@@ -289,7 +289,7 @@ docker-up-aio: docker-build-aio ## Start AIO profile with docker compose
 	docker compose --profile aio up -d
 
 docker-dev-web: ## Start all containers except for Web UI in dev mode
-	docker compose --profile web-dev up -d
+	MIGRATE_AUTO_FIX_DIRTY=true docker compose --profile web-dev up -d
 	@echo "Web development services started. MongoDB and API are ready."
 
 docker-dev-mongo: ## Start all containers with MongoDB backend (except Web UI)
