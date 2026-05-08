@@ -59,13 +59,6 @@ func ConnectPostgres(dsn string, logger *slog.Logger) (*PostgresConnection, erro
 		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
-	if err := reconcileLegacyExecutionIDColumns(db); err != nil {
-		return nil, fmt.Errorf("postgres legacy execution_id backfill: %w", err)
-	}
-	if err := reconcileLegacyAttemptIndexes(db); err != nil {
-		return nil, fmt.Errorf("postgres legacy attempt index reconciliation: %w", err)
-	}
-
 	logger.Info("connected to postgres")
 
 	return &PostgresConnection{
@@ -128,53 +121,6 @@ func (p *PostgresConnection) Close() error {
 		return fmt.Errorf("get underlying sql.DB for close: %w", err)
 	}
 	return sqlDB.Close()
-}
-
-func reconcileLegacyExecutionIDColumns(db *gorm.DB) error {
-	if db == nil {
-		return fmt.Errorf("gorm db is nil")
-	}
-
-	targets := []struct {
-		table  string
-		column string
-	}{
-		{table: "run_shards", column: "execution_id"},
-		{table: "test_attempts", column: "execution_id"},
-	}
-
-	migrator := db.Migrator()
-	for _, target := range targets {
-		if !migrator.HasTable(target.table) || !migrator.HasColumn(target.table, target.column) {
-			continue
-		}
-
-		query := fmt.Sprintf(`UPDATE "%s" SET "%s" = '' WHERE "%s" IS NULL`, target.table, target.column, target.column)
-		if err := db.Exec(query).Error; err != nil {
-			return fmt.Errorf("backfill %s.%s: %w", target.table, target.column, err)
-		}
-	}
-
-	return nil
-}
-
-func reconcileLegacyAttemptIndexes(db *gorm.DB) error {
-	if db == nil {
-		return fmt.Errorf("gorm db is nil")
-	}
-
-	migrator := db.Migrator()
-	if !migrator.HasTable("test_attempts") {
-		return nil
-	}
-	if !migrator.HasIndex(&models.TestAttempt{}, "ux_attempts_test_execution_attempt_index") {
-		return nil
-	}
-	if err := migrator.DropIndex(&models.TestAttempt{}, "ux_attempts_test_execution_attempt_index"); err != nil {
-		return fmt.Errorf("drop legacy test_attempts unique index: %w", err)
-	}
-
-	return nil
 }
 
 func validatePostgresConfig(cfg PostgresConfig) error {
