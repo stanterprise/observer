@@ -22,13 +22,29 @@ make nats-up
 
 # Wait for services to be ready
 echo -e "${YELLOW}4. Waiting for services to be ready...${NC}"
-sleep 5
+for attempt in $(seq 1 30); do
+    if docker compose exec -T postgres pg_isready -U observer -d observer > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ PostgreSQL is ready${NC}"
+        break
+    fi
+
+    if [ "$attempt" -eq 30 ]; then
+        echo -e "${YELLOW}✗ PostgreSQL did not become ready in time. Check docker compose logs postgres.${NC}"
+        exit 1
+    fi
+
+    sleep 2
+done
 
 # Build binaries if they don't exist
-if [ ! -f "bin/ingestion" ] || [ ! -f "bin/processor" ] || [ ! -f "bin/api" ]; then
-	 echo -e "${YELLOW}5. Building binaries...${NC}"
+if [ ! -f "bin/ingestion" ] || [ ! -f "bin/processor" ] || [ ! -f "bin/api" ] || [ ! -f "bin/migrate" ]; then
+ 	 echo -e "${YELLOW}5. Building binaries...${NC}"
     make build-all
 fi
+
+echo -e "${YELLOW}5a. Applying PostgreSQL migrations...${NC}"
+POSTGRES_DSN='postgres://observer:password@localhost:5432/observer?sslmode=disable' \
+    ./bin/migrate -action up
 
 # Start services in background
 echo -e "${YELLOW}6. Starting Ingestion service...${NC}"

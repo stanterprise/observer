@@ -76,6 +76,14 @@ distributed:
 aio:
   enabled: false
 
+postgres:
+  host: observer-postgres
+  port: 5432
+  username: observer
+  password: password
+  database: observer
+  sslmode: disable
+
 # Use embedded MongoDB and NATS with increased resources
 mongodb:
   enabled: true

@@ -35,7 +35,7 @@ on:
       ssl_type:
         description: "SSL/TLS mode"
         required: false
-        default: "none"
+        default: "letsencrypt"
         type: choice
         options:
           - none
@@ -194,7 +194,7 @@ jobs:
           if [[ -d "\$REPO_DIR/.git" ]]; then
             echo "Updating existing repo at \$REPO_DIR ..."
             cd "\$REPO_DIR"
-            git fetch --tags origin
+            git fetch --tags origin --force
             git checkout "\$DEPLOY_REF" 2>/dev/null \
               || git checkout -B "\$DEPLOY_REF" "origin/\$DEPLOY_REF" 2>/dev/null \
               || true

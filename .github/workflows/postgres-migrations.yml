@@ -1,0 +1,70 @@
+name: PostgreSQL Migrations
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch: {}
+
+jobs:
+  migrate-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: observer
+          POSTGRES_USER: observer
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U observer -d observer"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_DSN: postgres://observer:password@localhost:5432/observer?sslmode=disable
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binaries
+        run: make build-all
+
+      - name: Apply migrations to empty PostgreSQL
+        run: ./bin/migrate -action up
+
+      - name: Smoke test API startup against migrated database
+        run: |
+          set -euo pipefail
+          PORT=18080 ./bin/api >/tmp/observer-api.log 2>&1 &
+          api_pid=$!
+          trap 'kill $api_pid 2>/dev/null || true; wait $api_pid 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/health >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != "true" ]; then
+            cat /tmp/observer-api.log
+            exit 1
+          fi
+
+      - name: Run migration-focused tests
+        run: go test ./internal/database/...
