@@ -79,7 +79,7 @@ services:
       - observer-data:/data
 
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -91,6 +91,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
     # Logging configuration
     logging:
@@ -99,6 +101,20 @@ services:
         max-size: "10m"
         max-file: "3"
         labels: "service=observer"
+
+  migrate:
+    image: ghcr.io/stanterprise/observer/api:${OBSERVER_VERSION:-latest}
+    container_name: observer-migrate
+    restart: "no"
+    environment:
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-observer}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-observer}?sslmode=disable
+      MIGRATE_AUTO_FIX_DIRTY: ${MIGRATE_AUTO_FIX_DIRTY:-false}
+    command: ["/usr/local/bin/migrate", "-action", "up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - observer-network
 
   # ============================================================================
   # Nginx Reverse Proxy (SSL/TLS Termination)
@@ -151,7 +167,8 @@ services:
       - observer
 
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      test:
+        ["CMD-SHELL", "[ -s /run/nginx.pid ] && kill -0 $(cat /run/nginx.pid)"]
       interval: 30s
       timeout: 10s
       retries: 3

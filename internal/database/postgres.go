@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -19,8 +20,14 @@ type PostgresConnection struct {
 	logger *slog.Logger
 }
 
-// ConnectPostgres opens a GORM connection to PostgreSQL using the provided DSN,
-// verifies the connection, and runs AutoMigrate to ensure the schema is up to date.
+type PostgresConfig struct {
+	DSN               string
+	Env               string
+	EnableAutoMigrate bool
+}
+
+// ConnectPostgres opens a GORM connection to PostgreSQL using the provided DSN
+// and verifies the connection.
 func ConnectPostgres(dsn string, logger *slog.Logger) (*PostgresConnection, error) {
 	if logger == nil {
 		logger = slog.Default()
@@ -52,24 +59,32 @@ func ConnectPostgres(dsn string, logger *slog.Logger) (*PostgresConnection, erro
 		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
-	if err := reconcileLegacyExecutionIDColumns(db); err != nil {
-		return nil, fmt.Errorf("postgres legacy execution_id backfill: %w", err)
-	}
-	if err := reconcileLegacyAttemptIndexes(db); err != nil {
-		return nil, fmt.Errorf("postgres legacy attempt index reconciliation: %w", err)
-	}
-
-	// Apply schema migrations so all tables exist in the correct state.
-	if err := db.AutoMigrate(models.ModelsForMigration()...); err != nil {
-		return nil, fmt.Errorf("postgres auto-migrate: %w", err)
-	}
-
-	logger.Info("connected to postgres and schema is up to date")
+	logger.Info("connected to postgres")
 
 	return &PostgresConnection{
 		DB:     db,
 		logger: logger,
 	}, nil
+}
+
+func ConnectPostgresWithConfig(cfg PostgresConfig, logger *slog.Logger) (*PostgresConnection, error) {
+	if err := validatePostgresConfig(cfg); err != nil {
+		return nil, err
+	}
+
+	connection, err := ConnectPostgres(cfg.DSN, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.EnableAutoMigrate {
+		if err := connection.DB.AutoMigrate(models.ModelsForMigration()...); err != nil {
+			_ = connection.Close()
+			return nil, fmt.Errorf("postgres auto-migrate: %w", err)
+		}
+	}
+
+	return connection, nil
 }
 
 // ConnectPostgresFromEnv reads POSTGRES_DSN (or DATABASE_URL as a fallback)
@@ -84,7 +99,16 @@ func ConnectPostgresFromEnv(logger *slog.Logger) (*PostgresConnection, error) {
 		return nil, nil
 	}
 
-	return ConnectPostgres(dsn, logger)
+	enableAutoMigrate, err := boolEnv("ENABLE_AUTO_MIGRATE")
+	if err != nil {
+		return nil, err
+	}
+
+	return ConnectPostgresWithConfig(PostgresConfig{
+		DSN:               dsn,
+		Env:               envOr("ENV", envOr("APP_ENV", "")),
+		EnableAutoMigrate: enableAutoMigrate,
+	}, logger)
 }
 
 // Close releases the underlying database connection pool.
@@ -99,49 +123,30 @@ func (p *PostgresConnection) Close() error {
 	return sqlDB.Close()
 }
 
-func reconcileLegacyExecutionIDColumns(db *gorm.DB) error {
-	if db == nil {
-		return fmt.Errorf("gorm db is nil")
+func validatePostgresConfig(cfg PostgresConfig) error {
+	if cfg.EnableAutoMigrate && cfg.Env != "local" {
+		return fmt.Errorf("AutoMigrate must not be enabled outside local development; set ENV=local or unset ENABLE_AUTO_MIGRATE")
 	}
-
-	targets := []struct {
-		table  string
-		column string
-	}{
-		{table: "run_shards", column: "execution_id"},
-		{table: "test_attempts", column: "execution_id"},
-	}
-
-	migrator := db.Migrator()
-	for _, target := range targets {
-		if !migrator.HasTable(target.table) || !migrator.HasColumn(target.table, target.column) {
-			continue
-		}
-
-		query := fmt.Sprintf(`UPDATE "%s" SET "%s" = '' WHERE "%s" IS NULL`, target.table, target.column, target.column)
-		if err := db.Exec(query).Error; err != nil {
-			return fmt.Errorf("backfill %s.%s: %w", target.table, target.column, err)
-		}
-	}
-
 	return nil
 }
 
-func reconcileLegacyAttemptIndexes(db *gorm.DB) error {
-	if db == nil {
-		return fmt.Errorf("gorm db is nil")
+func boolEnv(key string) (bool, error) {
+	value := os.Getenv(key)
+	if value == "" {
+		return false, nil
 	}
 
-	migrator := db.Migrator()
-	if !migrator.HasTable("test_attempts") {
-		return nil
-	}
-	if !migrator.HasIndex(&models.TestAttempt{}, "ux_attempts_test_execution_attempt_index") {
-		return nil
-	}
-	if err := migrator.DropIndex(&models.TestAttempt{}, "ux_attempts_test_execution_attempt_index"); err != nil {
-		return fmt.Errorf("drop legacy test_attempts unique index: %w", err)
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a valid boolean: %w", key, err)
 	}
 
-	return nil
+	return parsed, nil
+}
+
+func envOr(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
 }
