@@ -1,18 +1,3 @@
-#!/command/with-contenv sh
-set -eu
-
-if [ -z "${POSTGRES_DSN:-}" ]; then
-	export POSTGRES_DSN="postgres://${POSTGRES_USER:-observer}:${POSTGRES_PASSWORD:-password}@127.0.0.1:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-observer}?sslmode=disable"
-fi
-
-attempt=0
-until pg_isready -h 127.0.0.1 -p "${POSTGRES_PORT:-5432}" -U "${POSTGRES_USER:-observer}" -d "${POSTGRES_DB:-observer}" >/dev/null 2>&1; do
-	attempt=$((attempt + 1))
-	if [ "$attempt" -ge 60 ]; then
-		echo "postgres did not become ready within 60 seconds" >&2
-		exit 1
-	fi
-	sleep 1
-done
-
-exec /usr/local/bin/migrate -action up
+/bin/sh
+-ec
+if [ -z "${POSTGRES_DSN:-}" ]; then export POSTGRES_DSN="postgres://${POSTGRES_USER:-observer}:${POSTGRES_PASSWORD:-password}@127.0.0.1:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-observer}?sslmode=disable"; fi; attempt=0; until pg_isready -h 127.0.0.1 -p "${POSTGRES_PORT:-5432}" -U "${POSTGRES_USER:-observer}" -d "${POSTGRES_DB:-observer}" >/dev/null 2>&1; do attempt=$((attempt + 1)); if [ "$attempt" -ge 60 ]; then echo "postgres did not become ready within 60 seconds" >&2; exit 1; fi; sleep 1; done; exec /usr/local/bin/migrate -action up

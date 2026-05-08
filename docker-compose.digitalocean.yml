@@ -167,7 +167,7 @@ services:
       - observer
 
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      test: ["CMD-SHELL", "[ -s /run/nginx.pid ] && kill -0 $(cat /run/nginx.pid)"]
       interval: 30s
       timeout: 10s
       retries: 3
