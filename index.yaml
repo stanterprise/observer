@@ -2,8 +2,8 @@ apiVersion: v1
 entries:
   observer:
   - apiVersion: v2
-    appVersion: 0.4.0
-    created: "2026-05-08T19:20:52.238796409Z"
+    appVersion: 0.1.0
+    created: "2026-05-08T19:27:57.523866281Z"
     dependencies:
     - condition: mongodb.enabled
       name: mongodb
@@ -14,7 +14,7 @@ entries:
       repository: https://nats-io.github.io/k8s/helm/charts/
       version: ~1.2.0
     description: A Helm chart for Observer - Test Observability System
-    digest: 0c2921e70662a953c88557bf55c722182903b01e9edcf7269110abf12089fcde
+    digest: 216bb546c2902ecb58264fa90b14c92bc612118ac6475c763de6e8ec15e1b73c
     home: https://github.com/stanterprise/observer
     keywords:
     - testing
@@ -29,6 +29,6 @@ entries:
     - https://github.com/stanterprise/observer
     type: application
     urls:
-    - https://stanterprise.github.io/observer/observer-0.4.0.tgz
-    version: 0.4.0
-generated: "2026-05-08T19:20:52.230167441Z"
+    - https://stanterprise.github.io/observer/observer-0.1.0-063edd7.tgz
+    version: 0.1.0-063edd7
+generated: "2026-05-08T19:27:57.515125822Z"
