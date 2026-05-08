@@ -22,7 +22,19 @@ make nats-up
 
 # Wait for services to be ready
 echo -e "${YELLOW}4. Waiting for services to be ready...${NC}"
-sleep 5
+for attempt in $(seq 1 30); do
+    if docker compose exec -T postgres pg_isready -U observer -d observer > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ PostgreSQL is ready${NC}"
+        break
+    fi
+
+    if [ "$attempt" -eq 30 ]; then
+        echo -e "${YELLOW}✗ PostgreSQL did not become ready in time. Check docker compose logs postgres.${NC}"
+        exit 1
+    fi
+
+    sleep 2
+done
 
 # Build binaries if they don't exist
 if [ ! -f "bin/ingestion" ] || [ ! -f "bin/processor" ] || [ ! -f "bin/api" ] || [ ! -f "bin/migrate" ]; then
