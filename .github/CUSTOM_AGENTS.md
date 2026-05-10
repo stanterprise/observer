@@ -49,6 +49,7 @@ The supported agents are:
 ## Feedback and Improvements
 
 These agents are living documents that should evolve with the project. If you find:
+
 - Missing information or context
 - Outdated patterns or conventions
 - Unclear guidance or examples
@@ -59,14 +60,14 @@ Please update the relevant agent file or create a new agent definition!
 
 ## Quick Reference
 
-| Agent | Primary Use Case | Key Expertise | File Size |
-|-------|------------------|---------------|-----------|
-| **Architect** | System design & review | Distributed systems, event-driven, microservices | ~192 lines |
-| **Developer** | Code implementation | Go, TypeScript, React, testing | ~393 lines |
-| **UX Designer** | UI/UX design | React components, Tailwind, accessibility | ~451 lines |
-| **DevOps** | Infrastructure & deployment | Docker, Kubernetes, CI/CD, monitoring | ~553 lines |
-| **Testing** | Test strategy & implementation | Unit tests, integration, E2E, performance | ~612 lines |
-| **Documentation** | Technical writing | User guides, API docs, architecture docs | ~931 lines |
+| Agent             | Primary Use Case               | Key Expertise                                    | File Size  |
+| ----------------- | ------------------------------ | ------------------------------------------------ | ---------- |
+| **Architect**     | System design & review         | Distributed systems, event-driven, microservices | ~192 lines |
+| **Developer**     | Code implementation            | Go, TypeScript, React, testing                   | ~393 lines |
+| **UX Designer**   | UI/UX design                   | React components, Tailwind, accessibility        | ~451 lines |
+| **DevOps**        | Infrastructure & deployment    | Docker, Kubernetes, CI/CD, monitoring            | ~553 lines |
+| **Testing**       | Test strategy & implementation | Unit tests, integration, E2E, performance        | ~612 lines |
+| **Documentation** | Technical writing              | User guides, API docs, architecture docs         | ~931 lines |
 
 ---
 

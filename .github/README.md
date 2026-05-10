@@ -5,6 +5,7 @@ This directory contains GitHub-specific configuration files and workflows.
 ## Contents
 
 ### Workflows
+
 - `docker-publish.yml` - Automated Docker image builds and publishing to GitHub Container Registry
 
 ### AI Agent Configurations (`agents/`)
@@ -25,6 +26,7 @@ These configuration files support development workflows only. They do not affect
 ### Development Instructions (`copilot-instructions.md`)
 
 Comprehensive AI agent instructions that document:
+
 - Service architecture and component boundaries
 - Database integration patterns and safety rules
 - NATS messaging patterns
