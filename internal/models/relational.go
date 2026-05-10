@@ -247,15 +247,20 @@ func (Attachment) TableName() string {
 }
 
 type RunStat struct {
-	RunID     string    `gorm:"column:run_id;type:text;primaryKey" json:"runId"`
-	Total     int32     `gorm:"column:total" json:"total"`
-	Passed    int32     `gorm:"column:passed" json:"passed"`
-	Failed    int32     `gorm:"column:failed" json:"failed"`
-	Flaky     int32     `gorm:"column:flaky" json:"flaky"`
-	Skipped   int32     `gorm:"column:skipped" json:"skipped"`
-	Duration  int64     `gorm:"column:duration" json:"duration"`
-	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
-	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
+	RunID       string    `gorm:"column:run_id;type:text;primaryKey" json:"runId"`
+	Name        string    `gorm:"column:name;type:text" json:"name"`
+	Total       int32     `gorm:"column:total" json:"total"`
+	Passed      int32     `gorm:"column:passed" json:"passed"`
+	Failed      int32     `gorm:"column:failed" json:"failed"`
+	Flaky       int32     `gorm:"column:flaky" json:"flaky"`
+	Skipped     int32     `gorm:"column:skipped" json:"skipped"`
+	Broken      int32     `gorm:"column:broken" json:"broken"`
+	TimedOut    int32     `gorm:"column:timedout" json:"timedOut"`
+	Interrupted int32     `gorm:"column:interrupted" json:"interrupted"`
+	Unknown     int32     `gorm:"column:unknown" json:"unknown"`
+	Duration    int64     `gorm:"column:duration" json:"duration"`
+	CreatedAt   time.Time `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 }
 
 func (RunStat) TableName() string {

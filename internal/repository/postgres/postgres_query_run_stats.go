@@ -1,0 +1,49 @@
+package postgres
+
+import (
+	"context"
+	"fmt"
+
+	m "github.com/stanterprise/observer/internal/models"
+	"github.com/stanterprise/observer/internal/repository"
+	"gorm.io/gorm/clause"
+)
+
+func (r *PostgresRepository) GetRunStats(ctx context.Context, runID string) (*m.RunStat, error) {
+	if err := repository.ValidateRunID(runID); err != nil {
+		return nil, err
+	}
+	if err := r.ensureDB(); err != nil {
+		return nil, err
+	}
+
+	var stat m.RunStat
+	if err := r.db.WithContext(ctx).Where("run_id = ?", runID).First(&stat).Error; err != nil {
+		return nil, fmt.Errorf("load run stat: %w", err)
+	}
+
+	return &stat, nil
+}
+
+func (r *PostgresRepository) GetAllRunStats(ctx context.Context, limit int64, offset int64) ([]m.RunStat, error) {
+	if err := r.ensureDB(); err != nil {
+		return nil, err
+	}
+
+	var stats []m.RunStat
+	if err := r.db.
+		WithContext(ctx).
+		Order(clause.OrderBy{Columns: []clause.OrderByColumn{
+			{
+				Column: clause.Column{Name: "created_at"},
+				Desc:   false,
+			},
+		}}).
+		Limit(int(limit)).
+		Offset(int(offset)).
+		Find(&stats).Error; err != nil {
+		return nil, fmt.Errorf("load all run stats: %w", err)
+	}
+
+	return stats, nil
+}
