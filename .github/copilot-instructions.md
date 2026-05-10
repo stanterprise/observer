@@ -578,29 +578,3 @@ curl http://localhost:8222/streaming/channelsz  # JetStream stats
 ```
 
 Check consumer lag: Fetch consumer info via NATS CLI or monitoring endpoint.
-
-## Migration Roadmap
-
-**Completed:**
-
-- ✅ **Phase 1**: NATS JetStream publisher in ingestion service (stateless ingestion)
-- ✅ **Phase 2**: NATS JetStream consumer in processor service
-- ✅ **WebSocket Component**: Real-time event streaming via WebSocket
-- ✅ **Web UI**: React + TypeScript + Tailwind CSS interface with real-time updates
-- ✅ **REST API**: Test listing, run statistics, and detail endpoints
-- ✅ **MongoDB backend**: Processor/API persistence and queries
-- ✅ Separate service entrypoints (`cmd/ingestion`, `cmd/processor`, `cmd/api`)
-- ✅ NATS consumer with event routing and database persistence
-- ✅ Docker Compose profiles (AIO + distributed)
-- ✅ Multi-stage Dockerfiles for each service
-- ✅ Comprehensive test suite (20+ tests) with E2E NATS integration validation
-- ✅ Playwright reporter integration documentation
-- ✅ Web UI with Nginx reverse proxy for both deployment modes
-
-**Future phases:**
-
-- [ ] **Phase 4**: Complete GraphQL API implementation
-- [ ] Object storage integration (MinIO/S3) for test artifacts
-- [ ] Enhanced Web UI features (test details, artifact viewer, filtering)
-- [ ] Authentication layer (dev token, OIDC)
-- [ ] Observability (Prometheus metrics, OpenTelemetry tracing)
