@@ -132,6 +132,7 @@ PostgreSQL migrations are mandatory for schema changes. When you modify GORM mod
    - Increment the number; check existing migrations for the next available number
 
 3. **Up Migration (forward)**: Add your schema changes in `.up.sql`
+
    ```sql
    -- migrations/000003_add_raw_metadata_to_run.up.sql
    ALTER TABLE test_runs ADD COLUMN raw_metadata JSONB;
@@ -139,6 +140,7 @@ PostgreSQL migrations are mandatory for schema changes. When you modify GORM mod
    ```
 
 4. **Down Migration (rollback)**: Reverse the changes in `.down.sql`
+
    ```sql
    -- migrations/000003_add_raw_metadata_to_run.down.sql
    DROP INDEX IF EXISTS idx_test_runs_raw_metadata;
