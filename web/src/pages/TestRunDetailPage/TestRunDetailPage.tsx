@@ -395,7 +395,7 @@ export function TestRunDetailPage() {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <Link
-          to="/suite_runs"
+          to="/runs"
           className="group inline-flex items-center gap-2 rounded-md px-2 py-1 text-(--stitch-primary) transition-colors hover:bg-(--stitch-primary-soft) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
@@ -433,7 +433,7 @@ export function TestRunDetailPage() {
                   "The test run you're looking for doesn't exist or has been deleted."}
               </p>
               <Link
-                to="/suite_runs"
+                to="/runs"
                 className="inline-flex items-center rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
                 style={{
                   background:
@@ -506,7 +506,7 @@ export function TestRunDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link
-            to="/suite_runs"
+            to="/runs"
             className="group inline-flex h-10 w-10 items-center justify-center rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-card) text-(--stitch-on-surface-muted) transition-colors hover:bg-(--stitch-surface-low) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
             aria-label="Back to test runs"
           >

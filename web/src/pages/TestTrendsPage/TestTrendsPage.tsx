@@ -205,7 +205,7 @@ export function TestTrendsPage() {
     return (
       <div className="space-y-4">
         <Link
-          to="/suite_runs"
+          to="/runs"
           className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md px-2 py-1"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -241,7 +241,7 @@ export function TestTrendsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link
-            to="/suite_runs"
+            to="/runs"
             className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md p-1"
             aria-label="Back to test runs"
           >

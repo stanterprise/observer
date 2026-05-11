@@ -154,7 +154,7 @@ export default function DashboardPage() {
               </p>
               <div className="mt-6">
                 <Link
-                  to="/suite_runs"
+                  to="/runs"
                   className="inline-flex items-center rounded-md px-4 py-2 text-white transition-opacity hover:opacity-90"
                   style={{
                     background:
@@ -270,7 +270,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <CardTitle>Recent Test Runs</CardTitle>
                 <Link
-                  to="/suite_runs"
+                  to="/runs"
                   className="text-sm font-medium text-(--stitch-primary) hover:opacity-90"
                 >
                   View All →
@@ -376,7 +376,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Link
-                  to="/suite_runs"
+                  to="/runs"
                   className="flex items-center justify-center rounded-lg border px-4 py-3 transition-all"
                   style={{
                     borderColor: "var(--stitch-outline)",
