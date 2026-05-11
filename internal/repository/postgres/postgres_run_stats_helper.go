@@ -79,7 +79,7 @@ func (r *PostgresRepository) collectRunStats(ctx context.Context, tx *gorm.DB, r
 	}
 
 	update := tx.WithContext(ctx).
-		Table("public.run_stats").
+		Table("run_stats").
 		Where("run_id = ?", runID).
 		Updates(updatePayload)
 	if update.Error != nil {

@@ -126,7 +126,7 @@ func (r *PostgresRepository) FinalizeRunShardEnd(ctx context.Context, shard *m.R
 		}
 
 		if _, err := r.collectRunStats(ctx, tx, shard.RunID); err != nil {
-			r.logger.Error("collect run stats: %w", err)
+			r.logger.Error("collect run stats:", err)
 		}
 
 		parentRunFinalized = true

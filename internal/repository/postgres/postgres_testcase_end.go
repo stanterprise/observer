@@ -82,7 +82,7 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 		}
 
 		if _, err := r.collectRunStats(ctx, tx, test.RunID); err != nil {
-			r.logger.Error("collect run stats: %w", err)
+			r.logger.Error("collect run stats:", err)
 		}
 
 		return nil
