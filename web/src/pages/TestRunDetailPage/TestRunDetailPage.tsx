@@ -99,7 +99,10 @@ function dedupeTests(tests: Test[]): Test[] {
 function computeStatistics(tests: Test[]) {
   return {
     total: tests.length,
-    passed: tests.filter((test) => test.status === "PASSED").length,
+    passed: tests.filter(
+      (test) => test.status === "PASSED" || test.status === "FLAKY",
+    ).length,
+    flaky: tests.filter((test) => test.status === "FLAKY").length,
     failed: tests.filter((test) => test.status === "FAILED").length,
     skipped: tests.filter((test) => test.status === "SKIPPED").length,
     running: tests.filter((test) => test.status === "RUNNING").length,
@@ -111,9 +114,6 @@ function computeStatistics(tests: Test[]) {
     unknown: tests.filter((test) => test.status === "UNKNOWN").length,
     expected: tests.filter(
       (test) => test.status === "PASSED" && (test.attempts?.length ?? 0) === 1,
-    ).length,
-    flaky: tests.filter(
-      (test) => test.status === "PASSED" && (test.attempts?.length ?? 0) > 1,
     ).length,
   };
 }
