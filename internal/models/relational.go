@@ -258,6 +258,8 @@ type RunStat struct {
 	TimedOut    int32     `gorm:"column:timedout" json:"timedOut"`
 	Interrupted int32     `gorm:"column:interrupted" json:"interrupted"`
 	Unknown     int32     `gorm:"column:unknown" json:"unknown"`
+	NotRun      int32     `gorm:"column:not_run" json:"notRun"`
+	Running     int32     `gorm:"column:running" json:"running"`
 	Duration    int64     `gorm:"column:duration" json:"duration"`
 	CreatedAt   time.Time `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
 	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`

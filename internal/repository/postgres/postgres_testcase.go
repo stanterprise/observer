@@ -202,11 +202,21 @@ func upsertRelationalTestAttempt(tx *gorm.DB, attempt *m.TestAttempt, now time.T
 }
 
 func aggregateTestAttemptStatuses(attempts []m.TestAttempt, fallback string) string {
+	containsPassed := false
+	containsFailed := false
 	for _, attempt := range attempts {
 		if attempt.Status == "PASSED" {
-			return "PASSED"
+			containsPassed = true
+		}
+		if attempt.Status != "PASSED" {
+			containsFailed = true
 		}
 	}
+
+	if containsPassed && containsFailed {
+		return "FLAKY"
+	}
+
 	if fallback != "" {
 		return fallback
 	}
