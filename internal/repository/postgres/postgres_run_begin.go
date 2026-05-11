@@ -28,6 +28,22 @@ func (r *PostgresRepository) UpsertRunStart(ctx context.Context, run *m.TestRun)
 	run.UpdatedAt = now
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		stats, _ := r.GetRunStats(ctx, run.ID)
+
+		if stats == nil {
+			stats = &m.RunStat{
+				RunID:     run.ID,
+				Name:      run.Name,
+				CreatedAt: *run.StartTime,
+				UpdatedAt: now,
+				Total:     run.TotalTests,
+			}
+		} else {
+			stats.Total += run.TotalTests
+		}
+
+		tx.Save(stats)
+
 		assignment := m.TestRun{
 			Name:        run.Name,
 			Status:      "RUNNING",
