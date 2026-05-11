@@ -89,6 +89,84 @@ func TestUpsertRunStart_ShardedMergesMetadataAndTotals(t *testing.T) {
 	}
 }
 
+func TestUpsertRunStart_CreatesRunStat(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	start := time.Date(2026, 5, 1, 8, 0, 0, 0, time.UTC)
+
+	run := &m.TestRun{
+		ID:         "run-stat-create",
+		Name:       "Create RunStat",
+		Status:     "RUNNING",
+		StartTime:  &start,
+		TotalTests: 4,
+	}
+
+	if err := repo.UpsertRunStart(ctx, run); err != nil {
+		t.Fatalf("UpsertRunStart failed: %v", err)
+	}
+
+	var stat m.RunStat
+	if err := repo.db.WithContext(ctx).First(&stat, "run_id = ?", run.ID).Error; err != nil {
+		t.Fatalf("load run stat: %v", err)
+	}
+	if stat.RunID != run.ID {
+		t.Fatalf("stat.RunID = %q, want %q", stat.RunID, run.ID)
+	}
+	if stat.Name != run.Name {
+		t.Fatalf("stat.Name = %q, want %q", stat.Name, run.Name)
+	}
+	if stat.Total != run.TotalTests {
+		t.Fatalf("stat.Total = %d, want %d", stat.Total, run.TotalTests)
+	}
+	if !stat.CreatedAt.Equal(start) {
+		t.Fatalf("stat.CreatedAt = %v, want %v", stat.CreatedAt, start)
+	}
+}
+
+func TestUpsertRunStart_EnsuresRunStatWithoutInflatingTotal(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+	start := time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)
+
+	first := &m.TestRun{ID: "run-stat-update", Name: "Shard 1", Status: "RUNNING", StartTime: &start, TotalTests: 3}
+	second := &m.TestRun{ID: "run-stat-update", Name: "Shard 2", Status: "RUNNING", StartTime: &start, TotalTests: 5}
+
+	if err := repo.UpsertRunStart(ctx, first); err != nil {
+		t.Fatalf("UpsertRunStart(first) failed: %v", err)
+	}
+	var afterFirst m.RunStat
+	if err := repo.db.WithContext(ctx).First(&afterFirst, "run_id = ?", first.ID).Error; err != nil {
+		t.Fatalf("load run stat after first upsert: %v", err)
+	}
+
+	if err := repo.UpsertRunStart(ctx, second); err != nil {
+		t.Fatalf("UpsertRunStart(second) failed: %v", err)
+	}
+
+	var stat m.RunStat
+	if err := repo.db.WithContext(ctx).First(&stat, "run_id = ?", first.ID).Error; err != nil {
+		t.Fatalf("load run stat: %v", err)
+	}
+	if stat.Total != 3 {
+		t.Fatalf("stat.Total = %d, want 3", stat.Total)
+	}
+	if stat.Name != second.Name {
+		t.Fatalf("stat.Name = %q, want %q", stat.Name, second.Name)
+	}
+	if stat.UpdatedAt.Before(afterFirst.UpdatedAt) {
+		t.Fatalf("stat.UpdatedAt = %v, want >= %v", stat.UpdatedAt, afterFirst.UpdatedAt)
+	}
+
+	var count int64
+	if err := repo.db.WithContext(ctx).Model(&m.RunStat{}).Where("run_id = ?", first.ID).Count(&count).Error; err != nil {
+		t.Fatalf("count run stat rows: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("run stat row count = %d, want 1", count)
+	}
+}
+
 func TestUpsertRunStartSuitesAndTests(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
@@ -282,6 +360,7 @@ func modelsForSQLiteMigration() []interface{} {
 		&m.Test{},
 		&m.TestAttempt{},
 		&m.Attachment{},
+		&m.RunStat{},
 	}
 }
 

@@ -86,7 +86,7 @@ func (h *PostgresHandler) handleRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit, offset := parseLimitOffset(r, 50)
-	docs, _, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{}, limit, offset, true)
+	docs, _, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{}, limit, offset, false)
 	if err != nil {
 		h.logger.Error("failed to fetch runs from postgres", "error", err)
 		h.internalError(w)
@@ -117,30 +117,34 @@ func (h *PostgresHandler) handleRunsStats(w http.ResponseWriter, r *http.Request
 	}
 
 	limit, offset := parseLimitOffset(r, 50)
-	runs, err := h.repo.GetAllRunStats(r.Context(), limit, offset)
+	docs, _, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{}, limit, offset, false)
 	if err != nil {
 		h.logger.Error("failed to fetch run stats from postgres", "error", err)
 		h.internalError(w)
 		return
 	}
 
-	runStats := make([]map[string]interface{}, 0, len(runs))
-	for _, doc := range runs {
-
+	runStats := make([]map[string]interface{}, 0, len(docs))
+	for _, doc := range docs {
+		allTests := flattenRunTests(doc)
+		stats := buildTestStatistics(allTests)
 		runStat := map[string]interface{}{
 			"runName":     doc.Name,
-			"runId":       doc.RunID,
-			"total":       doc.Total,
-			"passed":      doc.Passed,
-			"failed":      doc.Failed,
-			"skipped":     doc.Skipped,
-			"running":     0,
-			"broken":      0,
-			"timedout":    0,
-			"interrupted": 0,
-			"unknown":     0,
+			"runId":       doc.ID,
+			"total":       stats["total"],
+			"passed":      stats["passed"],
+			"failed":      stats["failed"],
+			"skipped":     stats["skipped"],
+			"running":     stats["running"],
+			"broken":      stats["broken"],
+			"timedout":    stats["timedout"],
+			"interrupted": stats["interrupted"],
+			"unknown":     stats["unknown"],
 		}
-
+		lastUpdated := latestTestUpdate(allTests)
+		if !lastUpdated.IsZero() {
+			runStat["lastUpdated"] = lastUpdated.Format(time.RFC3339)
+		}
 		runStats = append(runStats, runStat)
 	}
 
