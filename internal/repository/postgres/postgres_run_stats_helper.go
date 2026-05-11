@@ -70,9 +70,26 @@ func (r *PostgresRepository) collectRunStats(ctx context.Context, tx *gorm.DB, r
 		stats["total"] += entry.Count
 	}
 
+	// Fetch created_at from the existing run_stats row to compute elapsed duration.
+	var createdAt time.Time
+	if err := tx.WithContext(ctx).
+		Table("run_stats").
+		Select("created_at").
+		Where("run_id = ?", runID).
+		Scan(&createdAt).Error; err != nil {
+		return nil, fmt.Errorf("fetching run_stats created_at for run_id %q: %w", runID, err)
+	}
+
+	now := time.Now()
+	var duration int64
+	if !createdAt.IsZero() {
+		duration = now.Sub(createdAt).Milliseconds()
+	}
+
 	// Build update payload with stats and timestamp.
 	updatePayload := map[string]interface{}{
-		"updated_at": time.Now(),
+		"updated_at": now,
+		"duration":   duration,
 	}
 	for k, v := range stats {
 		updatePayload[k] = v
