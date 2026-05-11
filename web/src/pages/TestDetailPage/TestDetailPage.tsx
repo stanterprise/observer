@@ -188,7 +188,7 @@ export function TestDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link
-            to={`/suite_runs/${test.runId}`}
+            to={`/runs/${test.runId}`}
             className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md p-1"
             aria-label="Back to test run"
           >

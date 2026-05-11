@@ -57,7 +57,7 @@ export function TestTrendsPage() {
     } catch (err) {
       console.error("Error fetching test trends:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to fetch test trends"
+        err instanceof Error ? err.message : "Failed to fetch test trends",
       );
     } finally {
       setLoading(false);
@@ -134,7 +134,7 @@ export function TestTrendsPage() {
   const calculatePassRate = (trends: TestTrendItem[]) => {
     if (trends.length === 0) return 0;
     const passed = trends.filter(
-      (t) => t.status.toUpperCase() === "PASSED"
+      (t) => t.status.toUpperCase() === "PASSED",
     ).length;
     return ((passed / trends.length) * 100).toFixed(1);
   };
@@ -173,10 +173,18 @@ export function TestTrendsPage() {
       const data = payload[0].payload;
       return (
         <div className="bg-(--stitch-surface-card) p-3 border border-(--stitch-outline) rounded-lg shadow-lg">
-          <p className="font-semibold text-(--stitch-on-surface)">{data.name}</p>
-          <p className="text-sm text-(--stitch-on-surface-muted)">Duration: {data.duration}ms</p>
-          <p className="text-sm text-(--stitch-on-surface-muted)">Status: {data.status}</p>
-          <p className="text-xs text-(--stitch-on-surface-subtle) mt-1">{data.fullDate}</p>
+          <p className="font-semibold text-(--stitch-on-surface)">
+            {data.name}
+          </p>
+          <p className="text-sm text-(--stitch-on-surface-muted)">
+            Duration: {data.duration}ms
+          </p>
+          <p className="text-sm text-(--stitch-on-surface-muted)">
+            Status: {data.status}
+          </p>
+          <p className="text-xs text-(--stitch-on-surface-subtle) mt-1">
+            {data.fullDate}
+          </p>
         </div>
       );
     }
@@ -186,7 +194,9 @@ export function TestTrendsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-(--stitch-on-surface-muted)">Loading test trends...</div>
+        <div className="text-(--stitch-on-surface-muted)">
+          Loading test trends...
+        </div>
       </div>
     );
   }
@@ -240,7 +250,9 @@ export function TestTrendsPage() {
           <div>
             <div className="flex items-center space-x-2">
               <TrendingUp className="h-6 w-6 text-(--stitch-primary)" />
-              <h1 className="text-3xl font-bold text-(--stitch-on-surface)">Test Trends</h1>
+              <h1 className="text-3xl font-bold text-(--stitch-on-surface)">
+                Test Trends
+              </h1>
             </div>
             <p className="text-sm text-(--stitch-on-surface-muted) mt-1">
               Historical performance data across multiple runs
@@ -255,7 +267,9 @@ export function TestTrendsPage() {
           <CardTitle className="text-lg">Test ID</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="font-mono text-sm text-(--stitch-on-surface-muted) break-all">{testId}</p>
+          <p className="font-mono text-sm text-(--stitch-on-surface-muted) break-all">
+            {testId}
+          </p>
         </CardContent>
       </Card>
 
@@ -264,23 +278,33 @@ export function TestTrendsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">Total Runs</p>
-              <p className="text-3xl font-bold text-(--stitch-on-surface)">{stats.total}</p>
+              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">
+                Total Runs
+              </p>
+              <p className="text-3xl font-bold text-(--stitch-on-surface)">
+                {stats.total}
+              </p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">Pass Rate</p>
-              <p className="text-3xl font-bold text-(--status-success)">{passRate}%</p>
+              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">
+                Pass Rate
+              </p>
+              <p className="text-3xl font-bold text-(--status-success)">
+                {passRate}%
+              </p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">Passed</p>
+              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">
+                Passed
+              </p>
               <p className="text-3xl font-bold text-(--status-success)">
                 {stats.passed}
               </p>
@@ -290,8 +314,12 @@ export function TestTrendsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">Failed</p>
-              <p className="text-3xl font-bold text-(--status-failure)">{stats.failed}</p>
+              <p className="text-sm text-(--stitch-on-surface-muted) mb-1">
+                Failed
+              </p>
+              <p className="text-3xl font-bold text-(--status-failure)">
+                {stats.failed}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -304,7 +332,9 @@ export function TestTrendsPage() {
             <div className="flex items-center justify-center space-x-3">
               <Clock className="h-5 w-5 text-(--stitch-primary)" />
               <div className="text-center">
-                <p className="text-sm text-(--stitch-on-surface-muted)">Average Duration</p>
+                <p className="text-sm text-(--stitch-on-surface-muted)">
+                  Average Duration
+                </p>
                 <p className="text-xl font-semibold text-(--stitch-on-surface)">
                   {formatDuration(avgDuration)}
                 </p>
@@ -327,7 +357,10 @@ export function TestTrendsPage() {
                   data={prepareChartData(trends)}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-gray-200"
+                  />
                   <XAxis
                     dataKey="name"
                     tick={{ fontSize: 12 }}
@@ -395,10 +428,13 @@ export function TestTrendsPage() {
                 </thead>
                 <tbody className="bg-(--stitch-surface-card) divide-y divide-(--stitch-outline)">
                   {trends.map((trend, index) => (
-                    <tr key={`${trend.runId}-${trend.testId}-${index}`} className="hover:bg-(--stitch-surface-low)">
+                    <tr
+                      key={`${trend.runId}-${trend.testId}-${index}`}
+                      className="hover:bg-(--stitch-surface-low)"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link
-                          to={`/suite_runs/${trend.runId}`}
+                          to={`/runs/${trend.runId}`}
                           className="font-mono text-sm text-(--stitch-primary) hover:underline focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded"
                         >
                           {trend.runId.substring(0, 12)}...
@@ -415,7 +451,7 @@ export function TestTrendsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <Link
-                          to={`/suite_runs/${trend.runId}/tests/${trend.testId}`}
+                          to={`/runs/${trend.runId}/tests/${trend.testId}`}
                           className="text-(--stitch-primary) hover:text-(--stitch-primary) hover:underline focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded px-2 py-1"
                         >
                           View Details

@@ -47,7 +47,7 @@ export function Layout() {
                 <span className="sm:hidden">Home</span>
               </Link>
               <Link
-                to="/suite_runs"
+                to="/runs"
                 className={cn(
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive("/suite_runs")

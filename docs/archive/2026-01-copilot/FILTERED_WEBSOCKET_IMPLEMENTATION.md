@@ -291,17 +291,17 @@ App mounts
 ### Run-Specific Connection
 
 ```
-User navigates to /suite_runs/abc-123
+User navigates to /runs/abc-123
   → TestRunDetailPage mounts
   → Connect to ws://api/ws?runId=abc-123
   → Receives all events for run abc-123
 
-User navigates to /suite_runs/abc-123/tests/test-1
+User navigates to /runs/abc-123/tests/test-1
   → TestDetailPage mounts (same runId)
   → Connect to ws://api/ws?runId=abc-123 (same filter)
   → WebSocket hook detects duplicate filter, reuses connection
 
-User navigates to /suite_runs/xyz-456
+User navigates to /runs/xyz-456
   → TestRunDetailPage remounts with new runId
   → WebSocket hook detects filter change
   → Disconnects old connection (abc-123)

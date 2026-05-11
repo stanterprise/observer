@@ -318,7 +318,7 @@ export default function DashboardPage() {
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <Link
-                              to={`/suite_runs/${run.runId}`}
+                              to={`/runs/${run.runId}`}
                               className="font-medium text-(--stitch-primary) hover:opacity-90"
                             >
                               {run.runId}

@@ -18,14 +18,15 @@ import {
   X,
   FileText,
   RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 
 import type { TestRun } from "@/types/testRun";
-import { getRunCompletionStatus, getRunStatus } from "./utils";
+import { getRunCompletionStatus } from "./utils";
 import type { TestStatus } from "@/types/common";
 import Dialog from "@/components/Dialog";
 
-export function TestSuiteRunsPage() {
+export function TestRunsPage() {
   const pollIntervalMs = config.pollingIntervalMs;
   const { autoRefreshEnabled } = useRefresh();
   const [runs, setRuns] = useState<TestRun[]>([]);
@@ -258,7 +259,7 @@ export function TestSuiteRunsPage() {
         </h1>
         <div className="flex gap-2">
           <Link
-            to="/suite_runs/raw-messages"
+            to="/runs/raw-messages"
             className="px-4 py-2 bg-(--stitch-surface-card) text-(--stitch-on-surface) border border-(--stitch-outline) rounded-md hover:bg-(--stitch-surface-card) transition-colors flex items-center gap-2"
           >
             <FileText className="h-4 w-4" />
@@ -456,6 +457,11 @@ export function TestSuiteRunsPage() {
                         </span>
                         {" + "}
                         <span className="inline-flex items-center justify-center">
+                          <AlertTriangle className="h-4 w-4 mr-1 text-(--status-warning)" />
+                          Flaky
+                        </span>
+                        {" + "}
+                        <span className="inline-flex items-center justify-center">
                           <XCircle className="h-4 w-4 mr-1 text-(--status-failure)" />
                           Failed
                         </span>
@@ -485,7 +491,7 @@ export function TestSuiteRunsPage() {
                         }`}
                       >
                         <Clock className="h-4 w-4 mr-1" />
-                        Last Updated
+                        Created At
                         <ArrowUpDown className="h-3 w-3 ml-1" />
                       </button>
                     </th>
@@ -493,7 +499,7 @@ export function TestSuiteRunsPage() {
                 </thead>
                 <tbody className="bg-(--stitch-surface-card) divide-y divide-(--stitch-outline)">
                   {sortedRuns.map((run) => {
-                    const status = getRunStatus(run);
+                    const status = run.status as TestStatus;
                     const runCompletionStatus = getRunCompletionStatus(
                       run.status as TestStatus,
                     );
@@ -513,7 +519,7 @@ export function TestSuiteRunsPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-normal wrap-break-word max-w-152">
                           <Link
-                            to={`/suite_runs/${run.id}`}
+                            to={`/runs/${run.id}`}
                             className="text-(--stitch-primary) hover:text-(--stitch-primary) font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded"
                           >
                             {run.name || run.id}
@@ -554,6 +560,10 @@ export function TestSuiteRunsPage() {
                               (run.statistics!.interrupted || 0)}
                           </span>
                           {" + "}
+                          <span className="text-(--status-warning) font-semibold">
+                            {run.statistics!.flaky || 0}
+                          </span>
+                          {" + "}
                           <span className="text-(--stitch-on-surface-muted) font-semibold">
                             {run.statistics!.skipped}
                           </span>
@@ -563,13 +573,13 @@ export function TestSuiteRunsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-normal text-sm text-(--stitch-on-surface-muted)">
-                          {run.updatedAt ? (
+                          {run.createdAt ? (
                             <div className="flex flex-col">
                               <span>
-                                {new Date(run.updatedAt).toLocaleDateString()}
+                                {new Date(run.createdAt).toLocaleDateString()}
                               </span>
                               <span className="text-xs text-(--stitch-on-surface-muted)">
-                                {new Date(run.updatedAt).toLocaleTimeString()}
+                                {new Date(run.createdAt).toLocaleTimeString()}
                               </span>
                             </div>
                           ) : (

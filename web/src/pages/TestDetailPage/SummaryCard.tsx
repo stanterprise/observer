@@ -74,7 +74,7 @@ export default function SummaryCard({
                 </dt>
                 <dd className="text-right ml-4">
                   <Link
-                    to={`/suite_runs/${test.runId}`}
+                    to={`/runs/${test.runId}`}
                     className="font-mono text-(--stitch-primary) hover:underline focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded"
                   >
                     {test.runId}

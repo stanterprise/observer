@@ -16,7 +16,7 @@ export default ({ test, runId }: TestRecordProps) => {
   return (
     <Link
       key={test.id}
-      to={`/suite_runs/${runId}/tests/${test.id}`}
+      to={`/runs/${runId}/tests/${test.id}`}
       className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
     >
       <Card className="group cursor-pointer transition-colors duration-200 hover:border-(--status-running-border) hover:bg-(--stitch-surface-low)">

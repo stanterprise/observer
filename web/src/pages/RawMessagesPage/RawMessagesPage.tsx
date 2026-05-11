@@ -318,7 +318,7 @@ export function RawMessagesPage() {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <Link
-          to={`/suite_runs/${runId}`}
+          to={`/runs/${runId}`}
           className="inline-flex items-center gap-2 text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] transition-colors group"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
@@ -356,7 +356,7 @@ export function RawMessagesPage() {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <Link
-          to={`/suite_runs/${runId}`}
+          to={`/runs/${runId}`}
           className="inline-flex items-center gap-2 text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] transition-colors group"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
@@ -389,7 +389,7 @@ export function RawMessagesPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Link
-            to={`/suite_runs/${runId}`}
+            to={`/runs/${runId}`}
             className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-[var(--stitch-surface-card)] border border-[var(--stitch-outline)] text-[var(--stitch-on-surface)] hover:bg-[var(--stitch-surface-card)] hover:border-[var(--stitch-outline)] transition-all shadow-sm hover:shadow group"
             aria-label="Back to run detail"
           >
@@ -408,7 +408,7 @@ export function RawMessagesPage() {
         {/* Header actions */}
         <div className="flex items-center gap-3">
           <Link
-            to="/suite_runs/raw-messages"
+            to="/runs/raw-messages"
             className="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--stitch-surface-card)] border border-[var(--stitch-outline)] rounded-lg text-sm font-medium text-[var(--stitch-on-surface)] shadow-sm hover:bg-[var(--stitch-surface-card)] hover:border-[var(--stitch-outline)] transition-colors"
           >
             Directory

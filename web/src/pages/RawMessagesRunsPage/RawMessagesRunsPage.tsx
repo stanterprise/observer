@@ -56,7 +56,9 @@ export function RawMessagesRunsPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <h1 className="text-3xl font-bold text-(--stitch-on-surface)">Raw Message Runs</h1>
+        <h1 className="text-3xl font-bold text-(--stitch-on-surface)">
+          Raw Message Runs
+        </h1>
         <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
             <div
@@ -90,7 +92,9 @@ export function RawMessagesRunsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-(--stitch-on-surface)">Raw Message Runs</h1>
+          <h1 className="text-3xl font-bold text-(--stitch-on-surface)">
+            Raw Message Runs
+          </h1>
           <p className="text-sm text-(--stitch-on-surface-subtle) mt-1">
             Directory of runs with retained NATS messages
           </p>
@@ -106,7 +110,9 @@ export function RawMessagesRunsPage() {
 
       {error && (
         <Card className="border border-(--status-failure-border) bg-(--status-failure-soft)/50">
-          <CardContent className="py-4 text-(--status-failure)">{error}</CardContent>
+          <CardContent className="py-4 text-(--status-failure)">
+            {error}
+          </CardContent>
         </Card>
       )}
 
@@ -121,7 +127,7 @@ export function RawMessagesRunsPage() {
           {runs.map((run) => (
             <Link
               key={run.runId}
-              to={`/suite_runs/${run.runId}/raw-messages`}
+              to={`/runs/${run.runId}/raw-messages`}
               className="block"
             >
               <Card className="hover:border-(--status-running-border) hover:shadow-md transition-all">

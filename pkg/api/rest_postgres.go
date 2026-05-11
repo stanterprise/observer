@@ -86,24 +86,50 @@ func (h *PostgresHandler) handleRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit, offset := parseLimitOffset(r, 50)
-	docs, _, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{}, limit, offset, false)
+	stats, err := h.repo.GetAllRunStats(r.Context(), limit, offset)
 	if err != nil {
-		h.logger.Error("failed to fetch runs from postgres", "error", err)
+		h.logger.Error("failed to fetch run stats from postgres", "error", err)
 		h.internalError(w)
 		return
 	}
 
-	runs := make([]map[string]interface{}, 0, len(docs))
-	for _, doc := range docs {
-		allTests := flattenRunTests(doc)
+	runIDs := make([]string, 0, len(stats))
+	for _, stat := range stats {
+		runIDs = append(runIDs, stat.RunID)
+	}
+
+	metadataByRunID, err := h.repo.GetRunMetadataByIDs(r.Context(), runIDs)
+	if err != nil {
+		h.logger.Error("failed to fetch run metadata from postgres", "error", err)
+		h.internalError(w)
+		return
+	}
+
+	runs := make([]map[string]interface{}, 0, len(stats))
+	for _, stat := range stats {
+		runStatus := "PASSED"
+		if stat.Running == 0 {
+			if stat.Failed > 0 {
+				runStatus = "FAILED"
+			}
+		} else {
+			runStatus = "RUNNING"
+		}
+
+		metadata := map[string]interface{}{}
+		if m, ok := metadataByRunID[stat.RunID]; ok && m != nil {
+			metadata = m
+		}
+
 		runs = append(runs, map[string]interface{}{
-			"id":         doc.ID,
-			"name":       doc.Name,
-			"updatedAt":  doc.UpdatedAt,
-			"totalTests": len(allTests),
-			"status":     doc.Status,
-			"metadata":   doc.Metadata,
-			"statistics": buildTestStatistics(allTests),
+			"id":         stat.RunID,
+			"name":       stat.Name,
+			"createdAt":  stat.CreatedAt,
+			"updatedAt":  stat.UpdatedAt,
+			"totalTests": stat.Total,
+			"status":     runStatus,
+			"metadata":   metadata,
+			"statistics": stat,
 		})
 	}
 
@@ -117,35 +143,16 @@ func (h *PostgresHandler) handleRunsStats(w http.ResponseWriter, r *http.Request
 	}
 
 	limit, offset := parseLimitOffset(r, 50)
-	docs, _, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{}, limit, offset, false)
+	stats, err := h.repo.GetAllRunStats(r.Context(), limit, offset)
 	if err != nil {
 		h.logger.Error("failed to fetch run stats from postgres", "error", err)
 		h.internalError(w)
 		return
 	}
 
-	runStats := make([]map[string]interface{}, 0, len(docs))
-	for _, doc := range docs {
-		allTests := flattenRunTests(doc)
-		stats := buildTestStatistics(allTests)
-		runStat := map[string]interface{}{
-			"runName":     doc.Name,
-			"runId":       doc.ID,
-			"total":       stats["total"],
-			"passed":      stats["passed"],
-			"failed":      stats["failed"],
-			"skipped":     stats["skipped"],
-			"running":     stats["running"],
-			"broken":      stats["broken"],
-			"timedout":    stats["timedout"],
-			"interrupted": stats["interrupted"],
-			"unknown":     stats["unknown"],
-		}
-		lastUpdated := latestTestUpdate(allTests)
-		if !lastUpdated.IsZero() {
-			runStat["lastUpdated"] = lastUpdated.Format(time.RFC3339)
-		}
-		runStats = append(runStats, runStat)
+	runStats := make([]m.RunStat, 0, len(stats))
+	for _, stat := range stats {
+		runStats = append(runStats, stat)
 	}
 
 	h.writeJSON(w, map[string]interface{}{"runs": runStats})
