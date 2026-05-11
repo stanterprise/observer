@@ -36,7 +36,7 @@ func (r *PostgresRepository) GetAllRunStats(ctx context.Context, limit int64, of
 		Order(clause.OrderBy{Columns: []clause.OrderByColumn{
 			{
 				Column: clause.Column{Name: "created_at"},
-				Desc:   false,
+				Desc:   true,
 			},
 		}}).
 		Limit(int(limit)).

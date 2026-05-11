@@ -41,7 +41,7 @@ func mapStatusToRunStatsColumn(status string) string {
 func (r *PostgresRepository) collectRunStats(ctx context.Context, tx *gorm.DB, runID string) (map[string]interface{}, error) {
 	var grouped []runStatusCount
 	if err := tx.WithContext(ctx).
-		Table("public.tests").
+		Table("tests").
 		Select("status, count(*) as count").
 		Where("run_id = ?", runID).
 		Group("status").
