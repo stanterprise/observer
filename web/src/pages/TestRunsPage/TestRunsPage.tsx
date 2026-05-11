@@ -545,15 +545,15 @@ export function TestRunsPage() {
                             {run.statistics!.passed}
                           </span>
                           {" + "}
+                          <span className="text-(--status-warning) font-semibold">
+                            {run.statistics!.flaky || 0}
+                          </span>
+                          {" + "}
                           <span className="text-(--status-failure) font-semibold">
                             {run.statistics!.failed +
                               (run.statistics!.broken || 0) +
                               (run.statistics!.timedout || 0) +
                               (run.statistics!.interrupted || 0)}
-                          </span>
-                          {" + "}
-                          <span className="text-(--status-warning) font-semibold">
-                            {run.statistics!.flaky || 0}
                           </span>
                           {" + "}
                           <span className="text-(--stitch-on-surface-muted) font-semibold">
