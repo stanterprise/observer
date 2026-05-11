@@ -8,7 +8,6 @@ import (
 	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // UpsertRunStart upserts a TestRun row from a mapped run start event.
@@ -29,29 +28,6 @@ func (r *PostgresRepository) UpsertRunStart(ctx context.Context, run *m.TestRun)
 	run.UpdatedAt = now
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		statsCreatedAt := now
-		if run.StartTime != nil {
-			statsCreatedAt = *run.StartTime
-		}
-
-		stats := m.RunStat{
-			RunID:     run.ID,
-			Name:      run.Name,
-			Total:     run.TotalTests,
-			CreatedAt: statsCreatedAt,
-			UpdatedAt: now,
-		}
-
-		if err := tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "run_id"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{
-				"name":       run.Name,
-				"updated_at": now,
-			}),
-		}).Create(&stats).Error; err != nil {
-			return fmt.Errorf("upsert run stat: %w", err)
-		}
-
 		assignment := m.TestRun{
 			Name:        run.Name,
 			Status:      "RUNNING",
