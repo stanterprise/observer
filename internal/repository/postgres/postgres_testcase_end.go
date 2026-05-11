@@ -81,40 +81,8 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 			return fmt.Errorf("finalize relational test: %w", err)
 		}
 
-		var testStatus string
-
-		if overallStatus == "PASSED" && *test.RetryCount > 0 {
-			testStatus = "FLAKY"
-		} else {
-			testStatus = overallStatus
-		}
-		stats, err := r.GetRunStats(ctx, test.RunID)
-		if err != nil {
-			return fmt.Errorf("get run stats: %w", err)
-		}
-
-		switch testStatus {
-		case "PASSED":
-			stats.Passed++
-		case "FAILED":
-			stats.Failed++
-		case "FLAKY":
-			stats.Flaky++
-		case "SKIPPED":
-			stats.Skipped++
-		case "TIMED_OUT":
-			stats.TimedOut++
-		case "INTERRUPTED":
-			stats.Interrupted++
-		case "BROKEN":
-			stats.Broken++
-		case "UNKNOWN":
-			stats.Unknown++
-		}
-
-		stats.UpdatedAt = now
-		if err := tx.Save(stats).Error; err != nil {
-			return fmt.Errorf("update run stats: %w", err)
+		if _, err := r.collectRunStats(ctx, tx, test.RunID); err != nil {
+			r.logger.Error("collect run stats: %w", err)
 		}
 
 		return nil

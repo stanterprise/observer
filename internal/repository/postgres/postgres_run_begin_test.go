@@ -139,6 +139,35 @@ func TestUpsertRunStartSuitesAndTests(t *testing.T) {
 	}
 }
 
+func TestUpsertRunStart_CreatesRunStatsWhenStartTimeMissing(t *testing.T) {
+	repo := newSQLitePostgresRepository(t)
+	ctx := context.Background()
+
+	run := &m.TestRun{
+		ID:       "run-456",
+		Name:     "No Start Time",
+		Status:   "RUNNING",
+		Metadata: map[string]interface{}{"marker": "smoke"},
+	}
+
+	if err := repo.UpsertRunStart(ctx, run); err != nil {
+		t.Fatalf("UpsertRunStart failed: %v", err)
+	}
+
+	var storedRun m.TestRun
+	if err := repo.db.WithContext(ctx).First(&storedRun, "id = ?", run.ID).Error; err != nil {
+		t.Fatalf("load stored run: %v", err)
+	}
+
+	var stats m.RunStat
+	if err := repo.db.WithContext(ctx).First(&stats, "run_id = ?", run.ID).Error; err != nil {
+		t.Fatalf("load run stats: %v", err)
+	}
+	if stats.Name != run.Name {
+		t.Fatalf("run stats name = %q, want %q", stats.Name, run.Name)
+	}
+}
+
 func TestUpsertRunStartTests_PreservesTerminalStateAndAddsUniqueTests(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()

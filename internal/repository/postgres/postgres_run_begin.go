@@ -61,6 +61,31 @@ func (r *PostgresRepository) UpsertRunStart(ctx context.Context, run *m.TestRun)
 			return fmt.Errorf("upsert run start: %w", result.Error)
 		}
 
+		runStatsName := run.Name
+		if runStatsName == "" {
+			runStatsName = run.ID
+		}
+
+		stat := m.RunStat{RunID: run.ID}
+		err := tx.Where("run_id = ?", run.ID).First(&stat).Error
+		if err != nil {
+			if err != gorm.ErrRecordNotFound {
+				return fmt.Errorf("load run stats for run start %s: %w", run.ID, err)
+			}
+
+			stat = m.RunStat{
+				RunID: run.ID,
+				Name:  runStatsName,
+			}
+			if run.StartTime != nil {
+				stat.CreatedAt = *run.StartTime
+				stat.UpdatedAt = *run.StartTime
+			}
+			if err := tx.Create(&stat).Error; err != nil {
+				return fmt.Errorf("create run stats for run start %s: %w", run.ID, err)
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
