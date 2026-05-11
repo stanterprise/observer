@@ -33,7 +33,7 @@ SELECT
     COUNT(CASE WHEN t.status = 'UNKNOWN' THEN 1 END) as unknown,
     COUNT(CASE WHEN t.status = 'NOT_RUN' THEN 1 END) as not_run,
     COUNT(CASE WHEN t.status = 'RUNNING' THEN 1 END) as running,
-    EXTRACT(EPOCH FROM (r.finished_at - r.started_at)) * 1000 as duration,
+    COALESCE(EXTRACT(EPOCH FROM (r.updated_at - r.created_at)) * 1000, 0)::BIGINT as duration,
     r.created_at,
     r.updated_at
 FROM runs r
