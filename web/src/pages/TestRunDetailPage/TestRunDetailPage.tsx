@@ -12,7 +12,6 @@ import {
   X,
   Filter,
   Map as MapIcon,
-  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -523,13 +522,6 @@ export function TestRunDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            to={`/runs/${runId}/raw-messages`}
-            className="inline-flex items-center gap-2 rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-card) px-4 py-2 text-(--stitch-on-surface-muted) transition-colors hover:bg-(--stitch-surface-low) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
-          >
-            <FileText className="h-5 w-5" />
-            <span className="font-medium">Raw Messages</span>
-          </Link>
           <Link
             to={`/runs/${runId}/map`}
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"

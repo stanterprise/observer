@@ -16,7 +16,6 @@ import {
   AlertCircle,
   Tag,
   X,
-  FileText,
   RefreshCw,
   AlertTriangle,
 } from "lucide-react";
@@ -258,13 +257,6 @@ export function TestRunsPage() {
           Test Suite Runs
         </h1>
         <div className="flex gap-2">
-          <Link
-            to="/runs/raw-messages"
-            className="px-4 py-2 bg-(--stitch-surface-card) text-(--stitch-on-surface) border border-(--stitch-outline) rounded-md hover:bg-(--stitch-surface-card) transition-colors flex items-center gap-2"
-          >
-            <FileText className="h-4 w-4" />
-            Raw Messages
-          </Link>
           {selectedRuns.size > 0 && (
             <>
               <button
