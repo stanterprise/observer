@@ -224,7 +224,7 @@ npm run dev
 Route is defined in `web/src/App.tsx`:
 
 ```typescript
-<Route path="suite_runs/:runId/map" element={<TestMapPage />} />
+<Route path="/runs/:runId/map" element={<TestMapPage />} />
 ```
 
 ## Future Enhancements
