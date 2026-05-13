@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS run_stats (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+
 -- Backfill existing runs with run_stats records based on actual test statuses
 INSERT INTO run_stats (run_id, name, total, passed, failed, skipped, flaky, broken, timedout, interrupted, unknown, not_run, running, duration, created_at, updated_at)
 SELECT
