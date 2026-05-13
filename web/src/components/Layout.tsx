@@ -47,10 +47,10 @@ export function Layout() {
                 <span className="sm:hidden">Home</span>
               </Link>
               <Link
-                to="/suite_runs"
+                to="/runs"
                 className={cn(
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  isActive("/suite_runs")
+                  isActive("/runs")
                     ? "bg-(--stitch-primary-soft) text-(--stitch-primary)"
                     : "text-(--stitch-on-surface-muted) hover:text-(--stitch-on-surface) hover:bg-(--stitch-surface-low)",
                 )}

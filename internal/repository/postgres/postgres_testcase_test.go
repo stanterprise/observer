@@ -226,12 +226,13 @@ func TestUpsertTestBeginCreatesTestAndAttempt(t *testing.T) {
 func TestUpsertTestBeginCreatesPlaceholderSuiteWhenMissing(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
+	runID := "run-123"
 	suiteID := "suite-missing"
 	start := time.Date(2026, 5, 6, 3, 0, 0, 0, time.UTC)
 
 	test := &m.Test{
 		ID:             "test-123",
-		RunID:          "run-123",
+		RunID:          runID,
 		ExternalTestID: "test-123",
 		SuiteID:        &suiteID,
 		Name:           "My Test",
@@ -239,18 +240,26 @@ func TestUpsertTestBeginCreatesPlaceholderSuiteWhenMissing(t *testing.T) {
 		Status:         "RUNNING",
 		StartTime:      &start,
 	}
-	attempt := &m.TestAttempt{RunID: "run-123", TestID: "test-123", AttemptIndex: 0, Status: "RUNNING", StartTime: &start}
+	attempt := &m.TestAttempt{RunID: runID, TestID: "test-123", AttemptIndex: 0, Status: "RUNNING", StartTime: &start}
 
 	if err := repo.UpsertTestBegin(ctx, test, attempt); err != nil {
 		t.Fatalf("UpsertTestBegin failed: %v", err)
 	}
 
 	var suite m.Suite
-	if err := repo.db.WithContext(ctx).Where("run_id = ? AND id = ?", "run-123", suiteID).First(&suite).Error; err != nil {
+	if err := repo.db.WithContext(ctx).Where("run_id = ? AND id = ?", runID, suiteID).First(&suite).Error; err != nil {
 		t.Fatalf("load placeholder suite: %v", err)
 	}
 	if suite.ExternalSuiteID != suiteID {
 		t.Fatalf("suite.ExternalSuiteID = %q, want %q", suite.ExternalSuiteID, suiteID)
+	}
+
+	var run m.TestRun
+	if err := repo.db.WithContext(ctx).Where("id = ?", runID).First(&run).Error; err != nil {
+		t.Fatalf("load placeholder run: %v", err)
+	}
+	if run.Status != "RUNNING" {
+		t.Fatalf("run.Status = %q, want RUNNING", run.Status)
 	}
 }
 

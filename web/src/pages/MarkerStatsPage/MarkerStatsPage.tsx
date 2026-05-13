@@ -61,7 +61,9 @@ export function MarkerStatsPage() {
   const fetchMarkerStats = async (marker: string) => {
     try {
       setLoading(true);
-      const response = await fetch(apiUrl(`/marker/${encodeURIComponent(marker)}/stats?limit=100`));
+      const response = await fetch(
+        apiUrl(`/marker/${encodeURIComponent(marker)}/stats?limit=100`),
+      );
       if (!response.ok) {
         throw new Error(`Failed to fetch marker stats: ${response.statusText}`);
       }
@@ -71,7 +73,9 @@ export function MarkerStatsPage() {
     } catch (err) {
       console.error("Error fetching marker stats:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to fetch marker statistics"
+        err instanceof Error
+          ? err.message
+          : "Failed to fetch marker statistics",
       );
     } finally {
       setLoading(false);
@@ -145,10 +149,14 @@ export function MarkerStatsPage() {
   const prepareTimelineData = (runs: RunStat[]) => {
     // Sort by createdAt (oldest to newest for chronological order)
     return [...runs]
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      )
       .map((run, index) => {
         const date = new Date(run.createdAt);
-        const passRate = run.total > 0 ? ((run.passed / run.total) * 100).toFixed(1) : 0;
+        const passRate =
+          run.total > 0 ? ((run.passed / run.total) * 100).toFixed(1) : 0;
         return {
           name: `Run ${index + 1}`,
           runId: run.runId.substring(0, 8),
@@ -171,7 +179,11 @@ export function MarkerStatsPage() {
       { name: "Skipped", value: aggregateStats.skipped, fill: "#f59e0b" },
       { name: "Broken", value: aggregateStats.broken, fill: "#f97316" },
       { name: "Timedout", value: aggregateStats.timedout, fill: "#ec4899" },
-      { name: "Interrupted", value: aggregateStats.interrupted, fill: "#8b5cf6" },
+      {
+        name: "Interrupted",
+        value: aggregateStats.interrupted,
+        fill: "#8b5cf6",
+      },
       { name: "Unknown", value: aggregateStats.unknown, fill: "#6b7280" },
     ].filter((item) => item.value > 0);
   };
@@ -181,13 +193,27 @@ export function MarkerStatsPage() {
       const data = payload[0].payload;
       return (
         <div className="bg-[var(--stitch-surface-card)] p-3 border border-[var(--stitch-outline)] rounded-lg shadow-lg">
-          <p className="font-semibold text-[var(--stitch-on-surface)]">{data.name}</p>
-          <p className="text-sm text-[var(--stitch-on-surface-muted)]">Run ID: {data.runId}</p>
-          <p className="text-sm text-[var(--stitch-on-surface-muted)]">Passed: {data.passed}</p>
-          <p className="text-sm text-[var(--stitch-on-surface-muted)]">Failed: {data.failed}</p>
-          <p className="text-sm text-[var(--stitch-on-surface-muted)]">Total: {data.total}</p>
-          <p className="text-sm text-[var(--stitch-on-surface-muted)]">Pass Rate: {data.passRate}%</p>
-          <p className="text-xs text-[var(--stitch-on-surface-muted)] mt-1">{data.fullDate}</p>
+          <p className="font-semibold text-[var(--stitch-on-surface)]">
+            {data.name}
+          </p>
+          <p className="text-sm text-[var(--stitch-on-surface-muted)]">
+            Run ID: {data.runId}
+          </p>
+          <p className="text-sm text-[var(--stitch-on-surface-muted)]">
+            Passed: {data.passed}
+          </p>
+          <p className="text-sm text-[var(--stitch-on-surface-muted)]">
+            Failed: {data.failed}
+          </p>
+          <p className="text-sm text-[var(--stitch-on-surface-muted)]">
+            Total: {data.total}
+          </p>
+          <p className="text-sm text-[var(--stitch-on-surface-muted)]">
+            Pass Rate: {data.passRate}%
+          </p>
+          <p className="text-xs text-[var(--stitch-on-surface-muted)] mt-1">
+            {data.fullDate}
+          </p>
         </div>
       );
     }
@@ -197,7 +223,9 @@ export function MarkerStatsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-[var(--stitch-on-surface-muted)]">Loading marker statistics...</div>
+        <div className="text-[var(--stitch-on-surface-muted)]">
+          Loading marker statistics...
+        </div>
       </div>
     );
   }
@@ -278,7 +306,9 @@ export function MarkerStatsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">Total Runs</p>
+              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">
+                Total Runs
+              </p>
               <p className="text-3xl font-bold text-[var(--stitch-on-surface)]">
                 {aggregateStats.totalRuns}
               </p>
@@ -288,7 +318,9 @@ export function MarkerStatsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">Total Tests</p>
+              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">
+                Total Tests
+              </p>
               <p className="text-3xl font-bold text-[var(--stitch-on-surface)]">
                 {aggregateStats.totalTests}
               </p>
@@ -298,15 +330,21 @@ export function MarkerStatsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">Pass Rate</p>
-              <p className="text-3xl font-bold text-[var(--status-success)]">{passRate}%</p>
+              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">
+                Pass Rate
+              </p>
+              <p className="text-3xl font-bold text-[var(--status-success)]">
+                {passRate}%
+              </p>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">Passed</p>
+              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">
+                Passed
+              </p>
               <p className="text-3xl font-bold text-[var(--status-success)]">
                 {aggregateStats.passed}
               </p>
@@ -316,7 +354,9 @@ export function MarkerStatsPage() {
         <Card>
           <CardContent className="py-6">
             <div className="text-center">
-              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">Failed</p>
+              <p className="text-sm text-[var(--stitch-on-surface-muted)] mb-1">
+                Failed
+              </p>
               <p className="text-3xl font-bold text-[var(--status-failure)]">
                 {aggregateStats.failed}
               </p>
@@ -341,7 +381,10 @@ export function MarkerStatsPage() {
                   data={prepareTimelineData(runs)}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-gray-200"
+                  />
                   <XAxis
                     dataKey="name"
                     tick={{ fontSize: 12 }}
@@ -392,7 +435,10 @@ export function MarkerStatsPage() {
                   data={prepareTimelineData(runs)}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-gray-200"
+                  />
                   <XAxis
                     dataKey="name"
                     tick={{ fontSize: 12 }}
@@ -448,7 +494,10 @@ export function MarkerStatsPage() {
                   data={prepareStatusDistribution(runs)}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-gray-200"
+                  />
                   <XAxis
                     dataKey="name"
                     tick={{ fontSize: 12 }}
@@ -517,14 +566,18 @@ export function MarkerStatsPage() {
                 </thead>
                 <tbody className="bg-[var(--stitch-surface-card)] divide-y divide-[var(--stitch-outline)]">
                   {runs.map((run) => {
-                    const runPassRate = run.total > 0 
-                      ? ((run.passed / run.total) * 100).toFixed(1)
-                      : "0.0";
+                    const runPassRate =
+                      run.total > 0
+                        ? ((run.passed / run.total) * 100).toFixed(1)
+                        : "0.0";
                     return (
-                      <tr key={run.runId} className="hover:bg-[var(--stitch-surface-card)]">
+                      <tr
+                        key={run.runId}
+                        className="hover:bg-[var(--stitch-surface-card)]"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Link
-                            to={`/suite_runs/${run.runId}`}
+                            to={`/runs/${run.runId}`}
                             className="font-mono text-sm text-[var(--stitch-primary)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--stitch-primary)] focus:ring-offset-2 rounded"
                           >
                             {run.runId.substring(0, 12)}...
@@ -560,7 +613,7 @@ export function MarkerStatsPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <Link
-                            to={`/suite_runs/${run.runId}`}
+                            to={`/runs/${run.runId}`}
                             className="text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--stitch-primary)] focus:ring-offset-2 rounded px-2 py-1"
                           >
                             View Details

@@ -5,27 +5,28 @@ This directory contains GitHub-specific configuration files and workflows.
 ## Contents
 
 ### Workflows
+
 - `docker-publish.yml` - Automated Docker image builds and publishing to GitHub Container Registry
 
 ### AI Agent Configurations (`agents/`)
 
-This project uses GitHub Copilot and custom AI agents for development workflow automation. The agent configuration files in the `agents/` directory define specialized agents for:
+This project uses a lean set of custom GitHub Copilot agents:
 
 - **Architecture** (`architect.agent.md`) - System design and architecture decisions
-- **Development** (`developer.agent.md`) - Code implementation and feature development  
+- **Development** (`developer.agent.md`) - Code implementation and feature development
 - **DevOps** (`devops.agent.md`) - Infrastructure, deployment, and CI/CD
 - **Documentation** (`documentation.agent.md`) - Technical writing and documentation
-- **Testing** (`testing.agent.md`) - Test strategy and test automation
-- **UX Design** (`ux-designer.agent.md`) - UI/UX design and frontend development
-- **SpecKit** agents - Project specification and planning workflow tools
+- **Testing** (`testing.agent.md`) - Test strategy and automation
+- **UX Design** (`ux-designer.agent.md`) - UI/UX and accessibility
 
-These configuration files are part of our internal development process and provide context to AI tools. They do not affect the runtime behavior of the Observer service.
+These configuration files support development workflows only. They do not affect runtime behavior of the Observer service.
 
 **Note for contributors**: These files document our development workflow and conventions. While you don't need to use these tools to contribute, they provide valuable context about the project's architecture and best practices.
 
 ### Development Instructions (`copilot-instructions.md`)
 
 Comprehensive AI agent instructions that document:
+
 - Service architecture and component boundaries
 - Database integration patterns and safety rules
 - NATS messaging patterns

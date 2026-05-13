@@ -333,16 +333,16 @@ User Journey                    Active WebSocket Connections
 2. Goes to /dashboard           [Global: test/run events]
                                 [Dashboard: run.start/end] ✅ NEW
 
-3. Goes to /suite_runs          [Global: test/run events]
+3. Goes to /runs          [Global: test/run events]
                                 [Dashboard: CLOSED] ✅ CLEANUP
 
-4. Goes to /suite_runs/abc-123  [Global: test/run events]
+4. Goes to /runs/abc-123  [Global: test/run events]
                                 [Run: runId=abc-123] ✅ NEW
 
-5. Goes to /suite_runs/xyz-789  [Global: test/run events]
+5. Goes to /runs/xyz-789  [Global: test/run events]
                                 [Run: runId=xyz-789] ✅ REPLACED
 
-6. Goes to /suite_runs          [Global: test/run events]
+6. Goes to /runs          [Global: test/run events]
                                 [Run: CLOSED] ✅ CLEANUP
 
 Total connections at any time: Max 2 (Global + Page-specific)

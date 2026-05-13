@@ -498,7 +498,7 @@ export function TestMapPage() {
   };
 
   const handleTestClick = (testId: string) => {
-    navigate(`/suite_runs/${runId}/tests/${testId}`);
+    navigate(`/runs/${runId}/tests/${testId}`);
   };
 
   if (loading) {
@@ -536,7 +536,7 @@ export function TestMapPage() {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <Link
-          to={`/suite_runs/${runId}`}
+          to={`/runs/${runId}`}
           className="inline-flex items-center gap-2 text-[var(--stitch-primary)] hover:text-[var(--stitch-primary)] transition-colors group"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
@@ -555,7 +555,7 @@ export function TestMapPage() {
                 {error || "Unknown error"}
               </p>
               <Link
-                to={`/suite_runs/${runId}`}
+                to={`/runs/${runId}`}
                 className="inline-flex items-center px-4 py-2 bg-[var(--stitch-primary-soft)] text-[var(--stitch-on-surface)] rounded-lg hover:bg-[var(--stitch-primary-soft)] transition-colors"
               >
                 Back to Test Run
@@ -573,7 +573,7 @@ export function TestMapPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link
-            to={`/suite_runs/${runId}`}
+            to={`/runs/${runId}`}
             className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-[var(--stitch-surface-card)] border border-[var(--stitch-outline)] text-[var(--stitch-on-surface)] hover:bg-[var(--stitch-surface-card)] hover:border-[var(--stitch-outline)] transition-all shadow-sm hover:shadow group"
             aria-label="Back to test run"
           >

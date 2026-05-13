@@ -81,6 +81,10 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 			return fmt.Errorf("finalize relational test: %w", err)
 		}
 
+		if _, err := r.collectRunStats(ctx, tx, test.RunID); err != nil {
+			r.logger.Error("collect run stats", "err", err)
+		}
+
 		return nil
 	})
 	if err != nil {

@@ -4,7 +4,7 @@ import { Layout } from "./components/Layout";
 import {
   TestRunDetailPage,
   TestDetailPage,
-  TestSuiteRunsPage,
+  TestRunsPage,
   TestTrendsPage,
   MarkerStatsPage,
   MarkerBrowsePage,
@@ -21,8 +21,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<DashboardPage />} />
-          <Route path="suite_runs">
-            <Route index element={<TestSuiteRunsPage />} />
+          <Route path="runs">
+            <Route index element={<TestRunsPage />} />
             <Route path="raw-messages" element={<RawMessagesRunsPage />} />
             <Route path=":runId" element={<TestRunDetailPage />} />
             <Route path=":runId/map" element={<TestMapPage />} />

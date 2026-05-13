@@ -246,6 +246,29 @@ func (Attachment) TableName() string {
 	return "attachments"
 }
 
+type RunStat struct {
+	RunID       string    `gorm:"column:run_id;type:text;primaryKey" json:"runId"`
+	Name        string    `gorm:"column:name;type:text" json:"name"`
+	Total       int32     `gorm:"column:total" json:"total"`
+	Passed      int32     `gorm:"column:passed" json:"passed"`
+	Failed      int32     `gorm:"column:failed" json:"failed"`
+	Flaky       int32     `gorm:"column:flaky" json:"flaky"`
+	Skipped     int32     `gorm:"column:skipped" json:"skipped"`
+	Broken      int32     `gorm:"column:broken" json:"broken"`
+	TimedOut    int32     `gorm:"column:timedout" json:"timedOut"`
+	Interrupted int32     `gorm:"column:interrupted" json:"interrupted"`
+	Unknown     int32     `gorm:"column:unknown" json:"unknown"`
+	NotRun      int32     `gorm:"column:not_run" json:"notRun"`
+	Running     int32     `gorm:"column:running" json:"running"`
+	Duration    int64     `gorm:"column:duration" json:"duration"`
+	CreatedAt   time.Time `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
+}
+
+func (RunStat) TableName() string {
+	return "run_stats"
+}
+
 // ModelsForMigration lists models in schema creation order.
 func ModelsForMigration() []interface{} {
 	return []interface{}{
@@ -256,5 +279,6 @@ func ModelsForMigration() []interface{} {
 		&Test{},
 		&TestAttempt{},
 		&Attachment{},
+		&RunStat{},
 	}
 }

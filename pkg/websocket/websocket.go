@@ -1,11 +1,14 @@
 package websocket
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/pkg/publisher"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 )
@@ -681,6 +685,14 @@ func getNestedField(data map[string]interface{}, fieldPath string) (interface{},
 // normalizeEventData converts protobuf events to model-based JSON for consistency with REST API
 // This ensures WebSocket events match the MongoDB document structure used by the REST API
 func (h *Hub) normalizeEventData(event *publisher.Event) ([]byte, error) {
+	if event == nil {
+		return nil, fmt.Errorf("event is nil")
+	}
+
+	if len(bytes.TrimSpace(event.Data)) == 0 {
+		event.Data = json.RawMessage("{}")
+	}
+
 	// Convert protobuf to model-based structure
 	var modelData interface{}
 
@@ -688,35 +700,62 @@ func (h *Hub) normalizeEventData(event *publisher.Event) ([]byte, error) {
 	case publisher.EventTypeRunStart:
 		var req events.ReportRunStartEventRequest
 		if err := json.Unmarshal(event.Data, &req); err != nil {
-			return nil, fmt.Errorf("unmarshal run start: %w", err)
+			runDoc, fallbackErr := parseRunDocumentFromRaw(event.Data)
+			if fallbackErr != nil {
+				return nil, fmt.Errorf("unmarshal run start: %w", err)
+			}
+			modelData = runDoc
+			break
 		}
 		modelData = protoToTestRunDocument(&req)
 
 	case publisher.EventTypeTestBegin:
 		var req events.TestBeginEventRequest
 		if err := json.Unmarshal(event.Data, &req); err != nil {
-			return nil, fmt.Errorf("unmarshal test begin: %w", err)
+			testDoc, fallbackErr := parseTestDocumentFromRaw(event.Data)
+			if fallbackErr != nil {
+				return nil, fmt.Errorf("unmarshal test begin: %w", err)
+			}
+			modelData = testDoc
+			break
 		}
 		modelData = protoToTest(req.TestCase)
 
 	case publisher.EventTypeTestEnd:
 		var req events.TestEndEventRequest
 		if err := json.Unmarshal(event.Data, &req); err != nil {
-			return nil, fmt.Errorf("unmarshal test end: %w", err)
+			testDoc, fallbackErr := parseTestDocumentFromRaw(event.Data)
+			if fallbackErr != nil {
+				return nil, fmt.Errorf("unmarshal test end: %w", err)
+			}
+			modelData = testDoc
+			break
 		}
 		modelData = protoToTest(req.TestCase)
 
 	case publisher.EventTypeStepBegin:
 		var req events.StepBeginEventRequest
 		if err := json.Unmarshal(event.Data, &req); err != nil {
-			return nil, fmt.Errorf("unmarshal step begin: %w", err)
+			// Fallback for non-protobuf timestamp shapes (e.g. RFC3339 strings).
+			step, fallbackErr := parseStepDocumentFromRaw(event.Data)
+			if fallbackErr != nil {
+				return nil, fmt.Errorf("unmarshal step begin: %w", err)
+			}
+			modelData = step
+			break
 		}
 		modelData = protoToStepDocument(req.Step)
 
 	case publisher.EventTypeStepEnd:
 		var req events.StepEndEventRequest
 		if err := json.Unmarshal(event.Data, &req); err != nil {
-			return nil, fmt.Errorf("unmarshal step end: %w", err)
+			// Fallback for non-protobuf timestamp shapes (e.g. RFC3339 strings).
+			step, fallbackErr := parseStepDocumentFromRaw(event.Data)
+			if fallbackErr != nil {
+				return nil, fmt.Errorf("unmarshal step end: %w", err)
+			}
+			modelData = step
+			break
 		}
 		modelData = protoToStepDocument(req.Step)
 
@@ -724,13 +763,13 @@ func (h *Hub) normalizeEventData(event *publisher.Event) ([]byte, error) {
 		publisher.EventTypeRunEnd:
 		// For events not yet converted to models, pass through raw data
 		// TODO: Add model converters for these event types
-		if err := json.Unmarshal(event.Data, &modelData); err != nil {
+		if err := unmarshalRawData(event.Data, &modelData); err != nil {
 			return nil, fmt.Errorf("parse event data: %w", err)
 		}
 
 	default:
 		// For unknown event types, pass through the raw data
-		if err := json.Unmarshal(event.Data, &modelData); err != nil {
+		if err := unmarshalRawData(event.Data, &modelData); err != nil {
 			return nil, fmt.Errorf("parse unknown event type: %w", err)
 		}
 	}
@@ -751,6 +790,300 @@ func (h *Hub) normalizeEventData(event *publisher.Event) ([]byte, error) {
 
 	// Marshal complete event
 	return json.Marshal(normalizedEvent)
+}
+
+func unmarshalRawData(raw json.RawMessage, out *interface{}) error {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		*out = map[string]interface{}{}
+		return nil
+	}
+	return json.Unmarshal(trimmed, out)
+}
+
+func parseRunDocumentFromRaw(raw json.RawMessage) (*models.TestRun, error) {
+	var envelope map[string]interface{}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("decode run envelope: %w", err)
+	}
+
+	runMap, ok := mapValueAny(envelope, "run", "runStart", "run_start")
+	if !ok {
+		runMap = envelope
+	}
+
+	runID := stringValue(runMap, "run_id", "runId", "id")
+	if runID == "" {
+		runID = stringValue(envelope, "run_id", "runId", "id")
+	}
+	if runID == "" {
+		return nil, fmt.Errorf("run id is required")
+	}
+
+	run := &models.TestRun{
+		ID:          runID,
+		Name:        stringValue(runMap, "name"),
+		Description: stringValue(runMap, "description"),
+		Status:      stringValue(runMap, "status"),
+		InitiatedBy: stringValue(runMap, "initiated_by", "initiatedBy"),
+		ProjectName: stringValue(runMap, "project_name", "projectName"),
+	}
+
+	if totalTests, ok := numberToInt64(firstValue(runMap, "total_tests", "totalTests")); ok {
+		run.TotalTests = int32(totalTests)
+	}
+
+	if md, ok := mapValue(runMap, "metadata"); ok {
+		run.Metadata = md
+	}
+
+	if parsedTime, ok := parseFlexibleTime(firstValue(runMap, "start_time", "startTime")); ok {
+		run.StartTime = &parsedTime
+	}
+	if parsedTime, ok := parseFlexibleTime(firstValue(runMap, "end_time", "endTime")); ok {
+		run.EndTime = &parsedTime
+	}
+	if duration, ok := parseFlexibleDurationNanos(runMap["duration"]); ok {
+		run.Duration = &duration
+	}
+
+	return run, nil
+}
+
+func parseTestDocumentFromRaw(raw json.RawMessage) (*models.Test, error) {
+	var envelope map[string]interface{}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("decode test envelope: %w", err)
+	}
+
+	testMap, ok := mapValueAny(envelope, "test_case", "testCase", "test")
+	if !ok {
+		testMap = envelope
+	}
+
+	testID := stringValue(testMap, "id", "test_id", "testId")
+	if testID == "" {
+		return nil, fmt.Errorf("test id is required")
+	}
+
+	test := &models.Test{
+		ID:             testID,
+		RunID:          stringValue(testMap, "run_id", "runId"),
+		ExternalTestID: stringValue(testMap, "external_test_id", "externalTestId"),
+		Name:           stringValue(testMap, "name"),
+		Title:          stringValue(testMap, "title"),
+		Description:    stringValue(testMap, "description"),
+		Status:         stringValue(testMap, "status"),
+		Location:       stringValue(testMap, "location"),
+	}
+
+	suiteID := stringValue(testMap, "test_suite_id", "testSuiteId", "suite_id", "suiteId")
+	if suiteID != "" {
+		test.SuiteID = &suiteID
+	}
+
+	if md, ok := mapValue(testMap, "metadata"); ok {
+		test.Metadata = md
+	}
+
+	if parsedTime, ok := parseFlexibleTime(firstValue(testMap, "start_time", "startTime")); ok {
+		test.StartTime = &parsedTime
+	}
+	if parsedTime, ok := parseFlexibleTime(firstValue(testMap, "end_time", "endTime")); ok {
+		test.EndTime = &parsedTime
+	}
+	if duration, ok := parseFlexibleDurationNanos(testMap["duration"]); ok {
+		test.Duration = &duration
+	}
+
+	if retryCount, ok := numberToInt64(firstValue(testMap, "retry_count", "retryCount")); ok {
+		rc := int32(retryCount)
+		test.RetryCount = &rc
+	}
+	if retryIndex, ok := numberToInt64(firstValue(testMap, "retry_index", "retryIndex")); ok {
+		ri := int32(retryIndex)
+		test.RetryIndex = &ri
+	}
+
+	return test, nil
+}
+
+func parseStepDocumentFromRaw(raw json.RawMessage) (*models.StepDocument, error) {
+	var envelope map[string]interface{}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, fmt.Errorf("decode step envelope: %w", err)
+	}
+
+	stepMap, ok := mapValue(envelope, "step")
+	if !ok {
+		stepMap = envelope
+	}
+
+	id := stringValue(stepMap, "id")
+	if id == "" {
+		return nil, fmt.Errorf("step id is required")
+	}
+
+	step := &models.StepDocument{
+		ID:            id,
+		TestCaseRunID: stringValue(stepMap, "test_case_id", "testCaseId", "test_id", "testId"),
+		Title:         stringValue(stepMap, "title"),
+		Description:   stringValue(stepMap, "description"),
+		Status:        stringValue(stepMap, "status"),
+		ParentStepID:  stringValue(stepMap, "parent_step_id", "parentStepId"),
+		RunID:         stringValue(stepMap, "run_id", "runId"),
+		Type:          stringValue(stepMap, "type"),
+		Category:      stringValue(stepMap, "category"),
+	}
+
+	if md, ok := mapValue(stepMap, "metadata"); ok {
+		step.Metadata = md
+	}
+
+	if parsedTime, ok := parseFlexibleTime(stepMap["start_time"]); ok {
+		step.StartTime = &parsedTime
+	} else if parsedTime, ok := parseFlexibleTime(stepMap["startTime"]); ok {
+		step.StartTime = &parsedTime
+	}
+
+	if duration, ok := parseFlexibleDurationNanos(stepMap["duration"]); ok {
+		step.Duration = &duration
+	}
+
+	if step.RunID == "" {
+		step.RunID = stringValue(envelope, "run_id", "runId")
+	}
+
+	return step, nil
+}
+
+func mapValue(data map[string]interface{}, field string) (map[string]interface{}, bool) {
+	v, ok := data[field]
+	if !ok {
+		return nil, false
+	}
+	m, ok := v.(map[string]interface{})
+	return m, ok
+}
+
+func mapValueAny(data map[string]interface{}, fields ...string) (map[string]interface{}, bool) {
+	for _, field := range fields {
+		if m, ok := mapValue(data, field); ok {
+			return m, true
+		}
+	}
+	return nil, false
+}
+
+func firstValue(data map[string]interface{}, fields ...string) interface{} {
+	for _, field := range fields {
+		if v, ok := data[field]; ok {
+			return v
+		}
+	}
+	return nil
+}
+
+func stringValue(data map[string]interface{}, fields ...string) string {
+	for _, field := range fields {
+		v, ok := data[field]
+		if !ok || v == nil {
+			continue
+		}
+		switch val := v.(type) {
+		case string:
+			return val
+		case json.Number:
+			return val.String()
+		case float64:
+			return strconv.FormatFloat(val, 'f', -1, 64)
+		}
+	}
+	return ""
+}
+
+func parseFlexibleTime(raw interface{}) (time.Time, bool) {
+	switch v := raw.(type) {
+	case string:
+		if v == "" {
+			return time.Time{}, false
+		}
+		if parsed, err := time.Parse(time.RFC3339Nano, v); err == nil {
+			return parsed, true
+		}
+		if parsed, err := time.Parse(time.RFC3339, v); err == nil {
+			return parsed, true
+		}
+		return time.Time{}, false
+	case map[string]interface{}:
+		seconds, hasSeconds := numberToInt64(v["seconds"])
+		if !hasSeconds {
+			return time.Time{}, false
+		}
+		nanos, _ := numberToInt64(v["nanos"])
+		return time.Unix(seconds, nanos), true
+	default:
+		return time.Time{}, false
+	}
+}
+
+func parseFlexibleDurationNanos(raw interface{}) (int64, bool) {
+	switch v := raw.(type) {
+	case string:
+		if v == "" {
+			return 0, false
+		}
+		if d, err := time.ParseDuration(v); err == nil {
+			return d.Nanoseconds(), true
+		}
+		return numberToInt64(v)
+	case float64, json.Number, int64, int32, int:
+		return numberToInt64(v)
+	case map[string]interface{}:
+		seconds, hasSeconds := numberToInt64(v["seconds"])
+		nanos, hasNanos := numberToInt64(v["nanos"])
+		if !hasSeconds && !hasNanos {
+			return 0, false
+		}
+		return seconds*int64(time.Second) + nanos, true
+	default:
+		return 0, false
+	}
+}
+
+func numberToInt64(v interface{}) (int64, bool) {
+	switch n := v.(type) {
+	case int:
+		return int64(n), true
+	case int32:
+		return int64(n), true
+	case int64:
+		return n, true
+	case float64:
+		return int64(n), true
+	case json.Number:
+		if i, err := n.Int64(); err == nil {
+			return i, true
+		}
+		if f, err := n.Float64(); err == nil {
+			return int64(f), true
+		}
+		return 0, false
+	case string:
+		s := strings.TrimSpace(n)
+		if s == "" {
+			return 0, false
+		}
+		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return i, true
+		}
+		if f, err := strconv.ParseFloat(s, 64); err == nil {
+			return int64(f), true
+		}
+		return 0, false
+	default:
+		return 0, false
+	}
 }
 
 // Metrics returns current hub metrics for monitoring

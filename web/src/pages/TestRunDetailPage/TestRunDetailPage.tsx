@@ -12,14 +12,12 @@ import {
   X,
   Filter,
   Map as MapIcon,
-  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { SuiteTitleCard } from "./SuiteTitleCard";
 import type { TestStatus } from "@/types/common";
-import { assembleSuiteHierarchy } from "../TestSuiteRunsPage/utils";
-import { getRunStatus } from "../TestSuiteRunsPage/utils";
+import { assembleSuiteHierarchy } from "../TestRunsPage/utils";
 import type { Test } from "@/types/testCase";
 import type { TestSuite } from "@/types/testSuite";
 import TestSuiteRecord from "./TestSuiteRecord";
@@ -99,7 +97,10 @@ function dedupeTests(tests: Test[]): Test[] {
 function computeStatistics(tests: Test[]) {
   return {
     total: tests.length,
-    passed: tests.filter((test) => test.status === "PASSED").length,
+    passed: tests.filter(
+      (test) => test.status === "PASSED" || test.status === "FLAKY",
+    ).length,
+    flaky: tests.filter((test) => test.status === "FLAKY").length,
     failed: tests.filter((test) => test.status === "FAILED").length,
     skipped: tests.filter((test) => test.status === "SKIPPED").length,
     running: tests.filter((test) => test.status === "RUNNING").length,
@@ -111,9 +112,6 @@ function computeStatistics(tests: Test[]) {
     unknown: tests.filter((test) => test.status === "UNKNOWN").length,
     expected: tests.filter(
       (test) => test.status === "PASSED" && (test.attempts?.length ?? 0) === 1,
-    ).length,
-    flaky: tests.filter(
-      (test) => test.status === "PASSED" && (test.attempts?.length ?? 0) > 1,
     ).length,
   };
 }
@@ -397,7 +395,7 @@ export function TestRunDetailPage() {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <Link
-          to="/suite_runs"
+          to="/runs"
           className="group inline-flex items-center gap-2 rounded-md px-2 py-1 text-(--stitch-primary) transition-colors hover:bg-(--stitch-primary-soft) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
         >
           <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
@@ -435,7 +433,7 @@ export function TestRunDetailPage() {
                   "The test run you're looking for doesn't exist or has been deleted."}
               </p>
               <Link
-                to="/suite_runs"
+                to="/runs"
                 className="inline-flex items-center rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
                 style={{
                   background:
@@ -451,7 +449,7 @@ export function TestRunDetailPage() {
     );
   }
 
-  const overallStatus: TestStatus = getRunStatus(runDetail);
+  const overallStatus: TestStatus = runDetail.status as TestStatus;
   console.log(
     "Rendering run detail:",
     runDetail,
@@ -508,7 +506,7 @@ export function TestRunDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link
-            to="/suite_runs"
+            to="/runs"
             className="group inline-flex h-10 w-10 items-center justify-center rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-card) text-(--stitch-on-surface-muted) transition-colors hover:bg-(--stitch-surface-low) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
             aria-label="Back to test runs"
           >
@@ -525,14 +523,7 @@ export function TestRunDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link
-            to={`/suite_runs/${runId}/raw-messages`}
-            className="inline-flex items-center gap-2 rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-card) px-4 py-2 text-(--stitch-on-surface-muted) transition-colors hover:bg-(--stitch-surface-low) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
-          >
-            <FileText className="h-5 w-5" />
-            <span className="font-medium">Raw Messages</span>
-          </Link>
-          <Link
-            to={`/suite_runs/${runId}/map`}
+            to={`/runs/${runId}/map`}
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
             style={{
               background:

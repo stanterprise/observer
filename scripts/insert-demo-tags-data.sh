@@ -201,4 +201,4 @@ print("Run ID: run-tags-demo-001");
 
 EOF
 
-echo "Demo data inserted! View at http://localhost:3000/suite_runs/run-tags-demo-001"
+echo "Demo data inserted! View at http://localhost:3000/runs/run-tags-demo-001"

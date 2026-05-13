@@ -274,3 +274,191 @@ func TestSmartFiltering_NoFilterDoesNotReceiveSteps(t *testing.T) {
 		t.Errorf("Client with no filters should have 0 step messages, got %d", len(clientNoFilter.send))
 	}
 }
+
+func TestNormalizeEventData_StepBegin_WithStringStartTime(t *testing.T) {
+	hub := NewHub(nil)
+	startTime := "2026-05-11T00:23:26.943Z"
+
+	event := &publisher.Event{
+		Type:      publisher.EventTypeStepBegin,
+		Timestamp: time.Now(),
+		Data: json.RawMessage(`{
+			"step": {
+				"id": "step-1",
+				"run_id": "run-1",
+				"test_case_id": "test-1",
+				"title": "Open page",
+				"status": "STEP_STATUS_RUNNING",
+				"start_time": "` + startTime + `"
+			}
+		}`),
+	}
+
+	normalized, err := hub.normalizeEventData(event)
+	if err != nil {
+		t.Fatalf("normalizeEventData returned error: %v", err)
+	}
+
+	var out struct {
+		Type string                 `json:"type"`
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(normalized, &out); err != nil {
+		t.Fatalf("unmarshal normalized event: %v", err)
+	}
+
+	if got := out.Data["id"]; got != "step-1" {
+		t.Fatalf("data.id = %v, want step-1", got)
+	}
+	if got := out.Data["runId"]; got != "run-1" {
+		t.Fatalf("data.runId = %v, want run-1", got)
+	}
+	if got := out.Data["startTime"]; got != startTime {
+		t.Fatalf("data.startTime = %v, want %s", got, startTime)
+	}
+}
+
+func TestNormalizeEventData_StepEnd_WithProtoTimestampObject(t *testing.T) {
+	hub := NewHub(nil)
+
+	event := &publisher.Event{
+		Type:      publisher.EventTypeStepEnd,
+		Timestamp: time.Now(),
+		Data: json.RawMessage(`{
+			"step": {
+				"id": "step-2",
+				"run_id": "run-2",
+				"test_case_id": "test-2",
+				"status": "STEP_STATUS_PASSED",
+				"start_time": {
+					"seconds": 1778459006,
+					"nanos": 943000000
+				}
+			}
+		}`),
+	}
+
+	normalized, err := hub.normalizeEventData(event)
+	if err != nil {
+		t.Fatalf("normalizeEventData returned error: %v", err)
+	}
+
+	var out struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(normalized, &out); err != nil {
+		t.Fatalf("unmarshal normalized event: %v", err)
+	}
+
+	if got := out.Data["id"]; got != "step-2" {
+		t.Fatalf("data.id = %v, want step-2", got)
+	}
+	if got := out.Data["startTime"]; got == nil {
+		t.Fatal("data.startTime should be present")
+	}
+}
+
+func TestNormalizeEventData_RunStart_WithStringTimeFallback(t *testing.T) {
+	hub := NewHub(nil)
+
+	event := &publisher.Event{
+		Type:      publisher.EventTypeRunStart,
+		Timestamp: time.Now(),
+		Data: json.RawMessage(`{
+			"run_id": "run-100",
+			"name": "CI Run",
+			"total_tests": 42,
+			"start_time": "2026-05-11T00:31:11.964Z"
+		}`),
+	}
+
+	normalized, err := hub.normalizeEventData(event)
+	if err != nil {
+		t.Fatalf("normalizeEventData returned error: %v", err)
+	}
+
+	var out struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(normalized, &out); err != nil {
+		t.Fatalf("unmarshal normalized event: %v", err)
+	}
+
+	if got := out.Data["id"]; got != "run-100" {
+		t.Fatalf("data.id = %v, want run-100", got)
+	}
+	if got := out.Data["totalTests"]; got != float64(42) {
+		t.Fatalf("data.totalTests = %v, want 42", got)
+	}
+}
+
+func TestNormalizeEventData_TestBegin_WithStringTimeFallback(t *testing.T) {
+	hub := NewHub(nil)
+
+	event := &publisher.Event{
+		Type:      publisher.EventTypeTestBegin,
+		Timestamp: time.Now(),
+		Data: json.RawMessage(`{
+			"test_case": {
+				"id": "test-100",
+				"run_id": "run-100",
+				"test_suite_id": "suite-1",
+				"name": "should login",
+				"status": "TEST_CASE_STATUS_RUNNING",
+				"start_time": "2026-05-11T00:31:11.964Z"
+			}
+		}`),
+	}
+
+	normalized, err := hub.normalizeEventData(event)
+	if err != nil {
+		t.Fatalf("normalizeEventData returned error: %v", err)
+	}
+
+	var out struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(normalized, &out); err != nil {
+		t.Fatalf("unmarshal normalized event: %v", err)
+	}
+
+	if got := out.Data["id"]; got != "test-100" {
+		t.Fatalf("data.id = %v, want test-100", got)
+	}
+	if got := out.Data["runId"]; got != "run-100" {
+		t.Fatalf("data.runId = %v, want run-100", got)
+	}
+	if got := out.Data["startTime"]; got == nil {
+		t.Fatal("data.startTime should be present")
+	}
+}
+
+func TestNormalizeEventData_UnknownType_EmptyPayload(t *testing.T) {
+	hub := NewHub(nil)
+
+	event := &publisher.Event{
+		Type:      "",
+		Timestamp: time.Now(),
+		Data:      json.RawMessage(""),
+	}
+
+	normalized, err := hub.normalizeEventData(event)
+	if err != nil {
+		t.Fatalf("normalizeEventData returned error: %v", err)
+	}
+
+	var out struct {
+		Type string                 `json:"type"`
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(normalized, &out); err != nil {
+		t.Fatalf("unmarshal normalized event: %v", err)
+	}
+
+	if out.Type != "" {
+		t.Fatalf("type = %q, want empty", out.Type)
+	}
+	if out.Data == nil {
+		t.Fatal("data should not be nil")
+	}
+}
