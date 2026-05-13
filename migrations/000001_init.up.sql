@@ -1,4 +1,4 @@
-CREATE TABLE runs (
+CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY,
     name TEXT,
     description TEXT,
@@ -14,10 +14,10 @@ CREATE TABLE runs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_runs_status_started_at ON runs (status, started_at);
-CREATE INDEX idx_runs_started_at ON runs (started_at);
+CREATE INDEX IF NOT EXISTS idx_runs_status_started_at ON runs (status, started_at);
+CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs (started_at);
 
-CREATE TABLE run_executions (
+CREATE TABLE IF NOT EXISTS run_executions (
     id TEXT NOT NULL,
     run_id TEXT NOT NULL,
     name TEXT,
@@ -33,10 +33,10 @@ CREATE TABLE run_executions (
     CONSTRAINT fk_runs_executions FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_run_executions_run_status ON run_executions (run_id, status);
-CREATE INDEX idx_run_executions_started_at ON run_executions (started_at);
+CREATE INDEX IF NOT EXISTS idx_run_executions_run_status ON run_executions (run_id, status);
+CREATE INDEX IF NOT EXISTS idx_run_executions_started_at ON run_executions (started_at);
 
-CREATE TABLE run_shards (
+CREATE TABLE IF NOT EXISTS run_shards (
     id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL,
     execution_id TEXT NOT NULL DEFAULT '',
@@ -50,10 +50,10 @@ CREATE TABLE run_shards (
     CONSTRAINT fk_runs_shards FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_run_shards_run_status ON run_shards (run_id, execution_id, status);
-CREATE UNIQUE INDEX ux_run_shards_run_execution_shard_index ON run_shards (run_id, execution_id, shard_index);
+CREATE INDEX IF NOT EXISTS idx_run_shards_run_status ON run_shards (run_id, execution_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_run_shards_run_execution_shard_index ON run_shards (run_id, execution_id, shard_index);
 
-CREATE TABLE suites (
+CREATE TABLE IF NOT EXISTS suites (
     id TEXT NOT NULL,
     run_id TEXT NOT NULL,
     external_suite_id TEXT,
@@ -82,11 +82,11 @@ CREATE TABLE suites (
     CONSTRAINT fk_suites_suites FOREIGN KEY (parent_suite_id, run_id) REFERENCES suites(id, run_id)
 );
 
-CREATE INDEX idx_suites_run_id ON suites (run_id);
-CREATE INDEX idx_suites_run_status ON suites (run_id, status);
-CREATE INDEX idx_suites_run_external_suite_id ON suites (run_id, external_suite_id);
+CREATE INDEX IF NOT EXISTS idx_suites_run_id ON suites (run_id);
+CREATE INDEX IF NOT EXISTS idx_suites_run_status ON suites (run_id, status);
+CREATE INDEX IF NOT EXISTS idx_suites_run_external_suite_id ON suites (run_id, external_suite_id);
 
-CREATE TABLE tests (
+CREATE TABLE IF NOT EXISTS tests (
     id TEXT NOT NULL,
     run_id TEXT NOT NULL,
     external_test_id TEXT,
@@ -111,12 +111,12 @@ CREATE TABLE tests (
     CONSTRAINT fk_suites_tests FOREIGN KEY (suite_id, run_id) REFERENCES suites(id, run_id)
 );
 
-CREATE INDEX idx_tests_run_id ON tests (run_id);
-CREATE INDEX idx_tests_suite_external_test_id ON tests (suite_id, external_test_id);
-CREATE INDEX idx_tests_run_external_test_id ON tests (run_id, external_test_id);
-CREATE INDEX idx_tests_suite_status ON tests (suite_id, status);
+CREATE INDEX IF NOT EXISTS idx_tests_run_id ON tests (run_id);
+CREATE INDEX IF NOT EXISTS idx_tests_suite_external_test_id ON tests (suite_id, external_test_id);
+CREATE INDEX IF NOT EXISTS idx_tests_run_external_test_id ON tests (run_id, external_test_id);
+CREATE INDEX IF NOT EXISTS idx_tests_suite_status ON tests (suite_id, status);
 
-CREATE TABLE test_attempts (
+CREATE TABLE IF NOT EXISTS test_attempts (
     id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL,
     execution_id TEXT NOT NULL DEFAULT '',
@@ -142,13 +142,13 @@ CREATE TABLE test_attempts (
     CONSTRAINT fk_tests_attempts FOREIGN KEY (test_id, run_id) REFERENCES tests(id, run_id)
 );
 
-CREATE INDEX idx_attempts_run_id ON test_attempts (run_id);
-CREATE INDEX idx_attempts_execution_id ON test_attempts (execution_id);
-CREATE INDEX idx_attempts_test_attempt ON test_attempts (test_id, attempt_index);
-CREATE INDEX idx_attempts_status_finished_at ON test_attempts (status, finished_at);
-CREATE UNIQUE INDEX ux_attempts_run_test_execution_attempt_index ON test_attempts (run_id, test_id, execution_id, attempt_index);
+CREATE INDEX IF NOT EXISTS idx_attempts_run_id ON test_attempts (run_id);
+CREATE INDEX IF NOT EXISTS idx_attempts_execution_id ON test_attempts (execution_id);
+CREATE INDEX IF NOT EXISTS idx_attempts_test_attempt ON test_attempts (test_id, attempt_index);
+CREATE INDEX IF NOT EXISTS idx_attempts_status_finished_at ON test_attempts (status, finished_at);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_attempts_run_test_execution_attempt_index ON test_attempts (run_id, test_id, execution_id, attempt_index);
 
-CREATE TABLE attachments (
+CREATE TABLE IF NOT EXISTS attachments (
     id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL,
     test_id TEXT NOT NULL,
@@ -186,7 +186,7 @@ CREATE TABLE IF NOT EXISTS run_stats (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_attachments_run ON attachments (run_id);
-CREATE INDEX idx_attachments_test ON attachments (test_id);
-CREATE INDEX idx_attachments_attempt ON attachments (test_attempt_id);
-CREATE INDEX idx_attachments_created_at ON attachments (created_at);
+CREATE INDEX IF NOT EXISTS idx_attachments_run ON attachments (run_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_test ON attachments (test_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_attempt ON attachments (test_attempt_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_created_at ON attachments (created_at);
