@@ -119,7 +119,6 @@ func baselineLegacySchemaIfNeeded(dsn string) (err error) {
 	hasLegacySchema, err := hasAllTables(db,
 		"runs",
 		"run_executions",
-		"run_shards",
 		"suites",
 		"tests",
 		"test_attempts",

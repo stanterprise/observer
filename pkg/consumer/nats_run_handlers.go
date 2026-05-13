@@ -28,17 +28,8 @@ func (c *NATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) e
 	// Update the test run document with final status, times, and duration
 	// MongoDB UpdateTestRunEnd and MarkRunningTestsAsTimedOut removed (legacy)
 
-	runExecution := models.RunEndEventToRunExecution(&req)
+	_ = models.RunEndEventToRunExecution(&req)
 	if c.pgRepo.IsConfigured() {
-		if runShard := models.RunEndEventToRunShard(&req); runShard != nil {
-			if _, err := c.pgRepo.FinalizeRunShardEnd(ctx, runShard); err != nil {
-				return fmt.Errorf("finalize run shard end: %w", err)
-			}
-		} else {
-			if err := c.pgRepo.FinalizeRunExecutionEnd(ctx, runExecution); err != nil {
-				return fmt.Errorf("finalize run execution end: %w", err)
-			}
-		}
 	}
 
 	c.emitRunCompletenessSummary(req.RunId, req.FinalStatus.String())
@@ -73,11 +64,6 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 		}
 		if err := c.pgRepo.UpsertRunExecutionStart(ctx, runExecution); err != nil {
 			return fmt.Errorf("upsert run execution start: %w", err)
-		}
-		if runShard := models.RunStartEventToRunShard(&req); runShard != nil {
-			if err := c.pgRepo.UpsertRunShardStart(ctx, runShard); err != nil {
-				return fmt.Errorf("upsert run shard start: %w", err)
-			}
 		}
 		if err := c.pgRepo.UpsertRunStartSuites(ctx, relationalSuites); err != nil {
 			return fmt.Errorf("upsert run start suites: %w", err)

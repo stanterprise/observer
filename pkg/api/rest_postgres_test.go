@@ -138,49 +138,6 @@ func TestPostgresHandleRuns_LogicalRunWithMultipleExecutionsReturnsSingleRow(t *
 	}
 }
 
-func TestPostgresHandleRuns_UsesShardCompletionForDisplayedRunStatus(t *testing.T) {
-	handler, db := setupPostgresHandler(t)
-	now := time.Date(2026, 4, 18, 11, 45, 0, 0, time.UTC)
-	start := now.Add(-2 * time.Minute)
-	finish := now.Add(3 * time.Minute)
-	shardOne := int32(1)
-	shardTwo := int32(2)
-
-	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
-	seedRunExecutions(t, db,
-		m.RunExecution{ID: "exec-a", RunID: "run-1", Status: "RUNNING", TotalTests: 3, CreatedAt: now, UpdatedAt: now},
-		m.RunExecution{ID: "exec-b", RunID: "run-1", Status: "RUNNING", TotalTests: 5, CreatedAt: now, UpdatedAt: now},
-	)
-	seedRunShards(t, db,
-		m.RunShard{ID: "run-1:exec-a:1", RunID: "run-1", ExecutionID: "exec-a", ShardIndex: &shardOne, ShardCountExpected: &shardTwo, Status: "FAILED", StartTime: &start, EndTime: &finish, CreatedAt: now, UpdatedAt: now},
-		m.RunShard{ID: "run-1:exec-b:2", RunID: "run-1", ExecutionID: "exec-b", ShardIndex: &shardTwo, ShardCountExpected: &shardTwo, Status: "PASSED", StartTime: &now, EndTime: &finish, CreatedAt: now, UpdatedAt: now},
-	)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/runs", nil)
-	rec := httptest.NewRecorder()
-	handler.handleRuns(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
-	}
-
-	var response struct {
-		Runs []struct {
-			ID     string `json:"id"`
-			Status string `json:"status"`
-		} `json:"runs"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if len(response.Runs) != 1 {
-		t.Fatalf("expected 1 run, got %d", len(response.Runs))
-	}
-	if response.Runs[0].Status != "FAILED" {
-		t.Fatalf("run status = %q, want FAILED", response.Runs[0].Status)
-	}
-}
-
 func TestPostgresHandleRunDetail(t *testing.T) {
 	handler, db := setupPostgresHandler(t)
 	now := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
@@ -511,7 +468,6 @@ func modelsForPostgresHandlerTests() []interface{} {
 	return []interface{}{
 		&m.TestRun{},
 		&m.RunExecution{},
-		&m.RunShard{},
 		&m.Suite{},
 		&m.Test{},
 		&m.TestAttempt{},
@@ -530,13 +486,6 @@ func seedRunExecutions(t *testing.T, db *gorm.DB, executions ...m.RunExecution) 
 	t.Helper()
 	if err := db.WithContext(context.Background()).Create(&executions).Error; err != nil {
 		t.Fatalf("seed run executions: %v", err)
-	}
-}
-
-func seedRunShards(t *testing.T, db *gorm.DB, shards ...m.RunShard) {
-	t.Helper()
-	if err := db.WithContext(context.Background()).Create(&shards).Error; err != nil {
-		t.Fatalf("seed run shards: %v", err)
 	}
 }
 

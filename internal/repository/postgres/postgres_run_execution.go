@@ -209,19 +209,6 @@ func refreshLogicalRunAggregate(tx *gorm.DB, runID string, now time.Time) error 
 		return nil
 	}
 
-	var shards []m.RunShard
-	if err := tx.Where("run_id = ?", runID).Order("created_at asc, id asc").Find(&shards).Error; err != nil {
-		return fmt.Errorf("load run shards: %w", err)
-	}
-	if len(shards) > 0 {
-		if shardAggregate, ok := buildLogicalRunAggregateFromShards(runID, shards, aggregate.TotalTests, now); ok {
-			aggregate.Status = shardAggregate.Status
-			aggregate.StartTime = shardAggregate.StartTime
-			aggregate.EndTime = shardAggregate.EndTime
-			aggregate.Duration = shardAggregate.Duration
-		}
-	}
-
 	assignment := m.TestRun{
 		Status:     aggregate.Status,
 		TotalTests: aggregate.TotalTests,
@@ -235,26 +222,6 @@ func refreshLogicalRunAggregate(tx *gorm.DB, runID string, now time.Time) error 
 		return fmt.Errorf("refresh logical run aggregate: %w", result.Error)
 	}
 	return nil
-}
-
-func buildLogicalRunAggregateFromShards(runID string, shards []m.RunShard, totalTests int32, now time.Time) (*m.TestRun, bool) {
-	if len(shards) == 0 {
-		return nil, false
-	}
-
-	aggregate, ok := buildAggregatedRunFromShards(runID, shards, now)
-	if !ok {
-		return nil, false
-	}
-	aggregate.TotalTests = totalTests
-
-	if !allPersistedRunShardsFinished(shards) {
-		aggregate.Status = "RUNNING"
-		aggregate.EndTime = nil
-		aggregate.Duration = nil
-	}
-
-	return aggregate, true
 }
 
 func buildAggregatedRunFromExecutions(runID string, executions []m.RunExecution, now time.Time) (*m.TestRun, bool) {

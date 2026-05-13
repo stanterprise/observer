@@ -144,53 +144,6 @@ func (r *PostgresRepository) UpsertRunStartTests(ctx context.Context, tests []*m
 	})
 }
 
-// UpsertRunShardStart upserts a run shard row derived from run-level shard metadata.
-func (r *PostgresRepository) UpsertRunShardStart(ctx context.Context, shard *m.RunShard) error {
-	if shard == nil {
-		return fmt.Errorf("run shard is nil")
-	}
-	if err := repository.ValidateRunID(shard.RunID); err != nil {
-		return err
-	}
-	if shard.ShardIndex == nil {
-		return fmt.Errorf("shardIndex is required")
-	}
-	if err := r.ensureDB(); err != nil {
-		return err
-	}
-
-	now := time.Now()
-
-	shard.ID = m.BuildRunShardID(shard.RunID, shard.ExecutionID, shard.ShardIndex)
-
-	if shard.StartTime == nil {
-		shard.StartTime = &now
-	}
-	shard.CreatedAt = now
-	shard.UpdatedAt = now
-
-	result := r.db.WithContext(ctx).
-		Where(m.RunShard{RunID: shard.RunID, ExecutionID: shard.ExecutionID, ShardIndex: shard.ShardIndex}).
-		Assign(m.RunShard{
-			ID:                 shard.ID,
-			ExecutionID:        shard.ExecutionID,
-			ShardIndex:         shard.ShardIndex,
-			ShardCountExpected: shard.ShardCountExpected,
-			Status:             shard.Status,
-			StartTime:          shard.StartTime,
-			UpdatedAt:          now,
-			CreatedAt:          now,
-		}).
-		FirstOrCreate(shard)
-
-	if result.Error != nil {
-		return fmt.Errorf("upsert run shard start: %w", result.Error)
-	}
-
-	r.logger.Info("run shard upserted", "run_id", shard.RunID, "execution_id", shard.ExecutionID, "shard_index", *shard.ShardIndex)
-	return nil
-}
-
 func isShardedRunStart(metadata map[string]interface{}) bool {
 	if metadata == nil {
 		return false

@@ -78,7 +78,6 @@ type TestRun struct {
 	UpdatedAt   time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 
 	Executions []*RunExecution `gorm:"foreignKey:RunID;references:ID" json:"executions,omitempty"`
-	Shards     []*RunShard     `gorm:"foreignKey:RunID;references:ID" json:"shards,omitempty"`
 	Suites     []*Suite        `gorm:"foreignKey:RunID;references:ID" json:"suites,omitempty"`
 	Tests      []*Test         `gorm:"foreignKey:RunID;references:ID" json:"tests,omitempty"`
 }
@@ -90,39 +89,24 @@ func (TestRun) TableName() string {
 // RunExecution maps to the PostgreSQL run_executions table and captures
 // execution-scoped state beneath a logical run.
 type RunExecution struct {
-	ID         string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID      string                 `gorm:"column:run_id;type:text;not null;primaryKey;index:idx_run_executions_run_status,priority:1" json:"runId"`
-	Name       string                 `gorm:"column:name;type:text" json:"name,omitempty"`
-	Status     string                 `gorm:"column:status;type:text;index:idx_run_executions_run_status,priority:3" json:"status,omitempty"`
-	Metadata   map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
-	TotalTests int32                  `gorm:"column:total_tests" json:"totalTests,omitempty"`
-	StartTime  *time.Time             `gorm:"column:started_at;index:idx_run_executions_started_at" json:"startTime,omitempty"`
-	EndTime    *time.Time             `gorm:"column:finished_at" json:"endTime,omitempty"`
-	Duration   *int64                 `gorm:"column:duration" json:"duration,omitempty"`
-	CreatedAt  time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
-	UpdatedAt  time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
+	ID                 string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
+	RunID              string                 `gorm:"column:run_id;type:text;not null;primaryKey;index:idx_run_executions_run_status,priority:1" json:"runId"`
+	Name               string                 `gorm:"column:name;type:text" json:"name,omitempty"`
+	Status             string                 `gorm:"column:status;type:text;index:idx_run_executions_run_status,priority:3" json:"status,omitempty"`
+	IsShard            bool                   `gorm:"column:is_shard" json:"isShard,omitempty"`
+	ShardIndex         *int32                 `gorm:"column:shard_index;uniqueIndex:ux_run_shards_run_execution_shard_index,priority:3" json:"shardIndex,omitempty"`
+	ShardCountExpected *int32                 `gorm:"column:shard_count_expected" json:"shardCountExpected,omitempty"`
+	Metadata           map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
+	TotalTests         int32                  `gorm:"column:total_tests" json:"totalTests,omitempty"`
+	StartTime          *time.Time             `gorm:"column:started_at;index:idx_run_executions_started_at" json:"startTime,omitempty"`
+	EndTime            *time.Time             `gorm:"column:finished_at" json:"endTime,omitempty"`
+	Duration           *int64                 `gorm:"column:duration" json:"duration,omitempty"`
+	CreatedAt          time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
+	UpdatedAt          time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 }
 
 func (RunExecution) TableName() string {
 	return "run_executions"
-}
-
-// RunShard maps to the PostgreSQL run_shards table.
-type RunShard struct {
-	ID                 string     `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID              string     `gorm:"column:run_id;type:text;not null;index:idx_run_shards_run_status,priority:1;uniqueIndex:ux_run_shards_run_execution_shard_index,priority:1" json:"runId"`
-	ExecutionID        string     `gorm:"column:execution_id;type:text;not null;default:'';uniqueIndex:ux_run_shards_run_execution_shard_index,priority:2;index:idx_run_shards_run_status,priority:2" json:"executionId,omitempty"`
-	ShardIndex         *int32     `gorm:"column:shard_index;uniqueIndex:ux_run_shards_run_execution_shard_index,priority:3" json:"shardIndex,omitempty"`
-	ShardCountExpected *int32     `gorm:"column:shard_count_expected" json:"shardCountExpected,omitempty"`
-	Status             string     `gorm:"column:status;type:text;index:idx_run_shards_run_status,priority:3" json:"status,omitempty"`
-	StartTime          *time.Time `gorm:"column:started_at" json:"startTime,omitempty"`
-	EndTime            *time.Time `gorm:"column:finished_at" json:"endTime,omitempty"`
-	CreatedAt          time.Time  `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
-	UpdatedAt          time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
-}
-
-func (RunShard) TableName() string {
-	return "run_shards"
 }
 
 // Suite maps to the PostgreSQL suites table.
@@ -274,7 +258,6 @@ func ModelsForMigration() []interface{} {
 	return []interface{}{
 		&TestRun{},
 		&RunExecution{},
-		&RunShard{},
 		&Suite{},
 		&Test{},
 		&TestAttempt{},

@@ -63,33 +63,6 @@ func RunStartEventToTests(req *events.ReportRunStartEventRequest) []*Test {
 	return flattenTestRuns(req.TestSuites)
 }
 
-// RunStartEventToRunShard maps run-level shard metadata to a RunShard row.
-// Returns nil when the run is not sharded or shard metadata is incomplete.
-func RunStartEventToRunShard(req *events.ReportRunStartEventRequest) *RunShard {
-	if req == nil {
-		return nil
-	}
-
-	shardIndex, shardCount := parseRunShardMetadata(req.Metadata)
-	if shardIndex == nil || shardCount == nil {
-		return nil
-	}
-
-	now := time.Now()
-
-	return &RunShard{
-		ID:                 BuildRunShardID(req.RunId, req.ExecutionId, shardIndex),
-		RunID:              req.RunId,
-		ExecutionID:        req.ExecutionId,
-		ShardIndex:         shardIndex,
-		ShardCountExpected: shardCount,
-		Status:             "RUNNING",
-		StartTime:          &now,
-		CreatedAt:          now,
-		UpdatedAt:          now,
-	}
-}
-
 // RunEndEventToTestRun maps a TestRunEndEventRequest to TestRun.
 // The returned fields are intended for a partial update to finalize the run's terminal state.
 func RunEndEventToTestRun(req *events.TestRunEndEventRequest) TestRun {
@@ -145,39 +118,6 @@ func RunEndEventToRunExecution(req *events.TestRunEndEventRequest) *RunExecution
 	execution.EndTime = &end
 
 	return execution
-}
-
-// RunEndEventToRunShard maps run-level shard metadata in a terminal event to a RunShard row.
-// Returns nil when the run is not sharded or shard metadata is incomplete.
-func RunEndEventToRunShard(req *events.TestRunEndEventRequest) *RunShard {
-	if req == nil {
-		return nil
-	}
-
-	shardIndex, shardCount := parseRunShardMetadata(req.Metadata)
-	if shardIndex == nil || shardCount == nil {
-		return nil
-	}
-
-	now := time.Now()
-	shard := &RunShard{
-		ID:                 BuildRunShardID(req.RunId, req.ExecutionId, shardIndex),
-		RunID:              req.RunId,
-		ExecutionID:        req.ExecutionId,
-		ShardIndex:         shardIndex,
-		ShardCountExpected: shardCount,
-		Status:             req.FinalStatus.String(),
-		EndTime:            &now,
-		CreatedAt:          now,
-		UpdatedAt:          now,
-	}
-
-	if req.StartTime != nil {
-		t := req.StartTime.AsTime()
-		shard.StartTime = &t
-	}
-
-	return shard
 }
 
 // TestCaseRunToRelationalTest maps a TestCaseRun payload to the relational tests row.
@@ -280,25 +220,6 @@ func TestCaseRunToRelationalAttempt(protoTest *entities.TestCaseRun, attachments
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
-}
-
-func parseRunShardMetadata(metadata map[string]string) (*int32, *int32) {
-	shardIndex := firstInt32Metadata(metadata,
-		"shard.current",
-		"shard_current",
-		"shard_index",
-		"shardIndex",
-	)
-	shardCount := firstInt32Metadata(metadata,
-		"shard.total",
-		"shard_total",
-		"shard_count",
-		"shardCount",
-		"shard_count_expected",
-		"shardCountExpected",
-	)
-
-	return shardIndex, shardCount
 }
 
 func flattenSuiteRuns(protoSuites []*entities.TestSuiteRun) []*Suite {
@@ -488,10 +409,6 @@ func firstInt32Metadata(metadata map[string]string, keys ...string) *int32 {
 	}
 
 	return nil
-}
-
-func BuildRunShardID(runID, executionID string, shardIndex *int32) string {
-	return fmt.Sprintf("%s:%s:%d", runID, executionID, *shardIndex)
 }
 
 func BuildTestAttemptID(runID, testID, executionID string, attemptIndex int32) string {

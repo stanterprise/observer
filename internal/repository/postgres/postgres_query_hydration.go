@@ -46,14 +46,6 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 		return nil, fmt.Errorf("load run executions: %w", err)
 	}
 
-	var shards []m.RunShard
-	if err := r.db.WithContext(ctx).
-		Where("run_id IN ?", runIDs).
-		Order("created_at asc, id asc").
-		Find(&shards).Error; err != nil {
-		return nil, fmt.Errorf("load run shards: %w", err)
-	}
-
 	var attempts []m.TestAttempt
 	if err := r.db.WithContext(ctx).
 		Where("run_id IN ?", runIDs).
@@ -85,19 +77,6 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 	for _, execution := range executions {
 		if run, ok := runByID[execution.RunID]; ok {
 			run.Executions = append(run.Executions, execution)
-		}
-	}
-
-	shardsByRunID := make(map[string][]m.RunShard, len(runIDs))
-	for _, shard := range shards {
-		shardsByRunID[shard.RunID] = append(shardsByRunID[shard.RunID], shard)
-	}
-	for runID, run := range runByID {
-		if shardAggregate, ok := buildLogicalRunAggregateFromShards(runID, shardsByRunID[runID], run.TotalTests, run.UpdatedAt); ok {
-			run.Status = shardAggregate.Status
-			run.StartTime = shardAggregate.StartTime
-			run.EndTime = shardAggregate.EndTime
-			run.Duration = shardAggregate.Duration
 		}
 	}
 

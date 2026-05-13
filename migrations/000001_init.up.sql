@@ -36,23 +36,6 @@ CREATE TABLE run_executions (
 CREATE INDEX idx_run_executions_run_status ON run_executions (run_id, status);
 CREATE INDEX idx_run_executions_started_at ON run_executions (started_at);
 
-CREATE TABLE run_shards (
-    id TEXT PRIMARY KEY,
-    run_id TEXT NOT NULL,
-    execution_id TEXT NOT NULL DEFAULT '',
-    shard_index INTEGER,
-    shard_count_expected INTEGER,
-    status TEXT,
-    started_at TIMESTAMPTZ,
-    finished_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_runs_shards FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_run_shards_run_status ON run_shards (run_id, execution_id, status);
-CREATE UNIQUE INDEX ux_run_shards_run_execution_shard_index ON run_shards (run_id, execution_id, shard_index);
-
 CREATE TABLE suites (
     id TEXT NOT NULL,
     run_id TEXT NOT NULL,
@@ -89,6 +72,7 @@ CREATE INDEX idx_suites_run_external_suite_id ON suites (run_id, external_suite_
 CREATE TABLE tests (
     id TEXT NOT NULL,
     run_id TEXT NOT NULL,
+    execution_id TEXT NOT NULL,
     external_test_id TEXT,
     suite_id TEXT NOT NULL,
     name TEXT,
@@ -128,6 +112,7 @@ CREATE TABLE test_attempts (
     duration BIGINT,
     steps JSONB,
     steps_count INTEGER NOT NULL DEFAULT 0,
+    metadata JSONB,
     attachments JSONB,
     error_message TEXT,
     stack_trace TEXT,

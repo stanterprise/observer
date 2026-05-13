@@ -306,7 +306,6 @@ func modelsForSQLiteMigration() []interface{} {
 	return []interface{}{
 		&m.TestRun{},
 		&m.RunExecution{},
-		&m.RunShard{},
 		&m.Suite{},
 		&m.Test{},
 		&m.TestAttempt{},
