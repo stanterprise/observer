@@ -1,21 +1,4 @@
-CREATE TABLE IF NOT EXISTS run_stats (
-    run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    total INTEGER NOT NULL DEFAULT 0,
-    passed INTEGER NOT NULL DEFAULT 0,
-    failed INTEGER NOT NULL DEFAULT 0,
-    skipped INTEGER NOT NULL DEFAULT 0,
-    flaky INTEGER NOT NULL DEFAULT 0,
-    broken INTEGER NOT NULL DEFAULT 0,
-    timedout INTEGER NOT NULL DEFAULT 0,
-    interrupted INTEGER NOT NULL DEFAULT 0,
-    unknown INTEGER NOT NULL DEFAULT 0,
-    not_run INTEGER NOT NULL DEFAULT 0,
-    running INTEGER NOT NULL DEFAULT 0,
-    duration BIGINT NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+
 
 
 -- Backfill existing runs with run_stats records based on actual test statuses
