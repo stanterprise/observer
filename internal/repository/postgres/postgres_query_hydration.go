@@ -135,7 +135,7 @@ func hydrateTestFromAttempts(test *m.Test) {
 		return
 	}
 
-	test.Status = aggregateTestAttemptStatuses(latestAttempts, "")
+	test.Status = aggregateTestAttemptStatuses(latestAttempts)
 
 	var startedAt *time.Time
 	var finishedAt *time.Time

@@ -443,8 +443,8 @@ func TestFinalizeTestEndAggregatesPassingRetries(t *testing.T) {
 	if err := repo.db.WithContext(ctx).First(&storedTest, "id = ?", "run-123:test:test-123").Error; err != nil {
 		t.Fatalf("load stored test: %v", err)
 	}
-	if storedTest.Status != "PASSED" {
-		t.Fatalf("stored test status = %q, want PASSED", storedTest.Status)
+	if storedTest.Status != "FLAKY" {
+		t.Fatalf("stored test status = %q, want FLAKY", storedTest.Status)
 	}
 	if storedTest.RetryIndex == nil || *storedTest.RetryIndex != 1 {
 		t.Fatalf("stored retry index = %v, want 1", storedTest.RetryIndex)
@@ -618,11 +618,14 @@ func TestFinalizeTestEndPreservesSuiteIDForSparseTerminalPayload(t *testing.T) {
 }
 
 func TestAggregateTestAttemptStatuses(t *testing.T) {
-	attempts := []m.TestAttempt{{AttemptIndex: 0, Status: "FAILED"}, {AttemptIndex: 1, Status: "PASSED"}}
-	if got := aggregateTestAttemptStatuses(attempts, "FAILED"); got != "PASSED" {
-		t.Fatalf("aggregateTestAttemptStatuses() = %q, want PASSED", got)
+	attempts := []m.TestAttempt{
+		{AttemptIndex: 0, CreatedAt: time.Now(), Status: "FAILED"},
+		{AttemptIndex: 1, CreatedAt: time.Now().Add(time.Second * 100), Status: "PASSED"},
 	}
-	if got := aggregateTestAttemptStatuses([]m.TestAttempt{{AttemptIndex: 0, Status: "FAILED"}}, "FAILED"); got != "FAILED" {
+	if got := aggregateTestAttemptStatuses(attempts); got != "FLAKY" {
+		t.Fatalf("aggregateTestAttemptStatuses() = %q, want FLAKY", got)
+	}
+	if got := aggregateTestAttemptStatuses([]m.TestAttempt{{AttemptIndex: 0, CreatedAt: time.Now(), Status: "FAILED"}}); got != "FAILED" {
 		t.Fatalf("aggregateTestAttemptStatuses(single failure) = %q, want FAILED", got)
 	}
 }

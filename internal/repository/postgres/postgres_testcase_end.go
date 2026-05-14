@@ -60,7 +60,7 @@ func (r *PostgresRepository) FinalizeTestEnd(ctx context.Context, test *m.Test, 
 			return fmt.Errorf("load test attempts: %w", err)
 		}
 
-		overallStatus := aggregateTestAttemptStatuses(attempts, attempt.Status)
+		overallStatus := aggregateTestAttemptStatuses(attempts)
 		updates := map[string]interface{}{
 			"status":      overallStatus,
 			"updated_at":  now,
