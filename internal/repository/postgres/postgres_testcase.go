@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
@@ -201,25 +202,41 @@ func upsertRelationalTestAttempt(tx *gorm.DB, attempt *m.TestAttempt, now time.T
 	return nil
 }
 
-func aggregateTestAttemptStatuses(attempts []m.TestAttempt, fallback string) string {
-	for _, attempt := range attempts {
-		if attempt.Status == "PASSED" {
-			return "PASSED"
+func aggregateTestAttemptStatuses(attempts []m.TestAttempt) string {
+	// Sorted in descending order of creation time, then attempt index, so that the latest attempt is first.
+	sort.Slice(attempts, func(i, j int) bool {
+		return attempts[i].CreatedAt.After(attempts[j].CreatedAt)
+	})
+
+	latest := attempts[0].Status
+
+	if latest == "PASSED" {
+		isFlaky := false
+		for _, attempt := range attempts[1:] {
+			if attempt.Status == "FAILED" ||
+				attempt.Status == "BROKEN" ||
+				attempt.Status == "TIMEDOUT" ||
+				attempt.Status == "INTERRUPTED" {
+				isFlaky = true
+				break
+			}
 		}
+
+		if isFlaky {
+			return "FLAKY"
+		}
+		return "PASSED"
 	}
-	if fallback != "" {
-		return fallback
-	}
+
 	if len(attempts) == 0 {
-		return ""
+		return "NOT_RUN"
 	}
-	latest := attempts[0]
-	for _, attempt := range attempts[1:] {
-		if attempt.AttemptIndex >= latest.AttemptIndex {
-			latest = attempt
-		}
+
+	if latest == "UNKNOWN" || latest == "" || latest == "NOT_RUN" || latest == "SKIPPED" {
+		return "UNKNOWN"
 	}
-	return latest.Status
+
+	return latest
 }
 
 func latestExecutionAttemptSet(attempts []m.TestAttempt) ([]m.TestAttempt, string) {

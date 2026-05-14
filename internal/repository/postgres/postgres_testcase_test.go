@@ -619,10 +619,10 @@ func TestFinalizeTestEndPreservesSuiteIDForSparseTerminalPayload(t *testing.T) {
 
 func TestAggregateTestAttemptStatuses(t *testing.T) {
 	attempts := []m.TestAttempt{{AttemptIndex: 0, Status: "FAILED"}, {AttemptIndex: 1, Status: "PASSED"}}
-	if got := aggregateTestAttemptStatuses(attempts, "FAILED"); got != "PASSED" {
-		t.Fatalf("aggregateTestAttemptStatuses() = %q, want PASSED", got)
+	if got := aggregateTestAttemptStatuses(attempts); got != "FLAKY" {
+		t.Fatalf("aggregateTestAttemptStatuses() = %q, want FLAKY", got)
 	}
-	if got := aggregateTestAttemptStatuses([]m.TestAttempt{{AttemptIndex: 0, Status: "FAILED"}}, "FAILED"); got != "FAILED" {
+	if got := aggregateTestAttemptStatuses([]m.TestAttempt{{AttemptIndex: 0, Status: "FAILED"}}); got != "FAILED" {
 		t.Fatalf("aggregateTestAttemptStatuses(single failure) = %q, want FAILED", got)
 	}
 }
