@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/stanterprise/observer/internal/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -49,8 +48,10 @@ func (c *NATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) e
 
 	c.logger.Info("run end", "run_id", req.RunId, "execution_id", req.ExecutionId, "status", req.FinalStatus)
 
-	_ = models.RunEndEventToRunExecution(&req)
 	if c.pgRepo.IsConfigured() {
+		if err := c.pgRepo.HandleRunEnd(ctx, &req); err != nil {
+			return fmt.Errorf("handle run end: %w", err)
+		}
 	}
 
 	c.emitRunCompletenessSummary(req.RunId, req.FinalStatus.String())

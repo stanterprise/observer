@@ -7,11 +7,21 @@ import (
 
 	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository"
+	"github.com/stanterprise/proto-go/testsystem/v1/events"
+	"gorm.io/gorm"
 )
 
-// FinalizeRunEnd applies terminal state from TestRun to the existing run row.
-func (r *PostgresRepository) FinalizeRunEnd(ctx context.Context, fields m.TestRun) error {
-	if err := repository.ValidateRunID(fields.ID); err != nil {
+func (r *PostgresRepository) HandleRunEnd(ctx context.Context, event *events.TestRunEndEventRequest) error {
+	if event == nil {
+		return fmt.Errorf("run end request is nil")
+	}
+
+	runFields := m.RunEndEventToTestRun(event)
+	execution := m.RunEndEventToRunExecution(event)
+	if execution == nil {
+		return fmt.Errorf("run end mapping produced nil execution")
+	}
+	if err := repository.ValidateRunID(runFields.ID); err != nil {
 		return err
 	}
 	if err := r.ensureDB(); err != nil {
@@ -19,34 +29,36 @@ func (r *PostgresRepository) FinalizeRunEnd(ctx context.Context, fields m.TestRu
 	}
 
 	now := time.Now()
-	updates := map[string]interface{}{
-		"status":      fields.Status,
-		"updated_at":  now,
-		"finished_at": now,
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := upsertRunExecutionEnd(tx, execution, now); err != nil {
+			return err
+		}
+		if err := refreshLogicalRunAggregate(tx, runFields.ID, now); err != nil {
+			return err
+		}
+
+		statsRun := runFields
+		var storedRun m.TestRun
+		if err := tx.Where("id = ?", runFields.ID).First(&storedRun).Error; err != nil {
+			if err != gorm.ErrRecordNotFound {
+				return fmt.Errorf("load run after run end %s: %w", runFields.ID, err)
+			}
+		} else {
+			statsRun = storedRun
+		}
+
+		if err := ensureRunStats(tx, &statsRun, now); err != nil {
+			return err
+		}
+		if _, err := r.collectRunStats(ctx, tx, runFields.ID); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
-	if fields.StartTime != nil {
-		updates["started_at"] = *fields.StartTime
-	}
-	if fields.EndTime != nil {
-		updates["finished_at"] = *fields.EndTime
-	}
-	if fields.Duration != nil {
-		updates["duration"] = *fields.Duration
-	}
-
-	result := r.db.WithContext(ctx).
-		Model(&m.TestRun{}).
-		Where("id = ?", fields.ID).
-		Updates(updates)
-
-	if result.Error != nil {
-		return fmt.Errorf("finalize run end: %w", result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("test run not found: %s", fields.ID)
-	}
-
-	r.logger.Info("test run finalized", "run_id", fields.ID, "status", fields.Status)
+	r.logger.Info("run end persisted", "run_id", execution.RunID, "execution_id", execution.ID, "status", execution.Status)
 	return nil
 }
