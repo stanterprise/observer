@@ -209,7 +209,7 @@ func aggregateTestAttemptStatuses(attempts []m.TestAttempt) string {
 		return attempts[0].Status
 	}
 
-	// Sorted in descending order of creation time, then attempt index, so that the latest attempt is first.
+	// Sorted in descending order of creation time, so that the latest attempt is first.
 	sort.Slice(attempts, func(i, j int) bool {
 		return attempts[i].CreatedAt.After(attempts[j].CreatedAt)
 	})
@@ -234,7 +234,6 @@ func aggregateTestAttemptStatuses(attempts []m.TestAttempt) string {
 		return "PASSED"
 	}
 
-	// if all attempts statuses are the same, return that status instead of FLAKY
 	allSame := true
 	for _, attempt := range attempts[1:] {
 		if attempt.Status != latest {
