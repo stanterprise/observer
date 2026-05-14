@@ -5,46 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/stanterprise/observer/internal/models"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	"google.golang.org/protobuf/encoding/protojson"
 )
-
-// handleRunEnd processes a test run end event
-func (c *NATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) error {
-	var req events.TestRunEndEventRequest
-	unmarshaler := protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}
-	if err := unmarshaler.Unmarshal(data, &req); err != nil {
-		return fmt.Errorf("unmarshal run end event: %w", err)
-	}
-
-	c.logger.Info("run end", "run_id", req.RunId, "execution_id", req.ExecutionId, "status", req.FinalStatus)
-
-	// Convert protobuf Timestamp to *time.Time (removed, unused)
-	// Convert protobuf Duration to *int64 (removed, unused)
-
-	// Update the test run document with final status, times, and duration
-	// MongoDB UpdateTestRunEnd and MarkRunningTestsAsTimedOut removed (legacy)
-
-	runExecution := models.RunEndEventToRunExecution(&req)
-	if c.pgRepo.IsConfigured() {
-		if runShard := models.RunEndEventToRunShard(&req); runShard != nil {
-			if _, err := c.pgRepo.FinalizeRunShardEnd(ctx, runShard); err != nil {
-				return fmt.Errorf("finalize run shard end: %w", err)
-			}
-		} else {
-			if err := c.pgRepo.FinalizeRunExecutionEnd(ctx, runExecution); err != nil {
-				return fmt.Errorf("finalize run execution end: %w", err)
-			}
-		}
-	}
-
-	c.emitRunCompletenessSummary(req.RunId, req.FinalStatus.String())
-
-	return nil
-}
 
 func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage) error {
 	var req events.ReportRunStartEventRequest
@@ -64,29 +27,34 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 
 	c.markRunStart(req.RunId, req.TotalTests)
 
-	testRun, relationalSuites := models.RunStartEventToTestRun(&req)
-	runExecution := models.RunStartEventToRunExecution(&req)
-	relationalTests := models.RunStartEventToTests(&req)
 	if c.pgRepo.IsConfigured() {
-		if err := c.pgRepo.UpsertRunStart(ctx, testRun); err != nil {
-			return fmt.Errorf("upsert run start: %w", err)
-		}
-		if err := c.pgRepo.UpsertRunExecutionStart(ctx, runExecution); err != nil {
-			return fmt.Errorf("upsert run execution start: %w", err)
-		}
-		if runShard := models.RunStartEventToRunShard(&req); runShard != nil {
-			if err := c.pgRepo.UpsertRunShardStart(ctx, runShard); err != nil {
-				return fmt.Errorf("upsert run shard start: %w", err)
-			}
-		}
-		if err := c.pgRepo.UpsertRunStartSuites(ctx, relationalSuites); err != nil {
-			return fmt.Errorf("upsert run start suites: %w", err)
-		}
-		if err := c.pgRepo.UpsertRunStartTests(ctx, relationalTests); err != nil {
-			return fmt.Errorf("upsert run start tests: %w", err)
+		if err := c.pgRepo.HandleRunStart(ctx, &req); err != nil {
+			return fmt.Errorf("handle run start: %w", err)
 		}
 	}
 
-	// MongoDB MapSuites removed (legacy)
+	return nil
+}
+
+// handleRunEnd processes a test run end event
+func (c *NATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) error {
+	var req events.TestRunEndEventRequest
+	unmarshaler := protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
+	if err := unmarshaler.Unmarshal(data, &req); err != nil {
+		return fmt.Errorf("unmarshal run end event: %w", err)
+	}
+
+	c.logger.Info("run end", "run_id", req.RunId, "execution_id", req.ExecutionId, "status", req.FinalStatus)
+
+	if c.pgRepo.IsConfigured() {
+		if err := c.pgRepo.HandleRunEnd(ctx, &req); err != nil {
+			return fmt.Errorf("handle run end: %w", err)
+		}
+	}
+
+	c.emitRunCompletenessSummary(req.RunId, req.FinalStatus.String())
+
 	return nil
 }

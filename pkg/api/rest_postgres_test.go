@@ -61,6 +61,7 @@ func TestPostgresHandleRuns(t *testing.T) {
 	suiteID := "suite-1"
 	suiteID2 := "suite-2"
 	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Release", Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
+	seedRunStats(t, db, m.RunStat{RunID: "run-1", Name: "Release", Total: 2, Passed: 1, Failed: 1, CreatedAt: now, UpdatedAt: now})
 	seedSuites(t, db,
 		m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: now, UpdatedAt: now},
 		m.Suite{ID: suiteID2, RunID: "run-1", Name: "Suite 2", CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)},
@@ -108,9 +109,10 @@ func TestPostgresHandleRuns_LogicalRunWithMultipleExecutionsReturnsSingleRow(t *
 	now := time.Date(2026, 4, 18, 11, 30, 0, 0, time.UTC)
 
 	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
+	seedRunStats(t, db, m.RunStat{RunID: "run-1", Name: "Logical Aggregate", Total: 2, Running: 2, CreatedAt: now, UpdatedAt: now.Add(time.Second)})
 	seedRunExecutions(t, db,
-		m.RunExecution{ID: "exec-a", RunID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", TotalTests: 3, CreatedAt: now, UpdatedAt: now},
-		m.RunExecution{ID: "exec-b", RunID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", TotalTests: 5, CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)},
+		m.RunExecution{ID: "exec-a", RunID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", CreatedAt: now, UpdatedAt: now},
+		m.RunExecution{ID: "exec-b", RunID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)},
 	)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/runs", nil)
@@ -135,49 +137,6 @@ func TestPostgresHandleRuns_LogicalRunWithMultipleExecutionsReturnsSingleRow(t *
 	}
 	if response.Runs[0].ID != "run-1" {
 		t.Fatalf("run id = %q, want run-1", response.Runs[0].ID)
-	}
-}
-
-func TestPostgresHandleRuns_UsesShardCompletionForDisplayedRunStatus(t *testing.T) {
-	handler, db := setupPostgresHandler(t)
-	now := time.Date(2026, 4, 18, 11, 45, 0, 0, time.UTC)
-	start := now.Add(-2 * time.Minute)
-	finish := now.Add(3 * time.Minute)
-	shardOne := int32(1)
-	shardTwo := int32(2)
-
-	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
-	seedRunExecutions(t, db,
-		m.RunExecution{ID: "exec-a", RunID: "run-1", Status: "RUNNING", TotalTests: 3, CreatedAt: now, UpdatedAt: now},
-		m.RunExecution{ID: "exec-b", RunID: "run-1", Status: "RUNNING", TotalTests: 5, CreatedAt: now, UpdatedAt: now},
-	)
-	seedRunShards(t, db,
-		m.RunShard{ID: "run-1:exec-a:1", RunID: "run-1", ExecutionID: "exec-a", ShardIndex: &shardOne, ShardCountExpected: &shardTwo, Status: "FAILED", StartTime: &start, EndTime: &finish, CreatedAt: now, UpdatedAt: now},
-		m.RunShard{ID: "run-1:exec-b:2", RunID: "run-1", ExecutionID: "exec-b", ShardIndex: &shardTwo, ShardCountExpected: &shardTwo, Status: "PASSED", StartTime: &now, EndTime: &finish, CreatedAt: now, UpdatedAt: now},
-	)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/runs", nil)
-	rec := httptest.NewRecorder()
-	handler.handleRuns(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
-	}
-
-	var response struct {
-		Runs []struct {
-			ID     string `json:"id"`
-			Status string `json:"status"`
-		} `json:"runs"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if len(response.Runs) != 1 {
-		t.Fatalf("expected 1 run, got %d", len(response.Runs))
-	}
-	if response.Runs[0].Status != "FAILED" {
-		t.Fatalf("run status = %q, want FAILED", response.Runs[0].Status)
 	}
 }
 
@@ -251,7 +210,7 @@ func TestPostgresHandleRunDetail_RecomputesInflatedTotalTestsFromAttachedTests(t
 	handler, db := setupPostgresHandler(t)
 	now := time.Date(2026, 4, 18, 12, 30, 0, 0, time.UTC)
 	suiteID := "suite-1"
-	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Release", Status: "FAILED", TotalTests: 13062, CreatedAt: now, UpdatedAt: now})
+	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Release", Status: "FAILED", CreatedAt: now, UpdatedAt: now})
 	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: now, UpdatedAt: now})
 	seedTests(t, db,
 		m.Test{ID: "test-1", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test 1", Title: "Suite Test 1", Status: "PASSED", CreatedAt: now, UpdatedAt: now},
@@ -270,9 +229,6 @@ func TestPostgresHandleRunDetail_RecomputesInflatedTotalTestsFromAttachedTests(t
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if response.TotalTests != 2 {
-		t.Fatalf("run totalTests = %d, want 2", response.TotalTests)
-	}
 }
 
 func TestPostgresHandleRuns_DerivesStatisticsFromAttemptStatusWhenTestWasResetToNotRun(t *testing.T) {
@@ -280,6 +236,7 @@ func TestPostgresHandleRuns_DerivesStatisticsFromAttemptStatusWhenTestWasResetTo
 	now := time.Date(2026, 4, 29, 3, 35, 1, 0, time.UTC)
 	suiteID := "suite-1"
 	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Logical Aggregate", Status: "PASSED", CreatedAt: now, UpdatedAt: now})
+	seedRunStats(t, db, m.RunStat{RunID: "run-1", Name: "Logical Aggregate", Total: 1, Passed: 1, Unknown: 0, CreatedAt: now, UpdatedAt: now})
 	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: now, UpdatedAt: now})
 	seedTests(t, db, m.Test{ID: "test-1", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test", Title: "Suite Test", Status: "NOT_RUN", CreatedAt: now, UpdatedAt: now})
 	seedAttempts(t, db, m.TestAttempt{ID: "test-1:execution:exec-a:attempt:0", RunID: "run-1", ExecutionID: "exec-a", TestID: "test-1", AttemptIndex: 0, Status: "PASSED", CreatedAt: now, UpdatedAt: now})
@@ -350,6 +307,7 @@ func TestPostgresHandleRuns_UsesLatestExecutionStatusForRepeatedLogicalTest(t *t
 	suiteID := "suite-1"
 
 	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Logical Aggregate", Status: "FAILED", CreatedAt: firstStart, UpdatedAt: secondEnd})
+	seedRunStats(t, db, m.RunStat{RunID: "run-1", Name: "Logical Aggregate", Total: 1, Failed: 1, CreatedAt: firstStart, UpdatedAt: secondEnd})
 	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: firstStart, UpdatedAt: secondEnd})
 	seedTests(t, db, m.Test{ID: "test-1", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test", Title: "Suite Test", Status: "PASSED", CreatedAt: firstStart, UpdatedAt: secondEnd})
 	seedAttempts(t, db,
@@ -387,10 +345,11 @@ func TestPostgresHandleRuns_UsesLatestExecutionStatusForRepeatedLogicalTest(t *t
 func TestPostgresLoadLiveRunningTestDetails_UsesLiveRunningDetailRepo(t *testing.T) {
 	handler := NewPostgresHandler(nil, nil)
 	now := time.Date(2026, 4, 19, 15, 0, 0, 0, time.UTC)
+
 	retryIndex := int32(0)
 	stepStart := now.Add(5 * time.Second)
 	stepDuration := int64(3 * time.Second)
-	stepPayload := stepPayload(t, []*m.StepDocument{{
+	stepsPayload := stepPayload(t, []*m.StepDocument{{
 		ID:        "step-1",
 		Title:     "Live step",
 		Status:    "RUNNING",
@@ -398,7 +357,7 @@ func TestPostgresLoadLiveRunningTestDetails_UsesLiveRunningDetailRepo(t *testing
 		Duration:  &stepDuration,
 	}})
 
-	handler.SetLiveRunRepo(fakeLiveRunRepo{doc: &m.TestRun{
+	handler.liveRunRepo = fakeLiveRunRepo{doc: &m.TestRun{
 		ID: "run-1",
 		Tests: []*m.Test{{
 			ID:         "test-1",
@@ -410,10 +369,10 @@ func TestPostgresLoadLiveRunningTestDetails_UsesLiveRunningDetailRepo(t *testing
 				Status:       "RUNNING",
 				StartTime:    &stepStart,
 				Duration:     &stepDuration,
-				Steps:        stepPayload,
+				Steps:        stepsPayload,
 			}},
 		}},
-	}})
+	}}
 
 	baseTests := []*m.Test{{
 		ID:         "test-1",
@@ -511,11 +470,11 @@ func modelsForPostgresHandlerTests() []interface{} {
 	return []interface{}{
 		&m.TestRun{},
 		&m.RunExecution{},
-		&m.RunShard{},
 		&m.Suite{},
 		&m.Test{},
 		&m.TestAttempt{},
 		&m.Attachment{},
+		&m.RunStat{},
 	}
 }
 
@@ -526,17 +485,17 @@ func seedRuns(t *testing.T, db *gorm.DB, runs ...m.TestRun) {
 	}
 }
 
+func seedRunStats(t *testing.T, db *gorm.DB, stats ...m.RunStat) {
+	t.Helper()
+	if err := db.WithContext(context.Background()).Create(&stats).Error; err != nil {
+		t.Fatalf("seed run stats: %v", err)
+	}
+}
+
 func seedRunExecutions(t *testing.T, db *gorm.DB, executions ...m.RunExecution) {
 	t.Helper()
 	if err := db.WithContext(context.Background()).Create(&executions).Error; err != nil {
 		t.Fatalf("seed run executions: %v", err)
-	}
-}
-
-func seedRunShards(t *testing.T, db *gorm.DB, shards ...m.RunShard) {
-	t.Helper()
-	if err := db.WithContext(context.Background()).Create(&shards).Error; err != nil {
-		t.Fatalf("seed run shards: %v", err)
 	}
 }
 

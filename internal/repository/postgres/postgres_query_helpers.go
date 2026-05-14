@@ -7,14 +7,6 @@ import (
 	m "github.com/stanterprise/observer/internal/models"
 )
 
-func decodeAttemptSteps(raw *m.Step) []*m.StepDocument {
-	steps, err := m.StepDocumentsFromStep(raw)
-	if err != nil {
-		return []*m.StepDocument{}
-	}
-	return steps
-}
-
 func markerFromMetadata(metadata map[string]interface{}) (string, bool) {
 	if metadata == nil {
 		return "", false
@@ -48,17 +40,6 @@ func cloneMetadata(input map[string]interface{}) map[string]interface{} {
 	output := make(map[string]interface{}, len(input))
 	for key, value := range input {
 		output[key] = value
-	}
-	return output
-}
-
-func cloneAttachmentMaps(input []map[string]interface{}) []map[string]interface{} {
-	if len(input) == 0 {
-		return []map[string]interface{}{}
-	}
-	output := make([]map[string]interface{}, 0, len(input))
-	for _, item := range input {
-		output = append(output, cloneMetadata(item))
 	}
 	return output
 }

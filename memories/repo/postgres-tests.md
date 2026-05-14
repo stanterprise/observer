@@ -1,0 +1,2 @@
+- PostgreSQL run-start tests should exercise the current public entrypoint `HandleRunStart`; older `UpsertRunExecutionStart` assumptions are stale after run refactors.
+- `UpsertTestBegin` creates placeholder suites for missing suite rows but does not implicitly create a `TestRun` row.

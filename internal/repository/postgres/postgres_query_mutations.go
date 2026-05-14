@@ -36,9 +36,6 @@ func (r *PostgresRepository) DeleteRuns(ctx context.Context, runIDs []string) (i
 		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.Suite{}).Error; err != nil {
 			return fmt.Errorf("delete run suites: %w", err)
 		}
-		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.RunShard{}).Error; err != nil {
-			return fmt.Errorf("delete run shards: %w", err)
-		}
 		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.RunExecution{}).Error; err != nil {
 			return fmt.Errorf("delete run executions: %w", err)
 		}

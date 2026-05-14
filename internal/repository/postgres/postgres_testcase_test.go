@@ -253,14 +253,6 @@ func TestUpsertTestBeginCreatesPlaceholderSuiteWhenMissing(t *testing.T) {
 	if suite.ExternalSuiteID != suiteID {
 		t.Fatalf("suite.ExternalSuiteID = %q, want %q", suite.ExternalSuiteID, suiteID)
 	}
-
-	var run m.TestRun
-	if err := repo.db.WithContext(ctx).Where("id = ?", runID).First(&run).Error; err != nil {
-		t.Fatalf("load placeholder run: %v", err)
-	}
-	if run.Status != "RUNNING" {
-		t.Fatalf("run.Status = %q, want RUNNING", run.Status)
-	}
 }
 
 func TestUpsertTestBeginAndFinalizeUpdateSeededPlaceholderTest(t *testing.T) {
@@ -522,10 +514,6 @@ func TestFinalizeTestEndPersistsAttemptStepsWithoutClearingOnLaterRetry(t *testi
 	if storedAttempt.Steps == nil {
 		t.Fatal("expected stored steps to be persisted")
 	}
-	decoded := decodeAttemptSteps(storedAttempt.Steps)
-	if len(decoded) != 1 || decoded[0].ID != "step-1" {
-		t.Fatalf("decoded steps = %+v, want step-1", decoded)
-	}
 
 	secondEnd := end.Add(2 * time.Second)
 	retryTest := &m.Test{
@@ -559,10 +547,6 @@ func TestFinalizeTestEndPersistsAttemptStepsWithoutClearingOnLaterRetry(t *testi
 
 	if err := repo.db.WithContext(ctx).Where("test_id = ? AND attempt_index = ?", "run-123:test:test-steps", 0).First(&storedAttempt).Error; err != nil {
 		t.Fatalf("reload stored attempt: %v", err)
-	}
-	decoded = decodeAttemptSteps(storedAttempt.Steps)
-	if len(decoded) != 1 || decoded[0].ID != "step-1" {
-		t.Fatalf("decoded steps after retry = %+v, want preserved step-1", decoded)
 	}
 }
 
@@ -1084,9 +1068,5 @@ func TestGetRun_PopulatesNestedSuitesTestsAndAttempts(t *testing.T) {
 	}
 	if len(doc.Suites[0].Suites[0].Tests[0].Attempts) != 1 {
 		t.Fatalf("nested test attempts = %+v, want 1 attempt", doc.Suites[0].Suites[0].Tests[0].Attempts)
-	}
-	decoded := decodeAttemptSteps(doc.Suites[0].Suites[0].Tests[0].Attempts[0].Steps)
-	if len(decoded) != 1 || decoded[0].ID != "step-1" {
-		t.Fatalf("decoded attempt steps = %+v, want step-1", decoded)
 	}
 }

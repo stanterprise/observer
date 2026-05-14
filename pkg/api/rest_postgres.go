@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	m "github.com/stanterprise/observer/internal/models"
@@ -28,10 +27,6 @@ func NewPostgresHandler(repo *pgRepo.PostgresRepository, logger *slog.Logger) *P
 		logger = slog.Default()
 	}
 	return &PostgresHandler{repo: repo, logger: logger}
-}
-
-func (h *PostgresHandler) SetLiveRunRepo(r liveRunRepository) {
-	h.liveRunRepo = r
 }
 
 func (h *PostgresHandler) RegisterRoutes(r chi.Router) {
@@ -603,14 +598,4 @@ func buildTestStatistics(tests []*m.Test) map[string]int {
 		}
 	}
 	return stats
-}
-
-func latestTestUpdate(tests []*m.Test) time.Time {
-	var latest time.Time
-	for _, test := range tests {
-		if test != nil && test.UpdatedAt.After(latest) {
-			latest = test.UpdatedAt
-		}
-	}
-	return latest
 }

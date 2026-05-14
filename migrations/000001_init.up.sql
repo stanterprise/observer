@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS runs (
     status TEXT,
     metadata JSONB,
     duration BIGINT,
-    total_tests INTEGER NOT NULL DEFAULT 0,
     initiated_by TEXT,
     project_name TEXT,
     started_at TIMESTAMPTZ,
@@ -23,7 +22,9 @@ CREATE TABLE IF NOT EXISTS run_executions (
     name TEXT,
     status TEXT,
     metadata JSONB,
-    total_tests INTEGER NOT NULL DEFAULT 0,
+    shard_index INTEGER,
+    shard_total INTEGER,
+    is_shard BOOLEAN,
     started_at TIMESTAMPTZ,
     finished_at TIMESTAMPTZ,
     duration BIGINT,
@@ -35,23 +36,6 @@ CREATE TABLE IF NOT EXISTS run_executions (
 
 CREATE INDEX IF NOT EXISTS idx_run_executions_run_status ON run_executions (run_id, status);
 CREATE INDEX IF NOT EXISTS idx_run_executions_started_at ON run_executions (started_at);
-
-CREATE TABLE IF NOT EXISTS run_shards (
-    id TEXT PRIMARY KEY,
-    run_id TEXT NOT NULL,
-    execution_id TEXT NOT NULL DEFAULT '',
-    shard_index INTEGER,
-    shard_count_expected INTEGER,
-    status TEXT,
-    started_at TIMESTAMPTZ,
-    finished_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_runs_shards FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_run_shards_run_status ON run_shards (run_id, execution_id, status);
-CREATE UNIQUE INDEX IF NOT EXISTS ux_run_shards_run_execution_shard_index ON run_shards (run_id, execution_id, shard_index);
 
 CREATE TABLE IF NOT EXISTS suites (
     id TEXT NOT NULL,
@@ -128,6 +112,7 @@ CREATE TABLE IF NOT EXISTS test_attempts (
     duration BIGINT,
     steps JSONB,
     steps_count INTEGER NOT NULL DEFAULT 0,
+    metadata JSONB,
     attachments JSONB,
     error_message TEXT,
     stack_trace TEXT,

@@ -94,18 +94,6 @@ func isLowPriorityEvent(eventType publisher.EventType) bool {
 		eventType == publisher.EventTypeStepEnd
 }
 
-// isHighPriorityEvent returns true if the event type is high priority (e.g., tests, runs)
-// High priority events are broadcast to all clients matching their general filters.
-// These events are critical for test observability and should always be delivered.
-func isHighPriorityEvent(eventType publisher.EventType) bool {
-	return eventType == publisher.EventTypeRunStart ||
-		eventType == publisher.EventTypeRunEnd ||
-		eventType == publisher.EventTypeTestBegin ||
-		eventType == publisher.EventTypeTestEnd ||
-		eventType == publisher.EventTypeTestFailure ||
-		eventType == publisher.EventTypeTestError
-}
-
 // NATSConfig holds configuration for NATS WebSocket integration
 type NATSConfig struct {
 	URL          string
@@ -707,7 +695,11 @@ func (h *Hub) normalizeEventData(event *publisher.Event) ([]byte, error) {
 			modelData = runDoc
 			break
 		}
-		modelData = protoToTestRunDocument(&req)
+		runDoc := protoToTestRunDocument(&req)
+		if rawRunDoc, err := parseRunDocumentFromRaw(event.Data); err == nil {
+			runDoc = mergeSupplementalRunDocument(runDoc, rawRunDoc)
+		}
+		modelData = runDoc
 
 	case publisher.EventTypeTestBegin:
 		var req events.TestBeginEventRequest
@@ -829,10 +821,6 @@ func parseRunDocumentFromRaw(raw json.RawMessage) (*models.TestRun, error) {
 		ProjectName: stringValue(runMap, "project_name", "projectName"),
 	}
 
-	if totalTests, ok := numberToInt64(firstValue(runMap, "total_tests", "totalTests")); ok {
-		run.TotalTests = int32(totalTests)
-	}
-
 	if md, ok := mapValue(runMap, "metadata"); ok {
 		run.Metadata = md
 	}
@@ -848,6 +836,46 @@ func parseRunDocumentFromRaw(raw json.RawMessage) (*models.TestRun, error) {
 	}
 
 	return run, nil
+}
+
+func mergeSupplementalRunDocument(base, extra *models.TestRun) *models.TestRun {
+	if base == nil {
+		return extra
+	}
+	if extra == nil {
+		return base
+	}
+
+	merged := *base
+	if merged.Name == "" && extra.Name != "" {
+		merged.Name = extra.Name
+	}
+	if merged.Description == "" && extra.Description != "" {
+		merged.Description = extra.Description
+	}
+	if merged.Status == "" && extra.Status != "" {
+		merged.Status = extra.Status
+	}
+	if len(merged.Metadata) == 0 && len(extra.Metadata) > 0 {
+		merged.Metadata = extra.Metadata
+	}
+	if merged.InitiatedBy == "" && extra.InitiatedBy != "" {
+		merged.InitiatedBy = extra.InitiatedBy
+	}
+	if merged.ProjectName == "" && extra.ProjectName != "" {
+		merged.ProjectName = extra.ProjectName
+	}
+	if merged.StartTime == nil && extra.StartTime != nil {
+		merged.StartTime = extra.StartTime
+	}
+	if merged.EndTime == nil && extra.EndTime != nil {
+		merged.EndTime = extra.EndTime
+	}
+	if merged.Duration == nil && extra.Duration != nil {
+		merged.Duration = extra.Duration
+	}
+
+	return &merged
 }
 
 func parseTestDocumentFromRaw(raw json.RawMessage) (*models.Test, error) {

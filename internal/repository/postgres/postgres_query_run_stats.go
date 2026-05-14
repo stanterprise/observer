@@ -5,25 +5,8 @@ import (
 	"fmt"
 
 	m "github.com/stanterprise/observer/internal/models"
-	"github.com/stanterprise/observer/internal/repository"
 	"gorm.io/gorm/clause"
 )
-
-func (r *PostgresRepository) GetRunStats(ctx context.Context, runID string) (*m.RunStat, error) {
-	if err := repository.ValidateRunID(runID); err != nil {
-		return nil, err
-	}
-	if err := r.ensureDB(); err != nil {
-		return nil, err
-	}
-
-	var stat m.RunStat
-	if err := r.db.WithContext(ctx).Where("run_id = ?", runID).First(&stat).Error; err != nil {
-		return nil, fmt.Errorf("load run stat: %w", err)
-	}
-
-	return &stat, nil
-}
 
 func (r *PostgresRepository) GetAllRunStats(ctx context.Context, limit int64, offset int64) ([]m.RunStat, error) {
 	if err := r.ensureDB(); err != nil {

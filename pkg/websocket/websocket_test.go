@@ -105,9 +105,6 @@ func TestEventPriorityClassification(t *testing.T) {
 			if got := isLowPriorityEvent(tt.eventType); got != tt.isLowPri {
 				t.Errorf("isLowPriorityEvent(%v) = %v, want %v", tt.eventType, got, tt.isLowPri)
 			}
-			if got := isHighPriorityEvent(tt.eventType); got != tt.isHighPri {
-				t.Errorf("isHighPriorityEvent(%v) = %v, want %v", tt.eventType, got, tt.isHighPri)
-			}
 		})
 	}
 }
@@ -387,8 +384,8 @@ func TestNormalizeEventData_RunStart_WithStringTimeFallback(t *testing.T) {
 	if got := out.Data["id"]; got != "run-100" {
 		t.Fatalf("data.id = %v, want run-100", got)
 	}
-	if got := out.Data["totalTests"]; got != float64(42) {
-		t.Fatalf("data.totalTests = %v, want 42", got)
+	if got := out.Data["startTime"]; got == nil {
+		t.Fatal("data.startTime should be present")
 	}
 }
 

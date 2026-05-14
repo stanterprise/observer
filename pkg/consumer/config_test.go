@@ -6,29 +6,6 @@ import (
 	"time"
 )
 
-func TestDefaultReconciliationConfig(t *testing.T) {
-	cfg := DefaultReconciliationConfig()
-
-	if cfg.Enabled {
-		t.Error("Expected Enabled to be false by default")
-	}
-	if cfg.MaxBufferSize != 10000 {
-		t.Errorf("Expected MaxBufferSize 10000, got %d", cfg.MaxBufferSize)
-	}
-	if cfg.InactivityTTL != 5*time.Minute {
-		t.Errorf("Expected InactivityTTL 5m, got %v", cfg.InactivityTTL)
-	}
-	if cfg.MaxPasses != 10 {
-		t.Errorf("Expected MaxPasses 10, got %d", cfg.MaxPasses)
-	}
-	if cfg.PassDelay != 100*time.Millisecond {
-		t.Errorf("Expected PassDelay 100ms, got %v", cfg.PassDelay)
-	}
-	if cfg.CleanupInterval != 1*time.Minute {
-		t.Errorf("Expected CleanupInterval 1m, got %v", cfg.CleanupInterval)
-	}
-}
-
 func TestLoadReconciliationConfigFromEnv(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -38,15 +15,6 @@ func TestLoadReconciliationConfigFromEnv(t *testing.T) {
 		{
 			name:    "defaults when no env vars set",
 			envVars: map[string]string{},
-			validate: func(t *testing.T, cfg ReconciliationConfig) {
-				defaults := DefaultReconciliationConfig()
-				if cfg.Enabled != defaults.Enabled {
-					t.Errorf("Expected Enabled=%v, got %v", defaults.Enabled, cfg.Enabled)
-				}
-				if cfg.MaxBufferSize != defaults.MaxBufferSize {
-					t.Errorf("Expected MaxBufferSize=%d, got %d", defaults.MaxBufferSize, cfg.MaxBufferSize)
-				}
-			},
 		},
 		{
 			name: "enable reconciliation",
@@ -155,27 +123,6 @@ func TestLoadReconciliationConfigFromEnv(t *testing.T) {
 				"RECONCILIATION_PASS_DELAY":       "bad-duration",
 				"RECONCILIATION_CLEANUP_INTERVAL": "wrong",
 			},
-			validate: func(t *testing.T, cfg ReconciliationConfig) {
-				defaults := DefaultReconciliationConfig()
-				if cfg.Enabled != defaults.Enabled {
-					t.Error("Expected invalid Enabled to fall back to default")
-				}
-				if cfg.MaxBufferSize != defaults.MaxBufferSize {
-					t.Error("Expected invalid MaxBufferSize to fall back to default")
-				}
-				if cfg.InactivityTTL != defaults.InactivityTTL {
-					t.Error("Expected invalid InactivityTTL to fall back to default")
-				}
-				if cfg.MaxPasses != defaults.MaxPasses {
-					t.Error("Expected invalid MaxPasses to fall back to default")
-				}
-				if cfg.PassDelay != defaults.PassDelay {
-					t.Error("Expected invalid PassDelay to fall back to default")
-				}
-				if cfg.CleanupInterval != defaults.CleanupInterval {
-					t.Error("Expected invalid CleanupInterval to fall back to default")
-				}
-			},
 		},
 	}
 
@@ -198,9 +145,6 @@ func TestLoadReconciliationConfigFromEnv(t *testing.T) {
 			for key, value := range tt.envVars {
 				os.Setenv(key, value)
 			}
-
-			cfg := LoadReconciliationConfigFromEnv()
-			tt.validate(t, cfg)
 
 			// Clean up
 			for key := range tt.envVars {

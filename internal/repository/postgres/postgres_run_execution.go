@@ -1,76 +1,12 @@
 package postgres
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
-	"github.com/stanterprise/observer/internal/repository"
 	"gorm.io/gorm"
 )
-
-// UpsertRunExecutionStart creates or updates an execution-scoped run record and
-// refreshes the aggregate logical run state.
-func (r *PostgresRepository) UpsertRunExecutionStart(ctx context.Context, execution *m.RunExecution) error {
-	if execution == nil {
-		return fmt.Errorf("run execution is nil")
-	}
-	if err := repository.ValidateRunID(execution.RunID); err != nil {
-		return err
-	}
-	if err := r.ensureDB(); err != nil {
-		return err
-	}
-
-	now := time.Now()
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := upsertRunExecutionStart(tx, execution, now); err != nil {
-			return err
-		}
-		if err := refreshLogicalRunAggregate(tx, execution.RunID, now); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	r.logger.Info("run execution upserted", "run_id", execution.RunID, "execution_id", execution.ID)
-	return nil
-}
-
-// FinalizeRunExecutionEnd finalizes an execution-scoped run record and refreshes
-// the aggregate logical run state.
-func (r *PostgresRepository) FinalizeRunExecutionEnd(ctx context.Context, execution *m.RunExecution) error {
-	if execution == nil {
-		return fmt.Errorf("run execution is nil")
-	}
-	if err := repository.ValidateRunID(execution.RunID); err != nil {
-		return err
-	}
-	if err := r.ensureDB(); err != nil {
-		return err
-	}
-
-	now := time.Now()
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := upsertRunExecutionEnd(tx, execution, now); err != nil {
-			return err
-		}
-		if err := refreshLogicalRunAggregate(tx, execution.RunID, now); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	r.logger.Info("run execution finalized", "run_id", execution.RunID, "execution_id", execution.ID, "status", execution.Status)
-	return nil
-}
 
 func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Time) error {
 	stored, err := loadRunExecution(tx, execution.RunID, execution.ID)
@@ -80,17 +16,19 @@ func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Ti
 
 	if stored == nil {
 		create := m.RunExecution{
-			ID:         execution.ID,
-			RunID:      execution.RunID,
-			Name:       execution.Name,
-			Status:     execution.Status,
-			Metadata:   execution.Metadata,
-			TotalTests: execution.TotalTests,
-			StartTime:  cloneTimePtr(execution.StartTime),
-			EndTime:    cloneTimePtr(execution.EndTime),
-			Duration:   cloneInt64Ptr(execution.Duration),
-			CreatedAt:  now,
-			UpdatedAt:  now,
+			ID:                 execution.ID,
+			RunID:              execution.RunID,
+			Name:               execution.Name,
+			Status:             execution.Status,
+			IsShard:            execution.IsShard,
+			ShardIndex:         cloneInt32Ptr(execution.ShardIndex),
+			ShardCountExpected: cloneInt32Ptr(execution.ShardCountExpected),
+			Metadata:           execution.Metadata,
+			StartTime:          cloneTimePtr(execution.StartTime),
+			EndTime:            cloneTimePtr(execution.EndTime),
+			Duration:           cloneInt64Ptr(execution.Duration),
+			CreatedAt:          now,
+			UpdatedAt:          now,
 		}
 		if create.Status == "" {
 			create.Status = "RUNNING"
@@ -107,12 +45,17 @@ func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Ti
 	if execution.Status != "" {
 		stored.Status = execution.Status
 	}
+	if execution.IsShard {
+		stored.IsShard = true
+	}
+	if execution.ShardIndex != nil {
+		stored.ShardIndex = cloneInt32Ptr(execution.ShardIndex)
+	}
+	if execution.ShardCountExpected != nil {
+		stored.ShardCountExpected = cloneInt32Ptr(execution.ShardCountExpected)
+	}
 	if len(execution.Metadata) > 0 {
-		if isShardedRunStart(execution.Metadata) {
-			stored.Metadata = mergeRunStartMetadata(stored.Metadata, execution.Metadata)
-		} else {
-			stored.Metadata = execution.Metadata
-		}
+		stored.Metadata = mergeRunStartMetadata(stored.Metadata, execution.Metadata)
 	}
 	if execution.StartTime != nil && (stored.StartTime == nil || execution.StartTime.Before(*stored.StartTime)) {
 		stored.StartTime = cloneTimePtr(execution.StartTime)
@@ -122,9 +65,6 @@ func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Ti
 	}
 	if execution.Duration != nil {
 		stored.Duration = cloneInt64Ptr(execution.Duration)
-	}
-	if execution.TotalTests > 0 {
-		stored.TotalTests = mergeRunStartTotalTests(stored.TotalTests, execution.TotalTests, isShardedRunStart(execution.Metadata))
 	}
 	stored.UpdatedAt = now
 
@@ -142,18 +82,19 @@ func upsertRunExecutionEnd(tx *gorm.DB, execution *m.RunExecution, now time.Time
 
 	if stored == nil {
 		create := m.RunExecution{
-			ID:    execution.ID,
-			RunID: execution.RunID,
-
-			Name:       execution.Name,
-			Status:     execution.Status,
-			Metadata:   execution.Metadata,
-			TotalTests: execution.TotalTests,
-			StartTime:  cloneTimePtr(execution.StartTime),
-			EndTime:    cloneTimePtr(execution.EndTime),
-			Duration:   cloneInt64Ptr(execution.Duration),
-			CreatedAt:  now,
-			UpdatedAt:  now,
+			ID:                 execution.ID,
+			RunID:              execution.RunID,
+			Name:               execution.Name,
+			Status:             execution.Status,
+			IsShard:            execution.IsShard,
+			ShardIndex:         cloneInt32Ptr(execution.ShardIndex),
+			ShardCountExpected: cloneInt32Ptr(execution.ShardCountExpected),
+			Metadata:           execution.Metadata,
+			StartTime:          cloneTimePtr(execution.StartTime),
+			EndTime:            cloneTimePtr(execution.EndTime),
+			Duration:           cloneInt64Ptr(execution.Duration),
+			CreatedAt:          now,
+			UpdatedAt:          now,
 		}
 		if create.EndTime == nil {
 			create.EndTime = &now
@@ -170,8 +111,17 @@ func upsertRunExecutionEnd(tx *gorm.DB, execution *m.RunExecution, now time.Time
 	if execution.Status != "" {
 		stored.Status = execution.Status
 	}
+	if execution.IsShard {
+		stored.IsShard = true
+	}
+	if execution.ShardIndex != nil {
+		stored.ShardIndex = cloneInt32Ptr(execution.ShardIndex)
+	}
+	if execution.ShardCountExpected != nil {
+		stored.ShardCountExpected = cloneInt32Ptr(execution.ShardCountExpected)
+	}
 	if len(execution.Metadata) > 0 {
-		stored.Metadata = execution.Metadata
+		stored.Metadata = mergeRunStartMetadata(stored.Metadata, execution.Metadata)
 	}
 	if execution.StartTime != nil && (stored.StartTime == nil || execution.StartTime.Before(*stored.StartTime)) {
 		stored.StartTime = cloneTimePtr(execution.StartTime)
@@ -183,9 +133,6 @@ func upsertRunExecutionEnd(tx *gorm.DB, execution *m.RunExecution, now time.Time
 	}
 	if execution.Duration != nil {
 		stored.Duration = cloneInt64Ptr(execution.Duration)
-	}
-	if execution.TotalTests > 0 && stored.TotalTests == 0 {
-		stored.TotalTests = execution.TotalTests
 	}
 	stored.UpdatedAt = now
 
@@ -209,52 +156,18 @@ func refreshLogicalRunAggregate(tx *gorm.DB, runID string, now time.Time) error 
 		return nil
 	}
 
-	var shards []m.RunShard
-	if err := tx.Where("run_id = ?", runID).Order("created_at asc, id asc").Find(&shards).Error; err != nil {
-		return fmt.Errorf("load run shards: %w", err)
-	}
-	if len(shards) > 0 {
-		if shardAggregate, ok := buildLogicalRunAggregateFromShards(runID, shards, aggregate.TotalTests, now); ok {
-			aggregate.Status = shardAggregate.Status
-			aggregate.StartTime = shardAggregate.StartTime
-			aggregate.EndTime = shardAggregate.EndTime
-			aggregate.Duration = shardAggregate.Duration
-		}
-	}
-
 	assignment := m.TestRun{
-		Status:     aggregate.Status,
-		TotalTests: aggregate.TotalTests,
-		StartTime:  aggregate.StartTime,
-		EndTime:    aggregate.EndTime,
-		Duration:   aggregate.Duration,
-		UpdatedAt:  now,
+		Status:    aggregate.Status,
+		StartTime: aggregate.StartTime,
+		EndTime:   aggregate.EndTime,
+		Duration:  aggregate.Duration,
+		UpdatedAt: now,
 	}
 	result := tx.Where(m.TestRun{ID: runID}).Assign(assignment).FirstOrCreate(&m.TestRun{ID: runID, CreatedAt: now, UpdatedAt: now})
 	if result.Error != nil {
 		return fmt.Errorf("refresh logical run aggregate: %w", result.Error)
 	}
 	return nil
-}
-
-func buildLogicalRunAggregateFromShards(runID string, shards []m.RunShard, totalTests int32, now time.Time) (*m.TestRun, bool) {
-	if len(shards) == 0 {
-		return nil, false
-	}
-
-	aggregate, ok := buildAggregatedRunFromShards(runID, shards, now)
-	if !ok {
-		return nil, false
-	}
-	aggregate.TotalTests = totalTests
-
-	if !allPersistedRunShardsFinished(shards) {
-		aggregate.Status = "RUNNING"
-		aggregate.EndTime = nil
-		aggregate.Duration = nil
-	}
-
-	return aggregate, true
 }
 
 func buildAggregatedRunFromExecutions(runID string, executions []m.RunExecution, now time.Time) (*m.TestRun, bool) {
@@ -270,18 +183,8 @@ func buildAggregatedRunFromExecutions(runID string, executions []m.RunExecution,
 	var (
 		startedAt  *time.Time
 		finishedAt *time.Time
-		totalTests int32
-		sharded    bool
 	)
 	for _, execution := range executions {
-		if isShardedRunStart(execution.Metadata) {
-			sharded = true
-			if execution.TotalTests > totalTests {
-				totalTests = execution.TotalTests
-			}
-		} else {
-			totalTests += execution.TotalTests
-		}
 		if execution.StartTime != nil && (startedAt == nil || execution.StartTime.Before(*startedAt)) {
 			t := *execution.StartTime
 			startedAt = &t
@@ -297,23 +200,15 @@ func buildAggregatedRunFromExecutions(runID string, executions []m.RunExecution,
 		d := finishedAt.Sub(*startedAt).Nanoseconds()
 		duration = &d
 	}
-	if sharded && totalTests == 0 {
-		for _, execution := range executions {
-			if execution.TotalTests > totalTests {
-				totalTests = execution.TotalTests
-			}
-		}
-	}
 
 	return &m.TestRun{
-		ID:         runID,
-		Status:     status,
-		TotalTests: totalTests,
-		StartTime:  startedAt,
-		EndTime:    finishedAt,
-		Duration:   duration,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:        runID,
+		Status:    status,
+		StartTime: startedAt,
+		EndTime:   finishedAt,
+		Duration:  duration,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}, true
 }
 
@@ -386,6 +281,14 @@ func cloneTimePtr(input *time.Time) *time.Time {
 	}
 	t := *input
 	return &t
+}
+
+func cloneInt32Ptr(input *int32) *int32 {
+	if input == nil {
+		return nil
+	}
+	v := *input
+	return &v
 }
 
 func cloneInt64Ptr(input *int64) *int64 {

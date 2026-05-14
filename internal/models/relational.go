@@ -44,22 +44,6 @@ func StepFromDocuments(steps []*StepDocument) (*Step, error) {
 	return &payload, nil
 }
 
-func StepDocumentsFromStep(step *Step) ([]*StepDocument, error) {
-	if step == nil || len(*step) == 0 {
-		return []*StepDocument{}, nil
-	}
-
-	var steps []*StepDocument
-	if err := json.Unmarshal(*step, &steps); err != nil {
-		return nil, err
-	}
-	if steps == nil {
-		return []*StepDocument{}, nil
-	}
-
-	return steps, nil
-}
-
 // TestRun maps to the PostgreSQL runs table.
 // It intentionally mirrors TestRunDocument fields where practical.
 type TestRun struct {
@@ -69,7 +53,6 @@ type TestRun struct {
 	Status      string                 `gorm:"column:status;type:text;index:idx_runs_status_started_at,priority:1" json:"status,omitempty"`
 	Metadata    map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
 	Duration    *int64                 `gorm:"column:duration" json:"duration,omitempty"`
-	TotalTests  int32                  `gorm:"column:total_tests" json:"totalTests,omitempty"`
 	InitiatedBy string                 `gorm:"column:initiated_by;type:text" json:"initiatedBy,omitempty"`
 	ProjectName string                 `gorm:"column:project_name;type:text" json:"projectName,omitempty"`
 	StartTime   *time.Time             `gorm:"column:started_at;index:idx_runs_status_started_at,priority:2;index:idx_runs_started_at" json:"startTime,omitempty"`
@@ -78,7 +61,6 @@ type TestRun struct {
 	UpdatedAt   time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 
 	Executions []*RunExecution `gorm:"foreignKey:RunID;references:ID" json:"executions,omitempty"`
-	Shards     []*RunShard     `gorm:"foreignKey:RunID;references:ID" json:"shards,omitempty"`
 	Suites     []*Suite        `gorm:"foreignKey:RunID;references:ID" json:"suites,omitempty"`
 	Tests      []*Test         `gorm:"foreignKey:RunID;references:ID" json:"tests,omitempty"`
 }
@@ -90,45 +72,29 @@ func (TestRun) TableName() string {
 // RunExecution maps to the PostgreSQL run_executions table and captures
 // execution-scoped state beneath a logical run.
 type RunExecution struct {
-	ID         string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID      string                 `gorm:"column:run_id;type:text;not null;primaryKey;index:idx_run_executions_run_status,priority:1" json:"runId"`
-	Name       string                 `gorm:"column:name;type:text" json:"name,omitempty"`
-	Status     string                 `gorm:"column:status;type:text;index:idx_run_executions_run_status,priority:3" json:"status,omitempty"`
-	Metadata   map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
-	TotalTests int32                  `gorm:"column:total_tests" json:"totalTests,omitempty"`
-	StartTime  *time.Time             `gorm:"column:started_at;index:idx_run_executions_started_at" json:"startTime,omitempty"`
-	EndTime    *time.Time             `gorm:"column:finished_at" json:"endTime,omitempty"`
-	Duration   *int64                 `gorm:"column:duration" json:"duration,omitempty"`
-	CreatedAt  time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
-	UpdatedAt  time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
+	ID                 string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
+	RunID              string                 `gorm:"column:run_id;type:text;not null;primaryKey;index:idx_run_executions_run_status,priority:1" json:"runId"`
+	Name               string                 `gorm:"column:name;type:text" json:"name,omitempty"`
+	Status             string                 `gorm:"column:status;type:text;index:idx_run_executions_run_status,priority:2" json:"status,omitempty"`
+	IsShard            bool                   `gorm:"column:is_shard" json:"isShard,omitempty"`
+	ShardIndex         *int32                 `gorm:"column:shard_index" json:"shardIndex,omitempty"`
+	ShardCountExpected *int32                 `gorm:"column:shard_total" json:"shardCountExpected,omitempty"`
+	Metadata           map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
+	StartTime          *time.Time             `gorm:"column:started_at;index:idx_run_executions_started_at" json:"startTime,omitempty"`
+	EndTime            *time.Time             `gorm:"column:finished_at" json:"endTime,omitempty"`
+	Duration           *int64                 `gorm:"column:duration" json:"duration,omitempty"`
+	CreatedAt          time.Time              `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
+	UpdatedAt          time.Time              `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 }
 
 func (RunExecution) TableName() string {
 	return "run_executions"
 }
 
-// RunShard maps to the PostgreSQL run_shards table.
-type RunShard struct {
-	ID                 string     `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID              string     `gorm:"column:run_id;type:text;not null;index:idx_run_shards_run_status,priority:1;uniqueIndex:ux_run_shards_run_execution_shard_index,priority:1" json:"runId"`
-	ExecutionID        string     `gorm:"column:execution_id;type:text;not null;default:'';uniqueIndex:ux_run_shards_run_execution_shard_index,priority:2;index:idx_run_shards_run_status,priority:2" json:"executionId,omitempty"`
-	ShardIndex         *int32     `gorm:"column:shard_index;uniqueIndex:ux_run_shards_run_execution_shard_index,priority:3" json:"shardIndex,omitempty"`
-	ShardCountExpected *int32     `gorm:"column:shard_count_expected" json:"shardCountExpected,omitempty"`
-	Status             string     `gorm:"column:status;type:text;index:idx_run_shards_run_status,priority:3" json:"status,omitempty"`
-	StartTime          *time.Time `gorm:"column:started_at" json:"startTime,omitempty"`
-	EndTime            *time.Time `gorm:"column:finished_at" json:"endTime,omitempty"`
-	CreatedAt          time.Time  `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
-	UpdatedAt          time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
-}
-
-func (RunShard) TableName() string {
-	return "run_shards"
-}
-
 // Suite maps to the PostgreSQL suites table.
 type Suite struct {
 	ID              string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID           string                 `gorm:"column:run_id;primaryKey;type:text;not null;index:idx_suites_run_id;index:idx_suites_run_status,priority:1" json:"runId,omitempty"`
+	RunID           string                 `gorm:"column:run_id;primaryKey;type:text;not null;index:idx_suites_run_id;index:idx_suites_run_status,priority:1;index:idx_suites_run_external_suite_id,priority:1" json:"runId,omitempty"`
 	ExternalSuiteID string                 `gorm:"column:external_suite_id;type:text;index:idx_suites_run_external_suite_id,priority:2" json:"externalSuiteId,omitempty"`
 	ParentSuiteID   *string                `gorm:"column:parent_suite_id;type:text" json:"parentSuiteId,omitempty"`
 	Name            string                 `gorm:"column:name;type:text" json:"name,omitempty"`
@@ -162,9 +128,9 @@ func (Suite) TableName() string {
 // Test maps to the PostgreSQL tests table.
 type Test struct {
 	ID             string                 `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID          string                 `gorm:"column:run_id;primaryKey;type:text;not null;index:idx_tests_run_id" json:"runId,omitempty"`
+	RunID          string                 `gorm:"column:run_id;primaryKey;type:text;not null;index:idx_tests_run_id;index:idx_tests_run_external_test_id,priority:1" json:"runId,omitempty"`
 	ExternalTestID string                 `gorm:"column:external_test_id;type:text;index:idx_tests_suite_external_test_id,priority:2;index:idx_tests_run_external_test_id,priority:2" json:"externalTestId,omitempty"`
-	SuiteID        *string                `gorm:"column:suite_id;type:text;not null;index:idx_tests_suite_status,priority:1" json:"suiteId,omitempty"`
+	SuiteID        *string                `gorm:"column:suite_id;type:text;not null;index:idx_tests_suite_status,priority:1;index:idx_tests_suite_external_test_id,priority:1" json:"suiteId,omitempty"`
 	Name           string                 `gorm:"column:name;type:text" json:"name,omitempty"`
 	Title          string                 `gorm:"column:title;type:text" json:"title,omitempty"`
 	Description    string                 `gorm:"column:description;type:text" json:"description,omitempty"`
@@ -191,21 +157,18 @@ func (Test) TableName() string {
 // TestAttempt maps to PostgreSQL test_attempts.
 // Steps are stored on the attempt row as requested.
 type TestAttempt struct {
-	ID           string     `gorm:"column:id;type:text;primaryKey" json:"id"`
-	RunID        string     `gorm:"column:run_id;type:text;not null;index:idx_attempts_run_id;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:1" json:"runId,omitempty"`
-	ExecutionID  string     `gorm:"column:execution_id;type:text;not null;default:'';index:idx_attempts_execution_id;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:3" json:"executionId,omitempty"`
-	TestID       string     `gorm:"column:test_id;type:text;not null;index:idx_attempts_test_attempt,priority:1;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:2" json:"testId"`
-	AttemptIndex int32      `gorm:"column:attempt_index;not null;index:idx_attempts_test_attempt,priority:2;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:4" json:"attemptIndex"`
-	Status       string     `gorm:"column:status;type:text;index:idx_attempts_status_finished_at,priority:1" json:"status,omitempty"`
-	StartTime    *time.Time `gorm:"column:started_at" json:"startTime,omitempty"`
-	EndTime      *time.Time `gorm:"column:finished_at;index:idx_attempts_status_finished_at,priority:2" json:"endTime,omitempty"`
-	Duration     *int64     `gorm:"column:duration" json:"duration,omitempty"`
-
-	// Steps holds the step array containing step trees serialized as jsonb.
-	// Go type is json.RawMessage (provisional — concrete typed decode at read time).
-	Steps      *Step `gorm:"column:steps;type:jsonb" json:"steps,omitempty"`
-	StepsCount int32 `gorm:"column:steps_count" json:"stepsCount,omitempty"`
-
+	ID           string                   `gorm:"column:id;type:text;primaryKey" json:"id"`
+	RunID        string                   `gorm:"column:run_id;type:text;not null;index:idx_attempts_run_id;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:1" json:"runId,omitempty"`
+	ExecutionID  string                   `gorm:"column:execution_id;type:text;not null;default:'';index:idx_attempts_execution_id;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:3" json:"executionId,omitempty"`
+	TestID       string                   `gorm:"column:test_id;type:text;not null;index:idx_attempts_test_attempt,priority:1;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:2" json:"testId"`
+	AttemptIndex int32                    `gorm:"column:attempt_index;not null;index:idx_attempts_test_attempt,priority:2;uniqueIndex:ux_attempts_run_test_execution_attempt_index,priority:4" json:"attemptIndex"`
+	Status       string                   `gorm:"column:status;type:text;index:idx_attempts_status_finished_at,priority:1" json:"status,omitempty"`
+	StartTime    *time.Time               `gorm:"column:started_at" json:"startTime,omitempty"`
+	EndTime      *time.Time               `gorm:"column:finished_at;index:idx_attempts_status_finished_at,priority:2" json:"endTime,omitempty"`
+	Duration     *int64                   `gorm:"column:duration" json:"duration,omitempty"`
+	Steps        *Step                    `gorm:"column:steps;type:jsonb" json:"steps,omitempty"`
+	StepsCount   int32                    `gorm:"column:steps_count" json:"stepsCount,omitempty"`
+	Metadata     map[string]interface{}   `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
 	Attachments  []map[string]interface{} `gorm:"column:attachments;type:jsonb;serializer:json" json:"attachments,omitempty"`
 	ErrorMessage string                   `gorm:"column:error_message;type:text" json:"errorMessage,omitempty"`
 	StackTrace   string                   `gorm:"column:stack_trace;type:text" json:"stackTrace,omitempty"`
@@ -214,9 +177,8 @@ type TestAttempt struct {
 	Errors       []*TestErrorDocument     `gorm:"column:errors;type:jsonb;serializer:json" json:"errors,omitempty"`
 	StdOut       []*OutputDocument        `gorm:"column:stdout;type:jsonb;serializer:json" json:"stdout,omitempty"`
 	StdErr       []*OutputDocument        `gorm:"column:stderr;type:jsonb;serializer:json" json:"stderr,omitempty"`
-
-	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
-	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
+	CreatedAt    time.Time                `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
+	UpdatedAt    time.Time                `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 
 	AttachmentsRows []Attachment `gorm:"foreignKey:TestAttemptID;references:ID" json:"attachmentsRows,omitempty"`
 }
@@ -274,7 +236,6 @@ func ModelsForMigration() []interface{} {
 	return []interface{}{
 		&TestRun{},
 		&RunExecution{},
-		&RunShard{},
 		&Suite{},
 		&Test{},
 		&TestAttempt{},
