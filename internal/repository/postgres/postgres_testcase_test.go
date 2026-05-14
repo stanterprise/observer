@@ -443,8 +443,8 @@ func TestFinalizeTestEndAggregatesPassingRetries(t *testing.T) {
 	if err := repo.db.WithContext(ctx).First(&storedTest, "id = ?", "run-123:test:test-123").Error; err != nil {
 		t.Fatalf("load stored test: %v", err)
 	}
-	if storedTest.Status != "PASSED" {
-		t.Fatalf("stored test status = %q, want PASSED", storedTest.Status)
+	if storedTest.Status != "FLAKY" {
+		t.Fatalf("stored test status = %q, want FLAKY", storedTest.Status)
 	}
 	if storedTest.RetryIndex == nil || *storedTest.RetryIndex != 1 {
 		t.Fatalf("stored retry index = %v, want 1", storedTest.RetryIndex)
