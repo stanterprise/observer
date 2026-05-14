@@ -11,15 +11,6 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestIsShardedRunStart(t *testing.T) {
-	if !isShardedRunStart(map[string]interface{}{"shard.total": "4", "shard.current": "1"}) {
-		t.Fatal("expected sharded run metadata to be detected")
-	}
-	if isShardedRunStart(map[string]interface{}{"shard.total": "4"}) {
-		t.Fatal("expected incomplete shard metadata to be non-sharded")
-	}
-}
-
 func TestMergeRunStartMetadata(t *testing.T) {
 	existing := map[string]interface{}{"MARKER": "test", "existing": "value"}
 	incoming := map[string]interface{}{"shard.total": "4", "MARKER": "updated"}

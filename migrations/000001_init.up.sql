@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS run_executions (
     name TEXT,
     status TEXT,
     metadata JSONB,
-    total_tests INTEGER NOT NULL DEFAULT 0,
+    shard_index INTEGER,
+    shard_total INTEGER,
+    is_shard BOOLEAN,
     started_at TIMESTAMPTZ,
     finished_at TIMESTAMPTZ,
     duration BIGINT,
@@ -71,7 +73,6 @@ CREATE INDEX IF NOT EXISTS idx_suites_run_external_suite_id ON suites (run_id, e
 CREATE TABLE IF NOT EXISTS tests (
     id TEXT NOT NULL,
     run_id TEXT NOT NULL,
-    execution_id TEXT NOT NULL,
     external_test_id TEXT,
     suite_id TEXT NOT NULL,
     name TEXT,
