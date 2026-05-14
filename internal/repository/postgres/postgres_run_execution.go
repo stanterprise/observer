@@ -107,11 +107,7 @@ func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Ti
 		stored.Status = execution.Status
 	}
 	if len(execution.Metadata) > 0 {
-		if isShardedRunStart(execution.Metadata) {
-			stored.Metadata = mergeRunStartMetadata(stored.Metadata, execution.Metadata)
-		} else {
-			stored.Metadata = execution.Metadata
-		}
+		stored.Metadata = mergeRunStartMetadata(stored.Metadata, execution.Metadata)
 	}
 	if execution.StartTime != nil && (stored.StartTime == nil || execution.StartTime.Before(*stored.StartTime)) {
 		stored.StartTime = cloneTimePtr(execution.StartTime)
@@ -166,7 +162,7 @@ func upsertRunExecutionEnd(tx *gorm.DB, execution *m.RunExecution, now time.Time
 		stored.Status = execution.Status
 	}
 	if len(execution.Metadata) > 0 {
-		stored.Metadata = execution.Metadata
+		stored.Metadata = mergeRunStartMetadata(stored.Metadata, execution.Metadata)
 	}
 	if execution.StartTime != nil && (stored.StartTime == nil || execution.StartTime.Before(*stored.StartTime)) {
 		stored.StartTime = cloneTimePtr(execution.StartTime)

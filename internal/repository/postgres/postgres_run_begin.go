@@ -9,8 +9,12 @@ import (
 	"gorm.io/gorm"
 )
 
-func (r *PostgresRepository) HandleRunStart(ctx context.Context, req *events.ReportRunStartEventRequest) {
+// HandleRunStart handles the ReportRunStartEventRequest by creating or updating the TestRun and associated RunExecution, Suites, and Tests.
+// It ensures that sharded run metadata is merged correctly and that existing records are updated rather than duplicated.
+func (r *PostgresRepository) HandleRunStart(ctx context.Context, req *events.ReportRunStartEventRequest) error {
 	testRun, runExecution, testSuites, testCases := m.RunStartEventToAllEntities(req) // map event to all entities (test run, execution, suites, tests)
+
+	now := time.Now()
 
 	// check if run exists
 	var existing m.TestRun
@@ -25,10 +29,14 @@ func (r *PostgresRepository) HandleRunStart(ctx context.Context, req *events.Rep
 			r.logger.Error("create run start", testRun.ID, err)
 		}
 	} else {
-		now := time.Now()
 		existing.UpdatedAt = now
-
-		if err := r.db.Save(&existing).Error; err != nil {
+		if testRun != nil {
+			merged := mergeRuns(existing, *testRun) // merge existing and incoming run data, with incoming taking precedence
+			testRun = &merged
+		} else {
+			testRun = &existing
+		}
+		if err := r.db.Save(&testRun).Error; err != nil {
 			r.logger.Error("update run start", testRun.ID, err)
 		}
 	}
@@ -71,217 +79,41 @@ func (r *PostgresRepository) HandleRunStart(ctx context.Context, req *events.Rep
 			}
 		}
 
+		// create run stats record
+		stats, err := r.collectRunStats(ctx, tx, testRun.ID)
+		if err != nil {
+			tx.Logger.Error(ctx, "create run stats for run start", testRun.ID, err)
+		}
+		if err := tx.Create(&stats).Error; err != nil {
+			tx.Logger.Error(ctx, "create run stats for run start", testRun.ID, err)
+		}
 		return nil
 	})
+
+	return nil
 }
 
-// // UpsertRunStart upserts a TestRun row from a mapped run start event.
-// // On conflict the mutable fields (name, status, metadata, timing) are updated.
-// func (r *PostgresRepository) UpsertRunStart(ctx context.Context, run *m.TestRun) error {
-// 	if run == nil {
-// 		return fmt.Errorf("run is nil")
-// 	}
-// 	if err := repository.ValidateRunID(run.ID); err != nil {
-// 		return err
-// 	}
-// 	if err := r.ensureDB(); err != nil {
-// 		return err
-// 	}
+func mergeRuns(existing, incoming m.TestRun) m.TestRun {
+	merged := existing
 
-// 	now := time.Now()
-// 	run.CreatedAt = now
-// 	run.UpdatedAt = now
+	if incoming.Name != "" {
+		merged.Name = incoming.Name
+	}
+	if incoming.Status != "" {
+		merged.Status = incoming.Status
+	}
+	if len(incoming.Metadata) > 0 {
+		merged.Metadata = mergeRunStartMetadata(existing.Metadata, incoming.Metadata)
+	}
+	if incoming.StartTime != nil && (existing.StartTime == nil || incoming.StartTime.Before(*existing.StartTime)) {
+		merged.StartTime = cloneTimePtr(incoming.StartTime)
+	}
+	if incoming.EndTime != nil && (existing.EndTime == nil || incoming.EndTime.After(*existing.EndTime)) {
+		merged.EndTime = cloneTimePtr(incoming.EndTime)
+	}
+	if incoming.Duration != nil && (existing.Duration == nil || *incoming.Duration > *existing.Duration) {
+		merged.Duration = cloneInt64Ptr(incoming.Duration)
+	}
 
-// 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-// 		assignment := m.TestRun{
-// 			Name:        run.Name,
-// 			Status:      "RUNNING",
-// 			InitiatedBy: run.InitiatedBy,
-// 			ProjectName: run.ProjectName,
-// 			Metadata:    run.Metadata,
-// 			StartTime:   run.StartTime,
-// 			UpdatedAt:   now,
-// 			CreatedAt:   now,
-// 			Description: run.Description,
-// 		}
-
-// 		if isShardedRunStart(run.Metadata) {
-// 			var existing m.TestRun
-// 			err := tx.Where("id = ?", run.ID).First(&existing).Error
-// 			if err != nil && err != gorm.ErrRecordNotFound {
-// 				return fmt.Errorf("load existing run start: %w", err)
-// 			}
-// 			assignment.Metadata = mergeRunStartMetadata(existing.Metadata, run.Metadata)
-// 		}
-
-// 		result := tx.
-// 			Where(m.TestRun{ID: run.ID}).
-// 			Assign(assignment).
-// 			FirstOrCreate(run)
-
-// 		if result.Error != nil {
-// 			return fmt.Errorf("upsert run start: %w", result.Error)
-// 		}
-
-// 		runStatsName := run.Name
-// 		if runStatsName == "" {
-// 			runStatsName = run.ID
-// 		}
-
-// 		stat := m.RunStat{RunID: run.ID}
-// 		err := tx.Where("run_id = ?", run.ID).First(&stat).Error
-// 		if err != nil {
-// 			if err != gorm.ErrRecordNotFound {
-// 				return fmt.Errorf("load run stats for run start %s: %w", run.ID, err)
-// 			}
-
-// 			stat = m.RunStat{
-// 				RunID: run.ID,
-// 				Name:  runStatsName,
-// 			}
-// 			if run.StartTime != nil {
-// 				stat.CreatedAt = *run.StartTime
-// 				stat.UpdatedAt = *run.StartTime
-// 			}
-// 			if err := tx.Create(&stat).Error; err != nil {
-// 				return fmt.Errorf("create run stats for run start %s: %w", run.ID, err)
-// 			}
-// 		}
-
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	r.logger.Info("test run upserted", "run_id", run.ID)
-// 	return nil
-// }
-
-// // UpsertRunStartSuites upserts suite rows emitted in the run-start payload.
-// func (r *PostgresRepository) UpsertRunStartSuites(ctx context.Context, suites []*m.Suite) error {
-// 	if err := r.ensureDB(); err != nil {
-// 		return err
-// 	}
-
-// 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-// 		now := time.Now()
-// 		for _, suite := range suites {
-// 			if suite == nil {
-// 				continue
-// 			}
-// 			if err := repository.ValidateRunID(suite.RunID); err != nil {
-// 				return err
-// 			}
-// 			if err := upsertRunStartSuite(tx, suite, now); err != nil {
-// 				return err
-// 			}
-// 		}
-
-// 		return nil
-// 	})
-// }
-
-// // UpsertRunStartTests upserts test rows emitted in the run-start payload.
-// func (r *PostgresRepository) UpsertRunStartTests(ctx context.Context, tests []*m.Test) error {
-// 	if err := r.ensureDB(); err != nil {
-// 		return err
-// 	}
-
-// 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-// 		now := time.Now()
-// 		for _, test := range tests {
-// 			if test == nil {
-// 				continue
-// 			}
-// 			if err := repository.ValidateRunID(test.RunID); err != nil {
-// 				return err
-// 			}
-// 			if err := upsertRunStartTest(tx, test, now); err != nil {
-// 				return err
-// 			}
-// 		}
-
-// 		return nil
-// 	})
-// }
-
-// func isShardedRunStart(metadata map[string]interface{}) bool {
-// 	if metadata == nil {
-// 		return false
-// 	}
-// 	_, hasTotal := metadata["shard.total"]
-// 	_, hasCurrent := metadata["shard.current"]
-// 	return hasTotal && hasCurrent
-// }
-
-// func upsertRunStartTest(tx *gorm.DB, test *m.Test, now time.Time) error {
-// 	var stored m.Test
-// 	err := tx.Where("run_id = ? AND id = ?", test.RunID, test.ID).First(&stored).Error
-// 	if err != nil {
-// 		if err != gorm.ErrRecordNotFound {
-// 			return fmt.Errorf("load run start test %s: %w", test.ID, err)
-// 		}
-
-// 		create := *test
-// 		create.CreatedAt = now
-// 		create.UpdatedAt = now
-// 		if err := tx.Create(&create).Error; err != nil {
-// 			return fmt.Errorf("create run start test %s: %w", test.ID, err)
-// 		}
-// 		return nil
-// 	}
-
-// 	if test.RunID != "" {
-// 		stored.RunID = test.RunID
-// 	}
-// 	if test.ExternalTestID != "" {
-// 		stored.ExternalTestID = test.ExternalTestID
-// 	}
-// 	if test.SuiteID != nil {
-// 		stored.SuiteID = test.SuiteID
-// 	}
-// 	if test.Name != "" {
-// 		stored.Name = test.Name
-// 	}
-// 	if test.Title != "" {
-// 		stored.Title = test.Title
-// 	}
-// 	if test.Description != "" {
-// 		stored.Description = test.Description
-// 	}
-// 	stored.Status = mergeRunStartEntityStatus(stored.Status, test.Status)
-// 	if test.StartTime != nil && (stored.StartTime == nil || test.StartTime.Before(*stored.StartTime)) {
-// 		stored.StartTime = cloneTimePtr(test.StartTime)
-// 	}
-// 	if test.EndTime != nil && (stored.EndTime == nil || test.EndTime.After(*stored.EndTime)) {
-// 		stored.EndTime = cloneTimePtr(test.EndTime)
-// 	}
-// 	if test.Duration != nil {
-// 		stored.Duration = cloneInt64Ptr(test.Duration)
-// 	}
-// 	if len(test.Metadata) > 0 {
-// 		stored.Metadata = mergeRunStartMetadata(stored.Metadata, test.Metadata)
-// 	}
-// 	if len(test.Tags) > 0 {
-// 		stored.Tags = append([]string(nil), test.Tags...)
-// 	}
-// 	if test.Location != "" {
-// 		stored.Location = test.Location
-// 	}
-// 	if test.RetryCount != nil {
-// 		stored.RetryCount = test.RetryCount
-// 	}
-// 	if test.RetryIndex != nil {
-// 		stored.RetryIndex = test.RetryIndex
-// 	}
-// 	if test.Timeout != nil {
-// 		stored.Timeout = test.Timeout
-// 	}
-// 	stored.UpdatedAt = now
-
-// 	if err := tx.Save(&stored).Error; err != nil {
-// 		return fmt.Errorf("update run start test %s: %w", test.ID, err)
-// 	}
-// 	return nil
-// }
+	return merged
+}

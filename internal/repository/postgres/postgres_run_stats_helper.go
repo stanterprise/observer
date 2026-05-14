@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	m "github.com/stanterprise/observer/internal/models"
 	"gorm.io/gorm"
 )
 
@@ -38,7 +39,7 @@ func mapStatusToRunStatsColumn(status string) string {
 	}
 }
 
-func (r *PostgresRepository) collectRunStats(ctx context.Context, tx *gorm.DB, runID string) (map[string]interface{}, error) {
+func (r *PostgresRepository) collectRunStats(ctx context.Context, tx *gorm.DB, runID string) (*m.RunStat, error) {
 	var grouped []runStatusCount
 	if err := tx.WithContext(ctx).
 		Table("tests").
@@ -112,5 +113,21 @@ func (r *PostgresRepository) collectRunStats(ctx context.Context, tx *gorm.DB, r
 		result[k] = v
 	}
 	result["updated_at"] = updatePayload["updated_at"]
-	return result, nil
+	return &m.RunStat{
+		RunID:       runID,
+		Total:       int32(stats["total"]),
+		Passed:      int32(stats["passed"]),
+		Failed:      int32(stats["failed"]),
+		Skipped:     int32(stats["skipped"]),
+		Flaky:       int32(stats["flaky"]),
+		Broken:      int32(stats["broken"]),
+		TimedOut:    int32(stats["timedout"]),
+		Interrupted: int32(stats["interrupted"]),
+		Unknown:     int32(stats["unknown"]),
+		NotRun:      int32(stats["not_run"]),
+		Running:     int32(stats["running"]),
+		Duration:    duration,
+		CreatedAt:   createdAt,
+		UpdatedAt:   now,
+	}, nil
 }
