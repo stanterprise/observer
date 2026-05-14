@@ -203,6 +203,12 @@ func upsertRelationalTestAttempt(tx *gorm.DB, attempt *m.TestAttempt, now time.T
 }
 
 func aggregateTestAttemptStatuses(attempts []m.TestAttempt) string {
+	if len(attempts) == 0 {
+		return "NOT_RUN"
+	} else if len(attempts) == 1 {
+		return attempts[0].Status
+	}
+
 	// Sorted in descending order of creation time, then attempt index, so that the latest attempt is first.
 	sort.Slice(attempts, func(i, j int) bool {
 		return attempts[i].CreatedAt.After(attempts[j].CreatedAt)
@@ -226,12 +232,6 @@ func aggregateTestAttemptStatuses(attempts []m.TestAttempt) string {
 			return "FLAKY"
 		}
 		return "PASSED"
-	}
-
-	if len(attempts) == 0 {
-		return "NOT_RUN"
-	} else if len(attempts) == 1 {
-		return latest
 	}
 
 	// if all attempts statuses are the same, return that status instead of FLAKY
