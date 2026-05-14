@@ -80,6 +80,26 @@ func (r *PostgresRepository) HandleRunStart(ctx context.Context, req *events.Rep
 		}
 
 		// create run stats record
+		if err := tx.WithContext(ctx).
+			Table("run_stats").
+			Where("run_id = ?", testRun.ID).Error; err != nil {
+			if err != gorm.ErrRecordNotFound {
+				tx.Logger.Error(ctx, "load existing run stats for run start", testRun.ID, err)
+			} else {
+				runStats := m.RunStat{
+					RunID:     testRun.ID,
+					Name:      testRun.Name,
+					Duration:  0,
+					CreatedAt: time.Now(),
+					UpdatedAt: time.Now(),
+				}
+
+				if err := tx.Create(&runStats).Error; err != nil {
+					tx.Logger.Error(ctx, "create run stats for run start", testRun.ID, err)
+				}
+			}
+		}
+
 		stats, err := r.collectRunStats(ctx, tx, testRun.ID)
 		if err != nil {
 			tx.Logger.Error(ctx, "create run stats for run start", testRun.ID, err)

@@ -39,6 +39,53 @@ func mapStatusToRunStatsColumn(status string) string {
 	}
 }
 
+func generateRunStatWithStatusCounts(runId string, grouped []runStatusCount) *m.RunStat {
+	record := &m.RunStat{
+		RunID:       runId,
+		Total:       0,
+		Passed:      0,
+		Failed:      0,
+		Skipped:     0,
+		Flaky:       0,
+		Broken:      0,
+		TimedOut:    0,
+		Interrupted: 0,
+		Unknown:     0,
+		NotRun:      0,
+		Running:     0,
+		Duration:    0,
+	}
+
+	for _, entry := range grouped {
+		column := mapStatusToRunStatsColumn(entry.Status)
+		switch column {
+		case "passed":
+			record.Passed += int32(entry.Count)
+		case "failed":
+			record.Failed += int32(entry.Count)
+		case "skipped":
+			record.Skipped += int32(entry.Count)
+		case "flaky":
+			record.Flaky += int32(entry.Count)
+		case "broken":
+			record.Broken += int32(entry.Count)
+		case "timedout":
+			record.TimedOut += int32(entry.Count)
+		case "interrupted":
+			record.Interrupted += int32(entry.Count)
+		case "not_run":
+			record.NotRun += int32(entry.Count)
+		case "running":
+			record.Running += int32(entry.Count)
+		default:
+			record.Unknown += int32(entry.Count)
+		}
+		record.Total += int32(entry.Count)
+	}
+
+	return record
+}
+
 func (r *PostgresRepository) collectRunStats(ctx context.Context, tx *gorm.DB, runID string) (*m.RunStat, error) {
 	var grouped []runStatusCount
 	if err := tx.WithContext(ctx).
@@ -50,56 +97,21 @@ func (r *PostgresRepository) collectRunStats(ctx context.Context, tx *gorm.DB, r
 		return nil, err
 	}
 
-	// Always set a complete stats payload so old counts are cleared.
-	stats := map[string]int64{
-		"total":       0,
-		"passed":      0,
-		"failed":      0,
-		"skipped":     0,
-		"flaky":       0,
-		"broken":      0,
-		"timedout":    0,
-		"interrupted": 0,
-		"unknown":     0,
-		"not_run":     0,
-		"running":     0,
-	}
+	record := generateRunStatWithStatusCounts(runID, grouped)
 
-	for _, entry := range grouped {
-		column := mapStatusToRunStatsColumn(entry.Status)
-		stats[column] += entry.Count
-		stats["total"] += entry.Count
-	}
-
-	// Fetch created_at from the existing run_stats row to compute elapsed duration.
-	var createdAt time.Time
 	if err := tx.WithContext(ctx).
 		Table("run_stats").
-		Select("created_at").
 		Where("run_id = ?", runID).
-		Scan(&createdAt).Error; err != nil {
+		Scan(&record).Error; err != nil {
 		return nil, fmt.Errorf("fetching run_stats created_at for run_id %q: %w", runID, err)
 	}
 
-	now := time.Now()
-	var duration int64
-	if !createdAt.IsZero() {
-		duration = now.Sub(createdAt).Milliseconds()
+	if !record.CreatedAt.IsZero() {
+		now := time.Now()
+		record.Duration = now.Sub(record.CreatedAt).Milliseconds()
 	}
 
-	// Build update payload with stats and timestamp.
-	updatePayload := map[string]interface{}{
-		"updated_at": now,
-		"duration":   duration,
-	}
-	for k, v := range stats {
-		updatePayload[k] = v
-	}
-
-	update := tx.WithContext(ctx).
-		Table("run_stats").
-		Where("run_id = ?", runID).
-		Updates(updatePayload)
+	update := tx.WithContext(ctx).Save(record)
 	if update.Error != nil {
 		return nil, update.Error
 	}
@@ -107,27 +119,5 @@ func (r *PostgresRepository) collectRunStats(ctx context.Context, tx *gorm.DB, r
 		return nil, fmt.Errorf("run_stats row not found for run_id %q", runID)
 	}
 
-	// Return stats for caller reference.
-	result := make(map[string]interface{})
-	for k, v := range stats {
-		result[k] = v
-	}
-	result["updated_at"] = updatePayload["updated_at"]
-	return &m.RunStat{
-		RunID:       runID,
-		Total:       int32(stats["total"]),
-		Passed:      int32(stats["passed"]),
-		Failed:      int32(stats["failed"]),
-		Skipped:     int32(stats["skipped"]),
-		Flaky:       int32(stats["flaky"]),
-		Broken:      int32(stats["broken"]),
-		TimedOut:    int32(stats["timedout"]),
-		Interrupted: int32(stats["interrupted"]),
-		Unknown:     int32(stats["unknown"]),
-		NotRun:      int32(stats["not_run"]),
-		Running:     int32(stats["running"]),
-		Duration:    duration,
-		CreatedAt:   createdAt,
-		UpdatedAt:   now,
-	}, nil
+	return record, nil
 }
