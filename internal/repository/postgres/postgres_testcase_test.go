@@ -620,7 +620,7 @@ func TestFinalizeTestEndPreservesSuiteIDForSparseTerminalPayload(t *testing.T) {
 func TestAggregateTestAttemptStatuses(t *testing.T) {
 	attempts := []m.TestAttempt{
 		{AttemptIndex: 0, CreatedAt: time.Now(), Status: "FAILED"},
-		{AttemptIndex: 1, CreatedAt: time.Now().Add(time.Duration(100)), Status: "PASSED"},
+		{AttemptIndex: 1, CreatedAt: time.Now().Add(time.Second * 100), Status: "PASSED"},
 	}
 	if got := aggregateTestAttemptStatuses(attempts); got != "FLAKY" {
 		t.Fatalf("aggregateTestAttemptStatuses() = %q, want FLAKY", got)
