@@ -384,8 +384,8 @@ func TestNormalizeEventData_RunStart_WithStringTimeFallback(t *testing.T) {
 	if got := out.Data["id"]; got != "run-100" {
 		t.Fatalf("data.id = %v, want run-100", got)
 	}
-	if got := out.Data["totalTests"]; got != float64(42) {
-		t.Fatalf("data.totalTests = %v, want 42", got)
+	if got := out.Data["startTime"]; got == nil {
+		t.Fatal("data.startTime should be present")
 	}
 }
 

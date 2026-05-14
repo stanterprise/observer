@@ -113,9 +113,16 @@ func TestUpsertRunStart_CreatesRunStatsWhenStartTimeMissing(t *testing.T) {
 	}
 }
 
-func TestUpsertRunExecutionStartAggregatesLogicalRun(t *testing.T) {
+func TestHandleRunStartAggregatesLogicalRun(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
+
+	if err := repo.HandleRunStart(ctx, &events.ReportRunStartEventRequest{RunId: "run-123", Name: "Logical Aggregate", ExecutionId: "exec-a"}); err != nil {
+		t.Fatalf("HandleRunStart(exec-a) failed: %v", err)
+	}
+	if err := repo.HandleRunStart(ctx, &events.ReportRunStartEventRequest{RunId: "run-123", Name: "Logical Aggregate", ExecutionId: "exec-b"}); err != nil {
+		t.Fatalf("HandleRunStart(exec-b) failed: %v", err)
+	}
 
 	var storedRun m.TestRun
 	if err := repo.db.WithContext(ctx).First(&storedRun, "id = ?", "run-123").Error; err != nil {
@@ -135,13 +142,58 @@ func TestUpsertRunExecutionStartAggregatesLogicalRun(t *testing.T) {
 	}
 }
 
-func TestUpsertRunExecutionStart_SharedShardedTotalsUseLogicalCount(t *testing.T) {
+func TestHandleRunStart_ShardedExecutionsShareLogicalRun(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
+
+	first := &events.ReportRunStartEventRequest{
+		RunId:       "run-123",
+		Name:        "Shard 1",
+		ExecutionId: "exec-a",
+		Metadata: map[string]string{
+			"shard.total":   "2",
+			"shard.current": "1",
+		},
+	}
+	second := &events.ReportRunStartEventRequest{
+		RunId:       "run-123",
+		Name:        "Shard 2",
+		ExecutionId: "exec-b",
+		Metadata: map[string]string{
+			"shard.total":   "2",
+			"shard.current": "2",
+		},
+	}
+
+	if err := repo.HandleRunStart(ctx, first); err != nil {
+		t.Fatalf("HandleRunStart(first) failed: %v", err)
+	}
+	if err := repo.HandleRunStart(ctx, second); err != nil {
+		t.Fatalf("HandleRunStart(second) failed: %v", err)
+	}
 
 	var storedRun m.TestRun
 	if err := repo.db.WithContext(ctx).First(&storedRun, "id = ?", "run-123").Error; err != nil {
 		t.Fatalf("load stored run: %v", err)
+	}
+	if storedRun.Status != "RUNNING" {
+		t.Fatalf("storedRun.Status = %q, want RUNNING", storedRun.Status)
+	}
+
+	var runCount int64
+	if err := repo.db.WithContext(ctx).Model(&m.TestRun{}).Where("id = ?", "run-123").Count(&runCount).Error; err != nil {
+		t.Fatalf("count logical runs: %v", err)
+	}
+	if runCount != 1 {
+		t.Fatalf("runCount = %d, want 1", runCount)
+	}
+
+	var shardExecutionCount int64
+	if err := repo.db.WithContext(ctx).Model(&m.RunExecution{}).Where("run_id = ? AND is_shard = ?", "run-123", true).Count(&shardExecutionCount).Error; err != nil {
+		t.Fatalf("count sharded executions: %v", err)
+	}
+	if shardExecutionCount != 2 {
+		t.Fatalf("shardExecutionCount = %d, want 2", shardExecutionCount)
 	}
 }
 

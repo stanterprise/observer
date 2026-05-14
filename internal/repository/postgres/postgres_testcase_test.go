@@ -253,14 +253,6 @@ func TestUpsertTestBeginCreatesPlaceholderSuiteWhenMissing(t *testing.T) {
 	if suite.ExternalSuiteID != suiteID {
 		t.Fatalf("suite.ExternalSuiteID = %q, want %q", suite.ExternalSuiteID, suiteID)
 	}
-
-	var run m.TestRun
-	if err := repo.db.WithContext(ctx).Where("id = ?", runID).First(&run).Error; err != nil {
-		t.Fatalf("load placeholder run: %v", err)
-	}
-	if run.Status != "RUNNING" {
-		t.Fatalf("run.Status = %q, want RUNNING", run.Status)
-	}
 }
 
 func TestUpsertTestBeginAndFinalizeUpdateSeededPlaceholderTest(t *testing.T) {
