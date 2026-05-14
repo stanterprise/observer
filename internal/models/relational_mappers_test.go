@@ -22,7 +22,7 @@ func TestRunStartEventToRunExecution(t *testing.T) {
 		},
 	}
 
-	execution := RunStartEventToRunExecution(req)
+	execution := runStartEventToRunExecution(req)
 	if execution == nil {
 		t.Fatal("expected run execution")
 	}
@@ -122,7 +122,9 @@ func TestRunStartEventToTestRun_FlattensSuitesAndUsesSuiteMetadata(t *testing.T)
 		},
 	}
 
-	run, suites := RunStartEventToTestRun(req)
+	run := runStartEventToTestRun(req)
+	suites := runStartEventToSuites(req)
+
 	if run == nil {
 		t.Fatal("expected run mapping")
 	}
@@ -184,7 +186,7 @@ func TestRunStartEventToTests_FlattensNestedTests(t *testing.T) {
 		},
 	}
 
-	tests := RunStartEventToTests(req)
+	tests := runStartEventToTests(req)
 	if len(tests) != 2 {
 		t.Fatalf("len(tests) = %d, want 2", len(tests))
 	}

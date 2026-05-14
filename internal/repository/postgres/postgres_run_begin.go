@@ -7,8 +7,68 @@ import (
 
 	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository"
+	"github.com/stanterprise/proto-go/testsystem/v1/events"
 	"gorm.io/gorm"
 )
+
+func (r *PostgresRepository) HandleRunStart(ctx context.Context, req *events.ReportRunStartEventRequest) {
+	testRun, runExecution, testSuites, testCases := m.RunStartEventToAllEntities(req) // map event to all entities (test run, execution, suites, tests)
+
+	// check if run exists
+	var existing m.TestRun
+	err := r.db.Where("id = ?", testRun.ID).First(&existing).Error
+	if err != nil && err != gorm.ErrRecordNotFound {
+		r.logger.Error("load existing run start", testRun.ID, err)
+	}
+
+	now := time.Now()
+	existing.UpdatedAt = now
+
+	if err := r.db.Save(&existing).Error; err != nil {
+		r.logger.Error("update run start", testRun.ID, err)
+	}
+
+	r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&runExecution).Error; err != nil {
+			tx.Logger.Error(ctx, "create run execution for run start", testRun.ID, runExecution.ID, err)
+		}
+
+		// create suites and tests if they don't exist
+		for _, suite := range testSuites {
+			var existingSuite m.Suite
+			err := tx.Where("run_id = ? AND id = ?", suite.RunID, suite.ID).First(&existingSuite).Error
+			if err != nil {
+				if err != gorm.ErrRecordNotFound {
+					tx.Logger.Error(ctx, "load existing run start suite", suite.ID, err)
+					continue
+				}
+				suite.CreatedAt = now
+				suite.UpdatedAt = now
+				if err := tx.Create(&suite).Error; err != nil {
+					tx.Logger.Error(ctx, "create run start suite", suite.ID, err)
+				}
+			}
+		}
+
+		for _, test := range testCases {
+			var existingTest m.Test
+			err := tx.Where("run_id = ? AND id = ?", test.RunID, test.ID).First(&existingTest).Error
+			if err != nil {
+				if err != gorm.ErrRecordNotFound {
+					tx.Logger.Error(ctx, "load existing run start test", test.ID, err)
+					continue
+				}
+				test.CreatedAt = now
+				test.UpdatedAt = now
+				if err := tx.Create(&test).Error; err != nil {
+					tx.Logger.Error(ctx, "create run start test", test.ID, err)
+				}
+			}
+		}
+
+		return nil
+	})
+}
 
 // UpsertRunStart upserts a TestRun row from a mapped run start event.
 // On conflict the mutable fields (name, status, metadata, timing) are updated.

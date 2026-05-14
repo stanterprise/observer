@@ -10,17 +10,46 @@ import (
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 )
 
-// RunStartEventToTestRun maps a ReportRunStartEventRequest to a TestRun row.
-// The returned value is ready for an idempotent upsert into the runs table.
-func RunStartEventToTestRun(req *events.ReportRunStartEventRequest) (*TestRun, []*Suite) {
+func RunStartEventToAllEntities(req *events.ReportRunStartEventRequest) (*TestRun, *RunExecution, []*Suite, []*Test) {
 	if req == nil {
-		return nil, nil
+		return nil, nil, nil, nil
+	}
+
+	testRun := runStartEventToTestRun(req)
+	relationalSuites := runStartEventToSuites(req)
+	runExecution := runStartEventToRunExecution(req)
+	relationalTests := runStartEventToTests(req)
+
+	return testRun, runExecution, relationalSuites, relationalTests
+}
+
+func getShardInfoFromMetadata(metadata map[string]string) (total, current int32, ok bool) {
+	if metadata == nil {
+		return 0, 0, false
+	}
+	totalVal, hasTotal := metadata["shard.total"]
+	currentVal, hasCurrent := metadata["shard.current"]
+	if !hasTotal || !hasCurrent {
+		return 0, 0, false
+	}
+	totalInt, errTotal := strconv.Atoi(totalVal)
+	currentInt, errCurrent := strconv.Atoi(currentVal)
+	if errTotal != nil || errCurrent != nil {
+		return 0, 0, false
+	}
+	return int32(totalInt), int32(currentInt), true
+}
+
+// runStartEventToTestRun maps a ReportRunStartEventRequest to a TestRun row.
+// The returned value is ready for an idempotent upsert into the runs table.
+func runStartEventToTestRun(req *events.ReportRunStartEventRequest) *TestRun {
+	if req == nil {
+		return nil
 	}
 
 	now := time.Now()
 
 	md := stringMapToInterfaceMap(req.Metadata)
-	suites := flattenSuiteRuns(req.TestSuites)
 
 	return &TestRun{
 		ID:         req.RunId,
@@ -30,11 +59,16 @@ func RunStartEventToTestRun(req *events.ReportRunStartEventRequest) (*TestRun, [
 		Metadata:   md,
 		CreatedAt:  now,
 		UpdatedAt:  now,
-	}, suites
+	}
 }
 
-// RunStartEventToRunExecution maps a run-start event to an execution-scoped row.
-func RunStartEventToRunExecution(req *events.ReportRunStartEventRequest) *RunExecution {
+func runStartEventToSuites(req *events.ReportRunStartEventRequest) []*Suite {
+	suites := flattenSuiteRuns(req.TestSuites)
+	return suites
+}
+
+// runStartEventToRunExecution maps a run-start event to an execution-scoped row.
+func runStartEventToRunExecution(req *events.ReportRunStartEventRequest) *RunExecution {
 	if req == nil {
 		return nil
 	}
@@ -54,8 +88,8 @@ func RunStartEventToRunExecution(req *events.ReportRunStartEventRequest) *RunExe
 	}
 }
 
-// RunStartEventToTests maps embedded test cases in a run-start payload to relational test rows.
-func RunStartEventToTests(req *events.ReportRunStartEventRequest) []*Test {
+// runStartEventToTests maps embedded test cases in a run-start payload to relational test rows.
+func runStartEventToTests(req *events.ReportRunStartEventRequest) []*Test {
 	if req == nil {
 		return nil
 	}
@@ -63,7 +97,7 @@ func RunStartEventToTests(req *events.ReportRunStartEventRequest) []*Test {
 	return flattenTestRuns(req.TestSuites)
 }
 
-// RunEndEventToTestRun maps a TestRunEndEventRequest to TestRun.
+// runEndEventToTestRun maps a TestRunEndEventRequest to TestRun.
 // The returned fields are intended for a partial update to finalize the run's terminal state.
 func RunEndEventToTestRun(req *events.TestRunEndEventRequest) TestRun {
 	if req == nil {
