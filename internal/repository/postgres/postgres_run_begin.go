@@ -107,9 +107,6 @@ func (r *PostgresRepository) UpsertRunStart(ctx context.Context, run *m.TestRun)
 				return fmt.Errorf("load existing run start: %w", err)
 			}
 			assignment.Metadata = mergeRunStartMetadata(existing.Metadata, run.Metadata)
-			assignment.TotalTests = mergeRunStartTotalTests(existing.TotalTests, run.TotalTests, true)
-		} else {
-			assignment.TotalTests = mergeRunStartTotalTests(0, run.TotalTests, false)
 		}
 
 		result := tx.

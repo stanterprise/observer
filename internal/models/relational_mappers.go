@@ -52,13 +52,13 @@ func runStartEventToTestRun(req *events.ReportRunStartEventRequest) *TestRun {
 	md := stringMapToInterfaceMap(req.Metadata)
 
 	return &TestRun{
-		ID:         req.RunId,
-		Name:       req.Name,
-		Status:     "NOT_RUN",
-		TotalTests: req.TotalTests,
-		Metadata:   md,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:        req.RunId,
+		Name:      req.Name,
+		StartTime: &now,
+		Status:    "RUNNING",
+		Metadata:  md,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 }
 
@@ -74,17 +74,20 @@ func runStartEventToRunExecution(req *events.ReportRunStartEventRequest) *RunExe
 	}
 
 	now := time.Now()
+	total, current, ok := getShardInfoFromMetadata(req.Metadata)
 
 	return &RunExecution{
-		ID:    req.ExecutionId,
-		RunID: req.RunId,
-
-		Name:       req.Name,
-		Status:     "RUNNING",
-		Metadata:   stringMapToInterfaceMap(req.Metadata),
-		TotalTests: req.TotalTests,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:                 req.ExecutionId,
+		RunID:              req.RunId,
+		IsShard:            ok,
+		ShardIndex:         &current,
+		ShardCountExpected: &total,
+		StartTime:          &now,
+		Name:               req.Name,
+		Status:             "RUNNING",
+		Metadata:           stringMapToInterfaceMap(req.Metadata),
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}
 }
 

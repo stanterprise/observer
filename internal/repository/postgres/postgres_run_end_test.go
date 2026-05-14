@@ -14,14 +14,11 @@ func TestBuildAggregatedRunFromExecutions(t *testing.T) {
 	finishLater := finish.Add(2 * time.Minute)
 
 	run, ok := buildAggregatedRunFromExecutions("run-123", []m.RunExecution{
-		{RunID: "run-123", ID: "exec-a", Status: "PASSED", TotalTests: 3, StartTime: &start, EndTime: &finish},
-		{RunID: "run-123", ID: "exec-b", Status: "FAILED", TotalTests: 5, StartTime: &finish, EndTime: &finishLater},
+		{RunID: "run-123", ID: "exec-a", Status: "PASSED", StartTime: &start, EndTime: &finish},
+		{RunID: "run-123", ID: "exec-b", Status: "FAILED", StartTime: &finish, EndTime: &finishLater},
 	}, time.Now())
 	if !ok {
 		t.Fatal("expected aggregated run")
-	}
-	if run.TotalTests != 8 {
-		t.Fatalf("TotalTests = %d, want 8", run.TotalTests)
 	}
 	if run.Status != "FAILED" {
 		t.Fatalf("Status = %q, want FAILED", run.Status)
@@ -44,8 +41,8 @@ func TestRefreshLogicalRunAggregate_UsesShardCompletionForLogicalRunStatus(t *te
 		t.Fatalf("seed run: %v", err)
 	}
 	if err := repo.db.WithContext(context.Background()).Create([]m.RunExecution{
-		{ID: "exec-a", RunID: "run-123", Status: "RUNNING", TotalTests: 3, CreatedAt: now, UpdatedAt: now},
-		{ID: "exec-b", RunID: "run-123", Status: "RUNNING", TotalTests: 5, CreatedAt: now, UpdatedAt: now},
+		{ID: "exec-a", RunID: "run-123", Status: "RUNNING", CreatedAt: now, UpdatedAt: now},
+		{ID: "exec-b", RunID: "run-123", Status: "RUNNING", CreatedAt: now, UpdatedAt: now},
 	}).Error; err != nil {
 		t.Fatalf("seed executions: %v", err)
 	}
@@ -63,8 +60,5 @@ func TestRefreshLogicalRunAggregate_UsesShardCompletionForLogicalRunStatus(t *te
 	}
 	if stored.EndTime == nil || !stored.EndTime.Equal(finish) {
 		t.Fatalf("stored.EndTime = %v, want %v", stored.EndTime, finish)
-	}
-	if stored.TotalTests != 8 {
-		t.Fatalf("stored.TotalTests = %d, want 8", stored.TotalTests)
 	}
 }

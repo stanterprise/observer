@@ -80,17 +80,16 @@ func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Ti
 
 	if stored == nil {
 		create := m.RunExecution{
-			ID:         execution.ID,
-			RunID:      execution.RunID,
-			Name:       execution.Name,
-			Status:     execution.Status,
-			Metadata:   execution.Metadata,
-			TotalTests: execution.TotalTests,
-			StartTime:  cloneTimePtr(execution.StartTime),
-			EndTime:    cloneTimePtr(execution.EndTime),
-			Duration:   cloneInt64Ptr(execution.Duration),
-			CreatedAt:  now,
-			UpdatedAt:  now,
+			ID:        execution.ID,
+			RunID:     execution.RunID,
+			Name:      execution.Name,
+			Status:    execution.Status,
+			Metadata:  execution.Metadata,
+			StartTime: cloneTimePtr(execution.StartTime),
+			EndTime:   cloneTimePtr(execution.EndTime),
+			Duration:  cloneInt64Ptr(execution.Duration),
+			CreatedAt: now,
+			UpdatedAt: now,
 		}
 		if create.Status == "" {
 			create.Status = "RUNNING"
@@ -123,9 +122,6 @@ func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Ti
 	if execution.Duration != nil {
 		stored.Duration = cloneInt64Ptr(execution.Duration)
 	}
-	if execution.TotalTests > 0 {
-		stored.TotalTests = mergeRunStartTotalTests(stored.TotalTests, execution.TotalTests, isShardedRunStart(execution.Metadata))
-	}
 	stored.UpdatedAt = now
 
 	if err := tx.Save(stored).Error; err != nil {
@@ -145,15 +141,14 @@ func upsertRunExecutionEnd(tx *gorm.DB, execution *m.RunExecution, now time.Time
 			ID:    execution.ID,
 			RunID: execution.RunID,
 
-			Name:       execution.Name,
-			Status:     execution.Status,
-			Metadata:   execution.Metadata,
-			TotalTests: execution.TotalTests,
-			StartTime:  cloneTimePtr(execution.StartTime),
-			EndTime:    cloneTimePtr(execution.EndTime),
-			Duration:   cloneInt64Ptr(execution.Duration),
-			CreatedAt:  now,
-			UpdatedAt:  now,
+			Name:      execution.Name,
+			Status:    execution.Status,
+			Metadata:  execution.Metadata,
+			StartTime: cloneTimePtr(execution.StartTime),
+			EndTime:   cloneTimePtr(execution.EndTime),
+			Duration:  cloneInt64Ptr(execution.Duration),
+			CreatedAt: now,
+			UpdatedAt: now,
 		}
 		if create.EndTime == nil {
 			create.EndTime = &now
@@ -184,9 +179,6 @@ func upsertRunExecutionEnd(tx *gorm.DB, execution *m.RunExecution, now time.Time
 	if execution.Duration != nil {
 		stored.Duration = cloneInt64Ptr(execution.Duration)
 	}
-	if execution.TotalTests > 0 && stored.TotalTests == 0 {
-		stored.TotalTests = execution.TotalTests
-	}
 	stored.UpdatedAt = now
 
 	if err := tx.Save(stored).Error; err != nil {
@@ -210,12 +202,11 @@ func refreshLogicalRunAggregate(tx *gorm.DB, runID string, now time.Time) error 
 	}
 
 	assignment := m.TestRun{
-		Status:     aggregate.Status,
-		TotalTests: aggregate.TotalTests,
-		StartTime:  aggregate.StartTime,
-		EndTime:    aggregate.EndTime,
-		Duration:   aggregate.Duration,
-		UpdatedAt:  now,
+		Status:    aggregate.Status,
+		StartTime: aggregate.StartTime,
+		EndTime:   aggregate.EndTime,
+		Duration:  aggregate.Duration,
+		UpdatedAt: now,
 	}
 	result := tx.Where(m.TestRun{ID: runID}).Assign(assignment).FirstOrCreate(&m.TestRun{ID: runID, CreatedAt: now, UpdatedAt: now})
 	if result.Error != nil {
@@ -237,18 +228,8 @@ func buildAggregatedRunFromExecutions(runID string, executions []m.RunExecution,
 	var (
 		startedAt  *time.Time
 		finishedAt *time.Time
-		totalTests int32
-		sharded    bool
 	)
 	for _, execution := range executions {
-		if isShardedRunStart(execution.Metadata) {
-			sharded = true
-			if execution.TotalTests > totalTests {
-				totalTests = execution.TotalTests
-			}
-		} else {
-			totalTests += execution.TotalTests
-		}
 		if execution.StartTime != nil && (startedAt == nil || execution.StartTime.Before(*startedAt)) {
 			t := *execution.StartTime
 			startedAt = &t
@@ -264,23 +245,15 @@ func buildAggregatedRunFromExecutions(runID string, executions []m.RunExecution,
 		d := finishedAt.Sub(*startedAt).Nanoseconds()
 		duration = &d
 	}
-	if sharded && totalTests == 0 {
-		for _, execution := range executions {
-			if execution.TotalTests > totalTests {
-				totalTests = execution.TotalTests
-			}
-		}
-	}
 
 	return &m.TestRun{
-		ID:         runID,
-		Status:     status,
-		TotalTests: totalTests,
-		StartTime:  startedAt,
-		EndTime:    finishedAt,
-		Duration:   duration,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:        runID,
+		Status:    status,
+		StartTime: startedAt,
+		EndTime:   finishedAt,
+		Duration:  duration,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}, true
 }
 

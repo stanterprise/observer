@@ -69,7 +69,6 @@ type TestRun struct {
 	Status      string                 `gorm:"column:status;type:text;index:idx_runs_status_started_at,priority:1" json:"status,omitempty"`
 	Metadata    map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
 	Duration    *int64                 `gorm:"column:duration" json:"duration,omitempty"`
-	TotalTests  int32                  `gorm:"column:total_tests" json:"totalTests,omitempty"`
 	InitiatedBy string                 `gorm:"column:initiated_by;type:text" json:"initiatedBy,omitempty"`
 	ProjectName string                 `gorm:"column:project_name;type:text" json:"projectName,omitempty"`
 	StartTime   *time.Time             `gorm:"column:started_at;index:idx_runs_status_started_at,priority:2;index:idx_runs_started_at" json:"startTime,omitempty"`
@@ -97,7 +96,6 @@ type RunExecution struct {
 	ShardIndex         *int32                 `gorm:"column:shard_index;uniqueIndex:ux_run_shards_run_execution_shard_index,priority:3" json:"shardIndex,omitempty"`
 	ShardCountExpected *int32                 `gorm:"column:shard_count_expected" json:"shardCountExpected,omitempty"`
 	Metadata           map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
-	TotalTests         int32                  `gorm:"column:total_tests" json:"totalTests,omitempty"`
 	StartTime          *time.Time             `gorm:"column:started_at;index:idx_run_executions_started_at" json:"startTime,omitempty"`
 	EndTime            *time.Time             `gorm:"column:finished_at" json:"endTime,omitempty"`
 	Duration           *int64                 `gorm:"column:duration" json:"duration,omitempty"`

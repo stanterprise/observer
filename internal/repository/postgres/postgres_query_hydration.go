@@ -118,12 +118,6 @@ func (r *PostgresRepository) buildRuns(ctx context.Context, runIDs []string, inc
 		}
 	}
 
-	for _, run := range runByID {
-		if actualTotalTests := countRunTests(run); actualTotalTests > 0 {
-			run.TotalTests = actualTotalTests
-		}
-	}
-
 	return runs, nil
 }
 

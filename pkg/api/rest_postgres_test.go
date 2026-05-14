@@ -109,8 +109,8 @@ func TestPostgresHandleRuns_LogicalRunWithMultipleExecutionsReturnsSingleRow(t *
 
 	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", CreatedAt: now, UpdatedAt: now})
 	seedRunExecutions(t, db,
-		m.RunExecution{ID: "exec-a", RunID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", TotalTests: 3, CreatedAt: now, UpdatedAt: now},
-		m.RunExecution{ID: "exec-b", RunID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", TotalTests: 5, CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)},
+		m.RunExecution{ID: "exec-a", RunID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", CreatedAt: now, UpdatedAt: now},
+		m.RunExecution{ID: "exec-b", RunID: "run-1", Name: "Logical Aggregate", Status: "RUNNING", CreatedAt: now.Add(time.Second), UpdatedAt: now.Add(time.Second)},
 	)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/runs", nil)
@@ -208,7 +208,7 @@ func TestPostgresHandleRunDetail_RecomputesInflatedTotalTestsFromAttachedTests(t
 	handler, db := setupPostgresHandler(t)
 	now := time.Date(2026, 4, 18, 12, 30, 0, 0, time.UTC)
 	suiteID := "suite-1"
-	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Release", Status: "FAILED", TotalTests: 13062, CreatedAt: now, UpdatedAt: now})
+	seedRuns(t, db, m.TestRun{ID: "run-1", Name: "Release", Status: "FAILED", CreatedAt: now, UpdatedAt: now})
 	seedSuites(t, db, m.Suite{ID: suiteID, RunID: "run-1", Name: "Suite", CreatedAt: now, UpdatedAt: now})
 	seedTests(t, db,
 		m.Test{ID: "test-1", RunID: "run-1", SuiteID: &suiteID, Name: "Suite Test 1", Title: "Suite Test 1", Status: "PASSED", CreatedAt: now, UpdatedAt: now},
@@ -226,9 +226,6 @@ func TestPostgresHandleRunDetail_RecomputesInflatedTotalTestsFromAttachedTests(t
 	var response m.TestRun
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
-	}
-	if response.TotalTests != 2 {
-		t.Fatalf("run totalTests = %d, want 2", response.TotalTests)
 	}
 }
 

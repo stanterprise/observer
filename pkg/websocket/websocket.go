@@ -829,10 +829,6 @@ func parseRunDocumentFromRaw(raw json.RawMessage) (*models.TestRun, error) {
 		ProjectName: stringValue(runMap, "project_name", "projectName"),
 	}
 
-	if totalTests, ok := numberToInt64(firstValue(runMap, "total_tests", "totalTests")); ok {
-		run.TotalTests = int32(totalTests)
-	}
-
 	if md, ok := mapValue(runMap, "metadata"); ok {
 		run.Metadata = md
 	}

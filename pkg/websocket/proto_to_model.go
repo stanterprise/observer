@@ -28,10 +28,9 @@ func protoToTestRunDocument(req *events.ReportRunStartEventRequest) *models.Test
 	}
 
 	return &models.TestRun{
-		ID:         req.RunId,
-		Name:       req.Name,
-		TotalTests: req.TotalTests,
-		Metadata:   convertMetadata(req.Metadata),
+		ID:       req.RunId,
+		Name:     req.Name,
+		Metadata: convertMetadata(req.Metadata),
 	}
 }
 

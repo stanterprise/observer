@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS runs (
     status TEXT,
     metadata JSONB,
     duration BIGINT,
-    total_tests INTEGER NOT NULL DEFAULT 0,
     initiated_by TEXT,
     project_name TEXT,
     started_at TIMESTAMPTZ,
