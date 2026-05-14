@@ -94,18 +94,6 @@ func isLowPriorityEvent(eventType publisher.EventType) bool {
 		eventType == publisher.EventTypeStepEnd
 }
 
-// isHighPriorityEvent returns true if the event type is high priority (e.g., tests, runs)
-// High priority events are broadcast to all clients matching their general filters.
-// These events are critical for test observability and should always be delivered.
-func isHighPriorityEvent(eventType publisher.EventType) bool {
-	return eventType == publisher.EventTypeRunStart ||
-		eventType == publisher.EventTypeRunEnd ||
-		eventType == publisher.EventTypeTestBegin ||
-		eventType == publisher.EventTypeTestEnd ||
-		eventType == publisher.EventTypeTestFailure ||
-		eventType == publisher.EventTypeTestError
-}
-
 // NATSConfig holds configuration for NATS WebSocket integration
 type NATSConfig struct {
 	URL          string

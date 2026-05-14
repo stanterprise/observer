@@ -13,13 +13,3 @@ import (
 type Resolver struct {
 	logger *slog.Logger
 }
-
-// NewResolver creates a new GraphQL resolver.
-func NewResolver(logger *slog.Logger) *Resolver {
-	if logger == nil {
-		logger = slog.Default()
-	}
-	return &Resolver{
-		logger: logger,
-	}
-}

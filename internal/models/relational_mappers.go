@@ -3,7 +3,6 @@ package models
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	entities "github.com/stanterprise/proto-go/testsystem/v1/entities"
@@ -433,25 +432,6 @@ func stringMapToInterfaceMap(metadata map[string]string) map[string]interface{} 
 		converted[k] = v
 	}
 	return converted
-}
-
-func firstInt32Metadata(metadata map[string]string, keys ...string) *int32 {
-	for _, key := range keys {
-		value := strings.TrimSpace(metadata[key])
-		if value == "" {
-			continue
-		}
-
-		parsed, err := strconv.ParseInt(value, 10, 32)
-		if err != nil {
-			continue
-		}
-
-		converted := int32(parsed)
-		return &converted
-	}
-
-	return nil
 }
 
 func BuildTestAttemptID(runID, testID, executionID string, attemptIndex int32) string {

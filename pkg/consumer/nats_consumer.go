@@ -13,7 +13,6 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
-	m "github.com/stanterprise/observer/internal/models"
 	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/publisher"
@@ -27,11 +26,6 @@ import (
 type noopWriter struct{}
 
 func (n *noopWriter) Write(p []byte) (int, error) { return len(p), nil }
-
-// ptrInt32 returns a pointer to the given int32 value
-func ptrInt32(v int32) *int32 {
-	return &v
-}
 
 // extractTestID extracts the test ID from a test case run ID.
 // TestCaseRunId format is typically: {runId}-{testId}
@@ -694,47 +688,6 @@ func (c *NATSConsumer) handleHeartbeat(ctx context.Context, data json.RawMessage
 	}
 
 	c.logger.Debug("heartbeat", "source_id", req.SourceId)
-	return nil
-}
-
-// retainRawMessage persists the raw NATS message into the per-run retention document.
-// The run_id is extracted from the event data and used as the document identifier so
-// that all messages belonging to the same run are stored in a single document.
-func (c *NATSConsumer) retainRawMessage(ctx context.Context, msg jetstream.Msg, event publisher.Event) error {
-	runID := extractRunID(event.Data)
-	if runID == "" {
-		c.logger.Warn("could not extract run_id from message, skipping retention",
-			"event_type", event.Type,
-			"subject", msg.Subject())
-		return nil
-	}
-
-	// Parse the raw message bytes into a JSON map so the payload is stored as a
-	// readable JSON document rather than binary bytes.  We keep the full event
-	// envelope (type, timestamp, data) so the audit trail is complete.
-	parsedPayload := map[string]interface{}{}
-	if err := json.Unmarshal(msg.Data(), &parsedPayload); err != nil {
-		// Fallback: wrap in a map so it remains a JSON document.
-		parsedPayload = map[string]interface{}{
-			"raw":   string(msg.Data()),
-			"error": err.Error(),
-		}
-	}
-
-	retained := m.RetainedMessage{
-		Subject:    msg.Subject(),
-		EventType:  string(event.Type),
-		Payload:    parsedPayload,
-		Stream:     c.stream,
-		ReceivedAt: time.Now(),
-	}
-
-	// Attach JetStream sequence number when available.
-	if meta, err := msg.Metadata(); err == nil {
-		retained.Sequence = meta.Sequence.Stream
-	}
-
-	// Legacy raw message retention removed; nothing to return here.
 	return nil
 }
 

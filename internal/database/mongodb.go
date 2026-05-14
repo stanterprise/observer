@@ -173,21 +173,6 @@ func (m *MongoDBConnection) Collection(name string) *mongo.Collection {
 	return m.Database.Collection(name)
 }
 
-// DatabaseName returns the name of the connected database.
-func (m *MongoDBConnection) DatabaseName() string {
-	return m.Database.Name()
-}
-
-// TestRunsCollection returns the test_runs collection handle
-func (m *MongoDBConnection) TestRunsCollection() *mongo.Collection {
-	return m.Collection("test_runs")
-}
-
-// RawMessagesCollection returns the raw_messages collection handle used for message retention.
-func (m *MongoDBConnection) RawMessagesCollection() *mongo.Collection {
-	return m.Collection("raw_messages")
-}
-
 // LiveStepBuffersCollection returns the live_step_buffers collection handle used
 // for the standalone active-step-buffer contract.
 func (m *MongoDBConnection) LiveStepBuffersCollection() *mongo.Collection {
@@ -355,9 +340,4 @@ func MongoStepBufferTTL(logger *slog.Logger) time.Duration {
 
 	logger.Warn("invalid MONGO_STEP_BUFFER_TTL; using default", "value", raw, "default", defaultMongoStepBufferTTL.String())
 	return defaultMongoStepBufferTTL
-}
-
-// IsMongoDBURI checks if the provided DSN is a MongoDB URI
-func IsMongoDBURI(dsn string) bool {
-	return strings.HasPrefix(dsn, "mongodb://") || strings.HasPrefix(dsn, "mongodb+srv://")
 }

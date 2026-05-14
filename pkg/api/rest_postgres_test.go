@@ -340,34 +340,8 @@ func TestPostgresHandleRuns_UsesLatestExecutionStatusForRepeatedLogicalTest(t *t
 
 func TestPostgresLoadLiveRunningTestDetails_UsesLiveRunningDetailRepo(t *testing.T) {
 	handler := NewPostgresHandler(nil, nil)
-	now := time.Date(2026, 4, 19, 15, 0, 0, 0, time.UTC)
-	retryIndex := int32(0)
-	stepStart := now.Add(5 * time.Second)
-	stepDuration := int64(3 * time.Second)
-	stepPayload := stepPayload(t, []*m.StepDocument{{
-		ID:        "step-1",
-		Title:     "Live step",
-		Status:    "RUNNING",
-		StartTime: &stepStart,
-		Duration:  &stepDuration,
-	}})
 
-	handler.SetLiveRunRepo(fakeLiveRunRepo{doc: &m.TestRun{
-		ID: "run-1",
-		Tests: []*m.Test{{
-			ID:         "test-1",
-			Status:     "RUNNING",
-			RetryIndex: &retryIndex,
-			Attempts: []m.TestAttempt{{
-				ID:           "test-1:0",
-				AttemptIndex: 0,
-				Status:       "RUNNING",
-				StartTime:    &stepStart,
-				Duration:     &stepDuration,
-				Steps:        stepPayload,
-			}},
-		}},
-	}})
+	retryIndex := int32(0)
 
 	baseTests := []*m.Test{{
 		ID:         "test-1",

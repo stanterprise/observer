@@ -24,10 +24,6 @@ func stepBufferKey(testID string) string {
 	return replacer.Replace(testID)
 }
 
-func stepBufferField(testID string) string {
-	return "active_test_steps." + stepBufferKey(testID)
-}
-
 func liveStepBufferID(runID, executionID, testID string) string {
 	if executionID == "" {
 		return runID + ":" + stepBufferKey(testID)

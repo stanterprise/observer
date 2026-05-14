@@ -158,38 +158,3 @@ func hydrateTestFromAttempts(test *m.Test) {
 		test.Duration = &duration
 	}
 }
-
-func countRunTests(run *m.TestRun) int32 {
-	if run == nil {
-		return 0
-	}
-
-	seen := make(map[string]struct{})
-	for _, test := range run.Tests {
-		if test == nil || test.ID == "" {
-			continue
-		}
-		seen[test.ID] = struct{}{}
-	}
-	for _, suite := range run.Suites {
-		collectSuiteTestIDs(suite, seen)
-	}
-
-	return int32(len(seen))
-}
-
-func collectSuiteTestIDs(suite *m.Suite, seen map[string]struct{}) {
-	if suite == nil {
-		return
-	}
-
-	for _, test := range suite.Tests {
-		if test == nil || test.ID == "" {
-			continue
-		}
-		seen[test.ID] = struct{}{}
-	}
-	for _, nested := range suite.Suites {
-		collectSuiteTestIDs(nested, seen)
-	}
-}

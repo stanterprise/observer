@@ -141,13 +141,3 @@ func mergeRunStartMetadata(existing, incoming map[string]interface{}) map[string
 	}
 	return merged
 }
-
-func mergeRunStartTotalTests(existing, incoming int32, sharded bool) int32 {
-	if !sharded {
-		return incoming
-	}
-	if incoming <= 0 {
-		return existing
-	}
-	return existing + incoming
-}

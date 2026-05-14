@@ -44,22 +44,6 @@ func StepFromDocuments(steps []*StepDocument) (*Step, error) {
 	return &payload, nil
 }
 
-func StepDocumentsFromStep(step *Step) ([]*StepDocument, error) {
-	if step == nil || len(*step) == 0 {
-		return []*StepDocument{}, nil
-	}
-
-	var steps []*StepDocument
-	if err := json.Unmarshal(*step, &steps); err != nil {
-		return nil, err
-	}
-	if steps == nil {
-		return []*StepDocument{}, nil
-	}
-
-	return steps, nil
-}
-
 // TestRun maps to the PostgreSQL runs table.
 // It intentionally mirrors TestRunDocument fields where practical.
 type TestRun struct {

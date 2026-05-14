@@ -105,9 +105,6 @@ func TestEventPriorityClassification(t *testing.T) {
 			if got := isLowPriorityEvent(tt.eventType); got != tt.isLowPri {
 				t.Errorf("isLowPriorityEvent(%v) = %v, want %v", tt.eventType, got, tt.isLowPri)
 			}
-			if got := isHighPriorityEvent(tt.eventType); got != tt.isHighPri {
-				t.Errorf("isHighPriorityEvent(%v) = %v, want %v", tt.eventType, got, tt.isHighPri)
-			}
 		})
 	}
 }

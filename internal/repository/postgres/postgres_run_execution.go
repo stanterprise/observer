@@ -1,76 +1,12 @@
 package postgres
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	m "github.com/stanterprise/observer/internal/models"
-	"github.com/stanterprise/observer/internal/repository"
 	"gorm.io/gorm"
 )
-
-// UpsertRunExecutionStart creates or updates an execution-scoped run record and
-// refreshes the aggregate logical run state.
-func (r *PostgresRepository) UpsertRunExecutionStart(ctx context.Context, execution *m.RunExecution) error {
-	if execution == nil {
-		return fmt.Errorf("run execution is nil")
-	}
-	if err := repository.ValidateRunID(execution.RunID); err != nil {
-		return err
-	}
-	if err := r.ensureDB(); err != nil {
-		return err
-	}
-
-	now := time.Now()
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := upsertRunExecutionStart(tx, execution, now); err != nil {
-			return err
-		}
-		if err := refreshLogicalRunAggregate(tx, execution.RunID, now); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	r.logger.Info("run execution upserted", "run_id", execution.RunID, "execution_id", execution.ID)
-	return nil
-}
-
-// FinalizeRunExecutionEnd finalizes an execution-scoped run record and refreshes
-// the aggregate logical run state.
-func (r *PostgresRepository) FinalizeRunExecutionEnd(ctx context.Context, execution *m.RunExecution) error {
-	if execution == nil {
-		return fmt.Errorf("run execution is nil")
-	}
-	if err := repository.ValidateRunID(execution.RunID); err != nil {
-		return err
-	}
-	if err := r.ensureDB(); err != nil {
-		return err
-	}
-
-	now := time.Now()
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := upsertRunExecutionEnd(tx, execution, now); err != nil {
-			return err
-		}
-		if err := refreshLogicalRunAggregate(tx, execution.RunID, now); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	r.logger.Info("run execution finalized", "run_id", execution.RunID, "execution_id", execution.ID, "status", execution.Status)
-	return nil
-}
 
 func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Time) error {
 	stored, err := loadRunExecution(tx, execution.RunID, execution.ID)

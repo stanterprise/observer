@@ -62,49 +62,6 @@ func TestExtractDBName(t *testing.T) {
 	}
 }
 
-func TestIsMongoDBURI(t *testing.T) {
-	tests := []struct {
-		name     string
-		uri      string
-		expected bool
-	}{
-		{
-			name:     "mongodb scheme",
-			uri:      "mongodb://localhost:27017/db",
-			expected: true,
-		},
-		{
-			name:     "mongodb+srv scheme",
-			uri:      "mongodb+srv://cluster.example.com/db",
-			expected: true,
-		},
-		{
-			name:     "postgres scheme",
-			uri:      "postgres://localhost:5432/db",
-			expected: false,
-		},
-		{
-			name:     "file path",
-			uri:      "/path/to/db.sqlite",
-			expected: false,
-		},
-		{
-			name:     "empty string",
-			uri:      "",
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := IsMongoDBURI(tt.uri)
-			if result != tt.expected {
-				t.Errorf("IsMongoDBURI(%q) = %v, want %v", tt.uri, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestBuildMongoURIFromSplitEnv(t *testing.T) {
 	// Save original env vars
 	origVars := map[string]string{

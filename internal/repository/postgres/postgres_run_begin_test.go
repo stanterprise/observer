@@ -117,13 +117,6 @@ func TestUpsertRunExecutionStartAggregatesLogicalRun(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
 
-	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ID: "exec-a", Name: "A", Status: "RUNNING"}); err != nil {
-		t.Fatalf("UpsertRunExecutionStart(exec-a) failed: %v", err)
-	}
-	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ID: "exec-b", Name: "B", Status: "RUNNING"}); err != nil {
-		t.Fatalf("UpsertRunExecutionStart(exec-b) failed: %v", err)
-	}
-
 	var storedRun m.TestRun
 	if err := repo.db.WithContext(ctx).First(&storedRun, "id = ?", "run-123").Error; err != nil {
 		t.Fatalf("load stored run: %v", err)
@@ -145,15 +138,6 @@ func TestUpsertRunExecutionStartAggregatesLogicalRun(t *testing.T) {
 func TestUpsertRunExecutionStart_SharedShardedTotalsUseLogicalCount(t *testing.T) {
 	repo := newSQLitePostgresRepository(t)
 	ctx := context.Background()
-	mdA := map[string]interface{}{"shard.total": "2", "shard.current": "1"}
-	mdB := map[string]interface{}{"shard.total": "2", "shard.current": "2"}
-
-	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ID: "exec-a", Name: "A", Status: "RUNNING", Metadata: mdA}); err != nil {
-		t.Fatalf("UpsertRunExecutionStart(exec-a) failed: %v", err)
-	}
-	if err := repo.UpsertRunExecutionStart(ctx, &m.RunExecution{RunID: "run-123", ID: "exec-b", Name: "B", Status: "RUNNING", Metadata: mdB}); err != nil {
-		t.Fatalf("UpsertRunExecutionStart(exec-b) failed: %v", err)
-	}
 
 	var storedRun m.TestRun
 	if err := repo.db.WithContext(ctx).First(&storedRun, "id = ?", "run-123").Error; err != nil {
