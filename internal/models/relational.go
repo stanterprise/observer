@@ -94,7 +94,7 @@ type RunExecution struct {
 	Status             string                 `gorm:"column:status;type:text;index:idx_run_executions_run_status,priority:3" json:"status,omitempty"`
 	IsShard            bool                   `gorm:"column:is_shard" json:"isShard,omitempty"`
 	ShardIndex         *int32                 `gorm:"column:shard_index;uniqueIndex:ux_run_shards_run_execution_shard_index,priority:3" json:"shardIndex,omitempty"`
-	ShardCountExpected *int32                 `gorm:"column:shard_count_expected" json:"shardCountExpected,omitempty"`
+	ShardCountExpected *int32                 `gorm:"column:shard_total" json:"shardCountExpected,omitempty"`
 	Metadata           map[string]interface{} `gorm:"column:metadata;type:jsonb;serializer:json" json:"metadata,omitempty"`
 	StartTime          *time.Time             `gorm:"column:started_at;index:idx_run_executions_started_at" json:"startTime,omitempty"`
 	EndTime            *time.Time             `gorm:"column:finished_at" json:"endTime,omitempty"`

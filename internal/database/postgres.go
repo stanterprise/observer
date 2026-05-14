@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
 	"os"
 	"strconv"
@@ -34,7 +35,10 @@ func ConnectPostgres(dsn string, logger *slog.Logger) (*PostgresConnection, erro
 	}
 
 	gormCfg := &gorm.Config{
-		Logger: gormlogger.Default.LogMode(gormlogger.Warn),
+		Logger: gormlogger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), gormlogger.Config{
+			LogLevel:                  gormlogger.Warn,
+			IgnoreRecordNotFoundError: true,
+		}),
 		NowFunc: func() time.Time {
 			return time.Now().UTC()
 		},
