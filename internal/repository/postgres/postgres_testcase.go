@@ -230,9 +230,23 @@ func aggregateTestAttemptStatuses(attempts []m.TestAttempt) string {
 
 	if len(attempts) == 0 {
 		return "NOT_RUN"
+	} else if len(attempts) == 1 {
+		return latest
 	}
 
-	if latest == "UNKNOWN" || latest == "" || latest == "NOT_RUN" || latest == "SKIPPED" {
+	// if all attempts statuses are the same, return that status instead of FLAKY
+	allSame := true
+	for _, attempt := range attempts[1:] {
+		if attempt.Status != latest {
+			allSame = false
+			break
+		}
+	}
+	if allSame {
+		return latest
+	}
+
+	if len(attempts) > 1 && (latest == "UNKNOWN" || latest == "" || latest == "NOT_RUN" || latest == "SKIPPED") {
 		return "UNKNOWN"
 	}
 
