@@ -67,6 +67,20 @@ func TestUpsertRunStart_ShardedMergesMetadataAndTotals(t *testing.T) {
 	if stored.Metadata["extra"] != "yes" {
 		t.Fatalf("stored.Metadata[extra] = %v, want yes", stored.Metadata["extra"])
 	}
+
+	var firstExecution m.RunExecution
+	if err := repo.db.WithContext(ctx).First(&firstExecution, "run_id = ? AND id = ?", "run-123", "execution-123").Error; err != nil {
+		t.Fatalf("load first execution: %v", err)
+	}
+	if !firstExecution.IsShard {
+		t.Fatal("expected first execution to be marked as shard")
+	}
+	if firstExecution.ShardIndex == nil || *firstExecution.ShardIndex != 1 {
+		t.Fatalf("firstExecution.ShardIndex = %v, want 1", firstExecution.ShardIndex)
+	}
+	if firstExecution.ShardCountExpected == nil || *firstExecution.ShardCountExpected != 2 {
+		t.Fatalf("firstExecution.ShardCountExpected = %v, want 2", firstExecution.ShardCountExpected)
+	}
 }
 
 func TestUpsertRunStart_CreatesRunStatsWhenStartTimeMissing(t *testing.T) {

@@ -75,13 +75,19 @@ func runStartEventToRunExecution(req *events.ReportRunStartEventRequest) *RunExe
 
 	now := time.Now()
 	total, current, ok := getShardInfoFromMetadata(req.Metadata)
+	var shardIndex *int32
+	var shardCountExpected *int32
+	if ok {
+		shardIndex = &current
+		shardCountExpected = &total
+	}
 
 	return &RunExecution{
 		ID:                 req.ExecutionId,
 		RunID:              req.RunId,
 		IsShard:            ok,
-		ShardIndex:         &current,
-		ShardCountExpected: &total,
+		ShardIndex:         shardIndex,
+		ShardCountExpected: shardCountExpected,
 		StartTime:          &now,
 		Name:               req.Name,
 		Status:             "RUNNING",

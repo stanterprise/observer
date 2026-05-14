@@ -80,16 +80,19 @@ func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Ti
 
 	if stored == nil {
 		create := m.RunExecution{
-			ID:        execution.ID,
-			RunID:     execution.RunID,
-			Name:      execution.Name,
-			Status:    execution.Status,
-			Metadata:  execution.Metadata,
-			StartTime: cloneTimePtr(execution.StartTime),
-			EndTime:   cloneTimePtr(execution.EndTime),
-			Duration:  cloneInt64Ptr(execution.Duration),
-			CreatedAt: now,
-			UpdatedAt: now,
+			ID:                 execution.ID,
+			RunID:              execution.RunID,
+			Name:               execution.Name,
+			Status:             execution.Status,
+			IsShard:            execution.IsShard,
+			ShardIndex:         cloneInt32Ptr(execution.ShardIndex),
+			ShardCountExpected: cloneInt32Ptr(execution.ShardCountExpected),
+			Metadata:           execution.Metadata,
+			StartTime:          cloneTimePtr(execution.StartTime),
+			EndTime:            cloneTimePtr(execution.EndTime),
+			Duration:           cloneInt64Ptr(execution.Duration),
+			CreatedAt:          now,
+			UpdatedAt:          now,
 		}
 		if create.Status == "" {
 			create.Status = "RUNNING"
@@ -105,6 +108,15 @@ func upsertRunExecutionStart(tx *gorm.DB, execution *m.RunExecution, now time.Ti
 	}
 	if execution.Status != "" {
 		stored.Status = execution.Status
+	}
+	if execution.IsShard {
+		stored.IsShard = true
+	}
+	if execution.ShardIndex != nil {
+		stored.ShardIndex = cloneInt32Ptr(execution.ShardIndex)
+	}
+	if execution.ShardCountExpected != nil {
+		stored.ShardCountExpected = cloneInt32Ptr(execution.ShardCountExpected)
 	}
 	if len(execution.Metadata) > 0 {
 		stored.Metadata = mergeRunStartMetadata(stored.Metadata, execution.Metadata)
@@ -134,17 +146,19 @@ func upsertRunExecutionEnd(tx *gorm.DB, execution *m.RunExecution, now time.Time
 
 	if stored == nil {
 		create := m.RunExecution{
-			ID:    execution.ID,
-			RunID: execution.RunID,
-
-			Name:      execution.Name,
-			Status:    execution.Status,
-			Metadata:  execution.Metadata,
-			StartTime: cloneTimePtr(execution.StartTime),
-			EndTime:   cloneTimePtr(execution.EndTime),
-			Duration:  cloneInt64Ptr(execution.Duration),
-			CreatedAt: now,
-			UpdatedAt: now,
+			ID:                 execution.ID,
+			RunID:              execution.RunID,
+			Name:               execution.Name,
+			Status:             execution.Status,
+			IsShard:            execution.IsShard,
+			ShardIndex:         cloneInt32Ptr(execution.ShardIndex),
+			ShardCountExpected: cloneInt32Ptr(execution.ShardCountExpected),
+			Metadata:           execution.Metadata,
+			StartTime:          cloneTimePtr(execution.StartTime),
+			EndTime:            cloneTimePtr(execution.EndTime),
+			Duration:           cloneInt64Ptr(execution.Duration),
+			CreatedAt:          now,
+			UpdatedAt:          now,
 		}
 		if create.EndTime == nil {
 			create.EndTime = &now
@@ -160,6 +174,15 @@ func upsertRunExecutionEnd(tx *gorm.DB, execution *m.RunExecution, now time.Time
 	}
 	if execution.Status != "" {
 		stored.Status = execution.Status
+	}
+	if execution.IsShard {
+		stored.IsShard = true
+	}
+	if execution.ShardIndex != nil {
+		stored.ShardIndex = cloneInt32Ptr(execution.ShardIndex)
+	}
+	if execution.ShardCountExpected != nil {
+		stored.ShardCountExpected = cloneInt32Ptr(execution.ShardCountExpected)
 	}
 	if len(execution.Metadata) > 0 {
 		stored.Metadata = mergeRunStartMetadata(stored.Metadata, execution.Metadata)
@@ -322,6 +345,14 @@ func cloneTimePtr(input *time.Time) *time.Time {
 	}
 	t := *input
 	return &t
+}
+
+func cloneInt32Ptr(input *int32) *int32 {
+	if input == nil {
+		return nil
+	}
+	v := *input
+	return &v
 }
 
 func cloneInt64Ptr(input *int64) *int64 {

@@ -97,18 +97,24 @@ func (r *PostgresRepository) collectRunStats(ctx context.Context, tx *gorm.DB, r
 		return nil, err
 	}
 
-	record := generateRunStatWithStatusCounts(runID, grouped)
-
+	var stored m.RunStat
 	if err := tx.WithContext(ctx).
-		Table("run_stats").
 		Where("run_id = ?", runID).
-		Scan(&record).Error; err != nil {
-		return nil, fmt.Errorf("fetching run_stats created_at for run_id %q: %w", runID, err)
+		First(&stored).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("run_stats row not found for run_id %q", runID)
+		}
+		return nil, fmt.Errorf("fetching run_stats row for run_id %q: %w", runID, err)
 	}
 
-	if !record.CreatedAt.IsZero() {
-		now := time.Now()
-		record.Duration = now.Sub(record.CreatedAt).Milliseconds()
+	record := generateRunStatWithStatusCounts(runID, grouped)
+	record.Name = stored.Name
+	record.CreatedAt = stored.CreatedAt
+
+	now := time.Now()
+	record.UpdatedAt = now
+	if !stored.CreatedAt.IsZero() {
+		record.Duration = now.Sub(stored.CreatedAt).Milliseconds()
 	}
 
 	update := tx.WithContext(ctx).Save(record)
@@ -116,7 +122,7 @@ func (r *PostgresRepository) collectRunStats(ctx context.Context, tx *gorm.DB, r
 		return nil, update.Error
 	}
 	if update.RowsAffected == 0 {
-		return nil, fmt.Errorf("run_stats row not found for run_id %q", runID)
+		return nil, fmt.Errorf("update run_stats row for run_id %q affected 0 rows", runID)
 	}
 
 	return record, nil
