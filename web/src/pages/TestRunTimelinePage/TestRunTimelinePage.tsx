@@ -3,8 +3,10 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Clock, Map as MapIcon } from "lucide-react";
 import { Badge } from "@/components/Badge";
@@ -21,8 +23,14 @@ import { humanizeDuration, humanizeMilliseconds } from "@/utils/duration";
 const LABEL_COLUMN_WIDTH_PX = 264;
 const TIMELINE_MIN_WIDTH_PX = 960;
 const TIMELINE_MAX_WIDTH_PX = 4200;
-const ROW_HEIGHT_PX = 54;
-const ROW_VERTICAL_PADDING_PX = 10;
+const BAR_HEIGHT_PX = 16;
+const ROW_HEIGHT_PX = 24;
+const ROW_VERTICAL_PADDING_PX = 6;
+const BAR_HORIZONTAL_GAP_PX = 2;
+const TOOLTIP_DELAY_MS = 650;
+const TOOLTIP_WIDTH = 320;
+const TOOLTIP_VIEWPORT_PADDING = 12;
+const TOOLTIP_OFFSET = 10;
 
 const STATUS_ORDER: TestStatus[] = [
   "RUNNING",
@@ -64,6 +72,8 @@ type TimelineBar = {
   approximated: boolean;
   location?: string;
   tags: string[];
+  renderLeftPx: number;
+  renderWidthPx: number;
 };
 
 type TimelineLane = {
@@ -97,6 +107,17 @@ type TimelineModel = {
 type AttemptCandidate = {
   attempt: Attempt;
   synthetic: boolean;
+};
+
+type TooltipPosition = {
+  left: number;
+  top: number;
+  placement: "top" | "bottom";
+};
+
+type TimelineTooltipState = {
+  bar: TimelineBar;
+  position: TooltipPosition;
 };
 
 const DEFAULT_STATUS_STYLES = {
@@ -274,30 +295,94 @@ function resolveAttemptWindow(
   };
 }
 
-function packLaneRows(bars: TimelineBar[]): {
+function minimumLaneBarWidthPx(barCount: number): number {
+  if (barCount >= 800) {
+    return 4;
+  }
+
+  if (barCount >= 300) {
+    return 5;
+  }
+
+  if (barCount >= 120) {
+    return 6;
+  }
+
+  return 8;
+}
+
+function measureBarPixels(
+  bar: TimelineBar,
+  timelineStartMs: number,
+  spanMs: number,
+  chartWidthPx: number,
+  minWidthPx: number,
+): { leftPx: number; widthPx: number } {
+  const rawLeftPx = ((bar.startMs - timelineStartMs) / spanMs) * chartWidthPx;
+  const rawWidthPx = (bar.durationMs / spanMs) * chartWidthPx;
+  const widthPx = Math.max(rawWidthPx, minWidthPx);
+  const leftPx = Math.min(rawLeftPx, Math.max(chartWidthPx - widthPx, 0));
+
+  return {
+    leftPx,
+    widthPx,
+  };
+}
+
+function packLaneRows(
+  bars: TimelineBar[],
+  timelineStartMs: number,
+  spanMs: number,
+  chartWidthPx: number,
+): {
   bars: TimelineBar[];
   rowCount: number;
 } {
-  const packedBars = [...bars].sort((left, right) => {
-    if (left.startMs === right.startMs) {
-      if (left.endMs === right.endMs) {
-        return left.testTitle.localeCompare(right.testTitle);
-      }
-      return left.endMs - right.endMs;
-    }
-    return left.startMs - right.startMs;
-  });
+  const minWidthPx = minimumLaneBarWidthPx(bars.length);
+  const packedBars = bars
+    .map((bar) => {
+      const pixels = measureBarPixels(
+        bar,
+        timelineStartMs,
+        spanMs,
+        chartWidthPx,
+        minWidthPx,
+      );
 
-  const rowEndTimes: number[] = [];
+      return {
+        ...bar,
+        renderLeftPx: pixels.leftPx,
+        renderWidthPx: pixels.widthPx,
+      };
+    })
+    .sort((left, right) => {
+      if (left.renderLeftPx === right.renderLeftPx) {
+        if (left.renderWidthPx === right.renderWidthPx) {
+          if (left.startMs === right.startMs) {
+            if (left.endMs === right.endMs) {
+              return left.testTitle.localeCompare(right.testTitle);
+            }
+            return left.endMs - right.endMs;
+          }
+          return left.startMs - right.startMs;
+        }
+        return left.renderWidthPx - right.renderWidthPx;
+      }
+      return left.renderLeftPx - right.renderLeftPx;
+    });
+
+  const rowEndPixels: number[] = [];
 
   for (const bar of packedBars) {
-    let rowIndex = rowEndTimes.findIndex((endMs) => bar.startMs >= endMs);
+    let rowIndex = rowEndPixels.findIndex(
+      (endPx) => bar.renderLeftPx >= endPx + BAR_HORIZONTAL_GAP_PX,
+    );
 
     if (rowIndex === -1) {
-      rowIndex = rowEndTimes.length;
-      rowEndTimes.push(bar.endMs);
+      rowIndex = rowEndPixels.length;
+      rowEndPixels.push(bar.renderLeftPx + bar.renderWidthPx);
     } else {
-      rowEndTimes[rowIndex] = Math.max(rowEndTimes[rowIndex], bar.endMs);
+      rowEndPixels[rowIndex] = bar.renderLeftPx + bar.renderWidthPx;
     }
 
     bar.rowIndex = rowIndex;
@@ -305,7 +390,92 @@ function packLaneRows(bars: TimelineBar[]): {
 
   return {
     bars: packedBars,
-    rowCount: Math.max(rowEndTimes.length, 1),
+    rowCount: Math.max(rowEndPixels.length, 1),
+  };
+}
+
+function compactDurationLabel(durationMs: number): string {
+  if (durationMs < 1_000) {
+    return `${Math.max(Math.round(durationMs), 1)}ms`;
+  }
+
+  if (durationMs < 60_000) {
+    const seconds = durationMs / 1_000;
+    return seconds >= 10 ? `${seconds.toFixed(0)}s` : `${seconds.toFixed(1)}s`;
+  }
+
+  return humanizeMilliseconds(durationMs);
+}
+
+function compactRowHeightPx(): number {
+  return ROW_HEIGHT_PX - BAR_HORIZONTAL_GAP_PX * 2;
+}
+
+function compactBarTopPx(rowIndex: number): number {
+  return (
+    ROW_VERTICAL_PADDING_PX +
+    rowIndex * ROW_HEIGHT_PX +
+    Math.max((ROW_HEIGHT_PX - BAR_HEIGHT_PX) / 2, 0)
+  );
+}
+
+function compactBarClassName(widthPx: number): string {
+  if (widthPx < 30) {
+    return "rounded-md px-0 py-0";
+  }
+
+  if (widthPx < 72) {
+    return "rounded-md px-1.5 py-0.5";
+  }
+
+  return "rounded-lg px-2 py-1";
+}
+
+function formatStatusLabel(status: TestStatus): string {
+  return status
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function attemptAriaLabel(bar: TimelineBar): string {
+  return [
+    bar.testTitle,
+    `attempt ${bar.attemptIndex + 1}`,
+    bar.status.toLowerCase().replace("_", " "),
+    compactDurationLabel(bar.durationMs),
+    bar.approximated ? "timing inferred" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function formatTooltipTime(timestampMs: number): string {
+  return new Date(timestampMs).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function getTooltipPosition(rect: DOMRect): TooltipPosition {
+  const left = Math.min(
+    Math.max(
+      rect.left + rect.width / 2 - TOOLTIP_WIDTH / 2,
+      TOOLTIP_VIEWPORT_PADDING,
+    ),
+    window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_VIEWPORT_PADDING,
+  );
+  const placement = rect.top < 180 ? "bottom" : "top";
+
+  return {
+    left,
+    top:
+      placement === "top"
+        ? rect.top - TOOLTIP_OFFSET
+        : rect.bottom + TOOLTIP_OFFSET,
+    placement,
   };
 }
 
@@ -378,6 +548,14 @@ function formatRelativeOffset(offsetMs: number): string {
   return `+${humanizeMilliseconds(offsetMs)}`;
 }
 
+function isShardDisplayName(value?: string): boolean {
+  if (!value) {
+    return false;
+  }
+
+  return /^shard\s+\d+(?:\s+of\s+\d+)?$/i.test(value.trim());
+}
+
 function buildLaneLabel(
   execution: RunExecution | undefined,
   executionId: string,
@@ -388,22 +566,7 @@ function buildLaneLabel(
   status?: TestStatus;
   statusLabel?: string;
 } {
-  if (execution?.isShard && typeof execution.shardIndex === "number") {
-    const shardNumber = execution.shardIndex + 1;
-    const suffix =
-      typeof execution.shardCountExpected === "number"
-        ? ` of ${execution.shardCountExpected}`
-        : "";
-
-    return {
-      label: `Shard ${shardNumber}${suffix}`,
-      subtitle: executionId || execution.name || "Unnamed execution",
-      status: execution.status ? normalizeStatus(execution.status) : undefined,
-      statusLabel: execution.status,
-    };
-  }
-
-  if (execution?.name) {
+  if (execution?.name && !isShardDisplayName(execution.name) && !executionId) {
     return {
       label: execution.name,
       subtitle: executionId || execution.name,
@@ -478,6 +641,8 @@ function buildTimelineModel(runDetail: TestRun | null): TimelineModel | null {
         approximated: window.approximated,
         location: test.location,
         tags: test.tags ?? [],
+        renderLeftPx: 0,
+        renderWidthPx: 0,
       };
 
       earliestMs = Math.min(earliestMs, bar.startMs);
@@ -515,7 +680,7 @@ function buildTimelineModel(runDetail: TestRun | null): TimelineModel | null {
       const execution = executionId
         ? executionById.get(executionId)
         : undefined;
-      const packed = packLaneRows(bars);
+      const packed = packLaneRows(bars, earliestMs, spanMs, timelineWidthPx);
       const laneStartMs = Math.min(...packed.bars.map((bar) => bar.startMs));
       const laneEndMs = Math.max(...packed.bars.map((bar) => bar.endMs));
       const label = buildLaneLabel(
@@ -621,6 +786,51 @@ export function TestRunTimelinePage() {
   const [runDetail, setRunDetail] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hoverTimerRef = useRef<number | null>(null);
+  const [tooltipState, setTooltipState] = useState<TimelineTooltipState | null>(
+    null,
+  );
+
+  const clearHoverTimer = useCallback(() => {
+    if (hoverTimerRef.current !== null) {
+      window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  }, []);
+
+  const showTooltip = useCallback(
+    (target: HTMLAnchorElement, bar: TimelineBar) => {
+      setTooltipState({
+        bar,
+        position: getTooltipPosition(target.getBoundingClientRect()),
+      });
+    },
+    [],
+  );
+
+  const hideTooltip = useCallback(() => {
+    clearHoverTimer();
+    setTooltipState(null);
+  }, [clearHoverTimer]);
+
+  const handleBarPointerEnter = useCallback(
+    (target: HTMLAnchorElement, bar: TimelineBar) => {
+      clearHoverTimer();
+      hoverTimerRef.current = window.setTimeout(() => {
+        showTooltip(target, bar);
+        hoverTimerRef.current = null;
+      }, TOOLTIP_DELAY_MS);
+    },
+    [clearHoverTimer, showTooltip],
+  );
+
+  const handleBarFocus = useCallback(
+    (target: HTMLAnchorElement, bar: TimelineBar) => {
+      clearHoverTimer();
+      showTooltip(target, bar);
+    },
+    [clearHoverTimer, showTooltip],
+  );
 
   const fetchRunDetail = useCallback(
     async (id: string, options?: FetchRunDetailOptions) => {
@@ -694,6 +904,30 @@ export function TestRunTimelinePage() {
       window.clearInterval(intervalId);
     };
   }, [autoRefreshEnabled, fetchRunDetail, pollIntervalMs, runId]);
+
+  useEffect(() => {
+    if (!tooltipState) {
+      return;
+    }
+
+    const hide = () => {
+      setTooltipState(null);
+    };
+
+    window.addEventListener("scroll", hide, true);
+    window.addEventListener("resize", hide);
+
+    return () => {
+      window.removeEventListener("scroll", hide, true);
+      window.removeEventListener("resize", hide);
+    };
+  }, [tooltipState]);
+
+  useEffect(() => {
+    return () => {
+      clearHoverTimer();
+    };
+  }, [clearHoverTimer]);
 
   const timeline = useMemo(() => buildTimelineModel(runDetail), [runDetail]);
   const orderedStatuses = useMemo(
@@ -813,6 +1047,130 @@ export function TestRunTimelinePage() {
       </div>
     );
   }
+
+  const tooltip =
+    tooltipState && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="pointer-events-none fixed z-90 w-80 rounded-xl border border-(--stitch-outline) bg-(--stitch-surface-lowest) px-4 py-3 text-sm text-(--stitch-on-surface) shadow-2xl shadow-black/10"
+            style={{
+              left: `${tooltipState.position.left}px`,
+              top: `${tooltipState.position.top}px`,
+              transform:
+                tooltipState.position.placement === "top"
+                  ? "translateY(-100%)"
+                  : undefined,
+              backgroundColor: "var(--stitch-surface-card)",
+              borderColor: "var(--stitch-outline)",
+              color: "var(--stitch-on-surface)",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
+            }}
+            role="tooltip"
+          >
+            <div
+              className="absolute left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-(--stitch-outline) bg-(--stitch-surface-lowest)"
+              style={{
+                top:
+                  tooltipState.position.placement === "top"
+                    ? "calc(100% - 6px)"
+                    : "-6px",
+                borderWidth:
+                  tooltipState.position.placement === "top"
+                    ? "0 1px 1px 0"
+                    : "1px 0 0 1px",
+                borderStyle: "solid",
+                backgroundColor: "var(--stitch-surface-card)",
+                borderColor: "var(--stitch-outline)",
+              }}
+            />
+            <div className="relative space-y-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{
+                      backgroundColor: statusStyles(tooltipState.bar.status)
+                        .color,
+                    }}
+                  />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-(--stitch-on-surface-muted)">
+                    {formatStatusLabel(tooltipState.bar.status)}
+                  </span>
+                  {tooltipState.bar.approximated && (
+                    <span className="rounded-full bg-(--status-warning-soft) px-2 py-0.5 text-[10px] font-medium text-(--status-warning)">
+                      Inferred
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm font-semibold leading-5 text-(--stitch-on-surface)">
+                  {tooltipState.bar.testTitle}
+                </p>
+                <p className="text-xs leading-5 text-(--stitch-on-surface-muted)">
+                  Attempt {tooltipState.bar.attemptIndex + 1}
+                  {tooltipState.bar.executionId
+                    ? ` • ${tooltipState.bar.executionId}`
+                    : " • No execution id"}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-(--stitch-on-surface-muted)">
+                <div>
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-(--stitch-on-surface-subtle)">
+                    Duration
+                  </span>
+                  <span className="text-(--stitch-on-surface)">
+                    {compactDurationLabel(tooltipState.bar.durationMs)}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-(--stitch-on-surface-subtle)">
+                    Offset
+                  </span>
+                  <span className="text-(--stitch-on-surface)">
+                    {formatRelativeOffset(
+                      tooltipState.bar.startMs - timeline.startMs,
+                    )}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-(--stitch-on-surface-subtle)">
+                    Started
+                  </span>
+                  <span className="text-(--stitch-on-surface)">
+                    {formatTooltipTime(tooltipState.bar.startMs)}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-(--stitch-on-surface-subtle)">
+                    Finished
+                  </span>
+                  <span className="text-(--stitch-on-surface)">
+                    {formatTooltipTime(tooltipState.bar.endMs)}
+                  </span>
+                </div>
+              </div>
+              {tooltipState.bar.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {tooltipState.bar.tags.slice(0, 6).map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full bg-(--stitch-primary-soft) px-2 py-1 text-[11px] font-medium text-(--stitch-primary)"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {tooltipState.bar.tags.length > 6 && (
+                    <span className="rounded-full bg-(--stitch-surface-low) px-2 py-1 text-[11px] font-medium text-(--stitch-on-surface-muted)">
+                      +{tooltipState.bar.tags.length - 6}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <div className="space-y-6 pb-8 animate-in fade-in duration-300">
@@ -958,7 +1316,8 @@ export function TestRunTimelinePage() {
                 <p className="mt-1 text-sm text-(--stitch-on-surface-muted)">
                   Horizontal position maps to wall-clock time. Overlapping
                   attempts within the same execution are stacked into additional
-                  rows.
+                  rows, and very short intervals are compacted so the visible
+                  width stays closer to the real schedule.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs text-(--stitch-on-surface-muted)">
@@ -1097,10 +1456,8 @@ export function TestRunTimelinePage() {
                                   : "bg-(--stitch-surface-low)/30",
                               )}
                               style={{
-                                top:
-                                  ROW_VERTICAL_PADDING_PX +
-                                  rowIndex * ROW_HEIGHT_PX,
-                                height: ROW_HEIGHT_PX - 10,
+                                top: compactBarTopPx(rowIndex),
+                                height: compactRowHeightPx(),
                               }}
                               aria-hidden="true"
                             />
@@ -1108,73 +1465,79 @@ export function TestRunTimelinePage() {
                         )}
 
                         {lane.bars.map((bar) => {
-                          const leftPx =
-                            ((bar.startMs - timeline.startMs) /
-                              timeline.spanMs) *
-                            timeline.chartWidthPx;
-                          const widthPx = Math.max(
-                            (bar.durationMs / timeline.spanMs) *
-                              timeline.chartWidthPx,
-                            18,
-                          );
-                          const compact = widthPx < 168;
-                          const tiny = widthPx < 112;
+                          const leftPx = bar.renderLeftPx;
+                          const widthPx = bar.renderWidthPx;
+                          const showIndex = widthPx >= 30;
+                          const showTitle = widthPx >= 72;
+                          const showMeta = widthPx >= 160;
+                          const showChip = widthPx >= 120;
                           const barStyles = statusStyles(bar.status);
 
                           return (
                             <Link
                               key={bar.key}
                               to={`/runs/${runId}/tests/${bar.testId}`}
+                              aria-label={attemptAriaLabel(bar)}
                               className={cn(
-                                "absolute overflow-hidden rounded-xl border px-3 py-2 shadow-[0_6px_18px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(15,23,42,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)",
+                                "absolute overflow-hidden border shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_16px_rgba(15,23,42,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)",
+                                compactBarClassName(widthPx),
                                 bar.status === "RUNNING" && "animate-pulse",
                               )}
                               style={{
                                 left: leftPx,
-                                top:
-                                  ROW_VERTICAL_PADDING_PX +
-                                  bar.rowIndex * ROW_HEIGHT_PX,
+                                top: compactBarTopPx(bar.rowIndex),
                                 width: widthPx,
-                                height: ROW_HEIGHT_PX - 10,
+                                height: BAR_HEIGHT_PX,
                                 backgroundColor: barStyles.backgroundColor,
                                 borderColor: barStyles.borderColor,
                                 color: barStyles.color,
                               }}
-                              title={`${bar.testTitle}\nAttempt ${bar.attemptIndex + 1}\n${formatAxisTimestamp(
-                                bar.startMs,
-                                timeline.spanMs,
-                              )} -> ${formatAxisTimestamp(bar.endMs, timeline.spanMs)}\n${humanizeMilliseconds(
-                                bar.durationMs,
-                              )}`}
+                              onMouseEnter={(event) =>
+                                handleBarPointerEnter(event.currentTarget, bar)
+                              }
+                              onMouseLeave={hideTooltip}
+                              onFocus={(event) =>
+                                handleBarFocus(event.currentTarget, bar)
+                              }
+                              onBlur={hideTooltip}
                             >
-                              <div className="flex h-full min-w-0 flex-col justify-between gap-2">
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <span className="inline-flex shrink-0 items-center rounded-full bg-black/8 px-2 py-0.5 text-[11px] font-semibold text-current">
-                                    #{bar.attemptIndex + 1}
+                              <div className="flex h-full min-w-0 items-center gap-1.5">
+                                {showIndex && (
+                                  <span className="inline-flex shrink-0 items-center rounded-full bg-black/8 px-1.5 py-0 text-[10px] font-semibold leading-none text-current">
+                                    {bar.attemptIndex + 1}
                                   </span>
-                                  {!tiny && (
-                                    <span className="truncate text-xs font-medium uppercase tracking-[0.12em] text-current/80">
-                                      {bar.status
-                                        .toLowerCase()
-                                        .replace("_", " ")}
-                                    </span>
-                                  )}
-                                </div>
+                                )}
 
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-current">
-                                    {bar.testTitle}
-                                  </p>
-                                  {!tiny && (
-                                    <p className="truncate text-xs text-current/80">
-                                      {compact
-                                        ? humanizeMilliseconds(bar.durationMs)
-                                        : `${formatRelativeOffset(
-                                            bar.startMs - timeline.startMs,
-                                          )} • ${humanizeMilliseconds(bar.durationMs)}`}
-                                    </p>
-                                  )}
-                                </div>
+                                {showTitle && (
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex min-w-0 items-center gap-1.5">
+                                      <p className="truncate text-[11px] font-semibold leading-none text-current">
+                                        {bar.testTitle}
+                                      </p>
+                                      {showChip && (
+                                        <span className="shrink-0 truncate rounded-full bg-black/8 px-1.5 py-0 text-[10px] font-medium uppercase tracking-[0.08em] text-current/85">
+                                          {bar.status
+                                            .toLowerCase()
+                                            .replace("_", " ")}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {showMeta && (
+                                      <p className="mt-0.5 truncate text-[10px] leading-none text-current/80">
+                                        {compactDurationLabel(bar.durationMs)} •{" "}
+                                        {formatRelativeOffset(
+                                          bar.startMs - timeline.startMs,
+                                        )}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {!showTitle && !showIndex && (
+                                  <span className="sr-only">
+                                    {attemptAriaLabel(bar)}
+                                  </span>
+                                )}
                               </div>
                             </Link>
                           );
@@ -1214,6 +1577,7 @@ export function TestRunTimelinePage() {
           </div>
         </CardContent>
       </Card>
+      {tooltip}
     </div>
   );
 }
