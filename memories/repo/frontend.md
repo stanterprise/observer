@@ -1,0 +1,2 @@
+- Web UI uses Tailwind v4 CSS variable shorthand like `text-(--stitch-primary)` instead of legacy `text-[var(--stitch-primary)]`.
+- Workspace disables `tailwindCSS.lint.suggestCanonicalClasses` in `.vscode/settings.json` to avoid noisy canonical-form diagnostics.
