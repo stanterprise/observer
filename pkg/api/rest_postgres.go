@@ -102,9 +102,18 @@ func (h *PostgresHandler) handleRuns(w http.ResponseWriter, r *http.Request) {
 
 	runs := make([]map[string]interface{}, 0, len(stats))
 	for _, stat := range stats {
-		runStatus := "PASSED"
-		if stat.Running == 0 {
-			if stat.Failed > 0 {
+		runStatus := "NOT_RUN"
+		if stat.Total == 0 {
+			runStatus = "NOT_RUN"
+		}
+		if stat.NotRun == stat.Total {
+			runStatus = "NOT_RUN"
+		}
+		if stat.Passed+stat.Flaky+stat.Skipped == stat.Total {
+			runStatus = "PASSED"
+		}
+		if stat.NotRun == 0 {
+			if stat.Failed > 0 || stat.Broken > 0 || stat.TimedOut > 0 || stat.Interrupted > 0 {
 				runStatus = "FAILED"
 			}
 		} else {

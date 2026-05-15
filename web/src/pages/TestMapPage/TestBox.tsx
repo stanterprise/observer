@@ -122,10 +122,7 @@ const TOOLTIP_OFFSET = 10;
 const getTooltipContent = (test: Test): TooltipContent => {
   const duration = formatDuration(test.duration);
   const startedAt = formatStartedAt(test.createdAt ?? test.startTime);
-  const retries = Math.max(
-    (test.attempts?.length ?? 0) - 1,
-    test.retryCount ?? 0,
-  );
+  const retries = (test.attempts?.length ?? 1) - 1;
 
   return {
     title: test.title || test.id,

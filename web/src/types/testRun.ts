@@ -21,6 +21,8 @@ export interface TestRun {
 }
 
 export interface RunStatistics {
+  runId: string;
+  name: string;
   pending: number;
   notRun: number;
   total: number;
@@ -35,4 +37,7 @@ export interface RunStatistics {
   lastUpdated?: string;
   expected?: number;
   flaky?: number;
+  duration?: number; // Duration in nanoseconds
+  createdAt?: string;
+  updatedAt?: string;
 }

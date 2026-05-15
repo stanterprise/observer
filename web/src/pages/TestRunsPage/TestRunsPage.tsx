@@ -24,6 +24,7 @@ import type { TestRun } from "@/types/testRun";
 import { getRunCompletionStatus } from "./utils";
 import type { TestStatus } from "@/types/common";
 import Dialog from "@/components/Dialog";
+import { humanizeMilliseconds } from "@/utils/duration";
 
 export function TestRunsPage() {
   const pollIntervalMs = config.pollingIntervalMs;
@@ -396,6 +397,44 @@ export function TestRunsPage() {
       ) : (
         <Card>
           <CardContent className="p-0">
+            <div className="border-b border-(--stitch-outline) bg-(--stitch-surface-low) px-6 py-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-(--stitch-on-surface-subtle)">
+                    Breakdown Legend
+                  </p>
+                  <p className="text-sm text-(--stitch-on-surface-muted)">
+                    Order used in the Breakdown column for every run.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em]">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-(--status-success-border) bg-(--status-success-soft) px-2.5 py-1 text-(--status-success)">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Passed
+                  </span>
+                  <span className="text-(--stitch-on-surface-subtle)">+</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-(--status-warning-border) bg-(--status-warning-soft) px-2.5 py-1 text-(--status-warning)">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Flaky
+                  </span>
+                  <span className="text-(--stitch-on-surface-subtle)">+</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-(--status-failure-border) bg-(--status-failure-soft) px-2.5 py-1 text-(--status-failure)">
+                    <XCircle className="h-3.5 w-3.5" />
+                    Failed
+                  </span>
+                  <span className="text-(--stitch-on-surface-subtle)">+</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-(--status-neutral-border) bg-(--status-neutral-soft) px-2.5 py-1 text-(--status-neutral)">
+                    <CircleDashed className="h-3.5 w-3.5" />
+                    Skipped
+                  </span>
+                  <span className="text-(--stitch-on-surface-subtle)">/</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-(--stitch-primary) bg-(--stitch-primary-soft) px-2.5 py-1 text-(--stitch-primary)">
+                    <Play className="h-3.5 w-3.5" />
+                    Total
+                  </span>
+                </div>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="min-w-[1220px] w-full table-auto divide-y divide-(--stitch-outline)">
                 <thead className="bg-(--stitch-surface-card)">
@@ -440,36 +479,15 @@ export function TestRunsPage() {
                     </th>
                     <th
                       scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider w-40"
+                    >
+                      Duration
+                    </th>
+                    <th
+                      scope="col"
                       className="px-6 py-3 text-center text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider w-40"
                     >
-                      <div className="inline-flex items-center justify-center">
-                        <span className="inline-flex items-center justify-center">
-                          <CheckCircle className="h-4 w-4 mr-1 text-(--status-success)" />
-                          Passed
-                        </span>
-                        {" + "}
-                        <span className="inline-flex items-center justify-center">
-                          <AlertTriangle className="h-4 w-4 mr-1 text-(--status-warning)" />
-                          Flaky
-                        </span>
-                        {" + "}
-                        <span className="inline-flex items-center justify-center">
-                          <XCircle className="h-4 w-4 mr-1 text-(--status-failure)" />
-                          Failed
-                        </span>
-                        {" + "}
-                        <span className="inline-flex items-center justify-center">
-                          <CircleDashed className="h-4 w-4 mr-1 text-(--stitch-on-surface-muted)" />
-                          Skipped
-                        </span>
-                      </div>
-                      <div className="inline-flex items-center justify-center">
-                        {" / "}
-                        <div className="flex items-center justify-center">
-                          <Play className="h-4 w-4 mr-1 text-(--stitch-primary)" />
-                          Total
-                        </div>
-                      </div>
+                      Breakdown
                     </th>
                     <th
                       scope="col"
@@ -539,6 +557,9 @@ export function TestRunsPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {status !== "RUNNING" && <Badge status={status} />}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          {humanizeMilliseconds(run.statistics!.duration!)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <span className="text-(--status-success) font-semibold">

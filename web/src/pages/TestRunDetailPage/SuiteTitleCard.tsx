@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import type { TestRun } from "@/types/testRun";
+import { humanizeDuration } from "@/utils/duration";
 
 export type ProgressBarProps = {
   runDetail: TestRun;
@@ -115,31 +116,37 @@ export const SuiteTitleCard = ({
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex-1 min-w-0">
             <CardTitle className="text-xl md:text-2xl mb-2 truncate">
-              {runDetail.name ?? runDetail.id}
+              <div className="flex items-center gap-4 text-sm text-(--stitch-on-surface-muted)">
+                <span className="font-medium">Total Tests:</span>
+                <span className="font-bold text-(--stitch-on-surface)">
+                  {totalTests}
+                </span>
+                <span className="text-(--stitch-on-surface-subtle)">•</span>
+                <span className="font-medium">Duration:</span>
+                <span className="font-bold text-(--stitch-on-surface)">
+                  {runDetail.duration
+                    ? humanizeDuration(runDetail.duration!, 1_000_000_000)
+                    : "N/A"}
+                </span>
+                {runDetail.createdAt && (
+                  <>
+                    <span className="text-(--stitch-on-surface-subtle)">•</span>
+                    <span className="text-(--stitch-on-surface-muted)">
+                      {new Date(runDetail.createdAt).toLocaleDateString(
+                        undefined,
+                        {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        },
+                      )}
+                    </span>
+                  </>
+                )}
+              </div>
             </CardTitle>
-            <div className="flex items-center gap-4 text-sm text-(--stitch-on-surface-muted)">
-              <span className="font-medium">Total Tests:</span>
-              <span className="font-bold text-(--stitch-on-surface)">
-                {totalTests}
-              </span>
-              {runDetail.createdAt && (
-                <>
-                  <span className="text-(--stitch-on-surface-subtle)">•</span>
-                  <span className="text-(--stitch-on-surface-muted)">
-                    {new Date(runDetail.createdAt).toLocaleDateString(
-                      undefined,
-                      {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
-                    )}
-                  </span>
-                </>
-              )}
-            </div>
           </div>
           <Badge
             status={overallStatus!}

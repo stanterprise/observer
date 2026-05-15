@@ -94,8 +94,10 @@ function dedupeTests(tests: Test[]): Test[] {
   return Array.from(byKey.values());
 }
 
-function computeStatistics(tests: Test[]) {
+function computeStatistics(tests: Test[], runId: string, name: string) {
   return {
+    runId: runId,
+    name: name,
     total: tests.length,
     passed: tests.filter(
       (test) => test.status === "PASSED" || test.status === "FLAKY",
@@ -128,7 +130,7 @@ function normalizeRunDetail(data: TestRun): TestRun {
     ...data,
     suites,
     tests,
-    statistics: computeStatistics(tests),
+    statistics: computeStatistics(tests, data.id, data.name),
   };
 }
 
@@ -514,11 +516,8 @@ export function TestRunDetailPage() {
           </Link>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-(--stitch-on-surface) tracking-tight">
-              Test Suite Run
+              {runDetail.name ?? runDetail.id}
             </h1>
-            <p className="text-sm text-(--stitch-on-surface-subtle) mt-1">
-              {runDetail.name || runDetail.id}
-            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">

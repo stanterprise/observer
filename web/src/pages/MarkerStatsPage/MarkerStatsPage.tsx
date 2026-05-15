@@ -17,6 +17,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { humanizeDuration } from "@/utils/duration";
 
 interface RunStat {
   runId: string;
@@ -95,16 +96,6 @@ export function MarkerStatsPage() {
       INTERRUPTED: "INTERRUPTED",
     };
     return (statusMap[status.toUpperCase()] || "UNKNOWN") as TestStatus;
-  };
-
-  const formatDuration = (nanoseconds?: number) => {
-    if (!nanoseconds) return "N/A";
-    const milliseconds = nanoseconds / 1000000;
-    if (milliseconds < 1000) return `${milliseconds.toFixed(0)}ms`;
-    const seconds = milliseconds / 1000;
-    if (seconds < 60) return `${seconds.toFixed(1)}s`;
-    const minutes = seconds / 60;
-    return `${minutes.toFixed(1)}m`;
   };
 
   const formatDate = (dateString: string) => {
@@ -606,7 +597,7 @@ export function MarkerStatsPage() {
                           {runPassRate}%
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--stitch-on-surface)]">
-                          {formatDuration(run.duration)}
+                          {humanizeDuration(run.duration!, 1_000_000_000)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--stitch-on-surface-muted)]">
                           {formatDate(run.createdAt)}
