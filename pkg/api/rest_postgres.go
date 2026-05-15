@@ -115,6 +115,8 @@ func (h *PostgresHandler) handleRuns(w http.ResponseWriter, r *http.Request) {
 		if stat.NotRun == 0 {
 			if stat.Failed > 0 || stat.Broken > 0 || stat.TimedOut > 0 || stat.Interrupted > 0 {
 				runStatus = "FAILED"
+			} else if stat.Running > 0 {
+				runStatus = "RUNNING"
 			}
 		} else {
 			runStatus = "RUNNING"
