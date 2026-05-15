@@ -54,10 +54,10 @@ export function TestRunsPage() {
       const data = await response.json();
       const stats = (data.runs || []) as TestRun[];
 
-      // Sort by lastUpdated (most recent first by default)
+      // Sort by creation date (most recent first by default)
       stats.sort((a, b) => {
-        const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-        const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bTime - aTime; // Descending order (newest first)
       });
 
