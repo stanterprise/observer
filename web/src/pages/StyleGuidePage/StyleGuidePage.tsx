@@ -18,12 +18,12 @@ export function StyleGuidePage() {
   const guide = stitchStyleGuide[variant];
   const isDark = guide.colorMode === "DARK";
 
-  const panelClass = "border-0 text-[var(--stitch-on-surface)] shadow-none";
+  const panelClass = "border-0 text-(--stitch-on-surface) shadow-none";
 
-  const subduedTextClass = "text-[var(--stitch-on-surface-muted)]";
+  const subduedTextClass = "text-(--stitch-on-surface-muted)";
   const tokenPillClass = isDark
-    ? "bg-[var(--stitch-surface-low)] text-[var(--stitch-on-surface-muted)] border-[var(--stitch-outline)]"
-    : "bg-[var(--stitch-surface-low)] text-[var(--stitch-on-surface-muted)] border-[var(--stitch-outline)]";
+    ? "bg-(--stitch-surface-low) text-(--stitch-on-surface-muted) border-(--stitch-outline)"
+    : "bg-(--stitch-surface-low) text-(--stitch-on-surface-muted) border-(--stitch-outline)";
 
   const bodyFontFamily = `${guide.bodyFont}, Inter, system-ui, sans-serif`;
   const headlineFontFamily = `${guide.headlineFont}, Inter, system-ui, sans-serif`;
@@ -83,8 +83,8 @@ export function StyleGuidePage() {
         <p
           className={`text-sm font-semibold uppercase tracking-widest ${
             isDark
-              ? "text-[var(--stitch-primary)]"
-              : "text-[var(--stitch-primary)]"
+              ? "text-(--stitch-primary)"
+              : "text-(--stitch-primary)"
           }`}
         >
           Imported Stitch Design System
@@ -92,8 +92,8 @@ export function StyleGuidePage() {
         <h1
           className={`mt-2 text-3xl font-bold tracking-tight ${
             isDark
-              ? "text-[var(--stitch-on-surface)]"
-              : "text-[var(--stitch-on-surface)]"
+              ? "text-(--stitch-on-surface)"
+              : "text-(--stitch-on-surface)"
           }`}
           style={{ fontFamily: headlineFontFamily }}
         >
@@ -102,8 +102,8 @@ export function StyleGuidePage() {
         <p
           className={`mt-2 max-w-3xl text-sm ${
             isDark
-              ? "text-[var(--stitch-on-surface-muted)]"
-              : "text-[var(--stitch-on-surface)]"
+              ? "text-(--stitch-on-surface-muted)"
+              : "text-(--stitch-on-surface)"
           }`}
         >
           Creative North Star: <strong>{guide.creativeNorthStar}</strong>. This
@@ -121,8 +121,8 @@ export function StyleGuidePage() {
                 onClick={() => setVariant(item)}
                 className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                   selected
-                    ? "border-[var(--status-running-border)] bg-[var(--stitch-primary-soft)] text-[var(--stitch-primary)]"
-                    : "border-[var(--stitch-outline)] bg-[var(--stitch-surface-card)] text-[var(--stitch-on-surface)] hover:bg-[var(--stitch-surface-card)]"
+                    ? "border-(--status-running-border) bg-(--stitch-primary-soft) text-(--stitch-primary)"
+                    : "border-(--stitch-outline) bg-(--stitch-surface-card) text-(--stitch-on-surface) hover:bg-(--stitch-surface-card)"
                 }`}
               >
                 {item === "light" ? (
@@ -138,7 +138,7 @@ export function StyleGuidePage() {
         <div className="mt-5 flex flex-wrap gap-3">
           <Link
             to="/"
-            className="inline-flex items-center rounded-md bg-[var(--stitch-primary-soft)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--stitch-primary-soft)]"
+            className="inline-flex items-center rounded-md bg-(--stitch-primary-soft) px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-(--stitch-primary-soft)"
           >
             Return to dashboard
           </Link>
@@ -146,7 +146,7 @@ export function StyleGuidePage() {
             href="https://tailwindcss.com/docs/customizing-colors"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center rounded-md border-[var(--stitch-outline)] bg-[var(--stitch-surface-card)] px-4 py-2 text-sm font-medium text-[var(--stitch-on-surface)] transition-colors hover:bg-[var(--stitch-surface-card)]"
+            className="inline-flex items-center rounded-md border-(--stitch-outline) bg-(--stitch-surface-card) px-4 py-2 text-sm font-medium text-(--stitch-on-surface) transition-colors hover:bg-(--stitch-surface-card)"
           >
             Stitch export reference
             <ExternalLink className="ml-2 h-4 w-4" />
@@ -156,16 +156,16 @@ export function StyleGuidePage() {
           className="mt-4 flex flex-wrap gap-2 text-xs"
           style={{ fontFamily: labelFontFamily }}
         >
-          <span className="rounded-md bg-[var(--stitch-surface-card)]/80 px-2 py-1 text-[var(--stitch-on-surface)]">
+          <span className="rounded-md bg-(--stitch-surface-card)/80 px-2 py-1 text-(--stitch-on-surface)">
             Mode: {guide.colorMode}
           </span>
-          <span className="rounded-md bg-[var(--stitch-surface-card)]/80 px-2 py-1 text-[var(--stitch-on-surface)]">
+          <span className="rounded-md bg-(--stitch-surface-card)/80 px-2 py-1 text-(--stitch-on-surface)">
             Headline Font: {guide.headlineFont}
           </span>
-          <span className="rounded-md bg-[var(--stitch-surface-card)]/80 px-2 py-1 text-[var(--stitch-on-surface)]">
+          <span className="rounded-md bg-(--stitch-surface-card)/80 px-2 py-1 text-(--stitch-on-surface)">
             Body Font: {guide.bodyFont}
           </span>
-          <span className="rounded-md bg-[var(--stitch-surface-card)]/80 px-2 py-1 text-[var(--stitch-on-surface)]">
+          <span className="rounded-md bg-(--stitch-surface-card)/80 px-2 py-1 text-(--stitch-on-surface)">
             Roundness: {guide.roundness}
           </span>
         </div>
@@ -566,7 +566,7 @@ export function StyleGuidePage() {
                   key={rule}
                   className={`flex items-start gap-2 text-sm ${subduedTextClass}`}
                 >
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-[var(--status-success)]" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-(--status-success)" />
                   <span>{rule}</span>
                 </li>
               ))}
@@ -588,28 +588,28 @@ export function StyleGuidePage() {
                   key={rule}
                   className={`flex items-start gap-2 text-sm ${subduedTextClass}`}
                 >
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-[var(--status-success)]" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-(--status-success)" />
                   <span>{rule}</span>
                 </li>
               ))}
             </ul>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded-lg border-[var(--status-success-border)] bg-[var(--status-success-soft)] p-3">
-                <p className="text-sm font-semibold text-[var(--status-success)]">
+              <div className="rounded-lg border-(--status-success-border) bg-(--status-success-soft) p-3">
+                <p className="text-sm font-semibold text-(--status-success)">
                   Do
                 </p>
-                <ul className="mt-2 space-y-2 text-sm text-[var(--status-success)]">
+                <ul className="mt-2 space-y-2 text-sm text-(--status-success)">
                   {guide.doList.map((item) => (
                     <li key={item}>- {item}</li>
                   ))}
                 </ul>
               </div>
-              <div className="rounded-lg border-[var(--status-failure-border)] bg-[var(--status-failure-soft)] p-3">
-                <p className="text-sm font-semibold text-[var(--status-failure)]">
+              <div className="rounded-lg border-(--status-failure-border) bg-(--status-failure-soft) p-3">
+                <p className="text-sm font-semibold text-(--status-failure)">
                   Do Not
                 </p>
-                <ul className="mt-2 space-y-2 text-sm text-[var(--status-failure)]">
+                <ul className="mt-2 space-y-2 text-sm text-(--status-failure)">
                   {guide.dontList.map((item) => (
                     <li key={item}>- {item}</li>
                   ))}

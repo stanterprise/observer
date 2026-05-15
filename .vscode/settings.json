@@ -70,6 +70,7 @@
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
   "files.trimTrailingWhitespace": true,
+  "tailwindCSS.lint.suggestCanonicalClasses": "ignore",
   "[markdown]": {
     "files.trimTrailingWhitespace": false
   },

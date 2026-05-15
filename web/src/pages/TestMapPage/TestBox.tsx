@@ -122,10 +122,7 @@ const TOOLTIP_OFFSET = 10;
 const getTooltipContent = (test: Test): TooltipContent => {
   const duration = formatDuration(test.duration);
   const startedAt = formatStartedAt(test.createdAt ?? test.startTime);
-  const retries = Math.max(
-    (test.attempts?.length ?? 0) - 1,
-    test.retryCount ?? 0,
-  );
+  const retries = (test.attempts?.length ?? 1) - 1;
 
   return {
     title: test.title || test.id,
@@ -265,7 +262,7 @@ function TestBox({
     tooltipPosition && typeof document !== "undefined"
       ? createPortal(
           <div
-            className="pointer-events-none fixed z-[90] w-80 rounded-xl border border-[var(--stitch-outline)] bg-[var(--stitch-surface-lowest)] px-4 py-3 text-sm text-[var(--stitch-on-surface)] shadow-2xl shadow-black/10"
+            className="pointer-events-none fixed z-90 w-80 rounded-xl border border-(--stitch-outline) bg-(--stitch-surface-lowest) px-4 py-3 text-sm text-(--stitch-on-surface) shadow-2xl shadow-black/10"
             style={{
               left: `${tooltipPosition.left}px`,
               top: `${tooltipPosition.top}px`,
@@ -282,7 +279,7 @@ function TestBox({
             role="tooltip"
           >
             <div
-              className="absolute left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-[var(--stitch-outline)] bg-[var(--stitch-surface-lowest)]"
+              className="absolute left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-(--stitch-outline) bg-(--stitch-surface-lowest)"
               style={{
                 top:
                   tooltipPosition.placement === "top"
@@ -304,46 +301,46 @@ function TestBox({
                     className="h-2.5 w-2.5 rounded-full"
                     style={{ backgroundColor: accentColor }}
                   />
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--stitch-on-surface-muted)]">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-(--stitch-on-surface-muted)">
                     {tooltipContent.status}
                   </span>
                 </div>
-                <p className="text-sm font-semibold leading-5 text-[var(--stitch-on-surface)]">
+                <p className="text-sm font-semibold leading-5 text-(--stitch-on-surface)">
                   {tooltipContent.title}
                 </p>
                 {tooltipContent.description && (
-                  <p className="text-xs leading-5 text-[var(--stitch-on-surface-muted)]">
+                  <p className="text-xs leading-5 text-(--stitch-on-surface-muted)">
                     {tooltipContent.description}
                   </p>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-[var(--stitch-on-surface-muted)]">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-(--stitch-on-surface-muted)">
                 {tooltipContent.duration && (
                   <div>
-                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--stitch-on-surface-subtle)]">
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-(--stitch-on-surface-subtle)">
                       Duration
                     </span>
-                    <span className="text-[var(--stitch-on-surface)]">
+                    <span className="text-(--stitch-on-surface)">
                       {tooltipContent.duration}
                     </span>
                   </div>
                 )}
                 {tooltipContent.retries && (
                   <div>
-                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--stitch-on-surface-subtle)]">
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-(--stitch-on-surface-subtle)">
                       Retries
                     </span>
-                    <span className="text-[var(--stitch-on-surface)]">
+                    <span className="text-(--stitch-on-surface)">
                       {tooltipContent.retries}
                     </span>
                   </div>
                 )}
                 {tooltipContent.startedAt && (
                   <div className="col-span-2">
-                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--stitch-on-surface-subtle)]">
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-(--stitch-on-surface-subtle)">
                       Started
                     </span>
-                    <span className="text-[var(--stitch-on-surface)]">
+                    <span className="text-(--stitch-on-surface)">
                       {tooltipContent.startedAt}
                     </span>
                   </div>
@@ -354,13 +351,13 @@ function TestBox({
                   {tooltipContent.tags.slice(0, 6).map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-full bg-[var(--stitch-primary-soft)] px-2 py-1 text-[11px] font-medium text-[var(--stitch-primary)]"
+                      className="rounded-full bg-(--stitch-primary-soft) px-2 py-1 text-[11px] font-medium text-(--stitch-primary)"
                     >
                       {tag}
                     </span>
                   ))}
                   {tooltipContent.tags.length > 6 && (
-                    <span className="rounded-full bg-[var(--stitch-surface-low)] px-2 py-1 text-[11px] font-medium text-[var(--stitch-on-surface-muted)]">
+                    <span className="rounded-full bg-(--stitch-surface-low) px-2 py-1 text-[11px] font-medium text-(--stitch-on-surface-muted)">
                       +{tooltipContent.tags.length - 6}
                     </span>
                   )}
@@ -380,8 +377,8 @@ function TestBox({
         aria-label={tooltipText}
         className={cn(
           "block transition-all duration-150",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--stitch-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--stitch-background)]",
-          isHighlighted && "ring-1 ring-[var(--stitch-primary)]/80",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-1 focus-visible:ring-offset-(--stitch-background)",
+          isHighlighted && "ring-1 ring-(--stitch-primary)/80",
         )}
         style={{
           width: `${width}px`,

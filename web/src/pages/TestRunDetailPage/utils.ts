@@ -15,10 +15,3 @@ export const getTestStatus = (status: string): TestStatus => {
   };
   return (statusMap[status] || "UNKNOWN") as TestStatus;
 };
-
-export const formatDuration = (nanoseconds?: number) => {
-  if (!nanoseconds) return "N/A";
-  const milliseconds = nanoseconds / 1000000;
-  if (milliseconds < 1000) return `${milliseconds.toFixed(0)}ms`;
-  return `${(milliseconds / 1000).toFixed(2)}s`;
-};

@@ -16,11 +16,30 @@ export interface TestRun {
   createdAt: string;
   updatedAt: string;
   statistics?: RunStatistics;
+  executions?: RunExecution[];
   suites?: TestSuite[];
   tests?: Test[];
 }
 
+export interface RunExecution {
+  id: string;
+  runId: string;
+  name?: string;
+  status?: string;
+  isShard?: boolean;
+  shardIndex?: number;
+  shardCountExpected?: number;
+  metadata?: Record<string, unknown>;
+  startTime?: string;
+  endTime?: string;
+  duration?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RunStatistics {
+  runId: string;
+  name: string;
   pending: number;
   notRun: number;
   total: number;
@@ -35,4 +54,7 @@ export interface RunStatistics {
   lastUpdated?: string;
   expected?: number;
   flaky?: number;
+  duration?: number; // Duration in milliseconds
+  createdAt?: string;
+  updatedAt?: string;
 }

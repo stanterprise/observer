@@ -5,7 +5,8 @@ import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/Card";
 
 import type { Test } from "@/types/testCase";
-import { getTestStatus, formatDuration } from "./utils";
+import { getTestStatus } from "./utils";
+import { humanizeDuration } from "@/utils/duration";
 
 type TestRecordProps = {
   test: Test;
@@ -34,7 +35,7 @@ export default ({ test, runId }: TestRecordProps) => {
                   <Clock className="mr-1 h-4 w-4 text-(--stitch-on-surface-subtle)" />
                   <span className="font-medium">Duration:</span>
                   <span className="ml-1 font-semibold text-(--stitch-on-surface)">
-                    {formatDuration(test.duration)}
+                    {humanizeDuration(test.duration!, 1_000_000_000)}
                   </span>
                 </div>
                 {(test.attempts?.length ?? 0) > 1 && (

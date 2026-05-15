@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
-import { apiUrl, config } from "@/lib/config";
+import { config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { useRefresh } from "@/lib/refresh";
+import { fetchRunDetailData } from "@/lib/runDetail";
 import {
   ArrowLeft,
+  Clock,
   Play,
   Eye,
   EyeOff,
@@ -23,113 +25,13 @@ import type { TestSuite } from "@/types/testSuite";
 import TestSuiteRecord from "./TestSuiteRecord";
 import type { TestRun } from "@/types/testRun";
 
-const inFlightRunDetailRequests = new Map<string, Promise<TestRun>>();
-
 type FetchRunDetailOptions = {
   silent?: boolean;
   shouldIgnore?: () => boolean;
 };
 
-async function fetchRunDetailData(id: string): Promise<TestRun> {
-  const existingRequest = inFlightRunDetailRequests.get(id);
-  if (existingRequest) {
-    return existingRequest;
-  }
-
-  const request = fetch(apiUrl(`/runs/${id}`))
-    .then(async (response) => {
-      if (!response.ok) {
-        throw new Error(`Failed to fetch run details: ${response.statusText}`);
-      }
-
-      return normalizeRunDetail(await response.json());
-    })
-    .finally(() => {
-      inFlightRunDetailRequests.delete(id);
-    });
-
-  inFlightRunDetailRequests.set(id, request);
-  return request;
-}
-
 function isFlakyTest(test: Test): boolean {
   return test.status === "PASSED" && (test.attempts?.length ?? 0) > 1;
-}
-
-function flattenSuiteTests(suites: TestSuite[]): Test[] {
-  const flattened: Test[] = [];
-
-  const visit = (suite: TestSuite) => {
-    flattened.push(...(suite.tests ?? []));
-    suite.suites?.forEach(visit);
-  };
-
-  suites.forEach(visit);
-  return flattened;
-}
-
-function flattenSuites(suites: TestSuite[]): TestSuite[] {
-  const flattened: TestSuite[] = [];
-
-  const visit = (suite: TestSuite) => {
-    flattened.push({
-      ...suite,
-      tests: [],
-      suites: [],
-    });
-    suite.suites?.forEach(visit);
-  };
-
-  suites.forEach(visit);
-  return flattened;
-}
-
-function dedupeTests(tests: Test[]): Test[] {
-  const byKey = new Map<string, Test>();
-
-  for (const test of tests) {
-    byKey.set(`${test.id}:${test.suiteId ?? ""}`, test);
-  }
-
-  return Array.from(byKey.values());
-}
-
-function computeStatistics(tests: Test[]) {
-  return {
-    total: tests.length,
-    passed: tests.filter(
-      (test) => test.status === "PASSED" || test.status === "FLAKY",
-    ).length,
-    flaky: tests.filter((test) => test.status === "FLAKY").length,
-    failed: tests.filter((test) => test.status === "FAILED").length,
-    skipped: tests.filter((test) => test.status === "SKIPPED").length,
-    running: tests.filter((test) => test.status === "RUNNING").length,
-    pending: tests.filter((test) => test.status === "PENDING").length,
-    notRun: tests.filter((test) => test.status === "NOT_RUN").length,
-    broken: tests.filter((test) => test.status === "BROKEN").length,
-    timedout: tests.filter((test) => test.status === "TIMEDOUT").length,
-    interrupted: tests.filter((test) => test.status === "INTERRUPTED").length,
-    unknown: tests.filter((test) => test.status === "UNKNOWN").length,
-    expected: tests.filter(
-      (test) => test.status === "PASSED" && (test.attempts?.length ?? 0) === 1,
-    ).length,
-  };
-}
-
-function normalizeRunDetail(data: TestRun): TestRun {
-  const nestedSuites = data.suites ?? [];
-  const suites = flattenSuites(nestedSuites);
-  const tests = dedupeTests([
-    ...(data.tests ?? []),
-    ...flattenSuiteTests(nestedSuites),
-  ]);
-
-  return {
-    ...data,
-    suites,
-    tests,
-    statistics: computeStatistics(tests),
-  };
 }
 
 export function TestRunDetailPage() {
@@ -514,14 +416,18 @@ export function TestRunDetailPage() {
           </Link>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-(--stitch-on-surface) tracking-tight">
-              Test Suite Run
+              {runDetail.name ?? runDetail.id}
             </h1>
-            <p className="text-sm text-(--stitch-on-surface-subtle) mt-1">
-              {runDetail.name || runDetail.id}
-            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            to={`/runs/${runId}/timeline`}
+            className="inline-flex items-center gap-2 rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-card) px-4 py-2 text-(--stitch-on-surface) transition-colors hover:bg-(--stitch-surface-low) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
+          >
+            <Clock className="h-5 w-5 text-(--stitch-primary)" />
+            <span className="font-medium">View Timeline</span>
+          </Link>
           <Link
             to={`/runs/${runId}/map`}
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
