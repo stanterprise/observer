@@ -54,7 +54,7 @@ export interface RunStatistics {
   lastUpdated?: string;
   expected?: number;
   flaky?: number;
-  duration?: number; // Duration in nanoseconds
+  duration?: number; // Duration in milliseconds
   createdAt?: string;
   updatedAt?: string;
 }
