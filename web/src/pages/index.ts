@@ -1,6 +1,7 @@
 import TestDetailPage from "./TestDetailPage";
 import TestRunsPage from "./TestRunsPage";
 import TestRunDetailPage from "./TestRunDetailPage";
+import TestRunTimelinePage from "./TestRunTimelinePage";
 import TestTrendsPage from "./TestTrendsPage";
 import { MarkerStatsPage } from "./MarkerStatsPage";
 import { MarkerBrowsePage } from "./MarkerBrowsePage";
@@ -13,6 +14,7 @@ export {
   TestDetailPage,
   TestRunsPage,
   TestRunDetailPage,
+  TestRunTimelinePage,
   TestTrendsPage,
   MarkerStatsPage,
   MarkerBrowsePage,

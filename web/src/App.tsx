@@ -3,6 +3,7 @@ import { Layout } from "./components/Layout";
 
 import {
   TestRunDetailPage,
+  TestRunTimelinePage,
   TestDetailPage,
   TestRunsPage,
   TestTrendsPage,
@@ -25,6 +26,7 @@ function App() {
             <Route index element={<TestRunsPage />} />
             <Route path="raw-messages" element={<RawMessagesRunsPage />} />
             <Route path=":runId" element={<TestRunDetailPage />} />
+            <Route path=":runId/timeline" element={<TestRunTimelinePage />} />
             <Route path=":runId/map" element={<TestMapPage />} />
             <Route path=":runId/tests/:testId" element={<TestDetailPage />} />
             <Route path=":runId/raw-messages" element={<RawMessagesPage />} />
