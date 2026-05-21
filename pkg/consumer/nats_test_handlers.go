@@ -118,6 +118,10 @@ func (c *NATSConsumer) handleTestEnd(ctx context.Context, data json.RawMessage) 
 		"status", req.TestCase.Status,
 		"retry_index", req.TestCase.RetryIndex)
 
+	if c.metrics != nil {
+		c.metrics.testsCompleted.Add(ctx, 1, statusAttr(req.TestCase.Status.String()))
+	}
+
 	// Convert attachments
 	attachments := make([]map[string]interface{}, 0, len(req.TestCase.Attachments))
 	for _, att := range req.TestCase.Attachments {

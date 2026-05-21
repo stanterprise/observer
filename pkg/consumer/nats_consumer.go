@@ -15,10 +15,12 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/internal/repository/postgres"
+	"github.com/stanterprise/observer/internal/telemetry"
 	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/stanterprise/observer/pkg/storage"
 	"github.com/stanterprise/proto-go/testsystem/v1/common"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
+	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -65,6 +67,9 @@ type NATSConsumer struct {
 
 	integrityMu      sync.Mutex
 	runIntegrityByID map[string]*runIntegrity
+
+	metrics         *consumerMetrics
+	metricsReg      metric.Registration
 }
 
 // NATSConsumerConfig holds configuration for NATS consumer
@@ -232,6 +237,26 @@ func NewNATSConsumer(cfg NATSConsumerConfig, logger *slog.Logger, bufferRepo *mo
 		"defer_queue_ttl", cfg.DeferQueueTTL,
 	)
 
+	// Initialise OTel metrics instruments.  Uses the global MeterProvider which
+	// is a no-op if telemetry.Setup has not been called, so this never fails in
+	// tests or when metrics are intentionally disabled.
+	meter := telemetry.Meter("observer/processor")
+	metrics, reg, err := initConsumerMetrics(meter, func() int64 {
+		c.deferMu.Lock()
+		total := 0
+		for _, evts := range c.deferQueue {
+			total += len(evts)
+		}
+		c.deferMu.Unlock()
+		return int64(total)
+	})
+	if err != nil {
+		logger.Warn("consumer metrics init failed – metrics disabled for this consumer", "error", err)
+	} else {
+		c.metrics = metrics
+		c.metricsReg = reg
+	}
+
 	return c, nil
 }
 
@@ -287,13 +312,25 @@ func (c *NATSConsumer) Start(ctx context.Context, cfg NATSConsumerConfig) error 
 				continue
 			}
 
+			batchCount := int64(0)
 			for msg := range msgs.Messages() {
+				batchCount++
+				msgStart := time.Now()
 				event, err := c.processMessage(ctx, msg)
+				elapsed := time.Since(msgStart).Seconds()
+
+				if c.metrics != nil {
+					c.metrics.processingDuration.Record(ctx, elapsed, eventAttr(string(event.Type)))
+				}
+
 				if err != nil {
 					runID := extractRunID(event.Data)
 					c.incrementIntegrity(runID, func(ri *runIntegrity) {
 						ri.Failed++
 					})
+					if c.metrics != nil {
+						c.metrics.eventsFailed.Add(ctx, 1, eventAttr(string(event.Type)))
+					}
 					c.logger.Error("process message failed",
 						"subject", msg.Subject(),
 						"type", event.Type,
@@ -312,6 +349,9 @@ func (c *NATSConsumer) Start(ctx context.Context, cfg NATSConsumerConfig) error 
 						c.incrementIntegrity(runID, func(ri *runIntegrity) {
 							ri.DLQ++
 						})
+						if c.metrics != nil {
+							c.metrics.eventsDLQ.Add(ctx, 1, eventAttr(string(event.Type)))
+						}
 						if ackErr := msg.Ack(); ackErr != nil {
 							c.logger.Error("failed to ack message after DLQ", "error", ackErr)
 						}
@@ -326,10 +366,17 @@ func (c *NATSConsumer) Start(ctx context.Context, cfg NATSConsumerConfig) error 
 					c.incrementIntegrity(runID, func(ri *runIntegrity) {
 						ri.Processed++
 					})
+					if c.metrics != nil {
+						c.metrics.eventsProcessed.Add(ctx, 1, eventAttr(string(event.Type)))
+					}
 					if ackErr := msg.Ack(); ackErr != nil {
 						c.logger.Error("failed to ack message", "error", ackErr)
 					}
 				}
+			}
+
+			if c.metrics != nil && batchCount > 0 {
+				c.metrics.batchSize.Record(ctx, batchCount)
 			}
 		}
 	}
@@ -441,6 +488,10 @@ func (c *NATSConsumer) deferStepEvent(event publisher.Event, cause error) error 
 	c.incrementIntegrity(runID, func(ri *runIntegrity) {
 		ri.PendingDeferred++
 	})
+
+	if c.metrics != nil {
+		c.metrics.eventsDeferred.Add(context.Background(), 1, eventAttr(string(event.Type)))
+	}
 
 	c.logger.Warn("deferred orphan step event",
 		"type", event.Type,
@@ -757,6 +808,11 @@ func statusToString(status common.TestStatus) string {
 
 // Close closes the NATS connection
 func (c *NATSConsumer) Close() error {
+	if c.metricsReg != nil {
+		if err := c.metricsReg.Unregister(); err != nil {
+			c.logger.Warn("failed to unregister metrics callback", "error", err)
+		}
+	}
 	if c.storageDriver != nil {
 		if err := c.storageDriver.Close(); err != nil {
 			c.logger.Warn("failed to close storage driver", "error", err)

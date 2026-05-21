@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/stanterprise/observer/internal/telemetry"
 	"github.com/stanterprise/observer/pkg/healthhttp"
 	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/stanterprise/observer/pkg/server"
@@ -18,12 +19,38 @@ import (
 
 func main() {
 	var (
-		port       = flag.String("port", envOr("PORT", "50051"), "TCP port to listen on")
-		healthPort = flag.String("health-port", envOr("HEALTH_PORT", "8081"), "HTTP health check port")
+		port        = flag.String("port", envOr("PORT", "50051"), "TCP port to listen on")
+		healthPort  = flag.String("health-port", envOr("HEALTH_PORT", "8081"), "HTTP health check port")
+		metricsPort = flag.String("metrics-port", envOr("METRICS_PORT", "9090"), "HTTP metrics port")
 	)
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	// Initialise OTel telemetry (Prometheus exporter).
+	shutdownTelemetry, err := telemetry.Setup(context.Background(), "observer-ingestion", logger)
+	if err != nil {
+		logger.Warn("telemetry setup failed – metrics disabled", "error", err)
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := shutdownTelemetry(ctx); err != nil {
+				logger.Warn("telemetry shutdown error", "error", err)
+			}
+		}()
+	}
+
+	// Start metrics HTTP server (Prometheus scrape endpoint).
+	stopMetrics := telemetry.StartMetricsServer(*metricsPort, logger)
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := stopMetrics(ctx); err != nil {
+			logger.Warn("metrics server shutdown error", "error", err)
+		}
+	}()
+
 	addr := ":" + *port
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {

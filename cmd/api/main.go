@@ -15,16 +15,43 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stanterprise/observer/internal/database"
 	"github.com/stanterprise/observer/internal/repository/postgres"
+	"github.com/stanterprise/observer/internal/telemetry"
 	"github.com/stanterprise/observer/pkg/api"
 	"github.com/stanterprise/observer/pkg/storage"
 	"github.com/stanterprise/observer/pkg/websocket"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
 	port := flag.String("port", envOr("PORT", "8080"), "HTTP port to listen on")
+	metricsPort := flag.String("metrics-port", envOr("METRICS_PORT", "9090"), "HTTP metrics port")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	// Initialise OTel telemetry (Prometheus exporter).
+	shutdownTelemetry, err := telemetry.Setup(context.Background(), "observer-api", logger)
+	if err != nil {
+		logger.Warn("telemetry setup failed – metrics disabled", "error", err)
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := shutdownTelemetry(ctx); err != nil {
+				logger.Warn("telemetry shutdown error", "error", err)
+			}
+		}()
+	}
+
+	// Start metrics HTTP server (Prometheus scrape endpoint).
+	stopMetrics := telemetry.StartMetricsServer(*metricsPort, logger)
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := stopMetrics(ctx); err != nil {
+			logger.Warn("metrics server shutdown error", "error", err)
+		}
+	}()
 
 	// Connect to PostgreSQL (required for the REST API).
 	pgDB, err := database.ConnectPostgresFromEnv(logger)
@@ -135,8 +162,9 @@ func main() {
 
 	addr := ":" + *port
 
-	// Wrap with CORS middleware for local development
-	handler := corsMiddleware(router, logger)
+	// Wrap with OTel HTTP middleware (outermost layer for accurate coverage),
+	// then CORS.
+	handler := otelhttp.NewHandler(corsMiddleware(router, logger), "observer-api")
 
 	srv := &http.Server{
 		Addr:    addr,

@@ -27,6 +27,10 @@ func (c *NATSConsumer) handleRunStart(ctx context.Context, data json.RawMessage)
 
 	c.markRunStart(req.RunId, req.TotalTests)
 
+	if c.metrics != nil {
+		c.metrics.runsStarted.Add(ctx, 1)
+	}
+
 	if c.pgRepo.IsConfigured() {
 		if err := c.pgRepo.HandleRunStart(ctx, &req); err != nil {
 			return fmt.Errorf("handle run start: %w", err)
@@ -47,6 +51,10 @@ func (c *NATSConsumer) handleRunEnd(ctx context.Context, data json.RawMessage) e
 	}
 
 	c.logger.Info("run end", "run_id", req.RunId, "execution_id", req.ExecutionId, "status", req.FinalStatus)
+
+	if c.metrics != nil {
+		c.metrics.runsCompleted.Add(ctx, 1, statusAttr(req.FinalStatus.String()))
+	}
 
 	if c.pgRepo.IsConfigured() {
 		if err := c.pgRepo.HandleRunEnd(ctx, &req); err != nil {

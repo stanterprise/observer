@@ -10,6 +10,7 @@ import (
 	"github.com/stanterprise/observer/pkg/publisher"
 	events "github.com/stanterprise/proto-go/testsystem/v1/events"
 	observer "github.com/stanterprise/proto-go/testsystem/v1/observer"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health"
@@ -335,12 +336,15 @@ func (s *EventServer) ReportRunStart(ctx context.Context, in *events.ReportRunSt
 	return &observer.AckResponse{Success: true, Message: "Map test run received"}, nil
 }
 
-// NewGRPCServer creates a gRPC server with panic recovery and logging interceptors.
+// NewGRPCServer creates a gRPC server with panic recovery, logging, and OTel
+// instrumentation via a stats handler.
 func NewGRPCServer(logger *slog.Logger) *grpc.Server {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}
 	return grpc.NewServer(
+		// OTel stats handler for automatic gRPC metrics and traces.
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.ChainUnaryInterceptor(
 			recoveryInterceptor(logger),
 			loggingInterceptor(logger),

@@ -15,6 +15,7 @@ import (
 	"github.com/stanterprise/observer/internal/database"
 	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/internal/repository/postgres"
+	"github.com/stanterprise/observer/internal/telemetry"
 	"github.com/stanterprise/observer/pkg/consumer"
 )
 
@@ -31,10 +32,35 @@ func main() {
 		deferMaxAttempts = flag.Int("defer-max-attempts", envOrInt("DEFER_QUEUE_MAX_ATTEMPTS", 5), "Maximum replay attempts for deferred orphan step events")
 		deferTTL         = flag.Duration("defer-ttl", envOrDuration("DEFER_QUEUE_TTL", 5*time.Minute), "TTL for deferred orphan step events")
 		retainMessages   = flag.Bool("retain-messages", envOr("RETAIN_MESSAGES", "") == "true", "Deprecated no-op retained for compatibility; raw MongoDB message retention has been removed")
+		metricsPort      = flag.String("metrics-port", envOr("METRICS_PORT", "9090"), "HTTP metrics port")
 	)
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	// Initialise OTel telemetry (Prometheus exporter).
+	shutdownTelemetry, err := telemetry.Setup(context.Background(), "observer-processor", logger)
+	if err != nil {
+		logger.Warn("telemetry setup failed – metrics disabled", "error", err)
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := shutdownTelemetry(ctx); err != nil {
+				logger.Warn("telemetry shutdown error", "error", err)
+			}
+		}()
+	}
+
+	// Start metrics HTTP server (Prometheus scrape endpoint).
+	stopMetrics := telemetry.StartMetricsServer(*metricsPort, logger)
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := stopMetrics(ctx); err != nil {
+			logger.Warn("metrics server shutdown error", "error", err)
+		}
+	}()
 
 	// Connect to MongoDB for bufferized step management only.
 	mongoDB, err := database.ConnectMongoDBFromEnv(logger)
