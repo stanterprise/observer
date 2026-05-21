@@ -357,6 +357,40 @@ ingress:
       connectionDraining:
         drainingTimeoutSec: 60
 
+# Metrics / Observability
+# Each service exposes a Prometheus /metrics endpoint on a dedicated port.
+# Enable serviceMonitor when the Prometheus Operator CRD is installed in the cluster.
+metrics:
+  enabled: true
+  port: 9090
+
+  serviceMonitor:
+    # Set to true when Prometheus Operator is present (kube-prometheus-stack, etc.)
+    enabled: false
+    # Scrape interval
+    interval: "30s"
+    # Namespace to deploy the ServiceMonitor in (defaults to the release namespace)
+    namespace: ""
+    # Extra labels added to the ServiceMonitor – must match your Prometheus
+    # Operator labelSelector, e.g. { release: kube-prometheus-stack }
+    additionalLabels: {}
+
+  # Optional OTLP gRPC forwarding (e.g. to an OpenTelemetry Collector sidecar)
+  otlp:
+    enabled: false
+    endpoint: ""   # e.g. "otel-collector:4317"
+
+  # Grafana dashboard ConfigMap (loaded automatically by Grafana sidecar when enabled)
+  grafana:
+    dashboardConfigMap:
+      enabled: false
+      # Label that Grafana's sidecar watches for dashboard ConfigMaps.
+      # Matches the default used by the grafana/grafana Helm chart.
+      label: grafana_dashboard
+      labelValue: "1"
+      # Namespace to deploy the ConfigMap in (defaults to release namespace)
+      namespace: ""
+
 # Service Account
 serviceAccount:
   create: true

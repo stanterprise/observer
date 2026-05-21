@@ -17,6 +17,12 @@ spec:
       labels:
         {{- include "observer.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: aio
+      {{- if and .Values.metrics.enabled (not .Values.metrics.serviceMonitor.enabled) }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.metrics.port | quote }}
+        prometheus.io/path: "/metrics"
+      {{- end }}
     spec:
       serviceAccountName: {{ include "observer.serviceAccountName" . }}
       securityContext:
@@ -46,7 +52,16 @@ spec:
         - name: nats-monitor
           containerPort: 8222
           protocol: TCP
+        {{- if .Values.metrics.enabled }}
+        - name: metrics
+          containerPort: {{ .Values.metrics.port }}
+          protocol: TCP
+        {{- end }}
         env:
+        {{- if .Values.metrics.enabled }}
+        - name: METRICS_PORT
+          value: {{ .Values.metrics.port | quote }}
+        {{- end }}
         {{- range $key, $value := .Values.aio.env }}
         - name: {{ $key }}
           value: {{ $value | quote }}

@@ -19,6 +19,12 @@ spec:
       labels:
         {{- include "observer.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: processor
+      {{- if and .Values.metrics.enabled (not .Values.metrics.serviceMonitor.enabled) }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.metrics.port | quote }}
+        prometheus.io/path: "/metrics"
+      {{- end }}
     spec:
       serviceAccountName: {{ include "observer.serviceAccountName" . }}
       securityContext:
@@ -29,6 +35,12 @@ spec:
           {{- toYaml .Values.securityContext | nindent 10 }}
         image: {{ include "observer.image" (dict "component" "processor" "Values" .Values "Chart" .Chart) }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.metrics.enabled }}
+        ports:
+        - name: metrics
+          containerPort: {{ .Values.metrics.port }}
+          protocol: TCP
+        {{- end }}
         env:
         - name: NATS_URL
           value: {{ include "observer.nats.url" . }}
@@ -36,6 +48,10 @@ spec:
           value: {{ include "observer.postgres.dsn" . | quote }}
         - name: MONGODB_URI
           value: {{ include "observer.database.url" . }}
+        {{- if .Values.metrics.enabled }}
+        - name: METRICS_PORT
+          value: {{ .Values.metrics.port | quote }}
+        {{- end }}
         {{- range $key, $value := .Values.distributed.processor.env }}
         - name: {{ $key }}
           value: {{ $value | quote }}
