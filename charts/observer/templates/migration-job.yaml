@@ -7,7 +7,7 @@ metadata:
     {{- include "observer.labels" . | nindent 4 }}
     app.kubernetes.io/component: migration
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook: {{ ternary "post-install,post-upgrade" "pre-install,pre-upgrade" .Values.postgresql.enabled | quote }}
     helm.sh/hook-weight: "-5"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
@@ -19,7 +19,6 @@ spec:
         {{- include "observer.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: migration
     spec:
-      serviceAccountName: {{ include "observer.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -36,36 +35,20 @@ spec:
         - -c
         - |
           set -e
-          
-          # Install PostgreSQL client tools
-          echo "Installing PostgreSQL client tools..."
-          apk add --no-cache postgresql-client
-          
-          # Parse DSN to extract components
-          DB_HOST="{{ include "observer.postgres.host" . }}"
-          DB_PORT="{{ include "observer.postgres.port" . }}"
-          DB_USER="{{ include "observer.postgres.user" . }}"
-          DB_NAME="{{ include "observer.postgres.db" . }}"
-          
-          echo "Waiting for PostgreSQL to be ready at $DB_HOST:$DB_PORT..."
-          
-          # Wait for PostgreSQL to be ready
+
+          echo "Running migrations with retry while PostgreSQL becomes reachable..."
+
           attempt=0
-          until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
+          until /usr/local/bin/migrate -action=up; do
             attempt=$((attempt + 1))
             if [ "$attempt" -ge 60 ]; then
-              echo "PostgreSQL did not become ready within 60 seconds" >&2
+              echo "Migration failed after 60 attempts" >&2
               exit 1
             fi
-            echo "Waiting... ($attempt/60)"
-            sleep 1
+            echo "Migration attempt $attempt failed; retrying in 2s..."
+            sleep 2
           done
-          
-          echo "PostgreSQL is ready. Running migrations..."
-          
-          # Run migrations
-          /usr/local/bin/migrate -action=up
-          
+
           echo "Migrations completed successfully"
         resources:
           limits:

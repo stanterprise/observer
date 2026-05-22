@@ -23,6 +23,19 @@ spec:
       serviceAccountName: {{ include "observer.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+      - name: wait-for-nats
+        image: docker.io/busybox:1.36
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          until nc -z {{ include "observer.fullname" . }}-nats 4222; do
+            echo "Waiting for NATS..."
+            sleep 2
+          done
       containers:
       - name: ingestion
         securityContext:
