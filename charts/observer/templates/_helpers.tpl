@@ -132,6 +132,34 @@ NATS connection URL
 {{- end }}
 
 {{/*
+PostgreSQL Host
+*/}}
+{{- define "observer.postgres.host" -}}
+{{- .Values.postgres.host | default "postgres" -}}
+{{- end }}
+
+{{/*
+PostgreSQL Port
+*/}}
+{{- define "observer.postgres.port" -}}
+{{- .Values.postgres.port | default 5432 -}}
+{{- end }}
+
+{{/*
+PostgreSQL User
+*/}}
+{{- define "observer.postgres.user" -}}
+{{- .Values.postgres.username | default "observer" -}}
+{{- end }}
+
+{{/*
+PostgreSQL Database
+*/}}
+{{- define "observer.postgres.db" -}}
+{{- .Values.postgres.database | default "observer" -}}
+{{- end }}
+
+{{/*
 PostgreSQL DSN
 */}}
 {{- define "observer.postgres.dsn" -}}

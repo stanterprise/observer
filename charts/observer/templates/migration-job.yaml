@@ -1,0 +1,78 @@
+{{- if and (eq .Values.mode "distributed") .Values.distributed.enabled .Values.postgres.migration.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "observer.fullname" . }}-migrate
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.postgres.migration.backoffLimit | default 3 }}
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "observer.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      serviceAccountName: {{ include "observer.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: migrate
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: {{ include "observer.image" (dict "component" "api" "Values" .Values "Chart" .Chart) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: POSTGRES_DSN
+          value: {{ include "observer.postgres.dsn" . | quote }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          # Install PostgreSQL client tools
+          echo "Installing PostgreSQL client tools..."
+          apk add --no-cache postgresql-client
+          
+          # Parse DSN to extract components
+          DB_HOST="{{ include "observer.postgres.host" . }}"
+          DB_PORT="{{ include "observer.postgres.port" . }}"
+          DB_USER="{{ include "observer.postgres.user" . }}"
+          DB_NAME="{{ include "observer.postgres.db" . }}"
+          
+          echo "Waiting for PostgreSQL to be ready at $DB_HOST:$DB_PORT..."
+          
+          # Wait for PostgreSQL to be ready
+          attempt=0
+          until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
+            attempt=$((attempt + 1))
+            if [ "$attempt" -ge 60 ]; then
+              echo "PostgreSQL did not become ready within 60 seconds" >&2
+              exit 1
+            fi
+            echo "Waiting... ($attempt/60)"
+            sleep 1
+          done
+          
+          echo "PostgreSQL is ready. Running migrations..."
+          
+          # Run migrations
+          /usr/local/bin/migrate -action=up
+          
+          echo "Migrations completed successfully"
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+      restartPolicy: Never
+{{- end }}
