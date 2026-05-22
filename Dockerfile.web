@@ -28,11 +28,12 @@ FROM nginx:alpine
 # Copy built application from builder
 COPY --from=builder /build/dist /usr/share/nginx/html
 
-# Copy Nginx configuration template
-COPY docker/nginx/nginx.conf.template /etc/nginx/templates/default.conf.template
+# Copy Nginx server block template for distributed web mode.
+# This file is rendered into /etc/nginx/conf.d/default.conf by nginx entrypoint.
+COPY docker/nginx/nginx.web.conf.template /etc/nginx/templates/default.conf.template
 
 # Environment variables for backend configuration
-# These will be substituted in the nginx.conf.template by envsubst
+# These will be substituted in the web nginx template by envsubst
 ENV API_BACKEND_HOST=localhost \
     API_BACKEND_PORT=8080
 

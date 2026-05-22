@@ -146,8 +146,8 @@ RUN chmod +x /usr/local/bin/ingestion /usr/local/bin/processor /usr/local/bin/ap
 # Copy Web UI from web builder stage
 COPY --from=web-builder /build/dist /var/www/html
 
-# Copy and configure Nginx for AIO mode (API backend on localhost:8080)
-COPY docker/nginx/nginx.conf.template /etc/nginx/nginx.conf.template
+# Copy and configure full Nginx config for AIO mode (API backend on localhost:8080)
+COPY docker/nginx/nginx.aio.conf.template /etc/nginx/nginx.conf.template
 RUN sed 's/\${API_BACKEND_HOST}/localhost/g; s/\${API_BACKEND_PORT}/8080/g' \
     /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && \
     sed -i 's|/usr/share/nginx/html|/var/www/html|g' /etc/nginx/nginx.conf && \

@@ -30,7 +30,7 @@ services:
     volumes:
       - aio-data:/data
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -242,7 +242,7 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -267,7 +267,7 @@ services:
       api-mongo:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/health"]
       interval: 10s
       timeout: 5s
       retries: 5
