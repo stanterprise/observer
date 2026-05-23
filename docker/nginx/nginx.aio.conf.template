@@ -1,6 +1,3 @@
-# Deprecated compatibility template.
-# Use nginx.aio.conf.template for AIO and nginx.web.conf.template for distributed web.
-
 # Run as root (required when container runs as root with volume mounts)
 user root;
 

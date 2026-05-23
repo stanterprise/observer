@@ -26,7 +26,7 @@ go.work.sum
 
 # Build artifacts
 bin/
-observer
+/observer
 coverage.out
 
 # Test database files

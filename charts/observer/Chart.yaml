@@ -16,6 +16,10 @@ maintainers:
   - name: Stanterprise Team
     url: https://github.com/stanterprise
 dependencies:
+  - name: postgresql
+    version: "~16.7.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
   - name: mongodb
     version: "~16.3.0"
     repository: https://charts.bitnami.com/bitnami

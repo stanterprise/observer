@@ -23,6 +23,32 @@ spec:
       serviceAccountName: {{ include "observer.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.postgres.migration.enabled }}
+      initContainers:
+      - name: migrate
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: {{ include "observer.image" (dict "component" "api" "Values" .Values "Chart" .Chart) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: POSTGRES_DSN
+          value: {{ include "observer.postgres.dsn" . | quote }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          attempt=0
+          until /usr/local/bin/migrate -action=up; do
+            attempt=$((attempt + 1))
+            if [ "$attempt" -ge 90 ]; then
+              echo "Migration failed after 90 attempts" >&2
+              exit 1
+            fi
+            echo "Migration attempt $attempt failed; retrying in 2s..."
+            sleep 2
+          done
+      {{- end }}
       containers:
       - name: api
         securityContext:

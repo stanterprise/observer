@@ -174,11 +174,17 @@ distributed:
       maxReplicas: 2
       targetCPUUtilizationPercentage: 80
 
+    securityContext:
+      readOnlyRootFilesystem: false
+      runAsNonRoot: false
+      runAsUser: 0
+
     env:
       API_BACKEND_HOST: observer-api
       API_BACKEND_PORT: "8080"
 
 postgres:
+  # Used when postgresql.enabled=false (external PostgreSQL)
   host: ""
   port: 5432
   username: observer
@@ -189,9 +195,36 @@ postgres:
     enabled: true
     backoffLimit: 3
 
+# Embedded PostgreSQL dependency (default)
+postgresql:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+  auth:
+    username: observer
+    password: password
+    database: observer
+    postgresPassword: password
+  architecture: standalone
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
 # MongoDB configuration
 mongodb:
   enabled: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/mongodb
   # Use external MongoDB by setting enabled: false and configuring externalDatabase
   auth:
     enabled: true
@@ -291,8 +324,7 @@ ingress:
   web:
     enabled: false
     className: "nginx"
-    annotations:
-      {}
+    annotations: {}
       # cert-manager.io/cluster-issuer: "letsencrypt-prod"
       # nginx.ingress.kubernetes.io/ssl-redirect: "true"
     hosts:
@@ -300,8 +332,7 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
-    tls:
-      []
+    tls: []
       # - secretName: observer-web-tls
       #   hosts:
       #     - observer.example.com
@@ -310,8 +341,7 @@ ingress:
   api:
     enabled: false
     className: "nginx"
-    annotations:
-      {}
+    annotations: {}
       # cert-manager.io/cluster-issuer: "letsencrypt-prod"
       # nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
       # nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
@@ -321,8 +351,7 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
-    tls:
-      []
+    tls: []
       # - secretName: observer-api-tls
       #   hosts:
       #     - api.observer.example.com
@@ -339,8 +368,7 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
-    tls:
-      []
+    tls: []
       # - secretName: observer-grpc-tls
       #   hosts:
       #     - grpc.observer.example.com
