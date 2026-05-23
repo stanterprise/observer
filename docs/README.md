@@ -48,6 +48,7 @@ This folder contains the maintained documentation set for Observer.
 ## Helm release readiness
 
 - Chart hardening checklist: [HELM_CHART_HARDENING_CHECKLIST.md](HELM_CHART_HARDENING_CHECKLIST.md)
+- Detailed remediation plan: [HELM_CHART_REMEDIATION_PLAN.md](HELM_CHART_REMEDIATION_PLAN.md)
 - Publish-readiness rubric: [HELM_CHART_PUBLISH_READINESS_RUBRIC.md](HELM_CHART_PUBLISH_READINESS_RUBRIC.md)
 
 ## Historical documents
