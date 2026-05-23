@@ -36,7 +36,7 @@ helm install observer ./charts/observer --set mode=aio --set aio.enabled=true --
 Once published, you can install directly from the registry:
 
 ```bash
-helm install observer oci://ghcr.io/stanterprise/charts/observer --version 0.1.0
+helm install observer oci://ghcr.io/stanterprise/observer/charts/observer --version 0.1.0
 ```
 
 ## Configuration
@@ -63,8 +63,8 @@ The chart supports two deployment modes:
 | `mode`             | Deployment mode: `aio` or `distributed` | `distributed`           |
 | `image.registry`   | Docker registry for images              | `ghcr.io`               |
 | `image.repository` | Repository path for images              | `stanterprise/observer` |
-| `image.tag`        | Image tag (overrides appVersion)        | `""`                    |
-| `image.pullPolicy` | Image pull policy                       | `IfNotPresent`          |
+| `image.tag`        | Image tag (overrides appVersion)        | `latest`                |
+| `image.pullPolicy` | Image pull policy                       | `Always`                |
 
 #### AIO Mode Parameters
 
@@ -82,10 +82,10 @@ The chart supports two deployment modes:
 | Parameter                            | Description             | Default |
 | ------------------------------------ | ----------------------- | ------- |
 | `distributed.enabled`                | Enable distributed mode | `true`  |
-| `distributed.ingestion.replicaCount` | Ingestion replicas      | `2`     |
-| `distributed.processor.replicaCount` | Processor replicas      | `2`     |
-| `distributed.api.replicaCount`       | API replicas            | `2`     |
-| `distributed.web.replicaCount`       | Web UI replicas         | `2`     |
+| `distributed.ingestion.replicaCount` | Ingestion replicas      | `1`     |
+| `distributed.processor.replicaCount` | Processor replicas      | `1`     |
+| `distributed.api.replicaCount`       | API replicas            | `1`     |
+| `distributed.web.replicaCount`       | Web UI replicas         | `1`     |
 
 #### Database Parameters
 
