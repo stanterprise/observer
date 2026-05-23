@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 # Deployment mode: "aio" or "distributed"
-mode: aio
+mode: distributed
 
 # Global image configuration
 image:
@@ -19,7 +19,7 @@ fullnameOverride: ""
 
 # AIO (All-in-One) mode configuration
 aio:
-  enabled: true
+  enabled: false
   replicaCount: 1
 
   resources:
@@ -68,7 +68,7 @@ aio:
 
 # Distributed mode configuration
 distributed:
-  enabled: false
+  enabled: true
 
   # Ingestion service configuration
   ingestion:
