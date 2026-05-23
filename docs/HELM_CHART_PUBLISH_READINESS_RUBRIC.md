@@ -31,12 +31,12 @@ If the chart cannot provide those guarantees, the downstream repository should t
 
 **What the infra repo should expect:** default install, recommended presets, and documented optional modes all render and install successfully.
 
-| Score | Criteria |
-| ----- | -------- |
-| `0` | Default or documented install paths fail to render, collide, or require manual chart edits. |
-| `1` | One install path works, but other advertised presets or modes are broken or ambiguous. |
-| `2` | Core install paths work, but some optional surfaces still rely on repo-specific knowledge or wrappers. |
-| `3` | Every supported install path is render-tested, install-tested, and documented with clear prerequisites. |
+| Score | Criteria                                                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------- |
+| `0`   | Default or documented install paths fail to render, collide, or require manual chart edits.             |
+| `1`   | One install path works, but other advertised presets or modes are broken or ambiguous.                  |
+| `2`   | Core install paths work, but some optional surfaces still rely on repo-specific knowledge or wrappers.  |
+| `3`   | Every supported install path is render-tested, install-tested, and documented with clear prerequisites. |
 
 **Evidence:** `helm lint`, render matrix, install smoke tests, supported mode documentation.
 
@@ -44,12 +44,12 @@ If the chart cannot provide those guarantees, the downstream repository should t
 
 **What the infra repo should expect:** values files, schema, and docs describe the same public API.
 
-| Score | Criteria |
-| ----- | -------- |
-| `0` | Values contract is inconsistent, nil-prone, or contradicted by examples and docs. |
-| `1` | Core values work, but optional trees or example files drift from the real contract. |
-| `2` | Core values are stable, but some optional features lack schema validation or failure guards. |
-| `3` | Values are schema-backed, examples stay in sync, and unsupported combinations fail early with actionable errors. |
+| Score | Criteria                                                                                                         |
+| ----- | ---------------------------------------------------------------------------------------------------------------- |
+| `0`   | Values contract is inconsistent, nil-prone, or contradicted by examples and docs.                                |
+| `1`   | Core values work, but optional trees or example files drift from the real contract.                              |
+| `2`   | Core values are stable, but some optional features lack schema validation or failure guards.                     |
+| `3`   | Values are schema-backed, examples stay in sync, and unsupported combinations fail early with actionable errors. |
 
 **Evidence:** `values.yaml`, `values.schema.json`, example values renders, doc review.
 
@@ -57,12 +57,12 @@ If the chart cannot provide those guarantees, the downstream repository should t
 
 **What the infra repo should expect:** if the chart claims support for external PostgreSQL, MongoDB, NATS, or other services, those paths work without hidden coupling to embedded dependencies.
 
-| Score | Criteria |
-| ----- | -------- |
-| `0` | Claimed external modes are broken or still reference embedded services. |
-| `1` | External modes can work, but only after local template patches or undocumented overrides. |
-| `2` | External modes work for core dependencies, but some combinations or examples remain weakly tested. |
-| `3` | Every advertised external dependency path is CI-covered, documented, and free of embedded-service assumptions. |
+| Score | Criteria                                                                                                       |
+| ----- | -------------------------------------------------------------------------------------------------------------- |
+| `0`   | Claimed external modes are broken or still reference embedded services.                                        |
+| `1`   | External modes can work, but only after local template patches or undocumented overrides.                      |
+| `2`   | External modes work for core dependencies, but some combinations or examples remain weakly tested.             |
+| `3`   | Every advertised external dependency path is CI-covered, documented, and free of embedded-service assumptions. |
 
 **Evidence:** render matrix for external modes, install tests, explicit docs for each dependency path.
 
@@ -70,12 +70,12 @@ If the chart cannot provide those guarantees, the downstream repository should t
 
 **What the infra repo should expect:** secrets are handled safely enough that the downstream repo does not need to patch templates just to avoid leaking credentials.
 
-| Score | Criteria |
-| ----- | -------- |
-| `0` | Passwords are hardcoded in public defaults or rendered directly into manifests without an acceptable secret path. |
-| `1` | Some secret references exist, but major paths still rely on raw values or incomplete secret wiring. |
-| `2` | Secret-backed paths exist for core services, but optional features or examples still expose unsafe patterns. |
-| `3` | Public defaults avoid reusable passwords, secret references are first-class, and restricted-cluster security defaults are documented. |
+| Score | Criteria                                                                                                                              |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`   | Passwords are hardcoded in public defaults or rendered directly into manifests without an acceptable secret path.                     |
+| `1`   | Some secret references exist, but major paths still rely on raw values or incomplete secret wiring.                                   |
+| `2`   | Secret-backed paths exist for core services, but optional features or examples still expose unsafe patterns.                          |
+| `3`   | Public defaults avoid reusable passwords, secret references are first-class, and restricted-cluster security defaults are documented. |
 
 **Evidence:** workload templates, values contract, example manifests, security review.
 
@@ -83,12 +83,12 @@ If the chart cannot provide those guarantees, the downstream repository should t
 
 **What the infra repo should expect:** ingress, Gateway API, TLS, and gRPC exposure options are explicit, coherent, and controller-aware.
 
-| Score | Criteria |
-| ----- | -------- |
-| `0` | Networking surfaces conflict, duplicate resources, or rely on hidden cloud-controller assumptions. |
-| `1` | One environment works, but support boundaries are not clearly defined. |
-| `2` | Recommended networking paths are usable, while non-primary paths are clearly marked as limited or experimental. |
-| `3` | Each supported exposure model is validated, controller-specific behavior is gated, and public endpoint guidance is consistent. |
+| Score | Criteria                                                                                                                       |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `0`   | Networking surfaces conflict, duplicate resources, or rely on hidden cloud-controller assumptions.                             |
+| `1`   | One environment works, but support boundaries are not clearly defined.                                                         |
+| `2`   | Recommended networking paths are usable, while non-primary paths are clearly marked as limited or experimental.                |
+| `3`   | Each supported exposure model is validated, controller-specific behavior is gated, and public endpoint guidance is consistent. |
 
 **Evidence:** ingress or gateway render tests, TLS examples, controller-specific docs.
 
@@ -96,12 +96,12 @@ If the chart cannot provide those guarantees, the downstream repository should t
 
 **What the infra repo should expect:** upgrades, schema changes, and rollbacks have a documented and deterministic path.
 
-| Score | Criteria |
-| ----- | -------- |
-| `0` | Migration behavior is duplicated, unsafe, or undocumented. |
-| `1` | Upgrade path exists, but operators still need internal knowledge to avoid outages. |
-| `2` | Upgrade and migration behavior is usable for maintained environments, with some remaining operational caveats. |
-| `3` | Upgrade, rollback, and migration strategy are documented, tested, and release-noted. |
+| Score | Criteria                                                                                                       |
+| ----- | -------------------------------------------------------------------------------------------------------------- |
+| `0`   | Migration behavior is duplicated, unsafe, or undocumented.                                                     |
+| `1`   | Upgrade path exists, but operators still need internal knowledge to avoid outages.                             |
+| `2`   | Upgrade and migration behavior is usable for maintained environments, with some remaining operational caveats. |
+| `3`   | Upgrade, rollback, and migration strategy are documented, tested, and release-noted.                           |
 
 **Evidence:** migration hooks or jobs, release notes, upgrade docs, install-to-upgrade test results.
 
@@ -109,12 +109,12 @@ If the chart cannot provide those guarantees, the downstream repository should t
 
 **What the infra repo should expect:** the chart is supportable after install without forking basic health or scaling behavior.
 
-| Score | Criteria |
-| ----- | -------- |
-| `0` | Probes, init behavior, or notes are misleading enough to break normal operations. |
-| `1` | Core runtime works, but day-2 operations still depend on team knowledge. |
-| `2` | Health, scaling, and access patterns are mostly usable, with limited rough edges. |
-| `3` | Probes, autoscaling, service exposure, and post-install instructions reflect actual operator workflows. |
+| Score | Criteria                                                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------- |
+| `0`   | Probes, init behavior, or notes are misleading enough to break normal operations.                       |
+| `1`   | Core runtime works, but day-2 operations still depend on team knowledge.                                |
+| `2`   | Health, scaling, and access patterns are mostly usable, with limited rough edges.                       |
+| `3`   | Probes, autoscaling, service exposure, and post-install instructions reflect actual operator workflows. |
 
 **Evidence:** template review, smoke tests, operational runbooks, `NOTES.txt` validation.
 
@@ -122,12 +122,12 @@ If the chart cannot provide those guarantees, the downstream repository should t
 
 **What the infra repo should expect:** the upstream chart behaves like a product, not an internal folder.
 
-| Score | Criteria |
-| ----- | -------- |
-| `0` | README and release artifacts materially misrepresent the chart. |
-| `1` | Docs exist, but defaults, examples, and support boundaries drift from reality. |
-| `2` | Docs are serviceable for internal consumers, but still require maintainers to explain caveats out of band. |
-| `3` | README, deployment docs, architecture docs, release notes, and published artifacts are current and mutually consistent. |
+| Score | Criteria                                                                                                                |
+| ----- | ----------------------------------------------------------------------------------------------------------------------- |
+| `0`   | README and release artifacts materially misrepresent the chart.                                                         |
+| `1`   | Docs exist, but defaults, examples, and support boundaries drift from reality.                                          |
+| `2`   | Docs are serviceable for internal consumers, but still require maintainers to explain caveats out of band.              |
+| `3`   | README, deployment docs, architecture docs, release notes, and published artifacts are current and mutually consistent. |
 
 **Evidence:** README review, docs index, CHANGELOG, OCI package metadata, release notes.
 
