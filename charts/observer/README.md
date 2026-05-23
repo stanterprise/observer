@@ -19,7 +19,7 @@ cd charts/observer
 helm dependency update
 ```
 
-### Install with Default Configuration (Distributed Mode)
+### Install with Default Configuration (AIO Mode)
 
 ```bash
 helm install observer ./charts/observer
@@ -36,7 +36,7 @@ helm install observer ./charts/observer --set mode=aio --set aio.enabled=true --
 Once published, you can install directly from the registry:
 
 ```bash
-helm install observer oci://ghcr.io/stanterprise/charts/observer --version 0.1.0
+helm install observer oci://ghcr.io/stanterprise/observer/charts/observer --version 0.1.0
 ```
 
 ## Configuration
@@ -60,17 +60,17 @@ The chart supports two deployment modes:
 
 | Parameter          | Description                             | Default                 |
 | ------------------ | --------------------------------------- | ----------------------- |
-| `mode`             | Deployment mode: `aio` or `distributed` | `distributed`           |
+| `mode`             | Deployment mode: `aio` or `distributed` | `aio`                   |
 | `image.registry`   | Docker registry for images              | `ghcr.io`               |
 | `image.repository` | Repository path for images              | `stanterprise/observer` |
-| `image.tag`        | Image tag (overrides appVersion)        | `""`                    |
-| `image.pullPolicy` | Image pull policy                       | `IfNotPresent`          |
+| `image.tag`        | Image tag (overrides appVersion)        | `latest`                |
+| `image.pullPolicy` | Image pull policy                       | `Always`                |
 
 #### AIO Mode Parameters
 
 | Parameter                       | Description               | Default |
 | ------------------------------- | ------------------------- | ------- |
-| `aio.enabled`                   | Enable AIO mode           | `false` |
+| `aio.enabled`                   | Enable AIO mode           | `true`  |
 | `aio.replicaCount`              | Number of replicas        | `1`     |
 | `aio.persistence.enabled`       | Enable persistent storage | `true`  |
 | `aio.persistence.size`          | Storage size              | `10Gi`  |
@@ -81,11 +81,11 @@ The chart supports two deployment modes:
 
 | Parameter                            | Description             | Default |
 | ------------------------------------ | ----------------------- | ------- |
-| `distributed.enabled`                | Enable distributed mode | `true`  |
-| `distributed.ingestion.replicaCount` | Ingestion replicas      | `2`     |
-| `distributed.processor.replicaCount` | Processor replicas      | `2`     |
-| `distributed.api.replicaCount`       | API replicas            | `2`     |
-| `distributed.web.replicaCount`       | Web UI replicas         | `2`     |
+| `distributed.enabled`                | Enable distributed mode | `false` |
+| `distributed.ingestion.replicaCount` | Ingestion replicas      | `1`     |
+| `distributed.processor.replicaCount` | Processor replicas      | `1`     |
+| `distributed.api.replicaCount`       | API replicas            | `1`     |
+| `distributed.web.replicaCount`       | Web UI replicas         | `1`     |
 
 #### Database Parameters
 
