@@ -45,6 +45,11 @@ This folder contains the maintained documentation set for Observer.
 - GitHub Actions workflows: [GITHUB_ACTIONS_BUILDS.md](GITHUB_ACTIONS_BUILDS.md)
 - Quick reference commands: [../BUILD_QUICK_REF.md](../BUILD_QUICK_REF.md)
 
+## Helm release readiness
+
+- Chart hardening checklist: [HELM_CHART_HARDENING_CHECKLIST.md](HELM_CHART_HARDENING_CHECKLIST.md)
+- Publish-readiness rubric: [HELM_CHART_PUBLISH_READINESS_RUBRIC.md](HELM_CHART_PUBLISH_READINESS_RUBRIC.md)
+
 ## Historical documents
 
 Some older “status report” / “implementation summary” documents were generated during earlier Copilot-assisted work and are kept for archaeology only.
