@@ -2,13 +2,15 @@
 
 **Purpose:** Define the minimum hardening work required before the Observer chart is treated as a public distribution artifact.
 **Audience:** Maintainers of `charts/observer/` and downstream infrastructure repositories that consume the chart.
-**Last Reviewed:** 2026-05-22
+**Last Reviewed:** 2026-05-23
 
 Use this checklist before:
 
 - publishing a new OCI chart version
 - recommending the chart for third-party cluster installs
 - promoting a new networking, dependency, or security surface as supported
+
+Checked items below are verified against the current repository state. Partially implemented work remains unchecked until the full acceptance condition is met.
 
 ## Current Baseline
 
@@ -23,9 +25,9 @@ The May 2026 review found several blockers that should be treated as release-gat
 ## 1. Packaging And Release Hygiene
 
 - [ ] HC001 Every file under `charts/observer/templates/` has a single, intentional purpose with no duplicate resources or legacy aliases.
-- [ ] HC002 `helm lint charts/observer` passes without warnings that would confuse external consumers.
+- [x] HC002 `helm lint charts/observer` passes without warnings that would confuse external consumers.
 - [ ] HC003 `helm template` succeeds for the default chart, `values-aio.yaml`, `values-production.yaml`, and every advertised external dependency mode.
-- [ ] HC004 `Chart.yaml`, `Chart.lock`, and dependency versions are aligned and intentionally updated together.
+- [x] HC004 `Chart.yaml`, `Chart.lock`, and dependency versions are aligned and intentionally updated together.
 - [ ] HC005 Chart metadata includes accurate version, appVersion, maintainers, sources, and an icon.
 - [ ] HC006 The published artifact path is stable and documented, including OCI registry location and versioning policy.
 
