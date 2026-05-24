@@ -14,19 +14,16 @@ Checked items below are verified against the current repository state. Partially
 
 ## Current Baseline
 
-The May 2026 review found several blockers that should be treated as release-gating defects until resolved:
+The remaining release-gating defects are:
 
-- Duplicate GKE templates render the same `FrontendConfig` and `ManagedCertificate` names.
-- Distributed mode advertises external NATS support, but ingestion still waits for the in-cluster NATS service.
-- Database and broker credentials are injected as plain env values instead of secret references.
-- Gateway API support does not share a stable values contract with `values.yaml` and can fail to render.
+- Secret-backed runtime wiring exists, but public defaults, generated secrets, and legacy `existingSecret` fields are not fully hardened yet.
 - Chart documentation does not match the actual default install mode or image defaults.
 
 ## 1. Packaging And Release Hygiene
 
-- [ ] HC001 Every file under `charts/observer/templates/` has a single, intentional purpose with no duplicate resources or legacy aliases.
+- [x] HC001 Every file under `charts/observer/templates/` has a single, intentional purpose with no duplicate resources or legacy aliases.
 - [x] HC002 `helm lint charts/observer` passes without warnings that would confuse external consumers.
-- [ ] HC003 `helm template` succeeds for the default chart, `values-aio.yaml`, `values-production.yaml`, and every advertised external dependency mode.
+- [x] HC003 `helm template` succeeds for the default chart, `values-aio.yaml`, `values-production.yaml`, and every advertised external dependency mode.
 - [x] HC004 `Chart.yaml`, `Chart.lock`, and dependency versions are aligned and intentionally updated together.
 - [ ] HC005 Chart metadata includes accurate version, appVersion, maintainers, sources, and an icon.
 - [ ] HC006 The published artifact path is stable and documented, including OCI registry location and versioning policy.
@@ -34,25 +31,25 @@ The May 2026 review found several blockers that should be treated as release-gat
 ## 2. Values Contract And Defaults
 
 - [ ] HC010 `values.yaml` defines a complete contract for every supported feature tree, including optional Gateway and cloud-specific settings.
-- [ ] HC011 Example values files do not introduce keys that are missing from `values.yaml`.
+- [x] HC011 Example values files do not introduce keys that are missing from `values.yaml`.
 - [ ] HC012 Default install behavior in `values.yaml`, `charts/observer/README.md`, `DEPLOYMENT.md`, and `docs/architecture/06-helm.md` matches exactly.
 - [ ] HC013 Mutable defaults such as `latest` tags or `Always` pull policies are not used for public chart defaults unless the chart explicitly documents that policy.
 - [ ] HC014 Unsupported combinations fail early with template validation, `required`, `fail`, or schema validation instead of silently rendering broken manifests.
-- [ ] HC015 A `values.schema.json` file validates required fields, enums, and structural assumptions for supported modes.
+- [x] HC015 A `values.schema.json` file validates required fields, enums, and structural assumptions for supported modes.
 
 ## 3. External Dependency Contract
 
-- [ ] HC020 Every advertised external service mode works without hidden references to embedded services.
-- [ ] HC021 When `nats.enabled=false`, no workload or init container references the in-cluster NATS service name.
-- [ ] HC022 When `postgresql.enabled=false`, the chart requires a non-empty PostgreSQL host or documented secret-based equivalent.
-- [ ] HC023 When `mongodb.enabled=false`, the chart requires a non-empty MongoDB host or documented secret-based equivalent.
+- [x] HC020 Every advertised external service mode works without hidden references to embedded services.
+- [x] HC021 When `nats.enabled=false`, no workload or init container references the in-cluster NATS service name.
+- [x] HC022 When `postgresql.enabled=false`, the chart requires a non-empty PostgreSQL host or documented secret-based equivalent.
+- [x] HC023 When `mongodb.enabled=false`, the chart requires a non-empty MongoDB host or documented secret-based equivalent.
 - [ ] HC024 External dependency examples are rendered in CI and documented as first-class supported paths, not best-effort examples.
 - [ ] HC025 The chart clearly distinguishes between embedded dependencies, external dependencies, and unsupported hybrid combinations.
 
 ## 4. Secrets And Credential Handling
 
 - [ ] HC030 Public defaults do not ship with reusable passwords such as `password` for PostgreSQL, MongoDB, or app users.
-- [ ] HC031 Workload manifests use Kubernetes Secret references for credentials instead of raw `value:` entries where feasible.
+- [x] HC031 Workload manifests use Kubernetes Secret references for credentials instead of raw `value:` entries where feasible.
 - [ ] HC032 Every `existingSecret` or `existingSecret*Key` value in `values.yaml` is wired into templates and documented.
 - [ ] HC033 Connection strings do not expose credentials in rendered manifests when a secret-backed alternative exists.
 - [ ] HC034 README examples do not encourage operators to place live credentials directly into committed values files.
@@ -70,8 +67,8 @@ The May 2026 review found several blockers that should be treated as release-gat
 ## 6. Reliability And Day-2 Operations
 
 - [ ] HC050 Readiness, liveness, and startup behavior reflect the real health surface of each service.
-- [ ] HC051 Init containers only wait for dependencies that are actually enabled in the selected configuration.
-- [ ] HC052 Database migration behavior is single-path and deterministic; the chart does not run competing migration strategies in multiple workloads.
+- [x] HC051 Init containers only wait for dependencies that are actually enabled in the selected configuration.
+- [x] HC052 Database migration behavior is single-path and deterministic; the chart does not run competing migration strategies in multiple workloads.
 - [ ] HC053 Install, upgrade, and rollback behavior is documented for stateful dependencies and schema changes.
 - [ ] HC054 HPA behavior, replica defaults, and disruption tolerance are documented for distributed mode.
 - [ ] HC055 `NOTES.txt` reflects the real access paths and does not assume services or ports that the selected mode does not expose.
@@ -86,8 +83,8 @@ The May 2026 review found several blockers that should be treated as release-gat
 
 ## 8. Documentation And Supportability
 
-- [ ] HC070 `charts/observer/README.md` explains the current supported defaults, known limitations, and recommended install paths.
-- [ ] HC071 `DEPLOYMENT.md` and `docs/architecture/06-helm.md` are updated whenever install defaults or support surfaces change.
+- [x] HC070 `charts/observer/README.md` explains the current supported defaults, known limitations, and recommended install paths.
+- [x] HC071 `DEPLOYMENT.md` and `docs/architecture/06-helm.md` are updated whenever install defaults or support surfaces change.
 - [ ] HC072 Every values file shipped in the repo is still supported, still tested, and still documented.
 - [ ] HC073 Breaking changes and deprecations are called out in `CHANGELOG.md` or release notes.
 - [ ] HC074 Public examples prefer safe patterns such as secret references, immutable image tags, and explicit ingress configuration.

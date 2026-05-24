@@ -106,6 +106,17 @@ Get the full image name for a component
 {{- end }}
 
 {{/*
+Runtime Secret name for distributed dependency connection settings
+*/}}
+{{- define "observer.runtimeSecretName" -}}
+{{- if .Values.runtime.existingSecret -}}
+{{- .Values.runtime.existingSecret -}}
+{{- else -}}
+{{- printf "%s-runtime-env" (include "observer.fullname" .) -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Database connection string (MongoDB URI)
 */}}
 {{- define "observer.database.url" -}}
@@ -115,8 +126,9 @@ Database connection string (MongoDB URI)
 {{- $database := index .Values.mongodb.auth.databases 0 | default "observer" }}
 {{- printf "mongodb://%s:%s@%s-mongodb:27017/%s?authSource=%s" $user $password (include "observer.fullname" .) $database $database }}
 {{- else }}
+{{- $host := required "externalDatabase.host is required when mongodb.enabled=false" .Values.externalDatabase.host }}
 {{- $authSource := .Values.externalDatabase.authSource | default "admin" }}
-{{- printf "mongodb://%s:%s@%s:%d/%s?authSource=%s" .Values.externalDatabase.username .Values.externalDatabase.password .Values.externalDatabase.host (int .Values.externalDatabase.port) .Values.externalDatabase.database $authSource }}
+{{- printf "mongodb://%s:%s@%s:%d/%s?authSource=%s" .Values.externalDatabase.username .Values.externalDatabase.password $host (int .Values.externalDatabase.port) .Values.externalDatabase.database $authSource }}
 {{- end }}
 {{- end }}
 
@@ -127,7 +139,7 @@ NATS connection URL
 {{- if .Values.nats.enabled }}
 {{- printf "nats://%s-nats:4222" (include "observer.fullname" .) }}
 {{- else }}
-{{- .Values.externalNats.url }}
+{{- required "externalNats.url is required when nats.enabled=false" .Values.externalNats.url }}
 {{- end }}
 {{- end }}
 
@@ -138,7 +150,7 @@ PostgreSQL Host
 {{- if .Values.postgresql.enabled -}}
 {{- printf "%s-postgresql" (include "observer.fullname" .) -}}
 {{- else -}}
-{{- .Values.postgres.host | default "postgres" -}}
+{{- required "postgres.host is required when postgresql.enabled=false" .Values.postgres.host -}}
 {{- end -}}
 {{- end }}
 

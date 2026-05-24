@@ -21,6 +21,9 @@ aio:
 distributed:
   enabled: false
 
+postgresql:
+  enabled: false
+
 # Disable external dependencies in AIO mode
 mongodb:
   enabled: false
@@ -45,7 +48,7 @@ ingress:
 # Gateway API configuration
 gateway:
   enabled: true
-  gatewayClassName: gke-l7-global-external-managed
+  className: gke-l7-global-external-managed
 
   # Annotations for Google Cloud integration
   annotations:

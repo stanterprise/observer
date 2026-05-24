@@ -14,6 +14,7 @@ image:
   tag: latest
 
 imagePullSecrets: []
+podAnnotations: {}
 nameOverride: ""
 fullnameOverride: ""
 
@@ -286,18 +287,36 @@ externalNats:
   # Use existing secret for credentials
   existingSecret: ""
 
+# Distributed runtime connection secret
+runtime:
+  # Reuse an existing Secret containing NATS_URL, POSTGRES_DSN, and MONGODB_URI.
+  # When empty, the chart renders a generated Secret for distributed workloads.
+  existingSecret: ""
+
 # Gateway API configuration (alternative to Ingress)
 # GKE Gateway API for advanced L7 load balancing
 gateway:
   enabled: false
   className: gke-l7-global-external-managed
   annotations: {}
+  addresses: []
   # TLS configuration for Gateway
   tls:
     enabled: false
+    certificateName: observer-gateway-cert
+    gcpCertificateName: ""
     # Certificate reference - should match ManagedCertificate name
     certificateRefs: []
     # - name: observer-gateway-cert
+  web:
+    enabled: false
+    hostname: observer.example.com
+  api:
+    enabled: false
+    hostname: api.observer.example.com
+  grpc:
+    enabled: false
+    hostname: grpc.observer.example.com
 
 # Ingress configuration
 # Each ingress can be independently enabled and configured
@@ -376,9 +395,11 @@ ingress:
     # Set enabled: true when using className: "gce" for proper HTTP/2 support
     backendConfig:
       enabled: false
+      protocol: HTTP2
       healthCheck:
         checkIntervalSec: 10
         timeoutSec: 5
+        port: 8081
         type: HTTP2
         requestPath: /grpc.health.v1.HealthService/Check
       timeoutSec: 30

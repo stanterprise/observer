@@ -16,39 +16,21 @@ spec:
       app.kubernetes.io/component: api
   template:
     metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
         {{- include "observer.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: api
     spec:
       serviceAccountName: {{ include "observer.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- if .Values.postgres.migration.enabled }}
-      initContainers:
-      - name: migrate
-        securityContext:
-          {{- toYaml .Values.securityContext | nindent 10 }}
-        image: {{ include "observer.image" (dict "component" "api" "Values" .Values "Chart" .Chart) }}
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
-        env:
-        - name: POSTGRES_DSN
-          value: {{ include "observer.postgres.dsn" . | quote }}
-        command:
-        - /bin/sh
-        - -c
-        - |
-          set -e
-          attempt=0
-          until /usr/local/bin/migrate -action=up; do
-            attempt=$((attempt + 1))
-            if [ "$attempt" -ge 90 ]; then
-              echo "Migration failed after 90 attempts" >&2
-              exit 1
-            fi
-            echo "Migration attempt $attempt failed; retrying in 2s..."
-            sleep 2
-          done
-      {{- end }}
       containers:
       - name: api
         securityContext:
@@ -61,11 +43,20 @@ spec:
           protocol: TCP
         env:
         - name: NATS_URL
-          value: {{ include "observer.nats.url" . }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.runtimeSecretName" . }}
+              key: NATS_URL
         - name: POSTGRES_DSN
-          value: {{ include "observer.postgres.dsn" . | quote }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.runtimeSecretName" . }}
+              key: POSTGRES_DSN
         - name: MONGODB_URI
-          value: {{ include "observer.database.url" . }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.runtimeSecretName" . }}
+              key: MONGODB_URI
         {{- range $key, $value := .Values.distributed.api.env }}
         - name: {{ $key }}
           value: {{ $value | quote }}

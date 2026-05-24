@@ -55,109 +55,80 @@ docker pull ghcr.io/stanterprise/observer/web:latest
 
 #### AIO Mode
 
-```bash
-docker run -d \
-  --name observer \
-  -p 3000:80 \
-  -p 50051:50051 \
-  -p 8080:8080 \
-  -p 5432:5432 \
-  -v observer-data:/data \
-  ghcr.io/stanterprise/observer/aio:latest
-```
-
-Access:
-
-- Web UI: http://localhost:3000
-- gRPC: localhost:50051
-- API: http://localhost:8080
-- PostgreSQL: localhost:5432
-
-#### Distributed Mode with Docker Compose
-
-See [docker-compose.yml](docker-compose.yml) for the full configuration.
-
-```bash
-# Clone the repository for docker-compose.yml
-git clone https://github.com/stanterprise/observer.git
-cd observer
-
-# Update docker-compose.yml to use published images
-# Change image: observer:ingestion to ghcr.io/stanterprise/observer/ingestion:latest
-
-# Start distributed mode
-docker compose --profile dist up -d
-```
-
 ## Helm Chart Installation
+
+### Contract Summary
+
+The current Helm chart contract is:
+
+- Distributed mode is the default and primary install path.
+- AIO is a development and evaluation path.
+- The shipped AIO presets disable the PostgreSQL, MongoDB, and NATS subcharts.
+- Distributed installs run PostgreSQL migrations through the dedicated Helm hook job controlled by `postgres.migration.enabled`.
+- External PostgreSQL, MongoDB, and NATS require `postgres.host`, `externalDatabase.host`, and `externalNats.url` when their embedded dependencies are disabled.
+- Gateway API is only wired for AIO mode today.
+- Credentials are still passed through chart values and workload env vars today, so use non-committed overrides for sensitive values.
 
 ### Prerequisites
 
 - Kubernetes 1.23+
 - Helm 3.8+
 - kubectl configured to access your cluster
-- (Optional) Ingress controller (nginx, traefik, etc.)
-- (Optional) cert-manager for TLS certificates
+- Persistent storage for AIO state or embedded distributed dependencies
+- Optional ingress controller or GKE Gateway API support depending on the networking path you choose
 
 ### Quick Start
 
-#### Method 1: Install from OCI Registry (Recommended)
+#### Method 1: Install from OCI Registry
+
+Use this for published releases.
 
 ```bash
-# Install with default distributed mode
+# Default distributed install
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer --version 0.1.0
 
-# Install in AIO mode
+# AIO install
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
   --version 0.1.0 \
   --set mode=aio \
   --set aio.enabled=true \
-  --set distributed.enabled=false
+  --set distributed.enabled=false \
+  --set postgresql.enabled=false \
+  --set mongodb.enabled=false \
+  --set nats.enabled=false
 ```
 
 #### Method 2: Install from GitHub Pages
 
+If the release you are consuming has been published to the Helm repository:
+
 ```bash
-# Add the Helm repository
 helm repo add observer https://stanterprise.github.io/observer/
 helm repo update
 
-# Install the chart
-helm install observer observer/observer
-
-# Install in AIO mode with values file
-helm install observer observer/observer --set mode=aio --set aio.enabled=true --set distributed.enabled=false
+helm install observer observer/observer --version 0.1.0
 ```
 
 #### Method 3: Install from Source
 
+Use this when working from the repository or the shipped preset files.
+
 ```bash
-# Clone the repository
 git clone https://github.com/stanterprise/observer.git
 cd observer
 
-# Update Helm dependencies
 cd charts/observer
 helm dependency update
 cd ../..
 
-# Install the chart
 helm install observer ./charts/observer
-
-# Or with custom values
-helm install observer ./charts/observer -f ./charts/observer/values-production.yaml
 ```
 
 ### Verify Installation
 
 ```bash
-# Check deployment status
 helm status observer
-
-# Watch pods starting
 kubectl get pods -w
-
-# Check all resources
 kubectl get all -l app.kubernetes.io/instance=observer
 ```
 
@@ -165,175 +136,135 @@ kubectl get all -l app.kubernetes.io/instance=observer
 
 ### AIO (All-in-One) Mode
 
-Best for: Development, testing, proof-of-concept, small-scale deployments
+Best for development, evaluation, and small-scale demos.
 
-**Features:**
+Characteristics:
 
-- Single pod deployment
-- Embedded MongoDB database
-- Embedded PostgreSQL database
-- Embedded NATS server
-- All services in one container
-- Lower resource requirements
-- Simple configuration
+- Single Observer workload
+- No PostgreSQL, MongoDB, or NATS subcharts when using the shipped AIO presets
+- Simplified networking and persistence options
 
-**Installation:**
+Install from source with the preset:
 
 ```bash
-helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
-  --version 0.1.0 \
-  --set mode=aio \
-  --set aio.enabled=true \
-  --set distributed.enabled=false \
-  --set mongodb.enabled=false \
-  --set nats.enabled=false
+helm install observer ./charts/observer -f ./charts/observer/values-aio.yaml
 ```
 
-**Access:**
+For the GKE Gateway API preset:
 
 ```bash
-# Port forward to access services
+helm install observer ./charts/observer -f ./charts/observer/values-aio-gateway.yaml
+```
+
+Access example:
+
+```bash
 kubectl port-forward svc/observer-aio 3000:80
 kubectl port-forward svc/observer-aio 50051:50051
-
-# Web UI: http://localhost:3000
-# gRPC: localhost:50051
 ```
 
 ### Distributed Mode
 
-Best for: Production, CI/CD, high-scale deployments, high availability
+Best for the primary multi-workload deployment path.
 
-**Features:**
+Characteristics:
 
-- Separate pods for each service
-- Horizontal scaling with HPA
-- External or embedded MongoDB
-- External or embedded NATS with JetStream
-- Independent service scaling
-- Production-ready architecture
+- Separate ingestion, processor, API, and web workloads
+- Embedded or external PostgreSQL, MongoDB, and NATS
+- Dedicated migration hook job for schema changes
+- Separate ingress surfaces for web, API, and gRPC
 
-**Installation:**
+Default install:
 
 ```bash
-# With embedded MongoDB and NATS
-helm install observer oci://ghcr.io/stanterprise/observer/charts/observer --version 0.1.0
+helm install observer ./charts/observer
+```
 
-# With external MongoDB
-helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
-  --version 0.1.0 \
+All-external dependency example:
+
+```bash
+helm install observer ./charts/observer \
+  --set postgresql.enabled=false \
+  --set postgres.host=postgres.example.com \
+  --set postgres.username=observer \
+  --set postgres.password=securepassword \
+  --set postgres.database=observer \
   --set mongodb.enabled=false \
   --set externalDatabase.host=mongodb.example.com \
   --set externalDatabase.username=observer \
   --set externalDatabase.password=securepassword \
-  --set externalDatabase.database=observer
+  --set externalDatabase.database=observer \
+  --set nats.enabled=false \
+  --set externalNats.url=nats://nats.example.com:4222
 ```
 
-**Services:**
+Services:
 
-- `observer-ingestion`: gRPC endpoint (port 50051)
-- `observer-processor`: Event processor (no external port)
-- `observer-api`: REST/GraphQL API + WebSocket (port 8080)
-- `observer-web`: Web UI (port 80)
+- `observer-ingestion`: gRPC endpoint on port 50051
+- `observer-processor`: background processor
+- `observer-api`: REST API and WebSocket endpoint on port 8080
+- `observer-web`: web UI on port 80
 
 ## Configuration
 
-### Resource Requirements
+### External Dependencies
 
-#### Minimum (Development)
+Use these keys when disabling embedded distributed dependencies:
 
-```yaml
-distributed:
-  ingestion:
-    resources:
-      requests: { cpu: 100m, memory: 128Mi }
-      limits: { cpu: 500m, memory: 256Mi }
-  processor:
-    resources:
-      requests: { cpu: 200m, memory: 256Mi }
-      limits: { cpu: 1000m, memory: 512Mi }
-  api:
-    resources:
-      requests: { cpu: 100m, memory: 128Mi }
-      limits: { cpu: 500m, memory: 256Mi }
-```
+| Embedded Dependency | Disable Key                | Required External Key   |
+| ------------------- | -------------------------- | ----------------------- |
+| PostgreSQL          | `postgresql.enabled=false` | `postgres.host`         |
+| MongoDB             | `mongodb.enabled=false`    | `externalDatabase.host` |
+| NATS                | `nats.enabled=false`       | `externalNats.url`      |
 
-#### Recommended (Production)
+### Images
 
-See [charts/observer/values-production.yaml](charts/observer/values-production.yaml) for full configuration.
+The current default image behavior is mutable:
+
+- `image.tag=latest`
+- `image.pullPolicy=Always`
+
+Override both values if you want immutable release pinning.
 
 ### Persistence
 
-#### AIO Mode
+For AIO:
 
 ```yaml
 aio:
   persistence:
     enabled: true
     size: 10Gi
-    storageClass: "standard" # or your preferred storage class
 ```
 
-#### Distributed Mode
-
-```yaml
-mongodb:
-  persistence:
-    enabled: true
-    size: 50Gi
-    storageClass: "fast-ssd"
-
-nats:
-  config:
-    jetstream:
-      enabled: true
-      fileStore:
-        pvc:
-          size: 50Gi
-          storageClass: "fast-ssd"
-```
+For embedded distributed dependencies, see [charts/observer/values-production.yaml](charts/observer/values-production.yaml) for larger example sizes.
 
 ### Scaling
 
-#### Manual Scaling
+Distributed workloads support both manual replica counts and HPA settings through `distributed.*.replicaCount` and `distributed.*.autoscaling.*`.
 
-```yaml
-distributed:
-  ingestion:
-    replicaCount: 5
-  processor:
-    replicaCount: 3
-  api:
-    replicaCount: 3
-```
+### Networking
 
-#### Auto-scaling (HPA)
+The chart does not use a single `ingress.enabled` flag. Configure ingress per surface:
 
-```yaml
-distributed:
-  ingestion:
-    autoscaling:
-      enabled: true
-      minReplicas: 3
-      maxReplicas: 10
-      targetCPUUtilizationPercentage: 70
-      targetMemoryUtilizationPercentage: 80
-```
+- `ingress.web.*`
+- `ingress.api.*`
+- `ingress.grpc.*`
 
-### Ingress Configuration
+Gateway API resources are rendered only when `gateway.enabled=true` and `mode=aio`.
 
-#### Basic Ingress
+### Migration Behavior
 
-```yaml
-ingress:
-  enabled: true
-  className: nginx
-  hosts:
-    - host: observer.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-          service: web
+Distributed installs and upgrades use the dedicated migration Helm hook job in `charts/observer/templates/migration-job.yaml` when `postgres.migration.enabled=true`.
+
+## Helm Validation
+
+```bash
+helm lint ./charts/observer
+helm template observer ./charts/observer
+helm template observer ./charts/observer -f ./charts/observer/values-aio.yaml
+helm template observer ./charts/observer -f ./charts/observer/values-production.yaml
+helm template observer ./charts/observer -f ./charts/observer/values-aio-gateway.yaml
 ```
 
 #### Ingress with TLS
@@ -496,19 +427,27 @@ ingress:
 EOF
 ```
 
-### Using External Database
+### Using External Services
 
 ```bash
 helm install observer oci://ghcr.io/stanterprise/observer/charts/observer \
   --version 0.1.0 \
   --namespace observer \
+  --set postgresql.enabled=false \
+  --set postgres.host=postgres.example.com \
+  --set postgres.port=5432 \
+  --set postgres.username=observer \
+  --set postgres.password=securepassword \
+  --set postgres.database=observer \
   --set mongodb.enabled=false \
   --set externalDatabase.host=mongodb.example.com \
   --set externalDatabase.port=27017 \
   --set externalDatabase.username=observer \
   --set externalDatabase.password=securepassword \
   --set externalDatabase.database=observer \
-  --set externalDatabase.authSource=admin
+  --set externalDatabase.authSource=admin \
+  --set nats.enabled=false \
+  --set externalNats.url=nats://nats.example.com:4222
 ```
 
 ### Monitoring and Observability

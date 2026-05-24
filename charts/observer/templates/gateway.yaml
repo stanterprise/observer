@@ -11,7 +11,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  gatewayClassName: {{ .Values.gateway.gatewayClassName }}
+  gatewayClassName: {{ coalesce .Values.gateway.className .Values.gateway.gatewayClassName | quote }}
   listeners:
   {{- if .Values.gateway.web.enabled }}
   - name: http-web

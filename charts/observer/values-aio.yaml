@@ -25,6 +25,9 @@ aio:
 distributed:
   enabled: false
 
+postgresql:
+  enabled: false
+
 # Disable external dependencies in AIO mode (MongoDB and NATS are embedded)
 mongodb:
   enabled: false
@@ -58,8 +61,7 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
-    tls:
-      []
+    tls: []
       # - secretName: observer-web-tls
       #   hosts:
       #     - observer.example.com
@@ -81,8 +83,7 @@ ingress:
         paths:
           - path: /
             pathType: Prefix
-    tls:
-      []
+    tls: []
       # - secretName: observer-api-tls
       #   hosts:
       #     - api.observer.example.com

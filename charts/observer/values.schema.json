@@ -1,0 +1,495 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["aio", "distributed"]
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "registry": { "type": "string" },
+        "repository": { "type": "string" },
+        "pullPolicy": { "type": "string" },
+        "tag": { "type": "string" }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "podAnnotations": {
+      "type": "object"
+    },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "aio": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+            },
+            "webPort": { "type": "integer", "minimum": 1 },
+            "grpcPort": { "type": "integer", "minimum": 1 },
+            "apiPort": { "type": "integer", "minimum": 1 },
+            "natsPort": { "type": "integer", "minimum": 1 },
+            "natsMonitoringPort": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "persistence": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "storageClass": { "type": "string" },
+            "accessMode": { "type": "string" },
+            "size": { "type": "string", "minLength": 1 }
+          }
+        },
+        "grpcLoadBalancer": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "port": { "type": "integer", "minimum": 1 },
+            "annotations": { "type": "object" }
+          }
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number", "boolean"] }
+        }
+      }
+    },
+    "distributed": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "ingestion": { "$ref": "#/definitions/distributedWorkloadWithService" },
+        "processor": { "$ref": "#/definitions/distributedWorkload" },
+        "api": { "$ref": "#/definitions/distributedWorkloadWithService" },
+        "web": {
+          "allOf": [
+            { "$ref": "#/definitions/distributedWorkloadWithService" },
+            {
+              "type": "object",
+              "properties": {
+                "securityContext": { "type": "object" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "postgres": {
+      "type": "object",
+      "properties": {
+        "host": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1 },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "database": { "type": "string" },
+        "sslmode": { "type": "string" },
+        "migration": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "backoffLimit": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "postgresql": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "mongodb": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "externalDatabase": {
+      "type": "object",
+      "properties": {
+        "host": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1 },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "database": { "type": "string" },
+        "authSource": { "type": "string" },
+        "existingSecret": { "type": "string" },
+        "existingSecretPasswordKey": { "type": "string" }
+      }
+    },
+    "nats": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "externalNats": {
+      "type": "object",
+      "properties": {
+        "url": { "type": "string" },
+        "existingSecret": { "type": "string" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "existingSecret": { "type": "string" }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "annotations": { "type": "object" },
+        "addresses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "minLength": 1 },
+              "value": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "certificateName": { "type": "string" },
+            "gcpCertificateName": { "type": "string" },
+            "certificateRefs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        "web": { "$ref": "#/definitions/gatewayRoute" },
+        "api": { "$ref": "#/definitions/gatewayRoute" },
+        "grpc": { "$ref": "#/definitions/gatewayRoute" }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "managedCertificate": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        },
+        "ssl": {
+          "type": "object",
+          "properties": {
+            "redirect": { "type": "boolean" },
+            "policy": {
+              "type": "string",
+              "enum": ["", "MODERN", "COMPATIBLE", "RESTRICTED"]
+            }
+          }
+        },
+        "web": { "$ref": "#/definitions/ingressRoute" },
+        "api": { "$ref": "#/definitions/ingressRoute" },
+        "grpc": {
+          "allOf": [
+            { "$ref": "#/definitions/ingressRoute" },
+            {
+              "type": "object",
+              "properties": {
+                "backendConfig": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "protocol": { "type": "string" },
+                    "healthCheck": {
+                      "type": "object",
+                      "properties": {
+                        "checkIntervalSec": { "type": "integer", "minimum": 1 },
+                        "timeoutSec": { "type": "integer", "minimum": 1 },
+                        "port": { "type": "integer", "minimum": 1 },
+                        "type": { "type": "string" },
+                        "requestPath": { "type": "string" }
+                      }
+                    },
+                    "timeoutSec": { "type": "integer", "minimum": 1 },
+                    "connectionDraining": {
+                      "type": "object",
+                      "properties": {
+                        "drainingTimeoutSec": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "annotations": { "type": "object" },
+        "name": { "type": "string" }
+      }
+    },
+    "podSecurityContext": {
+      "type": "object"
+    },
+    "securityContext": {
+      "type": "object"
+    },
+    "aioSecurityContext": {
+      "type": "object"
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "affinity": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": { "const": "aio" }
+        }
+      },
+      "then": {
+        "properties": {
+          "aio": {
+            "type": "object",
+            "properties": {
+              "enabled": { "const": true }
+            },
+            "required": ["enabled"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": { "const": "distributed" }
+        }
+      },
+      "then": {
+        "properties": {
+          "distributed": {
+            "type": "object",
+            "properties": {
+              "enabled": { "const": true }
+            },
+            "required": ["enabled"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": { "const": "distributed" },
+          "nats": {
+            "type": "object",
+            "properties": {
+              "enabled": { "const": false }
+            },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "externalNats": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string", "minLength": 1 }
+            },
+            "required": ["url"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": { "const": "distributed" },
+          "postgresql": {
+            "type": "object",
+            "properties": {
+              "enabled": { "const": false }
+            },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "postgres": {
+            "type": "object",
+            "properties": {
+              "host": { "type": "string", "minLength": 1 }
+            },
+            "required": ["host"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": { "const": "distributed" },
+          "mongodb": {
+            "type": "object",
+            "properties": {
+              "enabled": { "const": false }
+            },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "externalDatabase": {
+            "type": "object",
+            "properties": {
+              "host": { "type": "string", "minLength": 1 }
+            },
+            "required": ["host"]
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "distributedWorkload": {
+      "type": "object",
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "resources": { "type": "object" },
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "minReplicas": { "type": "integer", "minimum": 1 },
+            "maxReplicas": { "type": "integer", "minimum": 1 },
+            "targetCPUUtilizationPercentage": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "targetMemoryUtilizationPercentage": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number", "boolean"] }
+        }
+      }
+    },
+    "distributedWorkloadWithService": {
+      "allOf": [
+        { "$ref": "#/definitions/distributedWorkload" },
+        {
+          "type": "object",
+          "properties": {
+            "service": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+                },
+                "port": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "gatewayRoute": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "hostname": { "type": "string" }
+      }
+    },
+    "ingressRoute": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "annotations": { "type": "object" },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "host": { "type": "string", "minLength": 1 },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": { "type": "string", "minLength": 1 },
+                    "pathType": {
+                      "type": "string",
+                      "enum": ["Prefix", "Exact", "ImplementationSpecific"]
+                    }
+                  },
+                  "required": ["path", "pathType"]
+                }
+              }
+            },
+            "required": ["host", "paths"]
+          }
+        },
+        "tls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "secretName": { "type": "string", "minLength": 1 },
+              "hosts": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
