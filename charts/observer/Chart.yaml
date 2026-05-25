@@ -2,8 +2,8 @@ apiVersion: v2
 name: observer
 description: A Helm chart for Observer - Test Observability System
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.7.0-beta
+appVersion: "0.7.0-beta"
 icon: https://raw.githubusercontent.com/stanterprise/observer/master/web/public/favicon.ico
 keywords:
   - testing
