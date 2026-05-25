@@ -256,9 +256,6 @@ externalDatabase:
   password: ""
   database: observer
   authSource: admin
-  # Use existing secret for password
-  existingSecret: ""
-  existingSecretPasswordKey: password
 
 # NATS configuration
 nats:
@@ -284,13 +281,13 @@ nats:
 # External NATS configuration (when nats.enabled=false)
 externalNats:
   url: ""
-  # Use existing secret for credentials
-  existingSecret: ""
 
 # Distributed runtime connection secret
 runtime:
   # Reuse an existing Secret containing NATS_URL, POSTGRES_DSN, and MONGODB_URI.
   # When empty, the chart renders a generated Secret for distributed workloads.
+  # Legacy distributed.*.env connection overrides are folded into that generated
+  # Secret for upgrade compatibility instead of being rendered directly on pods.
   existingSecret: ""
 
 # Gateway API configuration (alternative to Ingress)

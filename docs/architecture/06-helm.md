@@ -8,6 +8,7 @@ The Observer Helm chart lives in `charts/observer/` and defaults to distributed 
 - AIO presets disable the PostgreSQL, MongoDB, and NATS subcharts and run the stack in one Observer container.
 - Distributed installs and upgrades run PostgreSQL migrations through the dedicated Helm hook job in `templates/migration-job.yaml` when `postgres.migration.enabled=true`.
 - External PostgreSQL, MongoDB, and NATS are configured through `postgres.*`, `externalDatabase.*`, and `externalNats.*`.
+- Distributed workloads read runtime connection settings from Secret references and can reuse a pre-created Secret through `runtime.existingSecret`.
 - Gateway API resources are only wired for AIO mode today.
 - The chart currently uses mutable image defaults: `image.tag=latest` and `image.pullPolicy=Always`.
 
@@ -119,6 +120,7 @@ helm install observer ./charts/observer -f charts/observer/values-aio-gateway.ya
 | `externalDatabase.host`              | External MongoDB host when `mongodb.enabled=false` in distributed mode       | `""`          |
 | `nats.enabled`                       | Deploy embedded NATS                                                         | `true`        |
 | `externalNats.url`                   | External NATS URL when `nats.enabled=false` in distributed mode              | `""`          |
+| `runtime.existingSecret`             | Existing Secret with `NATS_URL`, `POSTGRES_DSN`, and `MONGODB_URI`           | `""`          |
 | `postgres.migration.enabled`         | Enable the dedicated migration hook job in distributed mode                  | `true`        |
 
 ## Networking Contract
@@ -150,6 +152,13 @@ helm install observer ./charts/observer \
   --set nats.enabled=false \
   --set externalNats.url=nats://nats.example.com:4222
 ```
+
+## Secret Handling Contract
+
+- Distributed workloads read `NATS_URL`, `POSTGRES_DSN`, and `MONGODB_URI` from Secret references.
+- The chart renders a runtime Secret by default for distributed mode.
+- Operators can set `runtime.existingSecret` to reuse a pre-created Secret with those keys.
+- Embedded dependency credentials continue to follow the dependency-chart auth configuration.
 
 ## Upgrade And Migration Behavior
 

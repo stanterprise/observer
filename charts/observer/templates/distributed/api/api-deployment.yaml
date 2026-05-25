@@ -2,18 +2,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "observer.fullname" . }}-web
+  name: {{ include "observer.fullname" . }}-api
   labels:
     {{- include "observer.labels" . | nindent 4 }}
-    app.kubernetes.io/component: web
+    app.kubernetes.io/component: api
 spec:
-  {{- if not .Values.distributed.web.autoscaling.enabled }}
-  replicas: {{ .Values.distributed.web.replicaCount }}
+  {{- if not .Values.distributed.api.autoscaling.enabled }}
+  replicas: {{ .Values.distributed.api.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
       {{- include "observer.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: web
+      app.kubernetes.io/component: api
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -22,7 +22,7 @@ spec:
       {{- end }}
       labels:
         {{- include "observer.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: web
+        app.kubernetes.io/component: api
     spec:
       serviceAccountName: {{ include "observer.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
@@ -32,37 +32,46 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-      - name: web
-        {{- $webSecurityContext := .Values.distributed.web.securityContext | default .Values.securityContext }}
+      - name: api
         securityContext:
-          {{- toYaml $webSecurityContext | nindent 10 }}
-        image: {{ include "observer.image" (dict "component" "web" "Values" .Values "Chart" .Chart) }}
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: {{ include "observer.image" (dict "component" "api" "Values" .Values "Chart" .Chart) }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
         - name: http
-          containerPort: 80
+          containerPort: 8080
           protocol: TCP
         env:
-        - name: NGINX_ENVSUBST_TEMPLATE_DIR
-          value: /tmp/nonexistent
-        {{- range $key, $value := .Values.distributed.web.env }}
-        - name: {{ $key }}
-          value: {{ $value | quote }}
-        {{- end }}
+        - name: NATS_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.runtimeSecretName" . }}
+              key: NATS_URL
+        - name: POSTGRES_DSN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.runtimeSecretName" . }}
+              key: POSTGRES_DSN
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.runtimeSecretName" . }}
+              key: MONGODB_URI
+{{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.api.env "excluded" (list "NATS_URL" "POSTGRES_DSN" "MONGODB_URI")) | nindent 8 }}
         livenessProbe:
           httpGet:
-            path: /
+            path: /health
             port: http
           initialDelaySeconds: 10
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /
+            path: /health
             port: http
           initialDelaySeconds: 5
           periodSeconds: 5
         resources:
-          {{- toYaml .Values.distributed.web.resources | nindent 10 }}
+          {{- toYaml .Values.distributed.api.resources | nindent 10 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

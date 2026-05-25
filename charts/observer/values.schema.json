@@ -129,9 +129,7 @@
         "username": { "type": "string" },
         "password": { "type": "string" },
         "database": { "type": "string" },
-        "authSource": { "type": "string" },
-        "existingSecret": { "type": "string" },
-        "existingSecretPasswordKey": { "type": "string" }
+        "authSource": { "type": "string" }
       }
     },
     "nats": {
@@ -143,8 +141,7 @@
     "externalNats": {
       "type": "object",
       "properties": {
-        "url": { "type": "string" },
-        "existingSecret": { "type": "string" }
+        "url": { "type": "string" }
       }
     },
     "runtime": {

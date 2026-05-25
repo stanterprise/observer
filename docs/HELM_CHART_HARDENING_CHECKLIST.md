@@ -16,8 +16,7 @@ Checked items below are verified against the current repository state. Partially
 
 The remaining release-gating defects are:
 
-- Secret-backed runtime wiring exists, but public defaults, generated secrets, and legacy `existingSecret` fields are not fully hardened yet.
-- Chart documentation does not match the actual default install mode or image defaults.
+- Secret-backed runtime wiring exists, but public defaults, generated secrets, and secret setup examples are not fully hardened yet.
 
 ## 1. Packaging And Release Hygiene
 
@@ -32,7 +31,7 @@ The remaining release-gating defects are:
 
 - [ ] HC010 `values.yaml` defines a complete contract for every supported feature tree, including optional Gateway and cloud-specific settings.
 - [x] HC011 Example values files do not introduce keys that are missing from `values.yaml`.
-- [ ] HC012 Default install behavior in `values.yaml`, `charts/observer/README.md`, `DEPLOYMENT.md`, and `docs/architecture/06-helm.md` matches exactly.
+- [x] HC012 Default install behavior in `values.yaml`, `charts/observer/README.md`, `DEPLOYMENT.md`, and `docs/architecture/06-helm.md` matches exactly.
 - [ ] HC013 Mutable defaults such as `latest` tags or `Always` pull policies are not used for public chart defaults unless the chart explicitly documents that policy.
 - [ ] HC014 Unsupported combinations fail early with template validation, `required`, `fail`, or schema validation instead of silently rendering broken manifests.
 - [x] HC015 A `values.schema.json` file validates required fields, enums, and structural assumptions for supported modes.
@@ -43,17 +42,17 @@ The remaining release-gating defects are:
 - [x] HC021 When `nats.enabled=false`, no workload or init container references the in-cluster NATS service name.
 - [x] HC022 When `postgresql.enabled=false`, the chart requires a non-empty PostgreSQL host or documented secret-based equivalent.
 - [x] HC023 When `mongodb.enabled=false`, the chart requires a non-empty MongoDB host or documented secret-based equivalent.
-- [ ] HC024 External dependency examples are rendered in CI and documented as first-class supported paths, not best-effort examples.
+- [x] HC024 External dependency examples are rendered in CI and documented as first-class supported paths, not best-effort examples.
 - [ ] HC025 The chart clearly distinguishes between embedded dependencies, external dependencies, and unsupported hybrid combinations.
 
 ## 4. Secrets And Credential Handling
 
 - [ ] HC030 Public defaults do not ship with reusable passwords such as `password` for PostgreSQL, MongoDB, or app users.
 - [x] HC031 Workload manifests use Kubernetes Secret references for credentials instead of raw `value:` entries where feasible.
-- [ ] HC032 Every `existingSecret` or `existingSecret*Key` value in `values.yaml` is wired into templates and documented.
+- [x] HC032 Every `existingSecret` or `existingSecret*Key` value in `values.yaml` is wired into templates and documented.
 - [ ] HC033 Connection strings do not expose credentials in rendered manifests when a secret-backed alternative exists.
 - [ ] HC034 README examples do not encourage operators to place live credentials directly into committed values files.
-- [ ] HC035 Secret-handling behavior is documented for both embedded and external dependency modes.
+- [x] HC035 Secret-handling behavior is documented for both embedded and external dependency modes.
 
 ## 5. Security Posture
 
@@ -85,17 +84,17 @@ The remaining release-gating defects are:
 
 - [x] HC070 `charts/observer/README.md` explains the current supported defaults, known limitations, and recommended install paths.
 - [x] HC071 `DEPLOYMENT.md` and `docs/architecture/06-helm.md` are updated whenever install defaults or support surfaces change.
-- [ ] HC072 Every values file shipped in the repo is still supported, still tested, and still documented.
+- [x] HC072 Every values file shipped in the repo is still supported, still tested, and still documented.
 - [ ] HC073 Breaking changes and deprecations are called out in `CHANGELOG.md` or release notes.
 - [ ] HC074 Public examples prefer safe patterns such as secret references, immutable image tags, and explicit ingress configuration.
 
 ## 9. CI Gates For Public Publication
 
-- [ ] HC080 CI runs `helm lint` for the chart on every change that touches `charts/observer/**`.
-- [ ] HC081 CI renders a matrix that includes default, AIO, production, external NATS, external PostgreSQL, and any supported Gateway or managed-certificate paths.
-- [ ] HC082 Rendered manifests are validated with a Kubernetes schema tool such as `kubeconform` or `kubeval`.
+- [x] HC080 CI runs `helm lint` for the chart on every change that touches `charts/observer/**`.
+- [x] HC081 CI renders a matrix that includes default, AIO, production, external NATS, external PostgreSQL, and any supported Gateway or managed-certificate paths.
+- [x] HC082 Rendered manifests are validated with a Kubernetes schema tool such as `kubeconform` or `kubeval`.
 - [ ] HC083 At least one install smoke test runs against a real or ephemeral cluster for the recommended public install path.
-- [ ] HC084 The chart is packaged and published only after the validation matrix passes.
+- [x] HC084 The chart is packaged and published only after the validation matrix passes.
 
 ## Release Gate
 

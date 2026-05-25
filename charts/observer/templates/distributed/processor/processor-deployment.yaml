@@ -2,18 +2,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "observer.fullname" . }}-api
+  name: {{ include "observer.fullname" . }}-processor
   labels:
     {{- include "observer.labels" . | nindent 4 }}
-    app.kubernetes.io/component: api
+    app.kubernetes.io/component: processor
 spec:
-  {{- if not .Values.distributed.api.autoscaling.enabled }}
-  replicas: {{ .Values.distributed.api.replicaCount }}
+  {{- if not .Values.distributed.processor.autoscaling.enabled }}
+  replicas: {{ .Values.distributed.processor.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
       {{- include "observer.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: api
+      app.kubernetes.io/component: processor
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -22,7 +22,7 @@ spec:
       {{- end }}
       labels:
         {{- include "observer.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: api
+        app.kubernetes.io/component: processor
     spec:
       serviceAccountName: {{ include "observer.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
@@ -32,15 +32,11 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-      - name: api
+      - name: processor
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}
-        image: {{ include "observer.image" (dict "component" "api" "Values" .Values "Chart" .Chart) }}
+        image: {{ include "observer.image" (dict "component" "processor" "Values" .Values "Chart" .Chart) }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
         env:
         - name: NATS_URL
           valueFrom:
@@ -57,24 +53,25 @@ spec:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: MONGODB_URI
-        {{- range $key, $value := .Values.distributed.api.env }}
-        - name: {{ $key }}
-          value: {{ $value | quote }}
-        {{- end }}
+{{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.processor.env "excluded" (list "NATS_URL" "POSTGRES_DSN" "MONGODB_URI")) | nindent 8 }}
         livenessProbe:
-          httpGet:
-            path: /health
-            port: http
+          exec:
+            command:
+            - pgrep
+            - -f
+            - processor
           initialDelaySeconds: 10
           periodSeconds: 10
         readinessProbe:
-          httpGet:
-            path: /health
-            port: http
+          exec:
+            command:
+            - pgrep
+            - -f
+            - processor
           initialDelaySeconds: 5
           periodSeconds: 5
         resources:
-          {{- toYaml .Values.distributed.api.resources | nindent 10 }}
+          {{- toYaml .Values.distributed.processor.resources | nindent 10 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

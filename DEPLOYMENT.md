@@ -67,7 +67,7 @@ The current Helm chart contract is:
 - Distributed installs run PostgreSQL migrations through the dedicated Helm hook job controlled by `postgres.migration.enabled`.
 - External PostgreSQL, MongoDB, and NATS require `postgres.host`, `externalDatabase.host`, and `externalNats.url` when their embedded dependencies are disabled.
 - Gateway API is only wired for AIO mode today.
-- Credentials are still passed through chart values and workload env vars today, so use non-committed overrides for sensitive values.
+- Distributed workloads consume connection settings through Secret references. Use `runtime.existingSecret` to reuse a Secret containing `NATS_URL`, `POSTGRES_DSN`, and `MONGODB_URI`, or let the chart render its generated runtime Secret.
 
 ### Prerequisites
 
@@ -216,6 +216,14 @@ Use these keys when disabling embedded distributed dependencies:
 | PostgreSQL          | `postgresql.enabled=false` | `postgres.host`         |
 | MongoDB             | `mongodb.enabled=false`    | `externalDatabase.host` |
 | NATS                | `nats.enabled=false`       | `externalNats.url`      |
+
+### Secret-Backed Runtime Config
+
+Distributed mode reads `NATS_URL`, `POSTGRES_DSN`, and `MONGODB_URI` from a Secret.
+
+- Leave `runtime.existingSecret` empty to let the chart render a generated runtime Secret.
+- Set `runtime.existingSecret` to reuse a pre-created Secret with those three keys.
+- Embedded dependency credentials still use the dependency-chart auth configuration.
 
 ### Images
 

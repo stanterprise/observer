@@ -62,10 +62,7 @@ spec:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: NATS_URL
-        {{- range $key, $value := .Values.distributed.ingestion.env }}
-        - name: {{ $key }}
-          value: {{ $value | quote }}
-        {{- end }}
+{{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.ingestion.env "excluded" (list "NATS_URL")) | nindent 8 }}
         livenessProbe:
           exec:
             command:
