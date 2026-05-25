@@ -36,7 +36,7 @@ spec:
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}
         image: {{ include "observer.image" (dict "component" "api" "Values" .Values "Chart" .Chart) }}
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        imagePullPolicy: {{ include "observer.image.pullPolicy" . }}
         ports:
         - name: http
           containerPort: 8080

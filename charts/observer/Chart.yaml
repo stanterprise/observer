@@ -4,6 +4,7 @@ description: A Helm chart for Observer - Test Observability System
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
+icon: https://raw.githubusercontent.com/stanterprise/observer/master/web/public/favicon.ico
 keywords:
   - testing
   - observability

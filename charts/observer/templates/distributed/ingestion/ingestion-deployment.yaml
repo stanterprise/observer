@@ -51,7 +51,7 @@ spec:
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}
         image: {{ include "observer.image" (dict "component" "ingestion" "Values" .Values "Chart" .Chart) }}
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        imagePullPolicy: {{ include "observer.image.pullPolicy" . }}
         ports:
         - name: grpc
           containerPort: 50051
@@ -64,21 +64,25 @@ spec:
               key: NATS_URL
 {{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.ingestion.env "excluded" (list "NATS_URL")) | nindent 8 }}
         livenessProbe:
-          exec:
-            command:
-            - pgrep
-            - -f
-            - ingestion
-          initialDelaySeconds: 10
+          grpc:
+            port: 50051
+          initialDelaySeconds: 15
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         readinessProbe:
-          exec:
-            command:
-            - pgrep
-            - -f
-            - ingestion
+          grpc:
+            port: 50051
           initialDelaySeconds: 5
           periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          grpc:
+            port: 50051
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 12
         resources:
           {{- toYaml .Values.distributed.ingestion.resources | nindent 10 }}
       {{- with .Values.nodeSelector }}

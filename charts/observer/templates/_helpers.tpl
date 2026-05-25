@@ -1,4 +1,13 @@
 {{/*
+Validate deployment mode early so operators see a clear error instead of a broken render.
+*/}}
+{{- define "observer.validateMode" -}}
+{{- if not (has .Values.mode (list "aio" "distributed")) -}}
+{{- fail (printf "values.mode must be 'aio' or 'distributed'; got %q" .Values.mode) -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Expand the name of the chart.
 */}}
 {{- define "observer.name" -}}
@@ -125,7 +134,7 @@ Render workload env entries while skipping chart-managed keys.
 {{- range $key, $value := $env }}
 {{- if not (has $key $excluded) }}
 - name: {{ $key }}
-	value: {{ $value | quote }}
+  value: {{ $value | quote }}
 {{- end }}
 {{- end }}
 {{- end }}

@@ -146,58 +146,7 @@ nats:
       cpu: 200m
       memory: 256Mi
 
-# Enable configurable ingresses for production
-ingress:
-  # Web UI ingress
-  web:
-    enabled: true
-    className: nginx
-    annotations:
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
-      nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    hosts:
-      - host: observer.example.com
-        paths:
-          - path: /
-            pathType: Prefix
-    tls:
-      - secretName: observer-web-tls
-        hosts:
-          - observer.example.com
-
-  # API ingress (optional - can use same host as web with path prefix)
-  api:
-    enabled: true
-    className: nginx
-    annotations:
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
-      nginx.ingress.kubernetes.io/ssl-redirect: "true"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    hosts:
-      - host: api.observer.example.com
-        paths:
-          - path: /
-            pathType: Prefix
-    tls:
-      - secretName: observer-api-tls
-        hosts:
-          - api.observer.example.com
-
-  # gRPC ingress for test reporters
-  grpc:
-    enabled: true
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
-      nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    hosts:
-      - host: grpc.observer.example.com
-        paths:
-          - path: /
-            pathType: Prefix
-    tls:
-      - secretName: observer-grpc-tls
-        hosts:
-          - grpc.observer.example.com
+# Exposing services externally is the operator's responsibility.
+# Configure a LoadBalancer, NodePort, or an external ingress controller
+# appropriate for your cluster environment.
+# This chart does not render Ingress or Gateway manifests.

@@ -9,9 +9,9 @@ mode: distributed
 image:
   registry: ghcr.io
   repository: stanterprise/observer
-  pullPolicy: Always
+  # pullPolicy: IfNotPresent  # Omit to auto-detect: Always for mutable tags (latest/main/develop), IfNotPresent otherwise.
   # Overrides the image tag whose default is the chart appVersion.
-  tag: latest
+  tag: ""
 
 imagePullSecrets: []
 podAnnotations: {}
@@ -290,119 +290,6 @@ runtime:
   # Secret for upgrade compatibility instead of being rendered directly on pods.
   existingSecret: ""
 
-# Gateway API configuration (alternative to Ingress)
-# GKE Gateway API for advanced L7 load balancing
-gateway:
-  enabled: false
-  className: gke-l7-global-external-managed
-  annotations: {}
-  addresses: []
-  # TLS configuration for Gateway
-  tls:
-    enabled: false
-    certificateName: observer-gateway-cert
-    gcpCertificateName: ""
-    # Certificate reference - should match ManagedCertificate name
-    certificateRefs: []
-    # - name: observer-gateway-cert
-  web:
-    enabled: false
-    hostname: observer.example.com
-  api:
-    enabled: false
-    hostname: api.observer.example.com
-  grpc:
-    enabled: false
-    hostname: grpc.observer.example.com
-
-# Ingress configuration
-# Each ingress can be independently enabled and configured
-ingress:
-  # Google-managed SSL certificate (GCP/GKE only)
-  # Automatically provisions and renews certificates for your domains
-  managedCertificate:
-    enabled: false
-    # When enabled, creates a ManagedCertificate resource for all ingress hosts
-    # Certificate provisioning takes 15-60 minutes on first deployment
-    # Requires valid DNS records pointing to the load balancer IPs
-
-  # SSL/HTTPS configuration
-  ssl:
-    # Redirect HTTP to HTTPS (only enable after certificates are provisioned)
-    redirect: false
-    # TLS policy (GCP only) - MODERN, COMPATIBLE, or RESTRICTED
-    # MODERN: TLS 1.2+, strong ciphers
-    # COMPATIBLE: TLS 1.0+, wider compatibility
-    # RESTRICTED: TLS 1.2+, most restrictive
-    policy: "MODERN"
-
-  # Web UI ingress - serves the React frontend
-  web:
-    enabled: false
-    className: "nginx"
-    annotations: {}
-      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
-      # nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    hosts:
-      - host: observer.example.com
-        paths:
-          - path: /
-            pathType: Prefix
-    tls: []
-      # - secretName: observer-web-tls
-      #   hosts:
-      #     - observer.example.com
-
-  # API ingress - serves the REST/GraphQL API and WebSocket
-  api:
-    enabled: false
-    className: "nginx"
-    annotations: {}
-      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
-      # nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      # nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      # nginx.ingress.kubernetes.io/websocket-services: "observer-api"
-    hosts:
-      - host: api.observer.example.com
-        paths:
-          - path: /
-            pathType: Prefix
-    tls: []
-      # - secretName: observer-api-tls
-      #   hosts:
-      #     - api.observer.example.com
-
-  # gRPC ingress - serves the gRPC ingestion endpoint
-  grpc:
-    enabled: false
-    className: "nginx"
-    annotations:
-      nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
-      # nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    hosts:
-      - host: grpc.observer.example.com
-        paths:
-          - path: /
-            pathType: Prefix
-    tls: []
-      # - secretName: observer-grpc-tls
-      #   hosts:
-      #     - grpc.observer.example.com
-    # GCP BackendConfig for gRPC (only used with GCE ingress class)
-    # Set enabled: true when using className: "gce" for proper HTTP/2 support
-    backendConfig:
-      enabled: false
-      protocol: HTTP2
-      healthCheck:
-        checkIntervalSec: 10
-        timeoutSec: 5
-        port: 8081
-        type: HTTP2
-        requestPath: /grpc.health.v1.HealthService/Check
-      timeoutSec: 30
-      connectionDraining:
-        drainingTimeoutSec: 60
-
 # Service Account
 serviceAccount:
   create: true
@@ -415,6 +302,7 @@ podSecurityContext:
 
 # Security Context (for distributed mode services)
 securityContext:
+  allowPrivilegeEscalation: false
   capabilities:
     drop:
       - ALL
@@ -422,11 +310,18 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 1000
 
-# AIO Security Context (s6-overlay requires root for initialization)
+# AIO Security Context (s6-overlay requires root for init; allowPrivilegeEscalation
+# must remain true so s6-overlay can setuid/setgid during service supervision).
 aioSecurityContext:
+  allowPrivilegeEscalation: true
   capabilities:
     drop:
       - ALL
+    add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - DAC_OVERRIDE
   readOnlyRootFilesystem: false
   runAsNonRoot: false
   runAsUser: 0

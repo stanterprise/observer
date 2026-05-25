@@ -31,49 +31,7 @@ mongodb:
 nats:
   enabled: false
 
-# Disable traditional Ingress (using Gateway API instead)
-ingress:
-  web:
-    enabled: false
-  api:
-    enabled: false
-  grpc:
-    enabled: false
-  managedCertificate:
-    enabled: true
-  ssl:
-    redirect: false
-    policy: "MODERN"
-
-# Gateway API configuration
-gateway:
-  enabled: true
-  className: gke-l7-global-external-managed
-
-  # Annotations for Google Cloud integration
-  annotations:
-    networking.gke.io/certmap: observer-cert-map
-
-  # Static IP addresses (optional, will be allocated if not specified)
-  addresses: []
-
-  # TLS configuration using Google-managed certificates
-  tls:
-    enabled: false # Start without TLS, add later
-    certificateName: observer-cert
-    gcpCertificateName: "" # GCP Certificate Manager certificate name
-
-  # Web UI route
-  web:
-    enabled: true
-    hostname: observer.stanterprise.dev
-
-  # API route
-  api:
-    enabled: true
-    hostname: api.observer.stanterprise.dev
-
-  # gRPC route with native GRPCRoute support
-  grpc:
-    enabled: true
-    hostname: grpc.observer.stanterprise.dev
+# Exposing services externally is the operator's responsibility.
+# Configure a LoadBalancer, NodePort, or an external ingress controller
+# appropriate for your cluster environment.
+# This chart does not render Ingress or Gateway manifests.
