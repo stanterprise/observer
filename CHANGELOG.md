@@ -23,6 +23,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Codespaces support
 - Apache 2.0 license
 
+### Changed
+
+- Helm chart documentation now reflects the distributed-first contract, downstream-managed exposure model, and `runtime.existingSecret` production flow.
+- Chart examples now prefer immutable image tags and out-of-band runtime secret management instead of inline credentials in values files.
+- Distributed runtime connection overrides via `distributed.*.env` are documented as unsupported and rejected during validation.
+
+### Fixed
+
+- The distributed migration hook no longer depends on a chart-managed runtime Secret that has not been created yet during install or upgrade.
+
+### Removed
+
+- Chart-managed ingress and Gateway API examples from Helm documentation. Exposure, TLS, and certificates are now documented as downstream infrastructure concerns.
+
 ### Architecture
 
 - Phase 1: NATS JetStream publisher in ingestion service
