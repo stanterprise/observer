@@ -3,8 +3,12 @@ entries:
   observer:
   - apiVersion: v2
     appVersion: 0.7.0-beta
-    created: "2026-05-22T03:05:51.66046578Z"
+    created: "2026-05-26T03:44:48.868222153Z"
     dependencies:
+    - condition: postgresql.enabled
+      name: postgresql
+      repository: https://charts.bitnami.com/bitnami
+      version: ~16.7.0
     - condition: mongodb.enabled
       name: mongodb
       repository: https://charts.bitnami.com/bitnami
@@ -14,8 +18,9 @@ entries:
       repository: https://nats-io.github.io/k8s/helm/charts/
       version: ~1.2.0
     description: A Helm chart for Observer - Test Observability System
-    digest: 66961766932e9deded5be6f78464f00146033445923c0990bf8b7d7089ca20ff
+    digest: 68e12990523b02571e2bc4b578b267e487b2d54cd8de37e8e813b6f2bc51f5a9
     home: https://github.com/stanterprise/observer
+    icon: https://raw.githubusercontent.com/stanterprise/observer/master/web/public/favicon.ico
     keywords:
     - testing
     - observability
@@ -29,6 +34,6 @@ entries:
     - https://github.com/stanterprise/observer
     type: application
     urls:
-    - https://stanterprise.github.io/observer/observer-0.7.0-beta.tgz
-    version: 0.7.0-beta
-generated: "2026-05-22T03:05:51.651722187Z"
+    - https://stanterprise.github.io/observer/observer-0.7.0-beta-1056518.tgz
+    version: 0.7.0-beta-1056518
+generated: "2026-05-26T03:44:48.854052524Z"
