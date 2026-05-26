@@ -286,8 +286,8 @@ externalNats:
 runtime:
   # Reuse an existing Secret containing NATS_URL, POSTGRES_DSN, and MONGODB_URI.
   # When empty, the chart renders a generated Secret for distributed workloads.
-  # Legacy distributed.*.env connection overrides are folded into that generated
-  # Secret for upgrade compatibility instead of being rendered directly on pods.
+  # Distributed workload env blocks must not set NATS_URL, POSTGRES_DSN, or
+  # MONGODB_URI; use this secret or the canonical dependency values instead.
   existingSecret: ""
 
 # Service Account

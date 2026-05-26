@@ -126,6 +126,30 @@ Runtime Secret name for distributed dependency connection settings
 {{- end }}
 
 {{/*
+Distributed workloads must not override chart-managed connection env vars.
+*/}}
+{{- define "observer.validateNoManagedConnectionEnv" -}}
+{{- $path := .path -}}
+{{- $env := .env | default dict -}}
+{{- range $key := list "NATS_URL" "POSTGRES_DSN" "MONGODB_URI" -}}
+{{- if hasKey $env $key -}}
+{{- fail (printf "%s.%s is not supported in distributed mode; use runtime.existingSecret or canonical dependency values (externalNats.url, postgres.*, externalDatabase.*, or embedded dependency settings)" $path $key) -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Validate distributed-mode configuration before rendering resources.
+*/}}
+{{- define "observer.validateDistributedConfig" -}}
+{{- if and (eq .Values.mode "distributed") .Values.distributed.enabled -}}
+{{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.ingestion.env" "env" (.Values.distributed.ingestion.env | default dict)) -}}
+{{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.api.env" "env" (.Values.distributed.api.env | default dict)) -}}
+{{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.processor.env" "env" (.Values.distributed.processor.env | default dict)) -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Render workload env entries while skipping chart-managed keys.
 */}}
 {{- define "observer.renderFilteredEnv" -}}
@@ -141,33 +165,26 @@ Render workload env entries while skipping chart-managed keys.
 
 {{/*
 Distributed runtime NATS URL.
-Prefer the generated/shared secret value and fold in legacy per-workload overrides.
+Source-of-truth comes from canonical chart values only.
 */}}
 {{- define "observer.runtime.natsUrl" -}}
-{{- $ingestionEnv := .Values.distributed.ingestion.env | default dict -}}
-{{- $apiEnv := .Values.distributed.api.env | default dict -}}
-{{- $processorEnv := .Values.distributed.processor.env | default dict -}}
-{{- coalesce (index $ingestionEnv "NATS_URL") (index $apiEnv "NATS_URL") (index $processorEnv "NATS_URL") (include "observer.nats.url" .) -}}
+{{- include "observer.nats.url" . -}}
 {{- end }}
 
 {{/*
 Distributed runtime PostgreSQL DSN.
-Prefer the generated/shared secret value and fold in legacy per-workload overrides.
+Source-of-truth comes from canonical chart values only.
 */}}
 {{- define "observer.runtime.postgresDsn" -}}
-{{- $apiEnv := .Values.distributed.api.env | default dict -}}
-{{- $processorEnv := .Values.distributed.processor.env | default dict -}}
-{{- coalesce (index $apiEnv "POSTGRES_DSN") (index $processorEnv "POSTGRES_DSN") (include "observer.postgres.dsn" .) -}}
+{{- include "observer.postgres.dsn" . -}}
 {{- end }}
 
 {{/*
 Distributed runtime MongoDB URI.
-Prefer the generated/shared secret value and fold in legacy per-workload overrides.
+Source-of-truth comes from canonical chart values only.
 */}}
 {{- define "observer.runtime.mongodbUri" -}}
-{{- $apiEnv := .Values.distributed.api.env | default dict -}}
-{{- $processorEnv := .Values.distributed.processor.env | default dict -}}
-{{- coalesce (index $apiEnv "MONGODB_URI") (index $processorEnv "MONGODB_URI") (include "observer.database.url" .) -}}
+{{- include "observer.database.url" . -}}
 {{- end }}
 
 {{/*

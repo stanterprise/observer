@@ -36,11 +36,16 @@ spec:
         image: {{ include "observer.image" (dict "component" "api" "Values" .Values "Chart" .Chart) }}
         imagePullPolicy: {{ include "observer.image.pullPolicy" . }}
         env:
+        {{- if .Values.runtime.existingSecret }}
         - name: POSTGRES_DSN
           valueFrom:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: POSTGRES_DSN
+        {{- else }}
+        - name: POSTGRES_DSN
+          value: {{ include "observer.postgres.dsn" . | quote }}
+        {{- end }}
         command:
         - /bin/sh
         - -c

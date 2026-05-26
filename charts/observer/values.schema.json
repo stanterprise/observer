@@ -314,7 +314,14 @@
         },
         "env": {
           "type": "object",
-          "additionalProperties": { "type": ["string", "number", "boolean"] }
+          "additionalProperties": { "type": ["string", "number", "boolean"] },
+          "not": {
+            "anyOf": [
+              { "required": ["NATS_URL"] },
+              { "required": ["POSTGRES_DSN"] },
+              { "required": ["MONGODB_URI"] }
+            ]
+          }
         }
       }
     },
