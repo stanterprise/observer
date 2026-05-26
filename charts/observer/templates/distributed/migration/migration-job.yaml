@@ -1,0 +1,77 @@
+{{- if and (eq .Values.mode "distributed") .Values.distributed.enabled .Values.postgres.migration.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "observer.fullname" . }}-migrate
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    helm.sh/hook: {{ ternary "post-install,post-upgrade" "pre-install,pre-upgrade" .Values.postgresql.enabled | quote }}
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.postgres.migration.backoffLimit | default 3 }}
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "observer.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: migrate
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: {{ include "observer.image" (dict "component" "api" "Values" .Values "Chart" .Chart) }}
+        imagePullPolicy: {{ include "observer.image.pullPolicy" . }}
+        env:
+        {{- if .Values.runtime.existingSecret }}
+        - name: POSTGRES_DSN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.runtimeSecretName" . }}
+              key: POSTGRES_DSN
+        {{- else }}
+        - name: POSTGRES_DSN
+          value: {{ include "observer.postgres.dsn" . | quote }}
+        {{- end }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+
+          echo "Running migrations with retry while PostgreSQL becomes reachable..."
+
+          attempt=0
+          until /usr/local/bin/migrate -action=up; do
+            attempt=$((attempt + 1))
+            if [ "$attempt" -ge 60 ]; then
+              echo "Migration failed after 60 attempts" >&2
+              exit 1
+            fi
+            echo "Migration attempt $attempt failed; retrying in 2s..."
+            sleep 2
+          done
+
+          echo "Migrations completed successfully"
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+      restartPolicy: Never
+{{- end }}

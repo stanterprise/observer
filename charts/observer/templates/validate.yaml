@@ -1,0 +1,2 @@
+{{- include "observer.validateMode" . -}}
+{{- include "observer.validateDistributedConfig" . -}}

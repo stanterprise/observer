@@ -2,62 +2,65 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "observer.fullname" . }}-api
+  name: {{ include "observer.fullname" . }}-web
   labels:
     {{- include "observer.labels" . | nindent 4 }}
-    app.kubernetes.io/component: api
+    app.kubernetes.io/component: web
 spec:
-  {{- if not .Values.distributed.api.autoscaling.enabled }}
-  replicas: {{ .Values.distributed.api.replicaCount }}
+  {{- if not .Values.distributed.web.autoscaling.enabled }}
+  replicas: {{ .Values.distributed.web.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
       {{- include "observer.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: api
+      app.kubernetes.io/component: web
   template:
     metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
         {{- include "observer.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: api
+        app.kubernetes.io/component: web
     spec:
       serviceAccountName: {{ include "observer.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-      - name: api
+      - name: web
+        {{- $webSecurityContext := .Values.distributed.web.securityContext | default .Values.securityContext }}
         securityContext:
-          {{- toYaml .Values.securityContext | nindent 10 }}
-        image: {{ include "observer.image" (dict "component" "api" "Values" .Values "Chart" .Chart) }}
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- toYaml $webSecurityContext | nindent 10 }}
+        image: {{ include "observer.image" (dict "component" "web" "Values" .Values "Chart" .Chart) }}
+        imagePullPolicy: {{ include "observer.image.pullPolicy" . }}
         ports:
         - name: http
-          containerPort: 8080
+          containerPort: 80
           protocol: TCP
+        {{- $webEnv := include "observer.renderFilteredEnv" (dict "env" .Values.distributed.web.env "excluded" (list "NGINX_ENVSUBST_TEMPLATE_DIR")) }}
+        {{- if $webEnv }}
         env:
-        - name: NATS_URL
-          value: {{ include "observer.nats.url" . }}
-        - name: POSTGRES_DSN
-          value: {{ include "observer.postgres.dsn" . | quote }}
-        - name: MONGODB_URI
-          value: {{ include "observer.database.url" . }}
-        {{- range $key, $value := .Values.distributed.api.env }}
-        - name: {{ $key }}
-          value: {{ $value | quote }}
+{{ $webEnv | nindent 8 }}
         {{- end }}
         livenessProbe:
           httpGet:
-            path: /health
+            path: /
             port: http
           initialDelaySeconds: 10
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health
+            path: /
             port: http
           initialDelaySeconds: 5
           periodSeconds: 5
         resources:
-          {{- toYaml .Values.distributed.api.resources | nindent 10 }}
+          {{- toYaml .Values.distributed.web.resources | nindent 10 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

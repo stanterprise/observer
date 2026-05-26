@@ -3,23 +3,24 @@
 # Declare variables to be passed into your templates.
 
 # Deployment mode: "aio" or "distributed"
-mode: aio
+mode: distributed
 
 # Global image configuration
 image:
   registry: ghcr.io
   repository: stanterprise/observer
-  pullPolicy: Always
+  # pullPolicy: IfNotPresent  # Omit to auto-detect: Always for mutable tags (latest/main/develop), IfNotPresent otherwise.
   # Overrides the image tag whose default is the chart appVersion.
-  tag: latest
+  tag: ""
 
 imagePullSecrets: []
+podAnnotations: {}
 nameOverride: ""
 fullnameOverride: ""
 
 # AIO (All-in-One) mode configuration
 aio:
-  enabled: true
+  enabled: false
   replicaCount: 1
 
   resources:
@@ -68,7 +69,7 @@ aio:
 
 # Distributed mode configuration
 distributed:
-  enabled: false
+  enabled: true
 
   # Ingestion service configuration
   ingestion:
@@ -174,11 +175,17 @@ distributed:
       maxReplicas: 2
       targetCPUUtilizationPercentage: 80
 
+    securityContext:
+      readOnlyRootFilesystem: false
+      runAsNonRoot: false
+      runAsUser: 0
+
     env:
       API_BACKEND_HOST: observer-api
       API_BACKEND_PORT: "8080"
 
 postgres:
+  # Used when postgresql.enabled=false (external PostgreSQL)
   host: ""
   port: 5432
   username: observer
@@ -189,9 +196,36 @@ postgres:
     enabled: true
     backoffLimit: 3
 
+# Embedded PostgreSQL dependency (default)
+postgresql:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+  auth:
+    username: observer
+    password: password
+    database: observer
+    postgresPassword: password
+  architecture: standalone
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
 # MongoDB configuration
 mongodb:
   enabled: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/mongodb
   # Use external MongoDB by setting enabled: false and configuring externalDatabase
   auth:
     enabled: true
@@ -222,9 +256,6 @@ externalDatabase:
   password: ""
   database: observer
   authSource: admin
-  # Use existing secret for password
-  existingSecret: ""
-  existingSecretPasswordKey: password
 
 # NATS configuration
 nats:
@@ -250,112 +281,14 @@ nats:
 # External NATS configuration (when nats.enabled=false)
 externalNats:
   url: ""
-  # Use existing secret for credentials
+
+# Distributed runtime connection secret
+runtime:
+  # Reuse an existing Secret containing NATS_URL, POSTGRES_DSN, and MONGODB_URI.
+  # When empty, the chart renders a generated Secret for distributed workloads.
+  # Distributed workload env blocks must not set NATS_URL, POSTGRES_DSN, or
+  # MONGODB_URI; use this secret or the canonical dependency values instead.
   existingSecret: ""
-
-# Gateway API configuration (alternative to Ingress)
-# GKE Gateway API for advanced L7 load balancing
-gateway:
-  enabled: false
-  className: gke-l7-global-external-managed
-  annotations: {}
-  # TLS configuration for Gateway
-  tls:
-    enabled: false
-    # Certificate reference - should match ManagedCertificate name
-    certificateRefs: []
-    # - name: observer-gateway-cert
-
-# Ingress configuration
-# Each ingress can be independently enabled and configured
-ingress:
-  # Google-managed SSL certificate (GCP/GKE only)
-  # Automatically provisions and renews certificates for your domains
-  managedCertificate:
-    enabled: false
-    # When enabled, creates a ManagedCertificate resource for all ingress hosts
-    # Certificate provisioning takes 15-60 minutes on first deployment
-    # Requires valid DNS records pointing to the load balancer IPs
-
-  # SSL/HTTPS configuration
-  ssl:
-    # Redirect HTTP to HTTPS (only enable after certificates are provisioned)
-    redirect: false
-    # TLS policy (GCP only) - MODERN, COMPATIBLE, or RESTRICTED
-    # MODERN: TLS 1.2+, strong ciphers
-    # COMPATIBLE: TLS 1.0+, wider compatibility
-    # RESTRICTED: TLS 1.2+, most restrictive
-    policy: "MODERN"
-
-  # Web UI ingress - serves the React frontend
-  web:
-    enabled: false
-    className: "nginx"
-    annotations:
-      {}
-      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
-      # nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    hosts:
-      - host: observer.example.com
-        paths:
-          - path: /
-            pathType: Prefix
-    tls:
-      []
-      # - secretName: observer-web-tls
-      #   hosts:
-      #     - observer.example.com
-
-  # API ingress - serves the REST/GraphQL API and WebSocket
-  api:
-    enabled: false
-    className: "nginx"
-    annotations:
-      {}
-      # cert-manager.io/cluster-issuer: "letsencrypt-prod"
-      # nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      # nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      # nginx.ingress.kubernetes.io/websocket-services: "observer-api"
-    hosts:
-      - host: api.observer.example.com
-        paths:
-          - path: /
-            pathType: Prefix
-    tls:
-      []
-      # - secretName: observer-api-tls
-      #   hosts:
-      #     - api.observer.example.com
-
-  # gRPC ingress - serves the gRPC ingestion endpoint
-  grpc:
-    enabled: false
-    className: "nginx"
-    annotations:
-      nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
-      # nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    hosts:
-      - host: grpc.observer.example.com
-        paths:
-          - path: /
-            pathType: Prefix
-    tls:
-      []
-      # - secretName: observer-grpc-tls
-      #   hosts:
-      #     - grpc.observer.example.com
-    # GCP BackendConfig for gRPC (only used with GCE ingress class)
-    # Set enabled: true when using className: "gce" for proper HTTP/2 support
-    backendConfig:
-      enabled: false
-      healthCheck:
-        checkIntervalSec: 10
-        timeoutSec: 5
-        type: HTTP2
-        requestPath: /grpc.health.v1.HealthService/Check
-      timeoutSec: 30
-      connectionDraining:
-        drainingTimeoutSec: 60
 
 # Service Account
 serviceAccount:
@@ -369,6 +302,7 @@ podSecurityContext:
 
 # Security Context (for distributed mode services)
 securityContext:
+  allowPrivilegeEscalation: false
   capabilities:
     drop:
       - ALL
@@ -376,11 +310,18 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 1000
 
-# AIO Security Context (s6-overlay requires root for initialization)
+# AIO Security Context (s6-overlay requires root for init; allowPrivilegeEscalation
+# must remain true so s6-overlay can setuid/setgid during service supervision).
 aioSecurityContext:
+  allowPrivilegeEscalation: true
   capabilities:
     drop:
       - ALL
+    add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - DAC_OVERRIDE
   readOnlyRootFilesystem: false
   runAsNonRoot: false
   runAsUser: 0

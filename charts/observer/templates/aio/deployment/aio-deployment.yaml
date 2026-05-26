@@ -1,3 +1,4 @@
+{{- include "observer.validateMode" . -}}
 {{- if and (eq .Values.mode "aio") .Values.aio.enabled }}
 apiVersion: apps/v1
 kind: Deployment
@@ -14,11 +15,19 @@ spec:
       app.kubernetes.io/component: aio
   template:
     metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
         {{- include "observer.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: aio
     spec:
       serviceAccountName: {{ include "observer.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -26,7 +35,7 @@ spec:
         securityContext:
           {{- toYaml .Values.aioSecurityContext | nindent 10 }}
         image: {{ include "observer.image" (dict "component" "aio" "Values" .Values "Chart" .Chart) }}
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        imagePullPolicy: {{ include "observer.image.pullPolicy" . }}
         ports:
         - name: web
           containerPort: 80

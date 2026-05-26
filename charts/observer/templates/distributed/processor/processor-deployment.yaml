@@ -1,0 +1,136 @@
+{{- if and (eq .Values.mode "distributed") .Values.distributed.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "observer.fullname" . }}-processor
+  labels:
+    {{- include "observer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: processor
+spec:
+  {{- if not .Values.distributed.processor.autoscaling.enabled }}
+  replicas: {{ .Values.distributed.processor.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "observer.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: processor
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "observer.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: processor
+    spec:
+      serviceAccountName: {{ include "observer.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if or .Values.nats.enabled .Values.postgresql.enabled }}
+      initContainers:
+      {{- if .Values.nats.enabled }}
+      - name: wait-for-nats
+        image: docker.io/busybox:1.36
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          runAsUser: 65534
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          until nc -z {{ include "observer.fullname" . }}-nats 4222; do
+            echo "Waiting for NATS..."
+            sleep 2
+          done
+      {{- end }}
+      {{- if .Values.postgresql.enabled }}
+      - name: wait-for-postgres
+        image: docker.io/busybox:1.36
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          runAsUser: 65534
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          until nc -z {{ include "observer.fullname" . }}-postgresql {{ include "observer.postgres.port" . }}; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+      {{- end }}
+      {{- end }}
+      containers:
+      - name: processor
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: {{ include "observer.image" (dict "component" "processor" "Values" .Values "Chart" .Chart) }}
+        imagePullPolicy: {{ include "observer.image.pullPolicy" . }}
+        env:
+        - name: NATS_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.runtimeSecretName" . }}
+              key: NATS_URL
+        - name: POSTGRES_DSN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.runtimeSecretName" . }}
+              key: POSTGRES_DSN
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.runtimeSecretName" . }}
+              key: MONGODB_URI
+{{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.processor.env "excluded" (list "NATS_URL" "POSTGRES_DSN" "MONGODB_URI")) | nindent 8 }}
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - kill -0 1
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - kill -0 1
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          {{- toYaml .Values.distributed.processor.resources | nindent 10 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

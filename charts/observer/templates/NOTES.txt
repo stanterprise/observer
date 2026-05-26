@@ -1,172 +1,105 @@
-{{ if eq .Values.mode "aio" }}
-**********************************************************************
-***   Observer - All-in-One (AIO) Mode                            ***
-**********************************************************************
+{{- if eq .Values.mode "aio" }}
+Observer has been deployed in All-in-One (AIO) mode.
 
-Observer has been deployed in All-in-One mode with all services in a single container.
-
-{{- if .Values.ingress.managedCertificate.enabled }}
-
-🔒 HTTPS/SSL Configuration:
-{{- if .Values.ingress.web.enabled }}
-  Status: Google-managed certificate provisioning in progress
-
-  Check certificate status:
-    kubectl describe managedcertificate {{ include "observer.fullname" . }}-cert -n {{ .Release.Namespace }}
-
-  ⏱️  Certificate provisioning takes 15-60 minutes.
-  Once Status shows "Active", your sites will be available via HTTPS:
-
-{{- range .Values.ingress.web.hosts }}
-  Web UI: https://{{ .host }}
-{{- end }}
-{{- range .Values.ingress.api.hosts }}
-  API: https://{{ .host }}
-{{- end }}
-{{- range .Values.ingress.grpc.hosts }}
-  gRPC: {{ .host }}:443
-{{- end }}
-
-{{- if not .Values.ingress.ssl.redirect }}
-
-  💡 To enable HTTP → HTTPS redirect after certificates are Active:
-    1. Update values: ingress.ssl.redirect: true
-    2. Run: helm upgrade {{ .Release.Name }} charts/observer/ --namespace {{ .Release.Namespace }} --values charts/observer/values-aio.yaml
-{{- else }}
-  ✅ HTTP → HTTPS redirect is enabled
-{{- end }}
-{{- end }}
-{{- end }}
-
-1. Get the application URL by running:
+1. Access the Web UI:
 
 {{- if contains "NodePort" .Values.aio.service.type }}
   export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "observer.fullname" . }}-aio)
   export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
-  echo "Web UI: http://$NODE_IP:$NODE_PORT"
-  echo "gRPC Endpoint: $NODE_IP:$NODE_PORT"
+  echo "Web UI:        http://$NODE_IP:$NODE_PORT"
+  echo "gRPC Endpoint: $NODE_IP:$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[1].nodePort}" services {{ include "observer.fullname" . }}-aio)"
 
 {{- else if contains "LoadBalancer" .Values.aio.service.type }}
-  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-  You can watch the status by running: 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "observer.fullname" . }}-aio'
+  NOTE: It may take a few minutes for the LoadBalancer IP to be provisioned.
+  Watch: kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "observer.fullname" . }}-aio
 
   export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "observer.fullname" . }}-aio --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
-  echo "Web UI: http://$SERVICE_IP:{{ .Values.aio.service.webPort }}"
+  echo "Web UI:        http://$SERVICE_IP:{{ .Values.aio.service.webPort }}"
   echo "gRPC Endpoint: $SERVICE_IP:{{ .Values.aio.service.grpcPort }}"
 
-{{- else if contains "ClusterIP" .Values.aio.service.type }}
-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "observer.name" . }},app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=aio" -o jsonpath="{.items[0].metadata.name}")
+{{- else }}
+  # Port-forward the Web UI
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "observer.fullname" . }}-aio {{ .Values.aio.service.webPort }}:{{ .Values.aio.service.webPort }}
+  # Then visit: http://127.0.0.1:{{ .Values.aio.service.webPort }}
 
-  echo "Access the Web UI by running:"
-  echo "  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME {{ .Values.aio.service.webPort }}:80"
-  echo "  Then visit http://127.0.0.1:{{ .Values.aio.service.webPort }}"
-
-  echo ""
-  echo "Access the gRPC endpoint by running:"
-  echo "  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME {{ .Values.aio.service.grpcPort }}:50051"
-  echo "  Then connect to localhost:{{ .Values.aio.service.grpcPort }}"
+  # Port-forward the gRPC endpoint
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "observer.fullname" . }}-aio {{ .Values.aio.service.grpcPort }}:{{ .Values.aio.service.grpcPort }}
+  # Then connect to: localhost:{{ .Values.aio.service.grpcPort }}
 {{- end }}
 
-{{ else }}
-**********************************************************************
-***   Observer - Distributed Mode                                 ***
-**********************************************************************
+  NOTE: Exposing services externally is the operator's responsibility.
+  Configure a LoadBalancer, NodePort, or external ingress controller
+  appropriate for your cluster environment.
 
-Observer has been deployed in Distributed mode with separate services.
+{{- else }}
+Observer has been deployed in Distributed mode.
 
-Services deployed:
-- Ingestion: gRPC endpoint for test reporters
-- Processor: Event processor and database writer
-- API: REST/GraphQL API and WebSocket
-- Web: React-based web interface
-
-{{- if .Values.mongodb.enabled }}
-- MongoDB: Database (embedded)
-{{- end }}
+Services:
+  - {{ include "observer.fullname" . }}-ingestion  (gRPC :{{ .Values.distributed.ingestion.service.port }})
+  - {{ include "observer.fullname" . }}-api         (HTTP :{{ .Values.distributed.api.service.port }})
+  - {{ include "observer.fullname" . }}-web         (HTTP :{{ .Values.distributed.web.service.port }})
 {{- if .Values.nats.enabled }}
-- NATS: Message broker (embedded)
+  - {{ include "observer.fullname" . }}-nats        (NATS :4222, embedded)
+{{- end }}
+{{- if .Values.postgresql.enabled }}
+  - {{ include "observer.fullname" . }}-postgresql  (PostgreSQL :5432, embedded)
+{{- end }}
+{{- if .Values.mongodb.enabled }}
+  - {{ include "observer.fullname" . }}-mongodb     (MongoDB :27017, embedded)
 {{- end }}
 
-1. Get the Web UI URL:
+1. Access the Web UI:
 
-{{- if .Values.ingress.web.enabled }}
-{{- range .Values.ingress.web.hosts }}
-  Web UI: http{{ if $.Values.ingress.web.tls }}s{{ end }}://{{ .host }}{{ range .paths }}{{ .path }}{{ end }}
-{{- end }}
-
-{{- else if contains "NodePort" .Values.distributed.web.service.type }}
+{{- if contains "NodePort" .Values.distributed.web.service.type }}
   export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "observer.fullname" . }}-web)
   export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
   echo "Web UI: http://$NODE_IP:$NODE_PORT"
 
 {{- else if contains "LoadBalancer" .Values.distributed.web.service.type }}
-  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-  You can watch the status by running: 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "observer.fullname" . }}-web'
-
+  Watch: kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "observer.fullname" . }}-web
   export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "observer.fullname" . }}-web --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
   echo "Web UI: http://$SERVICE_IP:{{ .Values.distributed.web.service.port }}"
 
 {{- else }}
-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "observer.name" . }},app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=web" -o jsonpath="{.items[0].metadata.name}")
-  echo "Access the Web UI by running:"
-  echo "  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:80"
-  echo "  Then visit http://127.0.0.1:8080"
-{{- end }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "observer.fullname" . }}-web 8080:{{ .Values.distributed.web.service.port }}
+  # Then visit: http://127.0.0.1:8080
 {{- end }}
 
-2. Get the API endpoint:
+2. Access the API:
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "observer.fullname" . }}-api 8080:{{ .Values.distributed.api.service.port }}
+  # Then: http://127.0.0.1:8080
 
-{{- if .Values.ingress.api.enabled }}
-{{- range .Values.ingress.api.hosts }}
-  API: http{{ if $.Values.ingress.api.tls }}s{{ end }}://{{ .host }}{{ range .paths }}{{ .path }}{{ end }}
-{{- end }}
-{{- else }}
-  API is available via the Web UI ingress or port-forward:
-  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "observer.fullname" . }}-api 8080:8080
-{{- end }}
-
-3. Get the gRPC Ingestion endpoint:
-
-{{- if .Values.ingress.grpc.enabled }}
-{{- range .Values.ingress.grpc.hosts }}
-  gRPC: {{ .host }}{{ if $.Values.ingress.grpc.tls }}:443{{ else }}:50051{{ end }}
-{{- end }}
-
-{{- else if eq .Values.mode "distributed" }}
+3. Access the gRPC Ingestion endpoint:
 {{- if contains "NodePort" .Values.distributed.ingestion.service.type }}
   export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "observer.fullname" . }}-ingestion)
   export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
-  echo "gRPC Endpoint: $NODE_IP:$NODE_PORT"
+  echo "gRPC: $NODE_IP:$NODE_PORT"
 
 {{- else if contains "LoadBalancer" .Values.distributed.ingestion.service.type }}
   export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "observer.fullname" . }}-ingestion --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
-  echo "gRPC Endpoint: $SERVICE_IP:{{ .Values.distributed.ingestion.service.port }}"
+  echo "gRPC: $SERVICE_IP:{{ .Values.distributed.ingestion.service.port }}"
 
 {{- else }}
-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "observer.name" . }},app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=ingestion" -o jsonpath="{.items[0].metadata.name}")
-  echo "Access gRPC endpoint by running:"
-  echo "  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 50051:50051"
-  echo "  Then connect to localhost:50051"
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "observer.fullname" . }}-ingestion 50051:{{ .Values.distributed.ingestion.service.port }}
+  # Then connect to: localhost:50051
 {{- end }}
+
+  NOTE: Exposing services externally is the operator's responsibility.
+  Configure a LoadBalancer, NodePort, or external ingress controller
+  appropriate for your cluster environment.
+
 {{- end }}
 
 4. Check pod status:
-
   kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }}"
 
-4. View logs:
-
-{{ if eq .Values.mode "aio" }}
+5. View logs:
+{{- if eq .Values.mode "aio" }}
   kubectl logs --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=aio" -f
-{{ else }}
-  # Ingestion logs
+{{- else }}
   kubectl logs --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=ingestion" -f
-
-  # Processor logs
   kubectl logs --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=processor" -f
-
-  # API logs
   kubectl logs --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=api" -f
-{{ end }}
+{{- end }}
 
 For more information, visit: https://github.com/stanterprise/observer

@@ -1,6 +1,11 @@
 name: Helm Chart Publishing
 
 on:
+  pull_request:
+    paths:
+      - "charts/**"
+      - ".github/workflows/helm-publish.yml"
+      - ".github/ct.yaml"
   push:
     branches:
       - master
@@ -8,6 +13,8 @@ on:
       - "v*.*.*"
     paths:
       - "charts/**"
+      - ".github/workflows/helm-publish.yml"
+      - ".github/ct.yaml"
   workflow_dispatch:
 
 env:
@@ -44,30 +51,63 @@ jobs:
           helm lint charts/observer
           helm lint charts/observer -f charts/observer/values-aio.yaml
           helm lint charts/observer -f charts/observer/values-production.yaml
+          helm lint charts/observer -f charts/observer/values-aio-gateway.yaml
 
       - name: Set up chart-testing
         uses: helm/chart-testing-action@v2
 
       - name: Run chart-testing (lint)
-        run: ct lint --config .github/ct.yaml --charts charts/observer || true
+        run: ct lint --config .github/ct.yaml --charts charts/observer
 
-      - name: Template rendering test
+      - name: Install kubeconform
         run: |
-          echo "Testing distributed mode template rendering..."
-          helm template observer charts/observer > /dev/null
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz -o /tmp/kubeconform.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp kubeconform
+          sudo mv /tmp/kubeconform /usr/local/bin/kubeconform
+          kubeconform -v
 
-          echo "Testing AIO mode template rendering..."
-          helm template observer charts/observer -f charts/observer/values-aio.yaml > /dev/null
+      - name: Template rendering and manifest validation
+        run: |
+          set -euo pipefail
 
-          echo "Testing production mode template rendering..."
-          helm template observer charts/observer -f charts/observer/values-production.yaml > /dev/null
+          mkdir -p /tmp/observer-renders
 
-          echo "All template rendering tests passed!"
+          render_and_validate() {
+            local name="$1"
+            shift
+
+            echo "Rendering ${name}..."
+            helm template observer charts/observer "$@" > "/tmp/observer-renders/${name}.yaml"
+
+            echo "Validating ${name} manifests with kubeconform..."
+            kubeconform -summary -ignore-missing-schemas "/tmp/observer-renders/${name}.yaml"
+          }
+
+          render_and_validate default
+          render_and_validate aio -f charts/observer/values-aio.yaml
+          render_and_validate production -f charts/observer/values-production.yaml
+          render_and_validate aio-gateway -f charts/observer/values-aio-gateway.yaml
+          render_and_validate external-nats \
+            --set nats.enabled=false \
+            --set externalNats.url=nats://nats.example.com:4222
+          render_and_validate external-postgres \
+            --set postgresql.enabled=false \
+            --set postgres.host=postgres.example.com
+          render_and_validate external-mongodb \
+            --set mongodb.enabled=false \
+            --set externalDatabase.host=mongo.example.com
+          render_and_validate all-external \
+            --set postgresql.enabled=false \
+            --set postgres.host=postgres.example.com \
+            --set mongodb.enabled=false \
+            --set externalDatabase.host=mongo.example.com \
+            --set nats.enabled=false \
+            --set externalNats.url=nats://nats.example.com:4222
 
   package-push:
     runs-on: ubuntu-latest
     needs: lint-test
-    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
       packages: write
@@ -103,7 +143,9 @@ jobs:
             VERSION="${{ github.ref_name }}"
             VERSION="${VERSION#v}"
           else
-            VERSION="0.1.0-${GITHUB_SHA::7}"
+            # For branch pushes and workflow_dispatch: use chart version + short SHA
+            CHART_VERSION=$(grep '^version:' charts/observer/Chart.yaml | awk '{print $2}')
+            VERSION="${CHART_VERSION}-${GITHUB_SHA::7}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Chart version: $VERSION"

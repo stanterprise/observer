@@ -16,46 +16,73 @@ spec:
       app.kubernetes.io/component: ingestion
   template:
     metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
         {{- include "observer.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: ingestion
     spec:
       serviceAccountName: {{ include "observer.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.nats.enabled }}
+      initContainers:
+      - name: wait-for-nats
+        image: docker.io/busybox:1.36
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          until nc -z {{ include "observer.fullname" . }}-nats 4222; do
+            echo "Waiting for NATS..."
+            sleep 2
+          done
+      {{- end }}
       containers:
       - name: ingestion
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}
         image: {{ include "observer.image" (dict "component" "ingestion" "Values" .Values "Chart" .Chart) }}
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        imagePullPolicy: {{ include "observer.image.pullPolicy" . }}
         ports:
         - name: grpc
           containerPort: 50051
           protocol: TCP
         env:
         - name: NATS_URL
-          value: {{ include "observer.nats.url" . }}
-        {{- range $key, $value := .Values.distributed.ingestion.env }}
-        - name: {{ $key }}
-          value: {{ $value | quote }}
-        {{- end }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.runtimeSecretName" . }}
+              key: NATS_URL
+{{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.ingestion.env "excluded" (list "NATS_URL")) | nindent 8 }}
         livenessProbe:
-          exec:
-            command:
-            - pgrep
-            - -f
-            - ingestion
-          initialDelaySeconds: 10
+          grpc:
+            port: 50051
+          initialDelaySeconds: 15
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         readinessProbe:
-          exec:
-            command:
-            - pgrep
-            - -f
-            - ingestion
+          grpc:
+            port: 50051
           initialDelaySeconds: 5
           periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          grpc:
+            port: 50051
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 12
         resources:
           {{- toYaml .Values.distributed.ingestion.resources | nindent 10 }}
       {{- with .Values.nodeSelector }}
