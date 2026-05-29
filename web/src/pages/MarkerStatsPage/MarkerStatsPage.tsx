@@ -2,26 +2,24 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/Card";
-import { Badge } from "@/components/Badge";
 import { ArrowLeft, BarChart3, AlertCircle, TrendingUp } from "lucide-react";
-import type { TestStatus } from "@/types/common";
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   Legend,
+  AreaChart,
+  Area,
 } from "recharts";
 import { humanizeDuration } from "@/utils/duration";
 
 interface RunStat {
   runId: string;
-  runName?: string;
+  name: string;
   status?: string;
   metadata?: Record<string, any>;
   startTime?: string;
@@ -38,14 +36,28 @@ interface RunStat {
   timedout?: number;
   interrupted?: number;
   unknown?: number;
+  flaky: number;
 }
 
 interface MarkerStatsResponse {
   marker: string;
   runs: RunStat[];
-  total: number;
-  count: number;
 }
+
+type AggregateStats = {
+  totalRuns: number;
+  totalTests: number;
+  avgTests: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  broken: number;
+  timedout: number;
+  interrupted: number;
+  unknown: number;
+  avgPassed: number;
+  avgFailed: number;
+};
 
 export function MarkerStatsPage() {
   const { markerValue } = useParams<{ markerValue: string }>();
@@ -63,7 +75,7 @@ export function MarkerStatsPage() {
     try {
       setLoading(true);
       const response = await fetch(
-        apiUrl(`/marker/${encodeURIComponent(marker)}/stats?limit=100`),
+        apiUrl(`/marker/${encodeURIComponent(marker)}/stats`),
       );
       if (!response.ok) {
         throw new Error(`Failed to fetch marker stats: ${response.statusText}`);
@@ -83,30 +95,23 @@ export function MarkerStatsPage() {
     }
   };
 
-  const getRunStatus = (status?: string): TestStatus => {
-    if (!status) return "UNKNOWN";
-    const statusMap: Record<string, TestStatus> = {
-      PASSED: "PASSED",
-      FAILED: "FAILED",
-      SKIPPED: "SKIPPED",
-      RUNNING: "RUNNING",
-      UNKNOWN: "UNKNOWN",
-      BROKEN: "BROKEN",
-      TIMEDOUT: "TIMEDOUT",
-      INTERRUPTED: "INTERRUPTED",
-    };
-    return (statusMap[status.toUpperCase()] || "UNKNOWN") as TestStatus;
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + " " + date.toLocaleTimeString();
   };
 
+  const formatDurationValue = (duration?: number) => {
+    if (!Number.isFinite(duration)) {
+      return "0s";
+    }
+    return humanizeDuration(duration as number, 1_000);
+  };
+
   const calculateAggregateStats = (runs: RunStat[]) => {
-    const stats = {
+    const stats: AggregateStats = {
       totalRuns: runs.length,
       totalTests: 0,
+      avgTests: 0,
       passed: 0,
       failed: 0,
       skipped: 0,
@@ -114,6 +119,8 @@ export function MarkerStatsPage() {
       timedout: 0,
       interrupted: 0,
       unknown: 0,
+      avgPassed: 0,
+      avgFailed: 0,
     };
 
     runs.forEach((run) => {
@@ -126,6 +133,11 @@ export function MarkerStatsPage() {
       stats.interrupted += run.interrupted || 0;
       stats.unknown += run.unknown || 0;
     });
+
+    stats.avgTests =
+      stats.totalRuns > 0 ? stats.totalTests / stats.totalRuns : 0;
+    stats.avgPassed = stats.totalRuns > 0 ? stats.passed / stats.totalRuns : 0;
+    stats.avgFailed = stats.totalRuns > 0 ? stats.failed / stats.totalRuns : 0;
 
     return stats;
   };
@@ -149,34 +161,19 @@ export function MarkerStatsPage() {
         const passRate =
           run.total > 0 ? ((run.passed / run.total) * 100).toFixed(1) : 0;
         return {
-          name: `Run ${index + 1}`,
+          name: run.name || `Run ${index + 1}`,
           runId: run.runId.substring(0, 8),
           passed: run.passed,
+          flaky: run.flaky,
           failed: run.failed,
           skipped: run.skipped,
+          duration: run.duration,
           total: run.total,
           passRate: parseFloat(passRate as string),
           date: date.toLocaleDateString(),
           fullDate: date.toLocaleString(),
         };
       });
-  };
-
-  const prepareStatusDistribution = (runs: RunStat[]) => {
-    const aggregateStats = calculateAggregateStats(runs);
-    return [
-      { name: "Passed", value: aggregateStats.passed, fill: "#10b981" },
-      { name: "Failed", value: aggregateStats.failed, fill: "#ef4444" },
-      { name: "Skipped", value: aggregateStats.skipped, fill: "#f59e0b" },
-      { name: "Broken", value: aggregateStats.broken, fill: "#f97316" },
-      { name: "Timedout", value: aggregateStats.timedout, fill: "#ec4899" },
-      {
-        name: "Interrupted",
-        value: aggregateStats.interrupted,
-        fill: "#8b5cf6",
-      },
-      { name: "Unknown", value: aggregateStats.unknown, fill: "#6b7280" },
-    ].filter((item) => item.value > 0);
   };
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -190,15 +187,22 @@ export function MarkerStatsPage() {
           <p className="text-sm text-(--stitch-on-surface-muted)">
             Run ID: {data.runId}
           </p>
-          <p className="text-sm text-(--stitch-on-surface-muted)">
+          <p className="text-sm text-(--status-success)">
             Passed: {data.passed}
           </p>
-          <p className="text-sm text-(--stitch-on-surface-muted)">
+          <p className="text-sm text-(--status-warning)">Flaky: {data.flaky}</p>
+          <p className="text-sm text-(--status-failure)">
             Failed: {data.failed}
           </p>
           <p className="text-sm text-(--stitch-on-surface-muted)">
-            Total: {data.total}
+            Skipped: {data.skipped}
           </p>
+          <p className="text-sm text-(--stitch-primary)">Total: {data.total}</p>
+          {data.duration !== undefined && (
+            <p className="text-sm text-(--stitch-on-surface-muted)">
+              Duration: {formatDurationValue(data.duration)}
+            </p>
+          )}
           <p className="text-sm text-(--stitch-on-surface-muted)">
             Pass Rate: {data.passRate}%
           </p>
@@ -310,10 +314,10 @@ export function MarkerStatsPage() {
           <CardContent className="py-6">
             <div className="text-center">
               <p className="text-sm text-(--stitch-on-surface-muted) mb-1">
-                Total Tests
+                Avg. Tests
               </p>
               <p className="text-3xl font-bold text-(--stitch-on-surface)">
-                {aggregateStats.totalTests}
+                {aggregateStats.avgTests.toFixed(2)}
               </p>
             </div>
           </CardContent>
@@ -334,10 +338,10 @@ export function MarkerStatsPage() {
           <CardContent className="py-6">
             <div className="text-center">
               <p className="text-sm text-(--stitch-on-surface-muted) mb-1">
-                Passed
+                Avg. Passed
               </p>
               <p className="text-3xl font-bold text-(--status-success)">
-                {aggregateStats.passed}
+                {aggregateStats.avgPassed.toFixed(2)}
               </p>
             </div>
           </CardContent>
@@ -346,10 +350,10 @@ export function MarkerStatsPage() {
           <CardContent className="py-6">
             <div className="text-center">
               <p className="text-sm text-(--stitch-on-surface-muted) mb-1">
-                Failed
+                Avg. Failed
               </p>
               <p className="text-3xl font-bold text-(--status-failure)">
-                {aggregateStats.failed}
+                {aggregateStats.avgFailed.toFixed(2)}
               </p>
             </div>
           </CardContent>
@@ -410,19 +414,19 @@ export function MarkerStatsPage() {
         </Card>
       )}
 
-      {/* Passes and Failures Timeline */}
+      {/* Status Distribution Over Time */}
       {runs.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <TrendingUp className="h-5 w-5 text-(--status-timedout)" />
-              <span>Passes and Failures Over Time</span>
+              <span>Status Distribution Over Time</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="w-full h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart
+                <AreaChart
                   data={prepareTimelineData(runs)}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
@@ -447,42 +451,72 @@ export function MarkerStatsPage() {
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="passed"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    dot={{ fill: "#10b981", r: 4 }}
-                    activeDot={{ r: 6 }}
-                    name="Passed"
-                  />
-                  <Line
+
+                  <Area
                     type="monotone"
                     dataKey="failed"
+                    stackId={"status"}
                     stroke="#ef4444"
+                    fill="#ef4444"
                     strokeWidth={2}
                     dot={{ fill: "#ef4444", r: 4 }}
                     activeDot={{ r: 6 }}
                     name="Failed"
                   />
-                </LineChart>
+                  <Area
+                    type="monotone"
+                    dataKey="flaky"
+                    stackId={"status"}
+                    stroke="#f59e0b"
+                    fill="#f59e0b"
+                    strokeWidth={2}
+                    dot={{ fill: "#f59e0b", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Flaky"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="skipped"
+                    stackId={"status"}
+                    stroke="#6b7280"
+                    fill="#6b7280"
+                    strokeWidth={2}
+                    dot={{ fill: "#6b7280", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Skipped"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="passed"
+                    stackId={"status"}
+                    stroke="#10b981"
+                    fill="#10b981"
+                    strokeWidth={2}
+                    dot={{ fill: "#10b981", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Passed"
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Test Status Distribution */}
+      {/* Test Duration graph */}
       {runs.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Test Status Distribution</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <TrendingUp className="h-5 w-5 text-(--status-timedout)" />
+              <span>Test Duration Over Time</span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="w-full h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={prepareStatusDistribution(runs)}
+                <LineChart
+                  data={prepareTimelineData(runs)}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
                   <CartesianGrid
@@ -496,18 +530,30 @@ export function MarkerStatsPage() {
                   />
                   <YAxis
                     label={{
-                      value: "Count",
+                      value: "Duration",
                       angle: -90,
                       position: "insideLeft",
                       style: { fontSize: 12 },
                     }}
+                    tickFormatter={(value) =>
+                      formatDurationValue(Number(value))
+                    }
                     tick={{ fontSize: 12 }}
+                    width={96}
                     className="text-(--stitch-on-surface-muted)"
                   />
-                  <Tooltip />
+                  <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Bar dataKey="value" name="Tests" />
-                </BarChart>
+                  <Line
+                    type="monotone"
+                    dataKey="duration"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={{ fill: "#10b981", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Duration"
+                  />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -530,19 +576,13 @@ export function MarkerStatsPage() {
                 <thead className="bg-(--stitch-surface-card)">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider">
-                      Run ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider">
                       Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider">
-                      Status
+                      Stats
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider">
-                      Tests
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider">
-                      Pass Rate
+                      Total
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider">
                       Duration
@@ -571,14 +611,8 @@ export function MarkerStatsPage() {
                             to={`/runs/${run.runId}`}
                             className="font-mono text-sm text-(--stitch-primary) hover:underline focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded"
                           >
-                            {run.runId.substring(0, 12)}...
+                            {run.name || run.runId.substring(0, 12) + "..."}
                           </Link>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-(--stitch-on-surface)">
-                          {run.runName || "N/A"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge status={getRunStatus(run.status)} />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-(--stitch-on-surface)">
@@ -586,18 +620,29 @@ export function MarkerStatsPage() {
                               {run.passed}
                             </span>
                             {" / "}
+                            <span className="text-(--status-warning) font-semibold">
+                              {run.flaky}
+                            </span>
+                            {" / "}
                             <span className="text-(--status-failure) font-semibold">
                               {run.failed}
                             </span>
                             {" / "}
-                            {run.total}
+                            <span className="text-(--stitch-on-surface-muted) font-semibold">
+                              {run.skipped}
+                            </span>
                           </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-(--stitch-on-surface)">
+                          <span className="text-(--stitch-primary) font-semibold">
+                            {run.total}
+                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-(--stitch-on-surface)">
                           {runPassRate}%
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-(--stitch-on-surface)">
-                          {humanizeDuration(run.duration!, 1_000_000_000)}
+                          {humanizeDuration(run.duration!, 1_000)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-(--stitch-on-surface-muted)">
                           {formatDate(run.createdAt)}
