@@ -19,7 +19,7 @@ import { humanizeDuration } from "@/utils/duration";
 
 interface RunStat {
   runId: string;
-  name?: string;
+  name: string;
   status?: string;
   metadata?: Record<string, any>;
   startTime?: string;
@@ -36,14 +36,12 @@ interface RunStat {
   timedout?: number;
   interrupted?: number;
   unknown?: number;
-  flaky?: number;
+  flaky: number;
 }
 
 interface MarkerStatsResponse {
   marker: string;
   runs: RunStat[];
-  total: number;
-  count: number;
 }
 
 type AggregateStats = {
@@ -77,7 +75,7 @@ export function MarkerStatsPage() {
     try {
       setLoading(true);
       const response = await fetch(
-        apiUrl(`/marker/${encodeURIComponent(marker)}/stats?limit=100`),
+        apiUrl(`/marker/${encodeURIComponent(marker)}/stats`),
       );
       if (!response.ok) {
         throw new Error(`Failed to fetch marker stats: ${response.statusText}`);
