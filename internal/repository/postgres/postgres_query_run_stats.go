@@ -40,7 +40,7 @@ func (r *PostgresRepository) GetRunStatsByMarker(ctx context.Context, marker str
 	if err := r.db.
 		WithContext(ctx).
 		Joins("JOIN runs ON runs.id = run_stats.run_id").
-		Where("runs.metadata ->> 'MARKER' = ?", marker).
+		Where("TRIM(runs.metadata ->> 'MARKER') = ?", marker).
 		Order(clause.OrderBy{Columns: []clause.OrderByColumn{
 			{
 				Column: clause.Column{Name: "created_at"},

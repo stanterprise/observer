@@ -451,21 +451,11 @@ export function MarkerStatsPage() {
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="passed"
-                    stackId={1}
-                    stroke="#10b981"
-                    fill="#10b981"
-                    strokeWidth={2}
-                    dot={{ fill: "#10b981", r: 4 }}
-                    activeDot={{ r: 6 }}
-                    name="Passed"
-                  />
+
                   <Area
                     type="monotone"
                     dataKey="failed"
-                    stackId={2}
+                    stackId={"status"}
                     stroke="#ef4444"
                     fill="#ef4444"
                     strokeWidth={2}
@@ -476,7 +466,7 @@ export function MarkerStatsPage() {
                   <Area
                     type="monotone"
                     dataKey="flaky"
-                    stackId={3}
+                    stackId={"status"}
                     stroke="#f59e0b"
                     fill="#f59e0b"
                     strokeWidth={2}
@@ -487,13 +477,24 @@ export function MarkerStatsPage() {
                   <Area
                     type="monotone"
                     dataKey="skipped"
-                    stackId={4}
+                    stackId={"status"}
                     stroke="#6b7280"
                     fill="#6b7280"
                     strokeWidth={2}
                     dot={{ fill: "#6b7280", r: 4 }}
                     activeDot={{ r: 6 }}
                     name="Skipped"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="passed"
+                    stackId={"status"}
+                    stroke="#10b981"
+                    fill="#10b981"
+                    strokeWidth={2}
+                    dot={{ fill: "#10b981", r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Passed"
                   />
                 </AreaChart>
               </ResponsiveContainer>
