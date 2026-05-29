@@ -14,14 +14,13 @@ import {
   RawMessagesRunsPage,
   StyleGuidePage,
 } from "./pages";
-import DashboardPage from "./components/DashboardPage";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<DashboardPage />} />
+          <Route index element={<TestRunsPage />} />
           <Route path="runs">
             <Route index element={<TestRunsPage />} />
             <Route path="raw-messages" element={<RawMessagesRunsPage />} />
