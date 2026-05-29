@@ -585,6 +585,9 @@ export function MarkerStatsPage() {
                       Total
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider">
+                      Pass Rate
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider">
                       Duration
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-(--stitch-on-surface-muted) uppercase tracking-wider">
