@@ -156,12 +156,7 @@ func (h *PostgresHandler) handleRunsStats(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	runStats := make([]m.RunStat, 0, len(stats))
-	for _, stat := range stats {
-		runStats = append(runStats, stat)
-	}
-
-	h.writeJSON(w, map[string]interface{}{"runs": runStats})
+	h.writeJSON(w, map[string]interface{}{"runs": stats})
 }
 
 func (h *PostgresHandler) handleRunDetail(w http.ResponseWriter, r *http.Request) {
@@ -297,50 +292,16 @@ func (h *PostgresHandler) handleMarkerStats(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	limit := int64(100)
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if parsed, err := strconv.ParseInt(l, 10, 64); err == nil && parsed > 0 {
-			limit = parsed
-		}
-	}
-
-	docs, total, err := h.repo.GetRuns(r.Context(), pgRepo.ListRunsFilter{Marker: markerValue}, limit, 0, false)
+	stats, err := h.repo.GetRunStatsByMarker(r.Context(), markerValue)
 	if err != nil {
 		h.logger.Error("failed to fetch marker stats from postgres", "marker", markerValue, "error", err)
 		h.internalError(w)
 		return
 	}
 
-	runs := make([]map[string]interface{}, 0, len(docs))
-	for _, doc := range docs {
-		stats := buildTestStatistics(flattenRunTests(doc))
-		runs = append(runs, map[string]interface{}{
-			"runId":       doc.ID,
-			"runName":     doc.Name,
-			"status":      doc.Status,
-			"metadata":    doc.Metadata,
-			"startTime":   doc.StartTime,
-			"endTime":     doc.EndTime,
-			"duration":    doc.Duration,
-			"createdAt":   doc.CreatedAt,
-			"updatedAt":   doc.UpdatedAt,
-			"total":       stats["total"],
-			"passed":      stats["passed"],
-			"failed":      stats["failed"],
-			"skipped":     stats["skipped"],
-			"running":     stats["running"],
-			"broken":      stats["broken"],
-			"timedout":    stats["timedout"],
-			"interrupted": stats["interrupted"],
-			"unknown":     stats["unknown"],
-		})
-	}
-
 	h.writeJSON(w, map[string]interface{}{
 		"marker": markerValue,
-		"runs":   runs,
-		"total":  total,
-		"count":  len(runs),
+		"runs":   stats,
 	})
 }
 
@@ -587,6 +548,7 @@ func buildTestStatistics(tests []*m.Test) map[string]int {
 		"timedout":    0,
 		"interrupted": 0,
 		"unknown":     0,
+		"flaky":       0,
 	}
 	for _, test := range tests {
 		switch test.Status {
@@ -604,6 +566,8 @@ func buildTestStatistics(tests []*m.Test) map[string]int {
 			stats["timedout"]++
 		case "INTERRUPTED":
 			stats["interrupted"]++
+		case "FLAKY":
+			stats["flaky"]++
 		default:
 			stats["unknown"]++
 		}
