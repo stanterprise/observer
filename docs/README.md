@@ -19,6 +19,10 @@ This folder contains the maintained documentation set for Observer.
 - Database schema (MongoDB): [architecture/07-database-schema.md](architecture/07-database-schema.md)
 - Roadmap / next steps: [architecture/10-next-steps.md](architecture/10-next-steps.md)
 
+## Extending Observer
+
+- Plugin development guide (reporters, storage drivers, API handlers, interceptors, event handlers): [PLUGIN_DEVELOPMENT.md](PLUGIN_DEVELOPMENT.md)
+
 ## Integrations
 
 - Playwright reporter integration (practical guide): [PLAYWRIGHT_INTEGRATION.md](PLAYWRIGHT_INTEGRATION.md)
