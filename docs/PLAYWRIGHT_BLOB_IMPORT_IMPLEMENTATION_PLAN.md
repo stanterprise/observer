@@ -496,22 +496,74 @@ Provide secure defaults in code and make the Helm/AIO values explicit.
 
 ## 15. Web UI
 
-Add an `Import run` action to `web/src/pages/TestRunsPage/TestRunsPage.tsx`.
+Add an always-visible `Import run` action beside `Refresh` in `web/src/pages/TestRunsPage/TestRunsPage.tsx`. It is independent of row selection and must remain available when the run list is empty. On narrow screens, allow the header actions to wrap without hiding the import action.
 
-The dialog should:
+Use the existing dialog and style tokens, but create a dedicated `ImportTestRunDialog` because file selection, capability discovery, warnings, and upload state exceed the generic single-input dialog's responsibility.
 
-- Accept one or more `.zip` files through a standard file picker and drag/drop target.
-- Load supported producer/format/version combinations from `GET /api/v1/imports`.
-- Show Playwright blob v2 as the selected report type and submit to `apiUrl(adapter.uploadPath)`.
-- Show file names and sizes before upload and allow removal.
-- Offer an optional display name.
-- Disable submission while empty or uploading.
-- Show upload/import progress as an indeterminate state for the synchronous MVP.
-- Present structured server errors and compatibility guidance.
-- Display non-fatal warnings after success.
-- Refresh the run list and navigate to `/runs/{runId}` after success.
+### Capability discovery and report selection
 
-Use the existing dialog and style tokens, but create a dedicated import dialog component because file selection, warnings, and progress exceed the generic single-input dialog's responsibility.
+- Fetch `GET /api/v1/imports` when the dialog first opens and cache the result for the page session.
+- Render report choices from the capability response rather than hard-coding endpoints.
+- For the MVP, select `Playwright / Blob / v2` and submit to `apiUrl(adapter.uploadPath)`.
+- Keep the report selector visible even with one option so the producer/format/version model is clear and future adapters can appear without redesigning the dialog.
+- If discovery fails or returns no adapters, disable file submission and show a retryable `Import is unavailable` state.
+- Surface advertised file-count, request-size, extension, inline-attachment, and external-attachment capabilities before selection.
+
+### File selection and validation
+
+- Accept one or more `.zip` files through both a native file picker and a keyboard-operable drag/drop target.
+- Show each file's name and human-readable size, the aggregate size, and a remove action.
+- Reject duplicate local files by name/size/last-modified as an early convenience check; the server's content hash remains authoritative.
+- Enforce advertised extension, file-count, and total-request limits client-side for immediate feedback while treating server validation as authoritative.
+- Explain that all selected files become one logical run and that a sharded run must include its complete shard set.
+- Offer an optional, length-limited display name and state that changing the name does not create a duplicate when the same report content already exists.
+- Warn before submission when the server reports `externalAttachments: false` and selected reports may contain artifacts larger than the inline threshold.
+
+### Dialog states
+
+Model the flow explicitly rather than with unrelated booleans:
+
+```text
+loading-capabilities -> ready -> uploading -> success
+                              \-> error -> ready
+```
+
+- `loading-capabilities`: show a compact skeleton/spinner.
+- `ready`: enable Import only when an adapter and valid files are present.
+- `uploading`: lock report/file/name edits, show an indeterminate progress indicator, and label the current phase as `Uploading and processing`. Browser `fetch` does not expose reliable upload progress, so do not display a fabricated percentage.
+- Provide a Cancel action backed by `AbortController`; cancellation must abort the request and return the dialog to `ready` with selected files intact.
+- `error`: preserve correctable input and render the server's stable error code as actionable copy.
+- `success`: show created-versus-existing state, imported counts/statistics, and bounded warnings.
+
+Map important server errors to specific guidance:
+
+- `unsupported_report_version` / `report_version_mismatch`: show detected and supported versions.
+- `incomplete_shard_set`: list missing or duplicate shard indexes when supplied.
+- `upload_too_large`: show the applicable server limit.
+- `attachment_storage_required`: explain that large report artifacts require configured storage.
+- `import_capacity_exceeded`: offer Retry without clearing files.
+- Authentication/authorization failures: do not retry automatically; tell the user access is required.
+
+Do not expose raw backend errors or stack traces in the browser.
+
+### Completion behavior
+
+- On `201`, show `Run imported` with the run ID and summary.
+- On idempotent `200` with `created: false`, show `Run already imported`; do not imply a second run was created.
+- Keep warnings visible in the success state instead of navigating before the user can read them.
+- Provide `View run` as the primary action, navigating to `/runs/{runId}`.
+- Provide `Import another` as a secondary action that clears the completed files and returns to `ready` without refetching capabilities.
+- Refresh the Test Runs list silently after success so closing the dialog reveals the imported/existing run immediately.
+
+### Accessibility and interaction requirements
+
+- Associate all inputs with visible labels and descriptive help text.
+- Make the drop target operable with Enter/Space and retain the native file input for assistive technology.
+- Announce capability errors, upload state, cancellation, success, and import errors through an `aria-live` region.
+- Move focus to the first error on failed validation and to the success heading after completion.
+- Trap focus inside the modal and restore it to the `Import run` button on close; extend the shared `Dialog` component if needed.
+- Do not use color alone for success, warning, error, selected adapter, or drag-active states.
+- Prevent Escape/overlay close while uploading unless it first performs the same abort behavior as Cancel.
 
 ## 16. File-Level Work Plan
 
@@ -544,8 +596,10 @@ Use the existing dialog and style tokens, but create a dedicated import dialog c
 ### Frontend files
 
 - `web/src/pages/TestRunsPage/ImportTestRunDialog.tsx` — new upload UI.
-- `web/src/pages/TestRunsPage/TestRunsPage.tsx` — launch dialog, submit, refresh, navigate.
-- `web/src/types/import.ts` — response and structured error types.
+- `web/src/pages/TestRunsPage/TestRunsPage.tsx` — launch dialog, refresh the list after success, and navigate to the imported run.
+- `web/src/lib/imports.ts` — capability discovery, multipart upload, abort handling, and structured error parsing.
+- `web/src/types/import.ts` — adapter capability, response, warning, statistics, and structured error types.
+- `web/src/components/Dialog.tsx` — add focus trapping/restoration and upload-safe dismissal behavior if the dedicated dialog cannot provide these through existing props.
 
 ## 17. Test Strategy
 
@@ -608,6 +662,16 @@ Create a tiny TypeScript Playwright fixture project in test tooling with an exac
 
 The frontend currently has no test runner. For the MVP, require `npm run build`, `npm run lint`, and a documented manual browser check. Adding a frontend test framework is separate work.
 
+The manual Web UI acceptance check must cover:
+
+- Opening the dialog from an empty and populated Test Runs page.
+- Capability loading, retry, and unavailable states.
+- Picker and keyboard/drag-drop selection, client-side limits, file removal, and optional naming.
+- Upload cancellation and retry with files preserved.
+- New import, idempotent import, warnings, and each structured compatibility/limit error family.
+- Silent list refresh, `View run`, and `Import another` behavior.
+- Keyboard-only operation, focus restoration, `aria-live` announcements, narrow-screen layout, and light/dark variants.
+
 ## 18. Implementation Sequence
 
 ### Phase 1 — Contract and fixtures
@@ -647,10 +711,10 @@ Exit condition: imports work in local, AIO, and distributed configurations withi
 
 ### Phase 5 — Web UI and end-to-end acceptance
 
-1. Add the import dialog and Test Runs action.
-2. Handle success, idempotency, warnings, and structured failures.
-3. Run the real Playwright-blob end-to-end scenario.
-4. Verify run list, detail, retries, steps, logs, and attachments visually.
+1. Add the typed import client, capability-driven dialog, and Test Runs action.
+2. Implement file validation, abortable upload states, success/idempotency summaries, warnings, and structured failures.
+3. Complete focus, keyboard, `aria-live`, responsive, and theme verification.
+4. Run the real Playwright-blob end-to-end scenario and verify run list, detail, retries, steps, logs, and attachments visually.
 
 Exit condition: a user can select Playwright blob files and inspect the complete imported run without a CLI or database intervention.
 
@@ -658,6 +722,9 @@ Exit condition: a user can select Playwright blob files and inspect the complete
 
 - `GET /api/v1/imports` advertises the Playwright blob v2 adapter and its API-base-relative upload path.
 - A valid Playwright blob schema-v2 ZIP imports through `POST /api/v1/imports/playwright/blob/v2` and from the Test Runs page.
+- The Test Runs page exposes an always-available, capability-driven import dialog with multi-file selection, advertised-limit validation, optional naming, and abortable upload.
+- The dialog distinguishes new and idempotent imports, keeps warnings readable, refreshes the list, and links to the resulting run.
+- The import flow is keyboard-operable, announces state changes, traps/restores focus, works on narrow screens, and supports both UI themes.
 - Unknown report types, unsupported versions, and URL/content version mismatches return distinct structured errors.
 - Adding another report adapter requires registering a new tuple and implementation, without changing the Playwright route or generic API handler.
 - Multiple valid shard ZIPs in one request create one logical run with one execution per blob.
