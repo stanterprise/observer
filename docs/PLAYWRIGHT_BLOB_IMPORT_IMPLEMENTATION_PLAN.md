@@ -47,6 +47,7 @@ Because the blob schema is an internal, versioned Playwright format rather than 
 - Single-report runs and multi-blob sharded runs.
 - Multiple projects in a run.
 - Retries and Observer flaky-status aggregation.
+- Playwright expected failures, unexpected passes, annotations, and discovered-but-not-run tests.
 - Nested suites and steps.
 - Test-scoped stdout and stderr.
 - Test and step errors.
@@ -140,6 +141,8 @@ POST /api/v1/imports/playwright/blob/v2
 
 `v1` and `v2` are intentionally independent. A future breaking change to Observer's upload or response contract would use `/api/v2/...`; a new Playwright blob schema would be added alongside the current adapter at `/api/v1/imports/playwright/blob/v3`.
 
+This introduces versioning for the new import surface only. Existing endpoints such as `/api/runs` and `/api/tests` remain unchanged; migrating the entire legacy REST API under `/api/v1` is outside this feature. The frontend's existing `/api` base URL therefore calls import paths beginning with `/v1/imports/...`.
+
 For formats that declare an upstream schema version, `reportVersion` mirrors it. Playwright blob's `v2` route therefore requires `onBlobReportMetadata.params.version == 2`. For formats without a declared version, the segment identifies Observer's compatibility profile for that representation and begins at `v1`. Once published, a profile must not be silently reinterpreted; incompatible parsing changes require a new report-version route.
 
 Use lowercase, URL-safe identifiers:
@@ -176,17 +179,19 @@ It returns the registered adapters and their limits so the web UI and future cli
       "producer": "playwright",
       "format": "blob",
       "reportVersion": "v2",
-      "uploadUrl": "/api/v1/imports/playwright/blob/v2",
+      "uploadPath": "/v1/imports/playwright/blob/v2",
       "fileExtensions": [".zip"],
       "multipleFiles": true,
       "maxFiles": 32,
-      "maxRequestBytes": 536870912
+      "maxRequestBytes": 536870912,
+      "externalAttachments": true,
+      "inlineAttachmentBytes": 102400
     }
   ]
 }
 ```
 
-An optional `GET /api/v1/imports/{producer}/{format}/{reportVersion}` capability endpoint may be added later if per-adapter guidance outgrows the index response.
+`uploadPath` is relative to the configured API base. The frontend resolves it with the existing `apiUrl()` helper, producing `/api/v1/...` by default while still working when `VITE_API_URL` points at another origin or base path. An optional `GET /api/v1/imports/{producer}/{format}/{reportVersion}` capability endpoint may be added later if per-adapter guidance outgrows the index response.
 
 ### Lookup and compatibility errors
 
@@ -241,7 +246,7 @@ Success for a new import:
 - Return structured error JSON with a stable `code`, user-safe `message`, and optional per-file details.
 - Use `400` for malformed multipart or invalid archives, `413` for limits, `415` for media-type mismatch, `422` for a valid but unsupported report version, content/path version mismatch, or inconsistent shard set, `503` when required attachment storage is unavailable, and `500` for unexpected persistence failures.
 
-Suggested error codes include `invalid_archive`, `missing_report_jsonl`, `unsupported_report_type`, `unsupported_report_version`, `report_version_mismatch`, `inconsistent_reports`, `missing_resource`, `upload_too_large`, and `attachment_storage_required`.
+Suggested error codes include `invalid_archive`, `missing_report_jsonl`, `unsupported_report_type`, `unsupported_report_version`, `report_version_mismatch`, `inconsistent_reports`, `incomplete_shard_set`, `upload_too_large`, and `attachment_storage_required`.
 
 ## 8. Identity and Idempotency
 
@@ -249,11 +254,13 @@ Blob reports do not contain an Observer run ID. Generate identities as follows:
 
 1. Compute SHA-256 for each uploaded ZIP while copying it to its bounded temporary file.
 2. Reject duplicate ZIP hashes within one request.
-3. Sort the individual hashes and hash the canonical list with a format/version prefix.
+3. Sort the individual hashes and hash the canonical list with a producer/format/report-version prefix.
 4. Use `pwb-<first 32 hex characters>` as the logical run ID.
 5. Use `pwbx-<first 24 hex characters of the individual ZIP hash>` as each execution ID.
 
 This makes file ordering irrelevant and makes retrying an upload safe. Store the full hashes in `runs.metadata.source`, not only the shortened IDs.
+
+After all file hashes are known, perform an early read-only lookup by run ID and full source digest before parsing or uploading resources. This avoids expensive duplicate work in the common retry case. The advisory-locked check in the final database transaction remains authoritative and closes the concurrency race.
 
 For concurrent duplicate uploads, take a PostgreSQL transaction-scoped advisory lock derived from the run ID. Under the lock:
 
@@ -261,7 +268,17 @@ For concurrent duplicate uploads, take a PostgreSQL transaction-scoped advisory 
 - If the ID exists with different provenance, fail closed as an identity conflict.
 - Otherwise create the entire run in one transaction.
 
-Do not allow a caller-supplied run ID in the MVP. An optional name affects display metadata but not identity.
+Run deletion must acquire the same per-run advisory lock before collecting attachment keys and deleting rows. Acquire locks in sorted run-ID order for multi-delete requests. Otherwise an import can return an idempotent success while the same run is concurrently disappearing.
+
+Do not allow a caller-supplied run ID in the MVP. An optional name affects display metadata but not identity. If the same content is imported again with a different name, return the existing run unchanged and include a warning that the requested name was not applied.
+
+Resolve the run display name in this order:
+
+1. A non-empty, length-limited multipart `name` value.
+2. An allowlisted Playwright run/bot name or tag when it is unambiguous.
+3. `Playwright run <source start time in UTC>`.
+
+This guarantees the non-null `run_stats.name` field without making import time part of deterministic identity.
 
 ## 9. Playwright-to-Observer Mapping
 
@@ -271,10 +288,10 @@ Do not allow a caller-supplied run ID in the MVP. An optional name affects displ
 | `onConfigure.config` | Run metadata | Preserve version, workers, rootDir, tags, and other allowlisted run configuration. |
 | `onProject` | Synthetic project suite | Create one root suite per project. Preserve project name, retries, timeout, and metadata, but do not persist the arbitrary `use` object. |
 | Nested `JsonSuite` | Suite | Derive a stable ID from project, ancestor titles, location, and sibling position. Preserve hierarchy and location. |
-| `JsonTestCase` | Test | Preserve Playwright `testId` as `external_test_id`, title, tags, location, timeout, retries, and repeat index. |
+| `JsonTestCase` | Test | Preserve Playwright `testId` as `external_test_id`, title, tags, location, timeout, retries, repeat index, expected status, and annotations. Create `NOT_RUN` tests even when no result event follows discovery. |
 | `onTestBegin.result` | TestAttempt start | Use `retry` as `attempt_index`, `id` to correlate later events, and convert start milliseconds to `time.Time`. |
-| `onTestEnd.result` | TestAttempt end | Map actual status, duration, errors, annotations, and attachments. |
-| `onStepBegin`/`onStepEnd` | Attempt `steps` JSONB | Correlate by result ID and parent step ID, preserve category/location, and construct a deterministic tree. |
+| `onTestEnd.result` | TestAttempt end | Map semantic Observer status, raw actual/expected status, duration, errors, annotations, and attachments. |
+| `onStepBegin`/`onStepEnd` | Attempt `steps` JSONB | Correlate by result ID and parent step ID, preserve category/location, and construct a deterministic tree. Derive step status from error/completion because Playwright's step-end payload has no explicit status. |
 | `onStdIO` | Attempt stdout/stderr | Decode base64 when indicated; preserve order. Global output is summarized as a warning in the MVP. |
 | `onAttach` | Attempt attachment | Deduplicate against legacy `onTestEnd.result.attachments`; link to a step when the event relationship permits it. |
 | `onError` | Run metadata/global error | Preserve sanitized global error details because the current schema has no run-error table. |
@@ -293,6 +310,18 @@ Do not allow a caller-supplied run ID in the MVP. An optional name affects displ
 
 Retries use the existing attempt aggregation: a failed attempt followed by a passed attempt produces `FLAKY`. Test start/end ranges are derived from their attempts. Suite status and timing are derived bottom-up from descendants. Run status comes from the imported execution end results, with existing logical execution aggregation applied for multiple blobs.
 
+### Expected-status semantics
+
+Observer's visible status must represent Playwright's semantic outcome, not blindly copy `TestResult.status`:
+
+- Actual status matches expected `passed` or `failed`: store Observer attempt status `PASSED` and preserve the raw actual/expected statuses and any error in attempt metadata.
+- Actual `passed` when `failed` was expected: store `FAILED` as an unexpected pass and record the reason in metadata even though no Playwright error may exist.
+- Actual failure/timed out/interrupted when `passed` was expected: use the corresponding Observer failure status.
+- Actual or expected skip: use `SKIPPED` when Playwright reports a skipped result.
+- A discovered test with no result events: use `NOT_RUN` and do not synthesize an attempt.
+
+This representation allows the existing Observer retry aggregation to reproduce Playwright's expected, unexpected, flaky, skipped, and not-run outcomes. It is also required because REST hydration recalculates test status from attempt statuses; setting only the stored test row would be overwritten on read.
+
 ### Duplicate test IDs across blobs
 
 Match Playwright merge semantics:
@@ -302,6 +331,18 @@ Match Playwright merge semantics:
 - All occurrences retain the original Playwright ID in `external_test_id` and provenance metadata.
 
 This handles multi-environment reports without breaking the `(run_id, test_id)` primary key.
+
+### Multi-blob grouping rules
+
+Define exactly which file sets form one logical run in the MVP:
+
+- One unsharded blob is valid.
+- Multiple unsharded blobs are treated as separate executions/environments and may contain duplicate test IDs, which are salted as described above.
+- A sharded import must contain one complete shard set: every blob declares the same positive shard total and indexes cover `1..total` exactly once.
+- Reject incomplete shard sets, duplicate shard indexes, mixed sharded/unsharded blobs, and multiple independent shard groups in one request.
+- Preserve differing environment tags and project names, but reject incompatible root test directories unless they normalize to the same logical root using each blob's declared path separator.
+
+Supporting multiple environments where each environment is itself sharded requires an explicit execution-group key and is deferred. The API must return `incomplete_shard_set` or `inconsistent_reports` rather than silently importing partial results.
 
 ## 10. Parser Design
 
@@ -314,10 +355,12 @@ Implement the adapter in `pkg/importer/playwrightblob`:
 5. Parse JSONL incrementally as an envelope of `method` plus `json.RawMessage` params.
 6. Decode only known events into private typed structs.
 7. Build indexes for projects, tests, result IDs, steps, output, and attachments.
-8. Validate references and terminal events after the stream is consumed.
+8. Validate references, complete result correlation, required terminal events, and the request's multi-blob grouping rules after the stream is consumed.
 9. Normalize each blob into one execution, then merge the executions into one bundle in canonical hash order.
 
 Unknown event methods in schema v2 should produce a warning and be ignored. Unknown required fields or an unknown schema version should fail the import.
+
+A missing attachment resource is not a malformed report. Playwright's blob writer can omit a path attachment if the source file no longer exists when the ZIP is finalized. Preserve the attachment metadata with `available: false`, emit a bounded warning, and continue. Unsafe resource paths, duplicate normalized entries, corrupt resource bytes, or checksum failures remain fatal.
 
 Do not use `bufio.Scanner` with its small default token limit. Use a bounded reader that supports explicitly configured large JSONL records and reports the line number on malformed input.
 
@@ -334,9 +377,15 @@ The service should:
 - Preserve Playwright attachment metadata such as source resource path and optional step ID under namespaced metadata.
 - Track every external storage key created during an import.
 
+Evolve `storage.Driver.Upload` from separate name/MIME arguments to a request object carrying `Name`, `MimeType`, optional declared `Size`, optional `Checksum`, and `Content`. Update local/S3 drivers and live-ingestion callers together. This avoids hidden type assertions and gives storage backends the information needed to choose a bounded upload strategy.
+
 Before the database transaction, store all referenced resources. If parsing, storage, or persistence fails, delete newly created external objects on a best-effort basis and log cleanup failures. If no storage driver is configured, allow only attachments below the configured inline threshold; reject the run before database writes if larger attachments are present.
 
 The MVP should continue storing attachment maps on `test_attempts` because that is the data path currently read by `AttachmentsCard` and `FindAttachmentByStorageKey`. Populating the separate `attachments` table can be a later normalization project and should not block import.
+
+The current S3 driver calls `io.ReadAll`, so adding a shared attachment service alone does not make large imports memory-safe. Refactor `pkg/storage/s3.go` as part of this feature to upload from a seekable temporary file or bounded multipart stream. The shared service should spool a ZIP entry once when the storage backend requires seeking, pass size/checksum metadata through the upload, and remove the spool file afterward. Add cancellation and large-object tests for both local and S3-compatible drivers.
+
+Imported artifacts also need an end-of-life path. Before deleting runs, collect external `storage_key` values from attempt, failure, and error attachment maps; delete the relational rows transactionally; then remove the external objects with retryable, best-effort logging. Because live-ingested runs use the same maps, this closes an existing leak for both live and imported data. If deletion cleanup is intentionally split into a later change, the import feature must be documented as not production-ready for large artifacts.
 
 ## 12. Atomic Persistence
 
@@ -355,12 +404,21 @@ Within one PostgreSQL transaction:
 5. Insert tests.
 6. Insert attempts with steps, outputs, errors, and attachment maps.
 7. Derive and persist test and suite aggregate fields.
-8. Compute `run_stats` using the existing status/statistics rules.
+8. Compute `run_stats` using the existing status-count rules and the imported source duration.
 9. Refresh logical run aggregation from executions.
 
 Prefer create-only semantics for a new content-derived run. Do not partially merge imported content into an existing live run.
 
 No database migration is required for the MVP: provenance and warnings fit in run/execution metadata, and all execution data fits the current relational tables. If asynchronous jobs are added later, introduce a separate `run_imports` table then.
+
+Do not call the current `collectRunStats` duration calculation unchanged for historical imports: it derives duration from database creation time, which would report import processing time or time since an old source run. For imports, set `run_stats.duration` from the logical source run duration in milliseconds while run/test/attempt duration fields remain nanoseconds.
+
+Use these timestamp semantics consistently:
+
+- `started_at` / `finished_at`: source Playwright execution times.
+- Entity `created_at` / `updated_at`: Observer persistence times.
+- `run_stats.created_at`: source run start time so run-list ordering reflects when the test ran, falling back to import time only when source time is unavailable.
+- `runs.metadata.source.imported_at`: Observer import time for auditing.
 
 ## 13. Safety and Resource Limits
 
@@ -372,20 +430,25 @@ Add configurable limits with conservative defaults:
 - Total uncompressed bytes across all ZIPs.
 - ZIP entry count.
 - `report.jsonl` bytes and maximum JSONL record bytes.
+- Total decoded JSONL, output, error, warning, and normalized-bundle bytes.
 - Test, step, output, error, and attachment counts.
 - Per-attachment and total inline attachment bytes.
 - Import processing timeout.
+- Concurrent imports per API instance.
 
 Reject:
 
 - Absolute paths, backslashes used to evade validation, `..`, NULs, symlinks, and duplicate normalized ZIP entry names.
 - Resources outside `resources/`.
 - ZIPs with suspicious compression ratios or declared sizes above configured limits.
-- Missing resource references.
 - Mixed blob schema versions in one request.
-- Shard metadata with inconsistent totals, duplicate shard indexes, or invalid ranges.
+- Incomplete shard sets, mixed sharded/unsharded files, or shard metadata with inconsistent totals, duplicate indexes, or invalid ranges.
 
 Never extract the archive tree to disk. Read validated entries directly from the ZIP. Temporary upload files must use a private directory, restrictive permissions, request-scoped names, and guaranteed cleanup on success, error, cancellation, and panic recovery.
+
+Use `http.MaxBytesReader` before creating the multipart reader and process parts incrementally rather than calling `ParseMultipartForm` without control over its spill behavior. Gate parsing/storage with a small weighted semaphore so several maximum-sized synchronous imports cannot exhaust API memory, temporary disk, database connections, or storage bandwidth. Return `429` or `503` with `import_capacity_exceeded` when capacity cannot be acquired within a short bounded wait.
+
+Cap the number and serialized size of warnings returned to the client. Log the omitted warning count instead of allowing a malformed report to create an unbounded response.
 
 Do not store Playwright's arbitrary `config.use` object wholesale; it can contain credentials, headers, storage state, or other secrets. Persist an allowlisted subset and counts/names for omitted fields.
 
@@ -395,7 +458,9 @@ Do not store Playwright's arbitrary `config.use` object wholesale; it can contai
 
 - Initialize the shared attachment service and tuple-keyed importer registry in `cmd/api/main.go`.
 - Register `GET /api/v1/imports` and `POST /api/v1/imports/{producer}/{format}/{reportVersion}` in a new API handler.
+- Route imports through the API's central authentication middleware when one is configured, and reserve an `imports:create` authorization capability before production auth is enabled. When cookie-based auth is introduced, require the platform's CSRF protection on this multipart write route. Until then, deployments must protect the write endpoint at the gateway consistently with the existing delete/marker endpoints.
 - Ensure request cancellation reaches file copy, parsing, storage, and database calls.
+- Integrate active imports with graceful shutdown: stop admitting new imports, cancel or drain active imports, allow rollback/artifact cleanup to finish, and make shutdown grace compatible with the configured import timeout instead of relying on the API's current fixed five-second window.
 - Add import-specific structured logs: request ID, format, file count, byte counts, schema/producer version, run ID, duration, entity counts, warning count, and outcome.
 - Add counters/histograms when the project adds its metrics endpoint; until then, keep log field names stable.
 
@@ -406,9 +471,11 @@ Nginx defaults are too small for typical blob reports. Add an import-specific `/
 - `client_max_body_size`
 - `client_body_temp_path` where needed
 - longer upload/send/read timeouts than ordinary API calls
-- buffering behavior appropriate for multipart uploads
+- `proxy_request_buffering off` so Nginx does not create a second full temporary copy before the API performs its own bounded spool
 
-Expose matching settings in Helm values for distributed deployments and document ingress-controller body-size/timeouts when ingress is managed outside this chart.
+Expose matching settings in Helm values for distributed deployments and document ingress-controller body-size/timeouts when ingress is managed outside this chart. Mount a dedicated writable `emptyDir` at `IMPORT_TMP_DIR` in the distributed API pod, give it a configurable `sizeLimit`, and include ephemeral-storage requests/limits. The AIO chart's existing `/tmp` volume must be sized and tested for the configured maximum request plus attachment spooling. This keeps imports working if containers later enable `readOnlyRootFilesystem` and prevents node-disk exhaustion.
+
+Distributed mode also needs one authoritative artifact-storage configuration shared by the API importer, processor, and attachment-serving handler. Add chart values/secret wiring for S3-compatible storage, or explicitly support a shared RWX volume for the local driver. Do not use pod-local artifact storage when the API has multiple replicas: an import uploaded by one pod would not be retrievable from another. Capability discovery should indicate whether large external attachments are currently supported.
 
 ### Configuration
 
@@ -418,7 +485,10 @@ Use `IMPORT_`-prefixed environment variables, for example:
 - `IMPORT_MAX_FILES`
 - `IMPORT_MAX_UNCOMPRESSED_BYTES`
 - `IMPORT_MAX_JSONL_RECORD_BYTES`
+- `IMPORT_MAX_DECODED_BYTES`
 - `IMPORT_TIMEOUT`
+- `IMPORT_SHUTDOWN_GRACE`
+- `IMPORT_MAX_CONCURRENT`
 - `IMPORT_TMP_DIR`
 - `IMPORT_INLINE_ATTACHMENT_BYTES`
 
@@ -432,7 +502,7 @@ The dialog should:
 
 - Accept one or more `.zip` files through a standard file picker and drag/drop target.
 - Load supported producer/format/version combinations from `GET /api/v1/imports`.
-- Show Playwright blob v2 as the selected report type and submit to its advertised `uploadUrl`.
+- Show Playwright blob v2 as the selected report type and submit to `apiUrl(adapter.uploadPath)`.
 - Show file names and sizes before upload and allow removal.
 - Offer an optional display name.
 - Disable submission while empty or uploading.
@@ -463,7 +533,10 @@ Use the existing dialog and style tokens, but create a dedicated import dialog c
 
 - `cmd/api/main.go` — construct and register the import handler.
 - `pkg/consumer/nats_test_handlers.go` and `pkg/consumer/nats_step_handlers.go` — use the shared attachment service.
+- `pkg/consumer/nats_consumer.go` and `cmd/processor/main.go` — inject the shared attachment service without changing live event semantics.
 - `pkg/api/rest_postgres.go` or a small query helper — resolve the imported run for the response.
+- `pkg/storage/driver.go`, `pkg/storage/local.go`, `pkg/storage/s3.go`, and storage tests — add upload size/checksum metadata and replace whole-object `io.ReadAll` behavior with bounded seekable/streaming upload support.
+- `internal/repository/postgres/postgres_query_mutations.go` and the delete-run handler — enumerate and clean external attachment objects when a run is deleted.
 - `docker/nginx/nginx.aio.conf.template` and `docker/nginx/nginx.web.conf.template` — import upload limits/timeouts.
 - `Dockerfile.api` and `Dockerfile.aio` — only copy new Go packages; no Node runtime change.
 - Helm values/schema/templates and deployment documentation — expose import settings.
@@ -482,6 +555,7 @@ Generate ZIP fixtures in tests rather than committing large opaque binaries. Cov
 
 - Minimal passing run.
 - Failed, skipped, timed-out, and interrupted results.
+- Expected failure, unexpected pass, annotations, and discovered tests with no result.
 - Retry followed by pass producing flaky status.
 - Multiple projects and nested suites.
 - Nested and incomplete steps.
@@ -490,12 +564,13 @@ Generate ZIP fixtures in tests rather than committing large opaque binaries. Cov
 - `onAttach` plus legacy result attachments without duplication.
 - Windows path separator metadata.
 - Global errors.
-- Multi-shard merge and stable identities independent of upload order.
+- Complete multi-shard merge and stable identities independent of upload order.
+- Incomplete, duplicate, mixed, and incompatible shard sets.
 - Duplicate test IDs across blobs.
 - Malformed JSONL with line-number error.
 - Missing metadata, configure, project, test, result, or end events.
 - Blob versions `1`, `2`, and greater than `2`.
-- Missing resources and unsafe resource paths.
+- Missing resources as warnings, plus corrupt or unsafe resource paths as errors.
 - ZIP bombs, excessive entries, excessive record size, and cancellation.
 
 ### Repository integration tests
@@ -506,26 +581,30 @@ Use the existing PostgreSQL testcontainer approach to verify:
 - Durations are converted to nanoseconds.
 - Attempts, steps, errors, output, and attachments hydrate through current REST queries.
 - Run and test statistics match expected values.
+- Historical source timestamps and `run_stats.duration` are not replaced with import time.
 - Re-import returns the existing run without duplicates.
+- Re-import with a different display name leaves the existing run unchanged and returns a warning.
 - Concurrent identical imports create one run.
 - A forced failure rolls back all relational rows.
 - External attachment cleanup runs after persistence failure.
+- Deleting an imported run attempts cleanup of all external attachment objects.
 
 ### API handler tests
 
-- Capability discovery lists only registered report tuples and their canonical URLs.
+- Capability discovery lists only registered report tuples and API-base-relative upload paths.
 - Exact routing selects the correct producer/format/version adapter.
 - Unknown type, unsupported version, and path/content version mismatch responses.
 - Valid multipart single and multi-file requests.
 - Missing files and malformed route identifiers.
 - Request/file/record limit responses.
+- Import concurrency saturation and bounded-warning responses.
 - Context cancellation and temporary-file cleanup.
 - Stable structured error responses and HTTP codes.
 - `201` new versus `200` idempotent response.
 
 ### End-to-end validation
 
-Create a tiny TypeScript Playwright fixture project in test tooling, generate a real blob with the pinned supported Playwright version, import it, and assert the run through `/api/runs/{runId}`. Include a retry, nested step, stdout, screenshot-like attachment, and trace-like binary attachment. This catches upstream format drift that hand-built fixtures can miss.
+Create a tiny TypeScript Playwright fixture project in test tooling with an exact, lockfile-pinned `@playwright/test` version. Generate a real blob, import it, and assert the run through `/api/runs/{runId}`. Include expected failure, unexpected failure, retry, nested step, stdout, screenshot-like attachment, and trace-like binary attachment. Add an explicit CI target for this contract test; ordinary Go unit tests should not depend on Node or the network. This catches upstream format drift that hand-built fixtures can miss.
 
 The frontend currently has no test runner. For the MVP, require `npm run build`, `npm run lint`, and a documented manual browser check. Adding a frontend test framework is separate work.
 
@@ -542,25 +621,25 @@ Exit condition: the supported format and expected Observer representation are ex
 ### Phase 2 — Parser and normalization
 
 1. Implement safe ZIP validation and incremental JSONL decoding.
-2. Implement project/suite/test discovery and event correlation.
-3. Build attempts, steps, outputs, errors, and attachment references.
-4. Implement deterministic multi-blob merge and validation.
+2. Implement project/suite/test discovery, expected-status normalization, and event correlation.
+3. Build attempts, steps, outputs, errors, and attachment references, including missing-resource warnings.
+4. Implement deterministic multi-blob merge, complete shard-set rules, and cross-platform path validation.
 
 Exit condition: a real blob produces a complete, deterministic `RunImportBundle` without database access.
 
 ### Phase 3 — Storage and persistence
 
 1. Extract the shared attachment service.
-2. Stream blob resources into inline or external storage.
-3. Add atomic PostgreSQL import, advisory-lock idempotency, and cleanup.
-4. Verify hydration through existing REST queries.
+2. Make S3-compatible upload memory-safe and stream/spool blob resources into inline or external storage.
+3. Add early duplicate lookup plus atomic PostgreSQL import, advisory-lock idempotency, source-time statistics, and rollback cleanup.
+4. Integrate attachment cleanup with run deletion and verify hydration through existing REST queries.
 
 Exit condition: imported runs are indistinguishable from live-ingested runs to the current API/UI.
 
 ### Phase 4 — HTTP and deployment
 
 1. Add capability discovery, the versioned multipart endpoint, and structured responses.
-2. Enforce request/archive/entity limits and timeouts.
+2. Enforce request/archive/entity/memory limits, concurrency admission, and timeouts.
 3. Update API wiring, Nginx, AIO, Helm values/schema, and docs.
 4. Add handler and deployment rendering tests.
 
@@ -577,20 +656,27 @@ Exit condition: a user can select Playwright blob files and inspect the complete
 
 ## 19. Acceptance Criteria
 
-- `GET /api/v1/imports` advertises the Playwright blob v2 adapter and its canonical upload URL.
+- `GET /api/v1/imports` advertises the Playwright blob v2 adapter and its API-base-relative upload path.
 - A valid Playwright blob schema-v2 ZIP imports through `POST /api/v1/imports/playwright/blob/v2` and from the Test Runs page.
 - Unknown report types, unsupported versions, and URL/content version mismatches return distinct structured errors.
 - Adding another report adapter requires registering a new tuple and implementation, without changing the Playwright route or generic API handler.
 - Multiple valid shard ZIPs in one request create one logical run with one execution per blob.
+- Incomplete, duplicate, or mixed shard sets are rejected rather than shown as complete runs.
 - Passed, failed, skipped, timed-out, interrupted, and flaky results are represented correctly.
+- Expected failures, unexpected passes, annotations, and discovered-but-not-run tests retain Playwright semantics.
 - Projects, suites, tests, retries, nested steps, stdout/stderr, errors, and attachments appear in existing detail views.
 - All Observer duration fields remain in nanoseconds.
 - Re-uploading the same blobs, in any order, returns the same run without duplicate rows or artifacts.
 - Unsupported versions and malformed or dangerous archives are rejected before database writes.
 - A failed import leaves no relational rows and best-effort removes newly stored external artifacts.
+- Imported run statistics use source execution time and duration, not upload/import duration.
+- Large S3-compatible attachments do not require loading the whole object into API memory.
+- Deleting an imported run performs best-effort external artifact cleanup.
 - The API never extracts untrusted ZIP paths to the filesystem and enforces configured compressed/uncompressed limits.
+- Concurrent imports are admission-controlled and cannot create unbounded in-memory bundles or warning responses.
 - Existing live gRPC/NATS ingestion behavior and tests continue to pass.
 - API, AIO, and Helm deployments expose documented upload size and timeout settings.
+- Distributed API and processor pods use the same durable artifact-storage configuration; imported artifacts remain retrievable across replicas.
 
 ## 20. Follow-Up Opportunities
 
@@ -603,3 +689,13 @@ After the MVP is stable:
 - Normalize attachment metadata into the existing `attachments` table.
 - Emit one summarized `run.imported` WebSocket event.
 - Add JUnit XML through the same `Importer` and `RunImportBundle` boundary.
+
+## 21. Implementation Readiness
+
+With the behaviors above specified, no additional architectural work is required before implementation begins. Phase 1 must still turn three operational choices into checked-in constants/fixtures:
+
+1. Pin the exact `@playwright/test` producer version used for the real schema-v2 contract fixture.
+2. Select and document default upload, decoded-size, attachment, concurrency, and timeout limits for AIO and distributed deployments.
+3. Confirm the MVP policies already assumed by this plan: synchronous request/response, exactly one complete shard group per request, missing attachments as warnings, and expected failures represented as semantic Observer passes with raw status retained in metadata.
+
+These are contract/configuration confirmations, not reasons to redesign the importer. Once fixed in Phase 1 tests and configuration, the remaining work is implementation and verification across the listed parser, storage, repository, API, deployment, and UI files.
