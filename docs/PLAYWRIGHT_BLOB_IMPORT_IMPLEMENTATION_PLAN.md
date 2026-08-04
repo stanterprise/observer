@@ -8,6 +8,7 @@ For the first release:
 
 - Accept one or more Playwright blob `.zip` files in one multipart request.
 - Treat the request as one logical Observer run and each blob as one run execution/shard.
+- Expose it at the versioned report route `POST /api/v1/imports/playwright/blob/v2`.
 - Support Playwright blob schema version `2` only. Reject version `1` and versions newer than `2` with a clear compatibility error.
 - Parse the ZIP and `report.jsonl` directly in Go; do not add Node.js or `@playwright/test` to the API runtime.
 - Build a complete, format-neutral import bundle before persisting it.
@@ -68,7 +69,7 @@ Because the blob schema is an internal, versioned Playwright format rather than 
 
 ```mermaid
 flowchart LR
-  UI["Test Runs import dialog"] -->|"multipart: reports[]"| API["POST /api/imports"]
+  UI["Test Runs import dialog"] -->|"multipart: reports[]"| API["POST /api/v1/imports/playwright/blob/v2"]
   API --> TMP["Bounded temporary files"]
   TMP --> DETECT["Format detection and limits"]
   DETECT --> PW["Playwright blob v2 adapter"]
@@ -86,8 +87,14 @@ The importer writes directly to PostgreSQL rather than publishing thousands of s
 Create `pkg/importer` with an interface such as:
 
 ```go
+type ReportType struct {
+    Producer string
+    Format   string
+    Version  string
+}
+
 type Importer interface {
-    Format() string
+    ReportType() ReportType
     Probe(ctx context.Context, files []SourceFile) (ProbeResult, error)
     Parse(ctx context.Context, files []SourceFile) (*RunImportBundle, error)
 }
@@ -104,19 +111,102 @@ type Importer interface {
 - `Warnings`
 - `Source`, including format, schema version, producer version, hashes, and original filenames
 
-The API handler selects an adapter using the explicit multipart `format` field. For MVP, the accepted value is `playwright-blob`. ZIP content is still probed so a mislabeled or invalid file cannot reach persistence.
+The registry keys adapters by the full `(producer, format, version)` tuple. For the MVP, the only registered tuple is `(playwright, blob, v2)`. The API handler selects the adapter from the URL and the adapter probes the uploaded ZIP content so a mismatched or invalid file cannot reach persistence.
 
 Keep Playwright JSON types private to `pkg/importer/playwrightblob`. Neither API code nor repository code should depend on the upstream event shape.
 
-## 6. Upload API Contract
+## 6. URL and Versioning Structure
+
+Use this canonical route shape for all report imports:
+
+```text
+/api/{apiVersion}/imports/{producer}/{format}/{reportVersion}
+```
+
+The segments have distinct responsibilities:
+
+| Segment | Meaning | Example |
+| --- | --- | --- |
+| `apiVersion` | Observer's HTTP request/response contract | `v1` |
+| `producer` | Framework or ecosystem that produced the report | `playwright` |
+| `format` | Report representation within that ecosystem | `blob` |
+| `reportVersion` | Version of the supported report schema/profile | `v2` |
+
+The first supported upload URL is:
+
+```text
+POST /api/v1/imports/playwright/blob/v2
+```
+
+`v1` and `v2` are intentionally independent. A future breaking change to Observer's upload or response contract would use `/api/v2/...`; a new Playwright blob schema would be added alongside the current adapter at `/api/v1/imports/playwright/blob/v3`.
+
+For formats that declare an upstream schema version, `reportVersion` mirrors it. Playwright blob's `v2` route therefore requires `onBlobReportMetadata.params.version == 2`. For formats without a declared version, the segment identifies Observer's compatibility profile for that representation and begins at `v1`. Once published, a profile must not be silently reinterpreted; incompatible parsing changes require a new report-version route.
+
+Use lowercase, URL-safe identifiers:
+
+- `producer` and `format`: `^[a-z][a-z0-9-]*$`
+- `reportVersion`: `^v[1-9][0-9]*$`
+
+Illustrative future routes—not commitments to implement them in this work—include:
+
+| Report family | Canonical upload URL |
+| --- | --- |
+| Playwright blob schema 2 | `/api/v1/imports/playwright/blob/v2` |
+| Playwright blob schema 3 | `/api/v1/imports/playwright/blob/v3` |
+| Playwright JSON compatibility profile 1 | `/api/v1/imports/playwright/json/v1` |
+| JUnit XML compatibility profile 1 | `/api/v1/imports/junit/xml/v1` |
+| pytest JSON compatibility profile 1 | `/api/v1/imports/pytest/json/v1` |
+
+Do not add a generic auto-detecting upload endpoint such as `POST /api/v1/imports` in the MVP. Explicit routing makes compatibility deterministic, makes authorization/rate limits configurable per report family, and prevents the meaning of an existing URL from changing when adapters are added.
+
+### Capability discovery
+
+Provide a read-only discovery endpoint:
+
+```text
+GET /api/v1/imports
+```
+
+It returns the registered adapters and their limits so the web UI and future clients do not hard-code the list:
+
+```json
+{
+  "data": [
+    {
+      "producer": "playwright",
+      "format": "blob",
+      "reportVersion": "v2",
+      "uploadUrl": "/api/v1/imports/playwright/blob/v2",
+      "fileExtensions": [".zip"],
+      "multipleFiles": true,
+      "maxFiles": 32,
+      "maxRequestBytes": 536870912
+    }
+  ]
+}
+```
+
+An optional `GET /api/v1/imports/{producer}/{format}/{reportVersion}` capability endpoint may be added later if per-adapter guidance outgrows the index response.
+
+### Lookup and compatibility errors
+
+Route all canonical uploads through one parameterized handler and then look up the exact tuple in the registry:
+
+- Unknown `producer` or `format`: `404` with `unsupported_report_type`.
+- Known producer/format but unknown `reportVersion`: `422` with `unsupported_report_version` and `supportedVersions`.
+- Uploaded content whose detected version differs from the URL: `422` with `report_version_mismatch`, `requestedVersion`, and `detectedVersion`.
+- A recognized version that cannot be parsed safely: `422` with the adapter-specific compatibility error.
+
+Do not redirect between report-version upload routes. A client must consciously select the matching adapter.
+
+## 7. Upload API Contract
 
 Register a new route:
 
 ```text
-POST /api/imports
+POST /api/v1/imports/playwright/blob/v2
 Content-Type: multipart/form-data
 
-format=playwright-blob
 name=<optional display name>
 reports=<one or more .zip files>
 ```
@@ -128,7 +218,11 @@ Success for a new import:
   "data": {
     "runId": "pwb-<digest>",
     "created": true,
-    "format": "playwright-blob",
+    "reportType": {
+      "producer": "playwright",
+      "format": "blob",
+      "version": "v2"
+    },
     "files": 4,
     "warnings": [],
     "statistics": {
@@ -145,11 +239,11 @@ Success for a new import:
 - Return `201 Created` for a new run.
 - Return `200 OK` with `created: false` when the exact same set of blobs was imported previously.
 - Return structured error JSON with a stable `code`, user-safe `message`, and optional per-file details.
-- Use `400` for malformed multipart or invalid archives, `413` for limits, `415` for format mismatch, `422` for a valid but unsupported blob version or inconsistent shard set, `503` when required attachment storage is unavailable, and `500` for unexpected persistence failures.
+- Use `400` for malformed multipart or invalid archives, `413` for limits, `415` for media-type mismatch, `422` for a valid but unsupported report version, content/path version mismatch, or inconsistent shard set, `503` when required attachment storage is unavailable, and `500` for unexpected persistence failures.
 
-Suggested error codes include `invalid_archive`, `missing_report_jsonl`, `unsupported_blob_version`, `inconsistent_reports`, `missing_resource`, `upload_too_large`, and `attachment_storage_required`.
+Suggested error codes include `invalid_archive`, `missing_report_jsonl`, `unsupported_report_type`, `unsupported_report_version`, `report_version_mismatch`, `inconsistent_reports`, `missing_resource`, `upload_too_large`, and `attachment_storage_required`.
 
-## 7. Identity and Idempotency
+## 8. Identity and Idempotency
 
 Blob reports do not contain an Observer run ID. Generate identities as follows:
 
@@ -169,7 +263,7 @@ For concurrent duplicate uploads, take a PostgreSQL transaction-scoped advisory 
 
 Do not allow a caller-supplied run ID in the MVP. An optional name affects display metadata but not identity.
 
-## 8. Playwright-to-Observer Mapping
+## 9. Playwright-to-Observer Mapping
 
 | Playwright source | Observer target | Rule |
 | --- | --- | --- |
@@ -209,7 +303,7 @@ Match Playwright merge semantics:
 
 This handles multi-environment reports without breaking the `(run_id, test_id)` primary key.
 
-## 9. Parser Design
+## 10. Parser Design
 
 Implement the adapter in `pkg/importer/playwrightblob`:
 
@@ -227,7 +321,7 @@ Unknown event methods in schema v2 should produce a warning and be ignored. Unkn
 
 Do not use `bufio.Scanner` with its small default token limit. Use a bounded reader that supports explicitly configured large JSONL records and reports the line number on malformed input.
 
-## 10. Attachment Handling
+## 11. Attachment Handling
 
 Extract attachment processing from the private NATS consumer method into a shared service used by live ingestion and imports.
 
@@ -244,7 +338,7 @@ Before the database transaction, store all referenced resources. If parsing, sto
 
 The MVP should continue storing attachment maps on `test_attempts` because that is the data path currently read by `AttachmentsCard` and `FindAttachmentByStorageKey`. Populating the separate `attachments` table can be a later normalization project and should not block import.
 
-## 11. Atomic Persistence
+## 12. Atomic Persistence
 
 Add a purpose-built repository method rather than calling the existing event-oriented methods one at a time:
 
@@ -268,7 +362,7 @@ Prefer create-only semantics for a new content-derived run. Do not partially mer
 
 No database migration is required for the MVP: provenance and warnings fit in run/execution metadata, and all execution data fits the current relational tables. If asynchronous jobs are added later, introduce a separate `run_imports` table then.
 
-## 12. Safety and Resource Limits
+## 13. Safety and Resource Limits
 
 Add configurable limits with conservative defaults:
 
@@ -295,19 +389,19 @@ Never extract the archive tree to disk. Read validated entries directly from the
 
 Do not store Playwright's arbitrary `config.use` object wholesale; it can contain credentials, headers, storage state, or other secrets. Persist an allowlisted subset and counts/names for omitted fields.
 
-## 13. API and Deployment Changes
+## 14. API and Deployment Changes
 
 ### Backend
 
-- Initialize the shared attachment service and importer registry in `cmd/api/main.go`.
-- Register `POST /api/imports` in a new API handler.
+- Initialize the shared attachment service and tuple-keyed importer registry in `cmd/api/main.go`.
+- Register `GET /api/v1/imports` and `POST /api/v1/imports/{producer}/{format}/{reportVersion}` in a new API handler.
 - Ensure request cancellation reaches file copy, parsing, storage, and database calls.
 - Add import-specific structured logs: request ID, format, file count, byte counts, schema/producer version, run ID, duration, entity counts, warning count, and outcome.
 - Add counters/histograms when the project adds its metrics endpoint; until then, keep log field names stable.
 
 ### Reverse proxy and Helm
 
-Nginx defaults are too small for typical blob reports. Add an import-specific location or configuration that sets:
+Nginx defaults are too small for typical blob reports. Add an import-specific `/api/v1/imports/` location or configuration that sets:
 
 - `client_max_body_size`
 - `client_body_temp_path` where needed
@@ -330,14 +424,15 @@ Use `IMPORT_`-prefixed environment variables, for example:
 
 Provide secure defaults in code and make the Helm/AIO values explicit.
 
-## 14. Web UI
+## 15. Web UI
 
 Add an `Import run` action to `web/src/pages/TestRunsPage/TestRunsPage.tsx`.
 
 The dialog should:
 
 - Accept one or more `.zip` files through a standard file picker and drag/drop target.
-- Show Playwright blob as the selected format; keep the UI shape ready for future formats.
+- Load supported producer/format/version combinations from `GET /api/v1/imports`.
+- Show Playwright blob v2 as the selected report type and submit to its advertised `uploadUrl`.
 - Show file names and sizes before upload and allow removal.
 - Offer an optional display name.
 - Disable submission while empty or uploading.
@@ -348,12 +443,12 @@ The dialog should:
 
 Use the existing dialog and style tokens, but create a dedicated import dialog component because file selection, warnings, and progress exceed the generic single-input dialog's responsibility.
 
-## 15. File-Level Work Plan
+## 16. File-Level Work Plan
 
 ### New backend files
 
-- `pkg/importer/importer.go` — adapter interface, source file, normalized bundle, and common errors.
-- `pkg/importer/registry.go` — format registration and lookup.
+- `pkg/importer/importer.go` — report-type tuple, adapter interface, source file, normalized bundle, and common errors.
+- `pkg/importer/registry.go` — `(producer, format, version)` registration, exact lookup, and capability listing.
 - `pkg/importer/playwrightblob/types.go` — private schema-v2 JSON event types.
 - `pkg/importer/playwrightblob/parser.go` — ZIP validation and streaming JSONL decoder.
 - `pkg/importer/playwrightblob/builder.go` — event correlation and normalized bundle construction.
@@ -362,7 +457,7 @@ Use the existing dialog and style tokens, but create a dedicated import dialog c
 - `pkg/importer/playwrightblob/status.go` — status and aggregate conversion.
 - `pkg/attachments/service.go` — shared inline/external attachment processing and cleanup tracking.
 - `internal/repository/postgres/postgres_import.go` — atomic bundle persistence and idempotency.
-- `pkg/api/imports.go` — multipart handler, limits, response, and error mapping.
+- `pkg/api/imports.go` — capability index, versioned multipart handler, limits, response, and error mapping.
 
 ### Existing backend files
 
@@ -379,7 +474,7 @@ Use the existing dialog and style tokens, but create a dedicated import dialog c
 - `web/src/pages/TestRunsPage/TestRunsPage.tsx` — launch dialog, submit, refresh, navigate.
 - `web/src/types/import.ts` — response and structured error types.
 
-## 16. Test Strategy
+## 17. Test Strategy
 
 ### Parser unit tests
 
@@ -418,8 +513,11 @@ Use the existing PostgreSQL testcontainer approach to verify:
 
 ### API handler tests
 
+- Capability discovery lists only registered report tuples and their canonical URLs.
+- Exact routing selects the correct producer/format/version adapter.
+- Unknown type, unsupported version, and path/content version mismatch responses.
 - Valid multipart single and multi-file requests.
-- Missing/unknown format and missing files.
+- Missing files and malformed route identifiers.
 - Request/file/record limit responses.
 - Context cancellation and temporary-file cleanup.
 - Stable structured error responses and HTTP codes.
@@ -431,12 +529,12 @@ Create a tiny TypeScript Playwright fixture project in test tooling, generate a 
 
 The frontend currently has no test runner. For the MVP, require `npm run build`, `npm run lint`, and a documented manual browser check. Adding a frontend test framework is separate work.
 
-## 17. Implementation Sequence
+## 18. Implementation Sequence
 
 ### Phase 1 — Contract and fixtures
 
 1. Capture a real schema-v2 blob and document the supported producer version.
-2. Define normalized import types, errors, limits, status mapping, and ID rules.
+2. Define report-type URL conventions, tuple-keyed registry behavior, normalized import types, errors, limits, status mapping, and ID rules.
 3. Add generated ZIP fixture helpers and parser contract tests.
 
 Exit condition: the supported format and expected Observer representation are executable tests.
@@ -461,7 +559,7 @@ Exit condition: imported runs are indistinguishable from live-ingested runs to t
 
 ### Phase 4 — HTTP and deployment
 
-1. Add the multipart endpoint and structured responses.
+1. Add capability discovery, the versioned multipart endpoint, and structured responses.
 2. Enforce request/archive/entity limits and timeouts.
 3. Update API wiring, Nginx, AIO, Helm values/schema, and docs.
 4. Add handler and deployment rendering tests.
@@ -477,9 +575,12 @@ Exit condition: imports work in local, AIO, and distributed configurations withi
 
 Exit condition: a user can select Playwright blob files and inspect the complete imported run without a CLI or database intervention.
 
-## 18. Acceptance Criteria
+## 19. Acceptance Criteria
 
-- A valid Playwright blob schema-v2 ZIP imports from the Test Runs page.
+- `GET /api/v1/imports` advertises the Playwright blob v2 adapter and its canonical upload URL.
+- A valid Playwright blob schema-v2 ZIP imports through `POST /api/v1/imports/playwright/blob/v2` and from the Test Runs page.
+- Unknown report types, unsupported versions, and URL/content version mismatches return distinct structured errors.
+- Adding another report adapter requires registering a new tuple and implementation, without changing the Playwright route or generic API handler.
 - Multiple valid shard ZIPs in one request create one logical run with one execution per blob.
 - Passed, failed, skipped, timed-out, interrupted, and flaky results are represented correctly.
 - Projects, suites, tests, retries, nested steps, stdout/stderr, errors, and attachments appear in existing detail views.
@@ -491,7 +592,7 @@ Exit condition: a user can select Playwright blob files and inspect the complete
 - Existing live gRPC/NATS ingestion behavior and tests continue to pass.
 - API, AIO, and Helm deployments expose documented upload size and timeout settings.
 
-## 19. Follow-Up Opportunities
+## 20. Follow-Up Opportunities
 
 After the MVP is stable:
 
