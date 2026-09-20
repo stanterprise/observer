@@ -163,8 +163,8 @@ Validate external dependencies are configured when embedded services are disable
 Validate distributed-mode configuration before rendering resources.
 */}}
 {{- define "observer.validateDistributedConfig" -}}
-{{- include "observer.validateExternalDependencies" . -}}
 {{- if and (eq .Values.mode "distributed") .Values.distributed.enabled -}}
+{{- include "observer.validateExternalDependencies" . -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.ingestion.env" "env" (.Values.distributed.ingestion.env | default dict)) -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.api.env" "env" (.Values.distributed.api.env | default dict)) -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.processor.env" "env" (.Values.distributed.processor.env | default dict)) -}}
@@ -215,7 +215,7 @@ Database connection string (MongoDB URI)
 {{- define "observer.database.url" -}}
 {{- if .Values.mongodb.enabled }}
 {{- $user := index .Values.mongodb.auth.usernames 0 | default "observer" }}
-{{- $password := index .Values.mongodb.auth.passwords 0 | default "password" }}
+{{- $password := index .Values.mongodb.auth.passwords 0 | default "" }}
 {{- $database := index .Values.mongodb.auth.databases 0 | default "observer" }}
 {{- printf "mongodb://%s:%s@%s-mongodb:27017/%s?authSource=%s" $user $password (include "observer.fullname" .) $database $database }}
 {{- else }}
@@ -274,9 +274,9 @@ PostgreSQL Password
 */}}
 {{- define "observer.postgres.password" -}}
 {{- if .Values.postgresql.enabled -}}
-{{- .Values.postgresql.auth.password | default "password" -}}
+{{- .Values.postgresql.auth.password | default "" -}}
 {{- else -}}
-{{- .Values.postgres.password | default "password" -}}
+{{- .Values.postgres.password | default "" -}}
 {{- end -}}
 {{- end }}
 

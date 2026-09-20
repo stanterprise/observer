@@ -86,7 +86,7 @@ postgres:
   host: ""
   port: 5432
   username: observer
-  password: password
+  password: "" # Use existingSecret to provide credentials in production
   database: observer
   sslmode: disable
 
@@ -97,9 +97,9 @@ postgresql:
     repository: bitnamilegacy/postgresql
   auth:
     username: observer
-    password: password
+    password: "" # Provide through a Secret or deployment-time values
     database: observer
-    postgresPassword: password
+    postgresPassword: "" # Provide through a Secret or deployment-time values
   architecture: standalone
   primary:
     persistence:

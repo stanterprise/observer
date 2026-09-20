@@ -204,9 +204,9 @@ postgresql:
     repository: bitnamilegacy/postgresql
   auth:
     username: observer
-    password: "" # Helm hook will generate this for embedded mode
+    password: "" # Provide through a Secret or deployment-time values
     database: observer
-    postgresPassword: "" # Helm hook will generate this for embedded mode
+    postgresPassword: "" # Provide through a Secret or deployment-time values
   architecture: standalone
   primary:
     persistence:
@@ -230,11 +230,11 @@ mongodb:
   auth:
     enabled: true
     rootUser: root
-    rootPassword: "" # Helm hook will generate this for embedded mode
+    rootPassword: "" # Provide through a Secret or deployment-time values
     usernames:
       - observer
     passwords:
-      - "" # Helm hook will generate this for embedded mode
+      - "" # Provide through a Secret or deployment-time values
     databases:
       - observer
   persistence:

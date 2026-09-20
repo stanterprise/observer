@@ -104,6 +104,11 @@ jobs:
             --set nats.enabled=false \
             --set externalNats.url=nats://nats.example.com:4222
 
+      - name: Validate chart contract and packaged artifact
+        env:
+          HELM_REQUIRE_DEPENDENCIES: "true"
+        run: scripts/test-helm-chart.sh
+
   package-push:
     runs-on: ubuntu-latest
     needs: lint-test
@@ -159,6 +164,10 @@ jobs:
       - name: Package Helm chart
         run: |
           helm package charts/observer --version ${{ steps.version.outputs.version }}
+
+      - name: Validate exact packaged chart before push
+        run: |
+          HELM_REQUIRE_DEPENDENCIES=true scripts/test-helm-chart.sh observer-${{ steps.version.outputs.version }}.tgz
 
       - name: Push Helm chart to OCI registry
         run: |

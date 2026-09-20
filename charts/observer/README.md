@@ -65,8 +65,8 @@ Shipped presets:
 **Password Defaults:**
 
 - The chart no longer ships with reusable password defaults in public values.
-- For embedded dependencies (AIO or development), the Helm hook generates random passwords.
-- For production, use external Secrets or pre-provisioned Secret values.
+- For embedded dependencies, provide dependency credentials through a Secret or deployment-time values.
+- For production, use external Secrets or pre-provisioned Secret values; credentials are never supplied by chart defaults.
 
 **Exposure and Networking:**
 
