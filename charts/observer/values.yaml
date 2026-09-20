@@ -58,6 +58,8 @@ aio:
     NATS_URL: nats://localhost:4222
     NATS_STREAM: tests_events
     NATS_WS_CONSUMER: websocket
+    IMPORT_TMP_DIR: /tmp
+    IMPORT_MAX_CONCURRENCY: "2"
 
   # gRPC LoadBalancer for direct external access (alternative to Ingress)
   grpcLoadBalancer:
@@ -152,6 +154,8 @@ distributed:
       NATS_STREAM: tests_events
       NATS_WS_CONSUMER: websocket
       CORS_ALLOWED_ORIGINS: "*"
+      IMPORT_TMP_DIR: /tmp
+      IMPORT_MAX_CONCURRENCY: "2"
 
   # Web UI configuration
   web:
