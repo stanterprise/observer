@@ -88,16 +88,38 @@ spec:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: NATS_URL
+        {{- if and (not .Values.runtime.existingSecret) .Values.postgresql.enabled }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.fullname" . }}-postgresql
+              key: password
+        {{- end }}
         - name: POSTGRES_DSN
+          {{- if and (not .Values.runtime.existingSecret) .Values.postgresql.enabled }}
+          value: {{ include "observer.embeddedPostgresDsn" . | quote }}
+          {{- else }}
           valueFrom:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: POSTGRES_DSN
+          {{- end }}
+        {{- if and (not .Values.runtime.existingSecret) .Values.mongodb.enabled }}
+        - name: MONGODB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.fullname" . }}-mongodb
+              key: mongodb-root-password
+        {{- end }}
         - name: MONGODB_URI
+          {{- if and (not .Values.runtime.existingSecret) .Values.mongodb.enabled }}
+          value: {{ include "observer.embeddedMongoDbUri" . | quote }}
+          {{- else }}
           valueFrom:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: MONGODB_URI
+          {{- end }}
 {{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.processor.env "excluded" (list "NATS_URL" "POSTGRES_DSN" "MONGODB_URI")) | nindent 8 }}
         {{- with .Values.extraEnv }}
         {{- range $key, $value := . }}

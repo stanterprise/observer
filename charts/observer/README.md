@@ -65,8 +65,8 @@ Shipped presets:
 **Password Defaults:**
 
 - The chart no longer ships with reusable password defaults in public values.
-- For embedded dependencies, provide dependency credentials through a Secret or deployment-time values.
-- For production, use external Secrets or pre-provisioned Secret values; credentials are never supplied by chart defaults.
+- For embedded dependencies, the bundled dependency charts generate random credentials and Observer workloads consume those dependency Secrets directly.
+- For external dependencies, use `runtime.existingSecret` or external Secret-backed values; reusable credentials are never supplied by chart defaults.
 
 **Exposure and Networking:**
 

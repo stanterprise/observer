@@ -43,8 +43,19 @@ spec:
               name: {{ include "observer.runtimeSecretName" . }}
               key: POSTGRES_DSN
         {{- else }}
+        {{- if .Values.postgresql.enabled }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "observer.fullname" . }}-postgresql
+              key: password
+        {{- end }}
         - name: POSTGRES_DSN
+          {{- if .Values.postgresql.enabled }}
+          value: {{ include "observer.embeddedPostgresDsn" . | quote }}
+          {{- else }}
           value: {{ include "observer.postgres.dsn" . | quote }}
+          {{- end }}
         {{- end }}
         command:
         - /bin/sh

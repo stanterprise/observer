@@ -306,3 +306,20 @@ PostgreSQL DSN
 {{- end -}}
 {{- printf "postgres://%s:%s@%s:%v/%s?sslmode=%s" ($username | urlquery) ($password | urlquery) $host $port ($database | urlquery) $sslmode -}}
 {{- end }}
+
+{{/*
+Embedded dependency DSNs use passwords generated and stored by the dependency charts.
+Kubernetes expands the referenced password variables when it builds the container env.
+*/}}
+{{- define "observer.embeddedPostgresDsn" -}}
+{{- $host := include "observer.postgres.host" . -}}
+{{- $port := include "observer.postgres.port" . -}}
+{{- $username := include "observer.postgres.user" . -}}
+{{- $database := include "observer.postgres.db" . -}}
+{{- printf "postgres://%s:$(POSTGRES_PASSWORD)@%s:%v/%s?sslmode=disable" ($username | urlquery) $host $port ($database | urlquery) -}}
+{{- end }}
+
+{{- define "observer.embeddedMongoDbUri" -}}
+{{- $database := index .Values.mongodb.auth.databases 0 | default "observer" -}}
+{{- printf "mongodb://root:$(MONGODB_ROOT_PASSWORD)@%s-mongodb:27017/%s?authSource=admin" (include "observer.fullname" .) $database -}}
+{{- end }}

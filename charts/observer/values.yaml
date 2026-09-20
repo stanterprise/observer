@@ -204,9 +204,9 @@ postgresql:
     repository: bitnamilegacy/postgresql
   auth:
     username: observer
-    password: "" # Provide through a Secret or deployment-time values
+    password: "" # Empty lets the dependency chart generate a credential
     database: observer
-    postgresPassword: "" # Provide through a Secret or deployment-time values
+    postgresPassword: "" # Empty lets the dependency chart generate a credential
   architecture: standalone
   primary:
     persistence:
@@ -230,11 +230,11 @@ mongodb:
   auth:
     enabled: true
     rootUser: root
-    rootPassword: "" # Provide through a Secret or deployment-time values
+    rootPassword: "" # Empty lets the dependency chart generate a credential
     usernames:
       - observer
     passwords:
-      - "" # Provide through a Secret or deployment-time values
+      - "" # Empty lets the dependency chart generate a credential
     databases:
       - observer
   persistence:
