@@ -180,7 +180,8 @@ distributed:
       runAsUser: 0
 
     env:
-      API_BACKEND_HOST: observer-api
+      # The deployment template replaces this with the release-qualified API Service name.
+      API_BACKEND_HOST: ""
       API_BACKEND_PORT: "8080"
 
 postgres:
@@ -223,6 +224,8 @@ postgresql:
 # MongoDB configuration
 mongodb:
   enabled: true
+  # The bundled Bitnami legacy image currently supports linux/amd64 only.
+  # Set enabled=false and provide externalDatabase for linux/arm64 clusters.
   image:
     registry: docker.io
     repository: bitnamilegacy/mongodb

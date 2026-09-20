@@ -42,11 +42,13 @@ spec:
         - name: http
           containerPort: 80
           protocol: TCP
-        {{- $webEnv := include "observer.renderFilteredEnv" (dict "env" .Values.distributed.web.env "excluded" (list "NGINX_ENVSUBST_TEMPLATE_DIR")) }}
+        {{- $webEnv := include "observer.renderFilteredEnv" (dict "env" .Values.distributed.web.env "excluded" (list "API_BACKEND_HOST" "NGINX_ENVSUBST_TEMPLATE_DIR")) }}
         {{- if $webEnv }}
         env:
 {{ $webEnv | nindent 8 }}
         {{- end }}
+        - name: API_BACKEND_HOST
+          value: {{ include "observer.fullname" . }}-api
         livenessProbe:
           httpGet:
             path: /
