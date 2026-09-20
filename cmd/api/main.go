@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -16,6 +17,9 @@ import (
 	"github.com/stanterprise/observer/internal/database"
 	"github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/api"
+	attachmentimport "github.com/stanterprise/observer/pkg/attachments"
+	"github.com/stanterprise/observer/pkg/importer"
+	"github.com/stanterprise/observer/pkg/importer/playwrightblob"
 	"github.com/stanterprise/observer/pkg/storage"
 	"github.com/stanterprise/observer/pkg/websocket"
 )
@@ -64,7 +68,23 @@ func main() {
 	}
 
 	postgresHandler := api.NewPostgresHandler(pgRepo, logger)
+	postgresHandler.SetStorageDriver(storageDriver)
 	postgresAttachmentHandler := api.NewPostgresAttachmentHandler(pgRepo, storageDriver, logger)
+	playwrightImporter := playwrightblob.New(playwrightblob.DefaultLimits(storageDriver != nil))
+	importRegistry, err := importer.NewRegistry(playwrightImporter)
+	if err != nil {
+		logger.Error("failed to initialize report import registry", "error", err)
+		os.Exit(1)
+	}
+	importAttachments := attachmentimport.NewImportService(storageDriver, playwrightImporter.Limits().InlineAttachmentBytes)
+	importTempDir := os.Getenv("IMPORT_TMP_DIR")
+	if importTempDir != "" {
+		if err := os.MkdirAll(importTempDir, 0700); err != nil {
+			logger.Error("failed to initialize import temporary directory", "path", importTempDir, "error", err)
+			os.Exit(1)
+		}
+	}
+	importHandler := api.NewImportHandler(importRegistry, pgRepo, importAttachments, logger, importTempDir, envOrInt("IMPORT_MAX_CONCURRENCY", 2))
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub(logger)
@@ -132,6 +152,7 @@ func main() {
 	// REST API endpoints
 	postgresHandler.RegisterRoutes(router)
 	postgresAttachmentHandler.RegisterRoutes(router)
+	importHandler.RegisterRoutes(router)
 
 	addr := ":" + *port
 
@@ -195,6 +216,18 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func envOrInt(key string, def int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return def
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return def
+	}
+	return parsed
 }
 
 // corsMiddleware adds CORS headers to support local web development
