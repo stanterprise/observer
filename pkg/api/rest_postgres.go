@@ -10,13 +10,17 @@ import (
 	"github.com/go-chi/chi/v5"
 	m "github.com/stanterprise/observer/internal/models"
 	pgRepo "github.com/stanterprise/observer/internal/repository/postgres"
+	"github.com/stanterprise/observer/pkg/storage"
 )
 
 type PostgresHandler struct {
-	repo        *pgRepo.PostgresRepository
-	liveRunRepo liveRunRepository
-	logger      *slog.Logger
+	repo          *pgRepo.PostgresRepository
+	liveRunRepo   liveRunRepository
+	logger        *slog.Logger
+	storageDriver storage.Driver
 }
+
+func (h *PostgresHandler) SetStorageDriver(driver storage.Driver) { h.storageDriver = driver }
 
 type liveRunRepository interface {
 	GetTestRun(ctx context.Context, id string) (*m.TestRun, error)
@@ -324,11 +328,24 @@ func (h *PostgresHandler) handleDeleteRuns(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	storageKeys, err := h.repo.StorageKeysForRuns(r.Context(), req.RunIDs)
+	if err != nil {
+		h.logger.Error("failed to collect attachment storage keys", "runIds", req.RunIDs, "error", err)
+		h.internalError(w)
+		return
+	}
 	deleted, err := h.repo.DeleteRuns(r.Context(), req.RunIDs)
 	if err != nil {
 		h.logger.Error("failed to delete runs from postgres", "runIds", req.RunIDs, "error", err)
 		h.internalError(w)
 		return
+	}
+	if h.storageDriver != nil {
+		for _, storageKey := range storageKeys {
+			if err := h.storageDriver.Delete(r.Context(), storageKey); err != nil {
+				h.logger.Warn("failed to clean up deleted run attachment", "storage_key", storageKey, "error", err)
+			}
+		}
 	}
 
 	h.writeJSON(w, map[string]interface{}{

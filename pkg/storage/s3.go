@@ -1,11 +1,11 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -110,20 +110,48 @@ func (d *S3Driver) Upload(ctx context.Context, name, mimeType string, content io
 	// Note: S3 uses a prefix for organization, local driver stores flat
 	storageKey := fmt.Sprintf("attachments/%s%s", id, ext)
 
-	contentBytes, err := io.ReadAll(content)
-	if err != nil {
-		return nil, fmt.Errorf("read S3 upload content: %w", err)
+	// PutObject benefits from a seekable body for retry/checksum support. Spool
+	// non-seekable streams to disk so large report artifacts do not accumulate
+	// in API process memory.
+	seekable, ok := content.(io.ReadSeeker)
+	var temporary *os.File
+	var err error
+	if !ok {
+		temporary, err = os.CreateTemp("", "observer-s3-upload-*")
+		if err != nil {
+			return nil, fmt.Errorf("create S3 upload spool: %w", err)
+		}
+		defer func() { _ = temporary.Close(); _ = os.Remove(temporary.Name()) }()
+		if _, err = io.Copy(temporary, content); err != nil {
+			return nil, fmt.Errorf("spool S3 upload content: %w", err)
+		}
+		if _, err = temporary.Seek(0, io.SeekStart); err != nil {
+			return nil, fmt.Errorf("rewind S3 upload spool: %w", err)
+		}
+		seekable = temporary
 	}
-	size := int64(len(contentBytes))
+	position, err := seekable.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, fmt.Errorf("inspect S3 upload content: %w", err)
+	}
+	size, err := seekable.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, fmt.Errorf("measure S3 upload content: %w", err)
+	}
+	if _, err = seekable.Seek(position, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("rewind S3 upload content: %w", err)
+	}
+	size -= position
 
 	// Upload to S3 using a seekable reader so S3-compatible backends like MinIO
 	// can compute checksums without TLS-specific streaming constraints.
 	uploadedAt := time.Now()
 	_, err = d.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(d.bucket),
-		Key:         aws.String(storageKey),
-		Body:        bytes.NewReader(contentBytes),
-		ContentType: aws.String(mimeType),
+		Bucket:        aws.String(d.bucket),
+		Key:           aws.String(storageKey),
+		Body:          seekable,
+		ContentLength: aws.Int64(size),
+		ContentType:   aws.String(mimeType),
 		Metadata: map[string]string{
 			"original-name": name,
 			"uploaded-at":   uploadedAt.Format(time.RFC3339),

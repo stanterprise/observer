@@ -24,6 +24,9 @@ func (r *PostgresRepository) DeleteRuns(ctx context.Context, runIDs []string) (i
 
 	var deletedRuns int64
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.RunStat{}).Error; err != nil {
+			return fmt.Errorf("delete run statistics: %w", err)
+		}
 		if err := tx.Where("run_id IN ?", runIDs).Delete(&m.Attachment{}).Error; err != nil {
 			return fmt.Errorf("delete run attachments: %w", err)
 		}
@@ -52,6 +55,41 @@ func (r *PostgresRepository) DeleteRuns(ctx context.Context, runIDs []string) (i
 	}
 
 	return deletedRuns, nil
+}
+
+func (r *PostgresRepository) StorageKeysForRuns(ctx context.Context, runIDs []string) ([]string, error) {
+	if err := r.ensureDB(); err != nil {
+		return nil, err
+	}
+	if len(runIDs) == 0 {
+		return []string{}, nil
+	}
+	keys := make(map[string]struct{})
+	var rows []m.Attachment
+	if err := r.db.WithContext(ctx).Select("storage_key").Where("run_id IN ? AND storage_key <> ''", runIDs).Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("list run attachment keys: %w", err)
+	}
+	for _, row := range rows {
+		if row.StorageKey != "" {
+			keys[row.StorageKey] = struct{}{}
+		}
+	}
+	var attempts []m.TestAttempt
+	if err := r.db.WithContext(ctx).Select("attachments").Where("run_id IN ?", runIDs).Find(&attempts).Error; err != nil {
+		return nil, fmt.Errorf("list run attempt attachments: %w", err)
+	}
+	for _, attempt := range attempts {
+		for _, attachment := range attempt.Attachments {
+			if key, ok := attachment["storage_key"].(string); ok && key != "" {
+				keys[key] = struct{}{}
+			}
+		}
+	}
+	result := make([]string, 0, len(keys))
+	for key := range keys {
+		result = append(result, key)
+	}
+	return result, nil
 }
 
 func (r *PostgresRepository) UpdateRunsMarker(ctx context.Context, runIDs []string, marker string) (int64, error) {

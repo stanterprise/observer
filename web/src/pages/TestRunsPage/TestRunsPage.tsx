@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
@@ -18,6 +18,7 @@ import {
   X,
   RefreshCw,
   AlertTriangle,
+  Upload,
 } from "lucide-react";
 
 import type { TestRun } from "@/types/testRun";
@@ -25,8 +26,10 @@ import { getRunCompletionStatus } from "./utils";
 import type { TestStatus } from "@/types/common";
 import Dialog from "@/components/Dialog";
 import { humanizeMilliseconds } from "@/utils/duration";
+import { ImportRunDialog } from "./ImportRunDialog";
 
 export function TestRunsPage() {
+  const navigate = useNavigate();
   const pollIntervalMs = config.pollingIntervalMs;
   const { autoRefreshEnabled } = useRefresh();
   const [runs, setRuns] = useState<TestRun[]>([]);
@@ -39,6 +42,7 @@ export function TestRunsPage() {
   const [showMarkerDialog, setShowMarkerDialog] = useState(false);
   const [markerValue, setMarkerValue] = useState("");
   const [updatingMarker, setUpdatingMarker] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   const fetchRuns = useCallback(async (options?: { silent?: boolean }) => {
     const silent = options?.silent ?? false;
@@ -287,6 +291,13 @@ export function TestRunsPage() {
             </>
           )}
           <button
+            onClick={() => setShowImportDialog(true)}
+            className="inline-flex items-center gap-2 rounded-md border border-(--stitch-outline) bg-(--stitch-surface-card) px-4 py-2 text-sm font-medium text-(--stitch-on-surface) transition-colors hover:bg-(--stitch-surface-low)"
+          >
+            <Upload className="h-4 w-4" />
+            Import run
+          </button>
+          <button
             onClick={() => fetchRuns()}
             className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-(--stitch-on-primary) shadow-sm transition-all hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2"
             style={{
@@ -309,6 +320,16 @@ export function TestRunsPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {showImportDialog && (
+        <ImportRunDialog
+          onClose={() => setShowImportDialog(false)}
+          onImported={({ runId }) => {
+            setShowImportDialog(false);
+            navigate(`/runs/${encodeURIComponent(runId)}`);
+          }}
+        />
       )}
 
       {/* Delete Confirmation Dialog */}
