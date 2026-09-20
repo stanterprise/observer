@@ -48,7 +48,9 @@ Shipped presets:
 
 **Image Management:**
 
-- `image.tag` defaults to the chart `appVersion` when empty.
+- `image.tag` defaults directly to the chart `appVersion` when empty. `appVersion` must always be the exact published Docker image tag, including any `v` prefix.
+- Stable release metadata may therefore use `appVersion: "v0.8.3"` with chart version `0.8.3`; prerelease and branch packages use the exact tags actually published for those builds.
+- Branch packages use the Docker-published branch tag (`master` or `develop`) as `appVersion`; commit-suffixed chart versions are package identifiers, not image tags.
 - `image.pullPolicy` auto-detects `Always` for mutable tags (`latest`, `main`, `develop`) and `IfNotPresent` for immutable tags.
 - For production installs, pin `image.tag` to an immutable tag or digest.
 

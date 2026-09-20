@@ -84,6 +84,9 @@ Get the image repository
 
 {{/*
 Get the image tag
+
+The chart appVersion is the exact published image tag. No prefix or suffix is
+added here; use image.tag when an explicit override is required.
 */}}
 {{- define "observer.image.tag" -}}
 {{- .Values.image.tag | default .Chart.AppVersion }}

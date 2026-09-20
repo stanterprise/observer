@@ -27,6 +27,17 @@ assert_render_fails() {
 
 render_matrix() {
   local chart_input="$1"
+  local expected_image_tag
+  local rendered_images
+
+  expected_image_tag="$(helm show chart "${chart_input}" | awk '$1 == "appVersion:" { gsub(/"/, "", $2); print $2 }')"
+  rendered_images="$(helm template observer "${chart_input}" | sed -n 's/.*image: ghcr.io\/stanterprise\/observer\/[^:]*:\([^" ]*\).*/\1/p' | sort -u)"
+  if [[ -z "${expected_image_tag}" || "${rendered_images}" != "${expected_image_tag}" ]]; then
+    echo "ERROR: rendered Observer image tags do not match appVersion"
+    echo "Expected: ${expected_image_tag}"
+    echo "Rendered: ${rendered_images}"
+    exit 1
+  fi
 
   echo "==> Helm lint (${chart_input})"
   helm lint "${chart_input}"
