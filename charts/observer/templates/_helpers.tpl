@@ -139,9 +139,31 @@ Distributed workloads must not override chart-managed connection env vars.
 {{- end }}
 
 {{/*
+Validate external dependencies are configured when embedded services are disabled.
+*/}}
+{{- define "observer.validateExternalDependencies" -}}
+{{- if not .Values.postgresql.enabled -}}
+{{- if not .Values.postgres.host -}}
+{{- fail "postgresql.enabled=false requires postgres.host to be set" -}}
+{{- end -}}
+{{- end -}}
+{{- if not .Values.mongodb.enabled -}}
+{{- if not .Values.externalDatabase.host -}}
+{{- fail "mongodb.enabled=false requires externalDatabase.host to be set" -}}
+{{- end -}}
+{{- end -}}
+{{- if not .Values.nats.enabled -}}
+{{- if not .Values.externalNats.url -}}
+{{- fail "nats.enabled=false requires externalNats.url to be set" -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Validate distributed-mode configuration before rendering resources.
 */}}
 {{- define "observer.validateDistributedConfig" -}}
+{{- include "observer.validateExternalDependencies" . -}}
 {{- if and (eq .Values.mode "distributed") .Values.distributed.enabled -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.ingestion.env" "env" (.Values.distributed.ingestion.env | default dict)) -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.api.env" "env" (.Values.distributed.api.env | default dict)) -}}

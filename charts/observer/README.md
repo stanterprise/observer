@@ -10,15 +10,69 @@ Shipped presets:
 
 ## Current Contract
 
+### Chart-Owned Responsibilities
+
+- Deployment and runtime configuration for Observer services (ingestion, processor, API, web).
+- Kubernetes Services exposing stable ports and protocols.
+- PostgreSQL migrations through a dedicated Helm hook job (when `postgres.migration.enabled=true`).
+- Health probes, resource requests/limits, and security contexts.
+- Image selection and tag management.
+
+### Operator-Owned Responsibilities
+
+- Ingress routing, TLS certificates, and DNS (see platform exposure task packet).
+- Private CA distribution and trust.
+- External Secret providers (ExternalSecret, SOPS, or vault).
+- Kubernetes network policies and cluster-level security.
+
+### Key Features
+
+**Deployment Modes:**
+
 - Distributed mode is the primary install path.
-- AIO is intended for development and evaluation.
-- The chart does not render Ingress or Gateway API manifests. Exposure, TLS, and certificates are downstream infrastructure concerns.
-- Distributed installs and upgrades run PostgreSQL migrations through the dedicated Helm hook job controlled by `postgres.migration.enabled`.
-- External PostgreSQL, MongoDB, and NATS are configured through `postgres.*`, `externalDatabase.*`, and `externalNats.*`.
-- Distributed workloads consume connection settings through Secret references. Set `runtime.existingSecret` to reuse a pre-created Secret containing `NATS_URL`, `POSTGRES_DSN`, and `MONGODB_URI`.
-- If `runtime.existingSecret` is empty, the chart renders a generated distributed runtime Secret.
-- `distributed.ingestion.env`, `distributed.api.env`, and `distributed.processor.env` must not set `NATS_URL`, `POSTGRES_DSN`, or `MONGODB_URI`; the chart rejects those keys during lint and template validation.
-- `image.tag` defaults to the chart `appVersion` when empty, and `image.pullPolicy` auto-detects `Always` for mutable tags such as `latest`, `main`, and `develop`, and `IfNotPresent` otherwise.
+- AIO is intended for development and evaluation only.
+- Both modes support embedded or external PostgreSQL, MongoDB, and NATS.
+
+**Connection Management:**
+
+- Distributed workloads consume connection strings from Kubernetes Secrets.
+- Set `runtime.existingSecret` to reuse a pre-created Secret containing `NATS_URL`, `POSTGRES_DSN`, and `MONGODB_URI`.
+- If `runtime.existingSecret` is empty, the chart renders a generated Secret for non-production installs.
+- `distributed.ingestion.env`, `distributed.api.env`, and `distributed.processor.env` must not set `NATS_URL`, `POSTGRES_DSN`, or `MONGODB_URI`; the chart rejects those keys at validation time.
+
+**External Dependencies:**
+
+- When disabling an embedded dependency, the external endpoint is required: set `postgres.host` when `postgresql.enabled=false`, etc.
+- The chart validates missing external endpoints and fails with a clear error message.
+
+**Image Management:**
+
+- `image.tag` defaults to the chart `appVersion` when empty.
+- `image.pullPolicy` auto-detects `Always` for mutable tags (`latest`, `main`, `develop`) and `IfNotPresent` for immutable tags.
+- For production installs, pin `image.tag` to an immutable tag or digest.
+
+**Storage and Private Endpoints:**
+
+- S3 configuration is supplied through a Secret: set `storage.s3.existingSecret` to the name of a Secret containing `STORAGE_DRIVER`, `STORAGE_S3_*`, and other storage environment variables.
+- Custom CA certificates are supplied through a Secret: set `customCA.existingSecret` to mount a CA certificate for private S3 endpoints or registries.
+
+**Extension Points:**
+
+- Use `extraEnv` to add environment variables to all workload containers.
+- Use `extraEnvFrom` to add ConfigMap or Secret references to all workload containers.
+- Use `extraVolumes` and `extraVolumeMounts` to add volumes to all workload pods.
+
+**Password Defaults:**
+
+- The chart no longer ships with reusable password defaults in public values.
+- For embedded dependencies (AIO or development), the Helm hook generates random passwords.
+- For production, use external Secrets or pre-provisioned Secret values.
+
+**Exposure and Networking:**
+
+- The chart does not render Ingress, Gateway API, or Certificate resources.
+- Downstream infrastructure or deployment bundles provide ingress routing, DNS, and TLS.
+- The chart exposes stable Services on documented ports for downstream use.
 
 ## Prerequisites
 
@@ -183,6 +237,98 @@ nats:
   enabled: false
 externalNats:
   url: nats://nats.example.com:4222
+```
+
+## Object Storage (S3) Configuration
+
+Observer can persist test artifacts and attachments to S3-compatible storage.
+
+### Using an S3 Secret
+
+Create a Kubernetes Secret with S3 configuration:
+
+```bash
+kubectl create secret generic observer-s3-config \
+  --from-literal=STORAGE_DRIVER=s3 \
+  --from-literal=STORAGE_S3_ENDPOINT=https://s3.example.com \
+  --from-literal=STORAGE_S3_REGION=us-east-1 \
+  --from-literal=STORAGE_S3_BUCKET=observer-artifacts \
+  --from-literal=STORAGE_S3_USE_PATH_STYLE=true \
+  --from-literal=STORAGE_S3_ACCESS_KEY_ID=<access-key> \
+  --from-literal=STORAGE_S3_SECRET_ACCESS_KEY=<secret-key>
+```
+
+Then reference it in the chart:
+
+```yaml
+storage:
+  s3:
+    existingSecret: observer-s3-config
+```
+
+## Custom CA Certificate Configuration
+
+For private S3 endpoints or private image registries, supply a custom CA certificate:
+
+### Using a Custom CA Secret
+
+Create a Kubernetes Secret with the CA certificate:
+
+```bash
+kubectl create secret generic observer-custom-ca \
+  --from-file=ca.crt=/path/to/ca.crt
+```
+
+Then reference it in the chart:
+
+```yaml
+customCA:
+  existingSecret: observer-custom-ca
+  mountPath: /etc/ssl/certs/custom-ca
+```
+
+The CA certificate will be mounted to all workload containers and available for private endpoint verification.
+
+## Extension Points
+
+The chart provides stable extension points for adding custom environment variables, volumes, and mounts without modifying the chart templates.
+
+### Extra Environment Variables
+
+Add environment variables to all workload containers:
+
+```yaml
+extraEnv:
+  LOG_LEVEL: debug
+  CUSTOM_HEADER: custom-value
+```
+
+### Extra Environment References
+
+Add ConfigMap or Secret references to all workload containers:
+
+```yaml
+extraEnvFrom:
+  - configMapRef:
+      name: app-config
+  - secretRef:
+      name: app-secrets
+```
+
+### Extra Volumes and Mounts
+
+Add custom volumes to workload pods:
+
+```yaml
+extraVolumes:
+  - name: custom-config
+    configMap:
+      name: my-config
+
+extraVolumeMounts:
+  - name: custom-config
+    mountPath: /etc/custom-config
+    readOnly: true
 ```
 
 ## Upgrading

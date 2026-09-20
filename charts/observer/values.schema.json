@@ -150,6 +150,54 @@
         "existingSecret": { "type": "string" }
       }
     },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "s3": {
+          "type": "object",
+          "properties": {
+            "existingSecret": {
+              "type": "string",
+              "description": "Secret name containing S3 configuration (STORAGE_DRIVER, STORAGE_S3_*)"
+            }
+          }
+        }
+      }
+    },
+    "customCA": {
+      "type": "object",
+      "properties": {
+        "existingSecret": {
+          "type": "string",
+          "description": "Secret or ConfigMap name containing ca.crt for private endpoints"
+        },
+        "mountPath": {
+          "type": "string",
+          "description": "Mount path for the CA certificate",
+          "default": "/etc/ssl/certs/custom-ca"
+        }
+      }
+    },
+    "extraEnv": {
+      "type": "object",
+      "description": "Extra environment variables to add to workload containers",
+      "additionalProperties": { "type": ["string", "number", "boolean"] }
+    },
+    "extraEnvFrom": {
+      "type": "array",
+      "description": "Extra envFrom entries (configMapRef, secretRef) for workload containers",
+      "items": { "type": "object" }
+    },
+    "extraVolumes": {
+      "type": "array",
+      "description": "Extra volume definitions for workload pods",
+      "items": { "type": "object" }
+    },
+    "extraVolumeMounts": {
+      "type": "array",
+      "description": "Extra volumeMount definitions for workload containers",
+      "items": { "type": "object" }
+    },
     "serviceAccount": {
       "type": "object",
       "properties": {

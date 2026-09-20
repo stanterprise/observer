@@ -99,6 +99,25 @@ spec:
               name: {{ include "observer.runtimeSecretName" . }}
               key: MONGODB_URI
 {{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.processor.env "excluded" (list "NATS_URL" "POSTGRES_DSN" "MONGODB_URI")) | nindent 8 }}
+        {{- with .Values.extraEnv }}
+        {{- range $key, $value := . }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if and .Values.storage .Values.storage.s3 .Values.storage.s3.existingSecret }}
+        envFrom:
+        - secretRef:
+            name: {{ .Values.storage.s3.existingSecret }}
+        {{- end }}
+        {{- with .Values.extraEnvFrom }}
+        {{- if and .Values.storage .Values.storage.s3 .Values.storage.s3.existingSecret }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        envFrom:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
         livenessProbe:
           exec:
             command:
@@ -121,6 +140,28 @@ spec:
           failureThreshold: 3
         resources:
           {{- toYaml .Values.distributed.processor.resources | nindent 10 }}
+        {{- if or (and .Values.customCA .Values.customCA.existingSecret) .Values.extraVolumeMounts }}
+        volumeMounts:
+        {{- if and .Values.customCA .Values.customCA.existingSecret }}
+        - name: custom-ca
+          mountPath: {{ .Values.customCA.mountPath | default "/etc/ssl/certs/custom-ca" }}
+          readOnly: true
+        {{- end }}
+        {{- with .Values.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+      {{- if or (and .Values.customCA .Values.customCA.existingSecret) .Values.extraVolumes }}
+      volumes:
+      {{- if and .Values.customCA .Values.customCA.existingSecret }}
+      - name: custom-ca
+        secret:
+          secretName: {{ .Values.customCA.existingSecret }}
+      {{- end }}
+      {{- with .Values.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
