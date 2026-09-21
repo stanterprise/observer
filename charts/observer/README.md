@@ -44,7 +44,8 @@ Shipped presets:
 
 - When disabling an embedded dependency, the external endpoint is required: set `postgres.host` when `postgresql.enabled=false`, etc.
 - The chart validates missing external endpoints and fails with a clear error message.
-- The bundled Bitnami legacy MongoDB image currently supports linux/amd64 only; ARM64 installations must use an external MongoDB endpoint until an ARM64-compatible image is validated.
+- The bundled Bitnami legacy PostgreSQL image is pinned to `17.6.0-debian-12-r4` and supports linux/amd64 and linux/arm64.
+- The bundled Bitnami legacy MongoDB image is pinned to `8.0.4-debian-12-r0` and currently supports linux/amd64 only; ARM64 installations must use an external MongoDB endpoint until an ARM64-compatible image is validated.
 
 **Image Management:**
 

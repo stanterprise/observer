@@ -203,6 +203,7 @@ postgresql:
   image:
     registry: docker.io
     repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
   auth:
     username: observer
     password: "" # Empty lets the dependency chart generate a credential
@@ -229,6 +230,7 @@ mongodb:
   image:
     registry: docker.io
     repository: bitnamilegacy/mongodb
+    tag: 8.0.4-debian-12-r0 # linux/amd64 only; use external MongoDB on ARM64
   # Use external MongoDB by setting enabled: false and configuring externalDatabase
   auth:
     enabled: true

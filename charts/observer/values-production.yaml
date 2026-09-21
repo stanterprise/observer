@@ -95,6 +95,7 @@ postgresql:
   image:
     registry: docker.io
     repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
   auth:
     username: observer
     password: "" # Provide through a Secret or deployment-time values
@@ -119,6 +120,7 @@ mongodb:
   image:
     registry: docker.io
     repository: bitnamilegacy/mongodb
+    tag: 8.0.4-debian-12-r0 # linux/amd64 only; use external MongoDB on ARM64
   persistence:
     enabled: true
     size: 50Gi
