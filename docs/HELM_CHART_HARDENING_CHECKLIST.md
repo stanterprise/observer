@@ -2,7 +2,7 @@
 
 **Purpose:** Define the minimum hardening work required before the Observer chart is treated as a public distribution artifact.
 **Audience:** Maintainers of `charts/observer/` and downstream infrastructure repositories that consume the chart.
-**Last Reviewed:** 2026-05-25
+**Last Reviewed:** 2026-09-22
 
 Use this checklist before:
 
@@ -10,16 +10,20 @@ Use this checklist before:
 - recommending the chart for third-party cluster installs
 - promoting a new dependency, exposure, or security surface as supported
 
-Checked items below are verified against the current repository state. Partially implemented work remains unchecked until the full acceptance condition is met.
+Checked items below are verified against the current repository state (`charts/observer/` as of 2026-09-20). Partially implemented work remains unchecked until the full acceptance condition is met.
 
 ## Current Baseline
 
 The remaining release-gating defects are:
 
-- Public defaults still ship reusable passwords for PostgreSQL, MongoDB, and AIO-local services.
-- The generated distributed runtime secret and AIO defaults still render connection strings when operators do not provide an existing Secret.
-- Distributed web and AIO security contexts are not yet aligned with restricted-cluster defaults.
-- CI still lacks an automated install or upgrade smoke test for the recommended public install path.
+- CI still lacks an automated install/upgrade/rollback smoke test against a real or ephemeral cluster for the recommended public install path (source templates and packaged artifacts are otherwise fully lint/render/schema validated).
+- `readOnlyRootFilesystem` is `false` chart-wide; no workload runs with a read-only root filesystem yet.
+- No NetworkPolicy resources or documented examples are shipped by the chart.
+- Documented upgrade/rollback guidance for stateful dependencies (PostgreSQL/MongoDB/NATS) and PodDisruptionBudget/replica-limit guidance for distributed mode do not exist yet.
+
+Previously tracked defects around reusable passwords, credential-bearing rendered manifests, and missing security contexts have been resolved; see the checked items below.
+
+One-off homelab k3s deployment notes and the separate `observer-mcp` chart task packets are archived under [archive/2026-09-copilot/](archive/2026-09-copilot/) and are not part of this checklist's scope.
 
 ## 1. Packaging And Release Hygiene
 
@@ -50,29 +54,29 @@ The remaining release-gating defects are:
 
 ## 4. Secrets And Credential Handling
 
-- [ ] HC030 Public defaults do not ship with reusable passwords such as `password` for PostgreSQL, MongoDB, or app users.
+- [x] HC030 Public defaults do not ship with reusable passwords such as `password` for PostgreSQL, MongoDB, or app users. All password/credential defaults in `values.yaml` are empty strings; embedded PostgreSQL/MongoDB subcharts auto-generate credentials.
 - [x] HC031 Workload manifests use Kubernetes Secret references for credentials instead of raw `value:` entries where feasible.
 - [x] HC032 Every `existingSecret` value in `values.yaml` is wired into templates and documented.
-- [ ] HC033 Connection strings do not expose credentials in rendered manifests when a secret-backed alternative exists.
+- [x] HC033 Connection strings do not expose credentials in rendered manifests when a secret-backed alternative exists. `NATS_URL`, `POSTGRES_DSN`, and `MONGODB_URI` are always injected via `secretKeyRef` in every workload/migration template.
 - [x] HC034 README and deployment examples avoid committed live credentials and prefer `runtime.existingSecret` or out-of-band secret creation.
 - [x] HC035 Secret-handling behavior is documented for both embedded and external dependency modes.
 
 ## 5. Security Posture
 
-- [ ] HC040 Non-root execution is the default for distributed workloads unless a component has a documented exception.
-- [ ] HC041 Root execution in AIO mode is explicitly justified and scoped to the minimum required behavior.
-- [ ] HC042 Container security contexts drop unnecessary capabilities and are consistent across services.
-- [ ] HC043 `readOnlyRootFilesystem`, `runAsNonRoot`, pod security context, and service account defaults are compatible with restricted clusters where possible.
-- [ ] HC044 Resource requests and limits are defined for every workload and documented as examples rather than guesses.
-- [ ] HC045 The chart exposes hooks for network policies, pod annotations, service account annotations, and image pull secrets where operators expect them.
+- [x] HC040 Non-root execution is the default for distributed workloads unless a component has a documented exception. `values.yaml` `securityContext` sets `runAsNonRoot: true`; the distributed `web` component's documented exception is scoped via `distributed.web.securityContext`.
+- [x] HC041 Root execution in AIO mode is explicitly justified and scoped to the minimum required behavior. `aioSecurityContext` includes an inline comment explaining the s6-overlay init requirement and only adds `SETUID`/`SETGID`/`CHOWN`/`DAC_OVERRIDE`.
+- [x] HC042 Container security contexts drop unnecessary capabilities and are consistent across services. All `securityContext` blocks drop `ALL` capabilities and set `allowPrivilegeEscalation: false` except the documented AIO exception.
+- [ ] HC043 `readOnlyRootFilesystem`, `runAsNonRoot`, pod security context, and service account defaults are compatible with restricted clusters where possible. `readOnlyRootFilesystem` is `false` for every workload; no workload currently runs with a read-only root filesystem.
+- [x] HC044 Resource requests and limits are defined for every workload and documented as examples rather than guesses. Every distributed workload, AIO, and embedded dependency defines `resources.limits`/`requests` in `values.yaml`.
+- [x] HC045 The chart exposes hooks for pod annotations, service account annotations, and image pull secrets where operators expect them (`podAnnotations`, `serviceAccount.annotations`, `imagePullSecrets` in `values.schema.json`/`values.yaml`). NetworkPolicy hooks are not yet exposed; downstream infrastructure must supply NetworkPolicy separately.
 
 ## 6. Reliability And Day-2 Operations
 
-- [ ] HC050 Readiness, liveness, and startup behavior reflect the real health surface of each service.
+- [x] HC050 Readiness, liveness, and startup behavior reflect the real health surface of each service. `livenessProbe`/`readinessProbe` (and `startupProbe` for ingestion) are defined per distributed workload and AIO.
 - [x] HC051 Init containers only wait for dependencies that are actually enabled in the selected configuration.
 - [x] HC052 Database migration behavior is single-path and deterministic; the chart does not run competing migration strategies in multiple workloads.
-- [ ] HC053 Install, upgrade, and rollback behavior is documented for stateful dependencies and schema changes.
-- [ ] HC054 HPA behavior, replica defaults, and disruption tolerance are documented for distributed mode.
+- [ ] HC053 Install, upgrade, and rollback behavior is documented for stateful dependencies and schema changes. The chart README documents the migration hook and Secret update step for `helm upgrade`, but there is no documented rollback story or compatibility matrix for PostgreSQL/MongoDB/NATS schema or data changes.
+- [ ] HC054 HPA behavior, replica defaults, and disruption tolerance are documented for distributed mode. HPA (`autoscaling/v2`) is implemented per distributed workload with configurable min/max replicas, but there is no PodDisruptionBudget and no dedicated documentation of replica/disruption behavior beyond the values files.
 - [x] HC055 `NOTES.txt` reflects the real access paths and does not assume services or ports that the selected mode does not expose.
 
 ## 7. Networking, Exposure, And Downstream Infra
@@ -94,9 +98,9 @@ The remaining release-gating defects are:
 ## 9. CI Gates For Public Publication
 
 - [x] HC080 CI runs `helm lint` for the chart on every change that touches `charts/observer/**`.
-- [x] HC081 CI renders a matrix that includes default, AIO, production, and advertised external dependency modes.
+- [x] HC081 CI renders a matrix that includes default, AIO, production, and advertised external dependency modes (`.github/workflows/helm-publish.yml`).
 - [x] HC082 Rendered manifests are validated with a Kubernetes schema tool such as `kubeconform` or `kubeval`.
-- [ ] HC083 At least one install smoke test runs against a real or ephemeral cluster for the recommended public install path.
+- [ ] HC083 At least one install smoke test runs against a real or ephemeral cluster for the recommended public install path. CI currently validates rendering, schema, and packaged-artifact contents (`scripts/test-helm-chart.sh`) but does not provision a cluster (e.g. `kind`/`k3d`) and run `helm install`/`helm upgrade`/`helm test`.
 - [x] HC084 The chart is packaged and published only after the validation matrix passes.
 
 ## Release Gate

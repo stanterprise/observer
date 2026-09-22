@@ -1,5 +1,14 @@
 # Helm Chart Issue Resolution Task Packet
 
+> **Archived 2026-09-22.** This packet was derived from a one-off homelab k3s
+> deployment retrospective and covers the separate `observer-mcp` chart; it is
+> unrelated to the ongoing `charts/observer` development effort and is not
+> maintained. Most of its P0 items (secret-backed connection strings, external
+> dependency validation, image tag safety) are already implemented in
+> `charts/observer` today - see
+> [HELM_CHART_HARDENING_CHECKLIST.md](../../HELM_CHART_HARDENING_CHECKLIST.md)
+> for the current, maintained chart status.
+
 **Status:** Proposed
 **Source:** [Helm chart deployment retrospective](HELM_CHART_DEPLOYMENT_RETROSPECTIVE.md)
 **Scope:** Observer chart, observer-mcp chart, and the declarative deployment bundle that combines them

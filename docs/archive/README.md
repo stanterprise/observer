@@ -9,12 +9,14 @@ They are preserved for context, but they are **not maintained** and may contain 
 - **[2025-11-copilot/](2025-11-copilot/)** - Phase 1 implementation notes (NATS publisher, initial architecture)
 - **[2025-12-copilot/](2025-12-copilot/)** - Phase 2 refactoring notes (processor service, service separation)
 - **[2026-01-copilot/](2026-01-copilot/)** - Phase 3+ implementation notes (WebSocket streaming, UI features, buffer fixes)
+- **[2026-09-copilot/](2026-09-copilot/)** - One-off homelab k3s deployment retrospective and task packets covering the separate `observer-mcp` chart; unrelated to ongoing `charts/observer` development
 
 ## Purpose
 
 These archives document:
+
 - Implementation decisions and rationale
-- Development iterations and problem-solving processes  
+- Development iterations and problem-solving processes
 - Feature evolution and technical debt resolution
 - Development workflow examples
 

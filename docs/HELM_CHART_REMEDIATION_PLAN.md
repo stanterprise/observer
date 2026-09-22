@@ -2,12 +2,38 @@
 
 **Purpose:** Convert the current Helm chart readiness findings into an implementation plan that can move `charts/observer/` from internal-use quality to public-consumption quality.
 **Audience:** Maintainers of the Observer chart and downstream infrastructure repositories that depend on it.
-**Last Reviewed:** 2026-05-22
+**Last Reviewed:** 2026-09-22
 
 This plan is the execution companion to:
 
 - [HELM_CHART_HARDENING_CHECKLIST.md](HELM_CHART_HARDENING_CHECKLIST.md)
 - [HELM_CHART_PUBLISH_READINESS_RUBRIC.md](HELM_CHART_PUBLISH_READINESS_RUBRIC.md)
+
+## Current Status (2026-09-22)
+
+Phases 0 through 4 and phase 6 are effectively complete against the current
+`charts/observer` state, verified directly against templates, `values.yaml`,
+`values.schema.json`, the README, and `.github/workflows/helm-publish.yml`:
+
+- **Phase 0-1 (support boundary, template hygiene, values contract):** done. No duplicate templates, `values.schema.json` validates the supported contract, and the README documents chart-owned vs. operator-owned responsibilities.
+- **Phase 2 (external dependency contract):** done. Disabling `postgresql`/`mongodb`/`nats` without the corresponding external endpoint fails render with an actionable message (enforced by `scripts/test-helm-chart.sh`); no embedded service DNS names leak into external modes.
+- **Phase 3 (secrets and credential handling):** done. No reusable password defaults ship in `values.yaml`; `NATS_URL`/`POSTGRES_DSN`/`MONGODB_URI` are always injected via `secretKeyRef`, never as literal `value:` entries.
+- **Phase 4 (migration, probes, runtime behavior):** done. A single migration hook job is the only migration path; every distributed workload defines liveness/readiness (and startup, for ingestion) probes; `NOTES.txt` reflects actual per-mode access paths.
+- **Phase 5 (networking and exposure hardening):** done, but scoped narrower than originally planned - the chart deliberately renders no Ingress, Gateway API, or cloud-specific resources at all (rather than picking one primary pattern to render); that boundary is documented in the README.
+- **Phase 6 (documentation alignment):** done for chart-owned docs (`charts/observer/README.md` matches current defaults and contract).
+- **Phase 7 (CI and release automation):** mostly done - lint, full render matrix, kubeconform schema validation, and packaged-artifact contract checks all run in CI. **Still open:** no cluster smoke test (`kind`/`k3d`) that actually runs `helm install`/`helm upgrade`/`helm test` against the packaged OCI artifact (checklist HC083).
+
+Remaining open work, in priority order:
+
+1. Add a real cluster install/upgrade/rollback smoke test to CI (phase 7 / HC083).
+2. Document upgrade/rollback and stateful-dependency compatibility expectations (HC053).
+3. Add PodDisruptionBudget and replica/disruption documentation for distributed mode (HC054).
+4. Consider NetworkPolicy hooks/examples and `readOnlyRootFilesystem: true` support where feasible (HC043/HC045).
+
+One-off homelab k3s deployment notes and task packets covering the separate
+`observer-mcp` chart are archived under
+[archive/2026-09-copilot/](archive/2026-09-copilot/) and are out of scope for
+this plan.
 
 ## Problem Statement
 

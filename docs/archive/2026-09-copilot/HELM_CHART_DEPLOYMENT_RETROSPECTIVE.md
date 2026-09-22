@@ -1,5 +1,11 @@
 # Observer on k3s: deployment retrospective and upgrade notes
 
+> **Archived 2026-09-22.** This documents a one-off homelab k3s/ARM64 deployment
+> and the separate `observer-mcp` chart; it is unrelated to the ongoing
+> `charts/observer` development effort and is not maintained. See
+> [HELM_CHART_HARDENING_CHECKLIST.md](../../HELM_CHART_HARDENING_CHECKLIST.md)
+> for the current, maintained chart status.
+
 Captured: 2026-08-31 (America/Chicago)  
 Scope: Observer `0.8.3` and observer-mcp `0.0.3` in the `observer` namespace
 

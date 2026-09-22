@@ -1,7 +1,7 @@
 # Helm Chart Publish-Readiness Rubric
 
 **Purpose:** Give downstream infrastructure repositories a repeatable way to decide whether the Observer chart can be consumed directly, wrapped internally, or blocked from adoption.
-**Last Reviewed:** 2026-05-22
+**Last Reviewed:** 2026-09-22
 
 ## Scoring Scale
 
@@ -180,11 +180,13 @@ Before a downstream infra repo accepts a new chart version, expect these artifac
 
 ## Practical Guidance For Observer
 
-Based on the May 2026 review, the current Observer chart should be treated as:
+Based on the 2026-09-22 review against the current `charts/observer` state:
 
-- `0` to `1` for installation and networking on the managed-certificate and Gateway paths
-- `0` to `1` for external dependency support because external NATS is not fully wired
-- `0` to `1` for secrets handling because public defaults and templates still expose credentials directly
-- `1` for documentation because chart docs do not match actual defaults
+- `3` for installation, configuration, and external dependency contracts (domains 1-3): every advertised mode renders, install-tests via `scripts/test-helm-chart.sh`, and external PostgreSQL/MongoDB/NATS paths fail render early with actionable errors when required endpoints are missing.
+- `3` for secrets handling (domain 4): public defaults ship no reusable passwords, and `NATS_URL`/`POSTGRES_DSN`/`MONGODB_URI` are always injected via `secretKeyRef`, never as literal `value:` entries.
+- `2` for networking and exposure (domain 5): the chart-managed boundary (no Ingress/Gateway/cloud-specific resources) is clear and documented, but downstream ingress/TLS guidance for k3s/homelab-style clusters lives only in archived, unmaintained notes (see [archive/2026-09-copilot/](archive/2026-09-copilot/)).
+- `1` to `2` for upgrade/migration (domain 6): the migration hook is single-path and documented for `helm upgrade`, but there is no documented rollback story or compatibility matrix for stateful dependency schema/data changes.
+- `2` for operability (domain 7): probes, HPA, and `NOTES.txt` reflect real behavior; no PodDisruptionBudget or NetworkPolicy hooks exist yet.
+- `2` to `3` for documentation (domain 8): chart README and values contract are in sync as of this review; the remaining gap is an automated, real-cluster install/upgrade/rollback smoke test (CI currently only renders, schema-validates, and inspects packaged artifacts).
 
-That places the chart in **Block Direct Consumption** territory for a public infrastructure repository until the current blockers are closed.
+That places the chart in **Consume Behind An Internal Wrapper**, moving toward **Consume Upstream Directly** once a real-cluster smoke test (checklist HC083) and stateful-dependency upgrade/rollback documentation are added.
