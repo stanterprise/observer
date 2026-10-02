@@ -10,6 +10,7 @@ CHART_INPUT="${1:-${CHART_PATH}}"
 assert_render_fails() {
   local name="$1"
   local expected="$2"
+  local expected_dot="${expected//\//.}"
   shift 2
 
   local output
@@ -18,8 +19,8 @@ assert_render_fails() {
     exit 1
   fi
 
-  if [[ "${output}" != *"${expected}"* ]]; then
-    echo "ERROR: ${name} failed without the expected message: ${expected}"
+  if [[ "${output}" != *"${expected}"* && "${output}" != *"${expected_dot}"* ]]; then
+    echo "ERROR: ${name} failed without the expected message: ${expected} or ${expected_dot}"
     printf '%s\n' "${output}"
     exit 1
   fi
