@@ -43,8 +43,8 @@ spec:
           containerPort: 80
           protocol: TCP
         {{- $webEnv := include "observer.renderFilteredEnv" (dict "env" .Values.distributed.web.env "excluded" (list "API_BACKEND_HOST" "NGINX_ENVSUBST_TEMPLATE_DIR")) }}
-        {{- if $webEnv }}
         env:
+        {{- if $webEnv }}
 {{ $webEnv | nindent 8 }}
         {{- end }}
         - name: API_BACKEND_HOST

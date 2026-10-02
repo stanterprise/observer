@@ -169,7 +169,7 @@
       "properties": {
         "existingSecret": {
           "type": "string",
-          "description": "Secret or ConfigMap name containing ca.crt for private endpoints"
+          "description": "Secret name containing ca.crt for private endpoints"
         },
         "mountPath": {
           "type": "string",

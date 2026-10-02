@@ -89,37 +89,57 @@ spec:
               name: {{ include "observer.runtimeSecretName" . }}
               key: NATS_URL
         {{- if and (not .Values.runtime.existingSecret) .Values.postgresql.enabled }}
+        - name: POSTGRES_HOST
+          value: {{ include "observer.postgres.host" . | quote }}
+        - name: POSTGRES_PORT
+          value: {{ include "observer.postgres.port" . | quote }}
+        - name: POSTGRES_USER
+          value: {{ include "observer.postgres.user" . | quote }}
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "observer.fullname" . }}-postgresql
-              key: password
+              name: {{ include "postgresql.v1.secretName" .Subcharts.postgresql }}
+              key: {{ include "postgresql.v1.userPasswordKey" .Subcharts.postgresql }}
+        - name: POSTGRES_DB
+          value: {{ include "observer.postgres.db" . | quote }}
+        - name: POSTGRES_SSLMODE
+          value: disable
         {{- end }}
+        {{- if or .Values.runtime.existingSecret (not .Values.postgresql.enabled) }}
         - name: POSTGRES_DSN
-          {{- if and (not .Values.runtime.existingSecret) .Values.postgresql.enabled }}
-          value: {{ include "observer.embeddedPostgresDsn" . | quote }}
-          {{- else }}
           valueFrom:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: POSTGRES_DSN
-          {{- end }}
+        {{- end }}
         {{- if and (not .Values.runtime.existingSecret) .Values.mongodb.enabled }}
-        - name: MONGODB_ROOT_PASSWORD
+        - name: MONGO_HOST
+          value: {{ printf "%s-mongodb" (include "observer.fullname" .) | quote }}
+        - name: MONGO_PORT
+          value: "27017"
+        - name: MONGO_USER
+          value: {{ .Values.mongodb.auth.rootUser | default "root" | quote }}
+        - name: MONGO_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "observer.fullname" . }}-mongodb
+              name: {{ include "mongodb.secretName" .Subcharts.mongodb }}
               key: mongodb-root-password
+        - name: MONGO_DATABASE
+          value: {{ index .Values.mongodb.auth.databases 0 | default "observer" | quote }}
+        - name: MONGO_AUTH_SOURCE
+          value: admin
         {{- end }}
+        {{- if or .Values.runtime.existingSecret (not .Values.mongodb.enabled) }}
         - name: MONGODB_URI
-          {{- if and (not .Values.runtime.existingSecret) .Values.mongodb.enabled }}
-          value: {{ include "observer.embeddedMongoDbUri" . | quote }}
-          {{- else }}
           valueFrom:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: MONGODB_URI
-          {{- end }}
+        {{- end }}
+        {{- if and .Values.customCA .Values.customCA.existingSecret (not (hasKey (.Values.distributed.processor.env | default dict) "AWS_CA_BUNDLE")) (not (hasKey (.Values.extraEnv | default dict) "AWS_CA_BUNDLE")) }}
+        - name: AWS_CA_BUNDLE
+          value: {{ printf "%s/ca.crt" (.Values.customCA.mountPath | default "/etc/ssl/certs/custom-ca") | quote }}
+        {{- end }}
 {{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.processor.env "excluded" (list "NATS_URL" "POSTGRES_DSN" "MONGODB_URI")) | nindent 8 }}
         {{- with .Values.extraEnv }}
         {{- range $key, $value := . }}
@@ -133,7 +153,7 @@ spec:
             name: {{ .Values.storage.s3.existingSecret }}
         {{- end }}
         {{- with .Values.extraEnvFrom }}
-        {{- if and .Values.storage .Values.storage.s3 .Values.storage.s3.existingSecret }}
+        {{- if and $.Values.storage $.Values.storage.s3 $.Values.storage.s3.existingSecret }}
         {{- toYaml . | nindent 8 }}
         {{- else }}
         envFrom:

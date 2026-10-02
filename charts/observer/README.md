@@ -51,14 +51,14 @@ Shipped presets:
 
 - `image.tag` defaults directly to the chart `appVersion` when empty. `appVersion` must always be the exact published Docker image tag, including any `v` prefix.
 - Stable release metadata may therefore use `appVersion: "v0.8.3"` with chart version `0.8.3`; prerelease and branch packages use the exact tags actually published for those builds.
-- Branch packages use the Docker-published branch tag (`master` or `develop`) as `appVersion`; commit-suffixed chart versions are package identifiers, not image tags.
+- Branch packages use the immutable Docker-published `sha-<seven-character-commit>` tag as `appVersion`; commit-suffixed chart versions are package identifiers, not image tags.
 - `image.pullPolicy` auto-detects `Always` for mutable tags (`latest`, `main`, `develop`) and `IfNotPresent` for immutable tags.
 - For production installs, pin `image.tag` to an immutable tag or digest.
 
 **Storage and Private Endpoints:**
 
 - S3 configuration is supplied through a Secret: set `storage.s3.existingSecret` to the name of a Secret containing `STORAGE_DRIVER`, `STORAGE_S3_*`, and other storage environment variables.
-- Custom CA certificates are supplied through a Secret: set `customCA.existingSecret` to mount a CA certificate for private S3 endpoints or registries.
+- Custom CA certificates are supplied through a Secret: set `customCA.existingSecret` to mount a CA certificate in distributed API and processor pods. `AWS_CA_BUNDLE` is set to the mounted `ca.crt` path unless overridden in the workload env or `extraEnv`.
 
 **Extension Points:**
 
@@ -291,7 +291,7 @@ customCA:
   mountPath: /etc/ssl/certs/custom-ca
 ```
 
-The CA certificate will be mounted to all workload containers and available for private endpoint verification.
+The CA certificate is mounted in the distributed API and processor pods. The chart points the AWS SDK at the mounted certificate using `AWS_CA_BUNDLE`; an explicit `AWS_CA_BUNDLE` in `distributed.api.env`, `distributed.processor.env`, or `extraEnv` takes precedence.
 
 ## Extension Points
 

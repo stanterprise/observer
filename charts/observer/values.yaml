@@ -305,7 +305,7 @@ storage:
 
 # Custom CA Certificate Configuration
 customCA:
-  existingSecret: ""  # Secret or ConfigMap containing ca.crt
+  existingSecret: ""  # Secret containing ca.crt
   mountPath: /etc/ssl/certs/custom-ca  # Where to mount the CA certificate
 
 # Extension Points for Workload Customization

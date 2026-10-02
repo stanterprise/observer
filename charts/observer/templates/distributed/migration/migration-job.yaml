@@ -42,20 +42,25 @@ spec:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: POSTGRES_DSN
-        {{- else }}
-        {{- if .Values.postgresql.enabled }}
+        {{- else if .Values.postgresql.enabled }}
+        - name: POSTGRES_HOST
+          value: {{ include "observer.postgres.host" . | quote }}
+        - name: POSTGRES_PORT
+          value: {{ include "observer.postgres.port" . | quote }}
+        - name: POSTGRES_USER
+          value: {{ include "observer.postgres.user" . | quote }}
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "observer.fullname" . }}-postgresql
-              key: password
-        {{- end }}
+              name: {{ include "postgresql.v1.secretName" .Subcharts.postgresql }}
+              key: {{ include "postgresql.v1.userPasswordKey" .Subcharts.postgresql }}
+        - name: POSTGRES_DB
+          value: {{ include "observer.postgres.db" . | quote }}
+        - name: POSTGRES_SSLMODE
+          value: disable
+        {{- else }}
         - name: POSTGRES_DSN
-          {{- if .Values.postgresql.enabled }}
-          value: {{ include "observer.embeddedPostgresDsn" . | quote }}
-          {{- else }}
           value: {{ include "observer.postgres.dsn" . | quote }}
-          {{- end }}
         {{- end }}
         command:
         - /bin/sh

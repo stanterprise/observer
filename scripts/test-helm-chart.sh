@@ -10,7 +10,6 @@ CHART_INPUT="${1:-${CHART_PATH}}"
 assert_render_fails() {
   local name="$1"
   local expected="$2"
-  local expected_dot="${expected//\//.}"
   shift 2
 
   local output
@@ -19,8 +18,8 @@ assert_render_fails() {
     exit 1
   fi
 
-  if [[ "${output}" != *"${expected}"* && "${output}" != *"${expected_dot}"* ]]; then
-    echo "ERROR: ${name} failed without the expected message: ${expected} or ${expected_dot}"
+  if [[ "${output}" != *"${expected}"* && "${output//\//.}" != *"${expected}"* ]]; then
+    echo "ERROR: ${name} failed without the expected message: ${expected}"
     printf '%s\n' "${output}"
     exit 1
   fi
@@ -28,6 +27,7 @@ assert_render_fails() {
 
 render_matrix() {
   local chart_input="$1"
+  local CHART_INPUT="$chart_input"
   local expected_image_tag
   local rendered_images
 
@@ -57,31 +57,43 @@ render_matrix() {
   helm template observer "${chart_input}" \
     --set mongodb.enabled=false \
     --set externalDatabase.host=mongo.example.com > /dev/null
+  helm template observer "${chart_input}" \
+    --set extraEnvFrom[0].configMapRef.name=chart-test-env \
+    --set storage.s3.existingSecret=chart-test-storage > /dev/null
+  helm template observer "${chart_input}" \
+    --set postgresql.auth.existingSecret=chart-test-postgres \
+    --set postgresql.auth.secretKeys.userPasswordKey=custom-password \
+    --set mongodb.auth.existingSecret=chart-test-mongodb \
+    --set mongodb.auth.rootUser=chart-test-root > /dev/null
+  helm template observer "${chart_input}" \
+    --set-json 'distributed.web.env.API_BACKEND_PORT=null' > /dev/null
 
   echo "==> Expected external-dependency failures (${chart_input})"
   assert_render_fails "missing external NATS URL" \
-    "externalNats/url" \
+    "externalNats.url" \
     --set nats.enabled=false
   assert_render_fails "missing external PostgreSQL host" \
-    "postgres/host" \
+    "postgres.host" \
     --set postgresql.enabled=false
   assert_render_fails "missing external MongoDB host" \
-    "externalDatabase/host" \
+    "externalDatabase.host" \
     --set mongodb.enabled=false
+  assert_render_fails "managed connection variables in extraEnv" \
+    "extraEnv.NATS_URL" \
+    --set-string extraEnv.NATS_URL=nats://not-allowed.example.com
 }
 
 if [[ "${CHART_INPUT}" == *.tgz ]]; then
   echo "==> Inspect packaged chart"
-  tar -tzf "${CHART_INPUT}" | grep -q '/Chart.yaml$'
-  tar -tzf "${CHART_INPUT}" | grep -q '/charts/postgresql-'
-  tar -tzf "${CHART_INPUT}" | grep -q '/charts/mongodb-'
-  tar -tzf "${CHART_INPUT}" | grep -q '/charts/nats-'
+  package_contents="$(tar -tzf "${CHART_INPUT}")"
+  grep -Fxq 'observer/Chart.yaml' <<< "${package_contents}"
+  grep -Fxq 'observer/charts/postgresql/Chart.yaml' <<< "${package_contents}"
+  grep -Fxq 'observer/charts/mongodb/Chart.yaml' <<< "${package_contents}"
+  grep -Fxq 'observer/charts/nats/Chart.yaml' <<< "${package_contents}"
   render_matrix "${CHART_INPUT}"
   echo "Packaged Helm chart tests completed."
   exit 0
 fi
-
-render_matrix "${CHART_INPUT}"
 
 if [ ! -d "${CHART_DEPS_PATH}" ] || [ -z "$(find "${CHART_DEPS_PATH}" -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
   echo "==> Helm dependencies are missing; attempting to build chart dependencies"
@@ -95,6 +107,8 @@ if [ ! -d "${CHART_DEPS_PATH}" ] || [ -z "$(find "${CHART_DEPS_PATH}" -mindepth 
     exit 0
   fi
 fi
+
+render_matrix "${CHART_INPUT}"
 
 package_dir="$(mktemp -d)"
 trap 'rm -rf "${package_dir}"' EXIT
