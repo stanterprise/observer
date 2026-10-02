@@ -13,9 +13,9 @@
 - Default: **NATS JetStream** (lightweight, simple).
 - Alternative: Kafka for higher scale (planned; not implemented).
 - Topics:
-	- `tests.events.v1` (current)
-	- `tests.summaries.v1` (planned/design topic)
-	- `tests.errors.v1` (planned/design topic)
+  - `tests.events.v1` (current)
+  - `tests.summaries.v1` (planned/design topic)
+  - `tests.errors.v1` (planned/design topic)
 
 ## 3. Processor / Indexer
 
@@ -27,16 +27,16 @@
 
 ## 4. Databases
 
-| Mode        | Engine               | Notes                                                                   |
-| ----------- | -------------------- | ----------------------------------------------------------------------- |
+| Mode        | Engine               | Notes                                                                                               |
+| ----------- | -------------------- | --------------------------------------------------------------------------------------------------- |
 | AIO         | MongoDB + PostgreSQL | Embedded MongoDB live buffer plus embedded relational DB; PostgreSQL is canonical for durable runs. |
-| Distributed | MongoDB + PostgreSQL | Embedded or external services; MongoDB buffers live steps and PostgreSQL stores durable runs. |
+| Distributed | MongoDB + PostgreSQL | Embedded or external services; MongoDB buffers live steps and PostgreSQL stores durable runs.       |
 
 ## 5. Artifact Storage
 
-| Mode        | Storage             | Path                                    |
-| ----------- | ------------------- | --------------------------------------- |
-| AIO         | Local FS            | `/data/artifacts`                       |
+| Mode        | Storage               | Path                                            |
+| ----------- | --------------------- | ----------------------------------------------- |
+| AIO         | Local FS              | `/data/artifacts`                               |
 | Distributed | MinIO / S3-compatible | Configurable bucket through the storage driver. |
 
 ## 6. API / GraphQL
@@ -56,7 +56,7 @@
 
 ## 8. Auth Layer
 
-| Mode        | Method                                  |
-| ----------- | --------------------------------------- |
-| AIO         | Single dev token (planned; not implemented) |
+| Mode        | Method                                              |
+| ----------- | --------------------------------------------------- |
+| AIO         | Single dev token (planned; not implemented)         |
 | Distributed | OIDC (GitHub, Okta, etc.; planned, not implemented) |

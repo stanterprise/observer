@@ -186,13 +186,13 @@ make docker-buildx-aio      # Fast cached builds
 
 ### Processor Service
 
-| Variable        | Default                 | Description                                  |
-| --------------- | ----------------------- | -------------------------------------------- |
-| `POSTGRES_DSN` | -                       | PostgreSQL connection string for relational writes |
-| `MONGODB_URI`   | -                       | MongoDB connection string for live step buffering |
-| `NATS_URL`      | `nats://localhost:4222` | NATS server URL                              |
-| `NATS_STREAM`   | `tests_events`          | JetStream stream name                        |
-| `NATS_CONSUMER` | `processor`             | Durable consumer name for JetStream consumer |
+| Variable        | Default                 | Description                                        |
+| --------------- | ----------------------- | -------------------------------------------------- |
+| `POSTGRES_DSN`  | -                       | PostgreSQL connection string for relational writes |
+| `MONGODB_URI`   | -                       | MongoDB connection string for live step buffering  |
+| `NATS_URL`      | `nats://localhost:4222` | NATS server URL                                    |
+| `NATS_STREAM`   | `tests_events`          | JetStream stream name                              |
+| `NATS_CONSUMER` | `processor`             | Durable consumer name for JetStream consumer       |
 
 ### API Service
 

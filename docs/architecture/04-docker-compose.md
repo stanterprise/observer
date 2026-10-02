@@ -14,16 +14,16 @@ docker compose --profile dist up -d
 
 ### Services
 
-| Service       | Description |
-| ------------- | ----------- |
-| `aio`         | Bundled application, broker, PostgreSQL, MongoDB, and web UI |
-| `nats`        | NATS JetStream event transport |
-| `postgres`    | Authoritative durable run-data database |
-| `mongodb`     | Transient live in-flight step buffer only |
-| `ingestion`   | gRPC event receiver and NATS publisher |
-| `processor`   | Event consumer; persists durable data to PostgreSQL |
-| `api`         | REST API and optional WebSocket event relay |
-| `web`         | Separate UI container for distributed mode |
+| Service     | Description                                                  |
+| ----------- | ------------------------------------------------------------ |
+| `aio`       | Bundled application, broker, PostgreSQL, MongoDB, and web UI |
+| `nats`      | NATS JetStream event transport                               |
+| `postgres`  | Authoritative durable run-data database                      |
+| `mongodb`   | Transient live in-flight step buffer only                    |
+| `ingestion` | gRPC event receiver and NATS publisher                       |
+| `processor` | Event consumer; persists durable data to PostgreSQL          |
+| `api`       | REST API and optional WebSocket event relay                  |
+| `web`       | Separate UI container for distributed mode                   |
 
 ### AIO Published Ports
 

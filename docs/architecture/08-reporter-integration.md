@@ -15,7 +15,7 @@ Current reporter configuration uses `grpcAddress`:
 
 ```typescript
 reporter: [
-	["@stanterprise/playwright-reporter", { grpcAddress: "localhost:50051" }],
+  ["@stanterprise/playwright-reporter", { grpcAddress: "localhost:50051" }],
 ];
 ```
 
