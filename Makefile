@@ -23,6 +23,13 @@ PROTOC_GEN_GO_VERSION ?= v1.36.6
 PROTOC_GEN_GO_GRPC_VERSION ?= v1.5.1
 GOLANGCI_LINT_VERSION ?= v1.60.3
 
+# Build metadata injected into pkg/version
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+VERSION_PKG := github.com/stanterprise/observer/pkg/version
+LDFLAGS := -X $(VERSION_PKG).Version=$(VERSION) -X $(VERSION_PKG).Commit=$(COMMIT) -X $(VERSION_PKG).BuildDate=$(BUILD_DATE)
+
 .PHONY: all help build build-all build-ingestion build-processor build-api build-migrate run run-dev run-dev-split env-print test test-race test-cover cover-report test-nats-integration fmt vet tidy generate lint proto tools clean clean-cache mongodb-up mongodb-down mongodb-logs mongodb-shell mongodb-reset nats-up nats-down nats-logs docker-build docker-build-all docker-build-aio docker-build-ingestion docker-build-processor docker-build-api docker-up-aio docker-up-dist docker-down docker-web-dev-down web-dev-mode helm-deps helm-lint helm-template helm-template-aio helm-template-prod helm-dry-run helm-dry-run-aio helm-dry-run-prod helm-test helm-validate FORCE
 
 .DEFAULT_GOAL := help
@@ -34,15 +41,15 @@ help: ## Show this help
 
 $(INGESTION_BIN): FORCE ## Build the ingestion service binary
 	@mkdir -p $(BIN_DIR)
-	go build -o $(INGESTION_BIN) ./cmd/ingestion
+	go build -ldflags '$(LDFLAGS)' -o $(INGESTION_BIN) ./cmd/ingestion
 
 $(PROCESSOR_BIN): FORCE ## Build the processor service binary
 	@mkdir -p $(BIN_DIR)
-	go build -o $(PROCESSOR_BIN) ./cmd/processor
+	go build -ldflags '$(LDFLAGS)' -o $(PROCESSOR_BIN) ./cmd/processor
 
 $(API_BIN): FORCE ## Build the api service binary
 	@mkdir -p $(BIN_DIR)
-	go build -o $(API_BIN) ./cmd/api
+	go build -ldflags '$(LDFLAGS)' -o $(API_BIN) ./cmd/api
 
 $(MIGRATE_BIN): FORCE ## Build the postgres migration binary
 	@mkdir -p $(BIN_DIR)

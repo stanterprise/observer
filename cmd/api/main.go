@@ -17,6 +17,7 @@ import (
 	"github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/api"
 	"github.com/stanterprise/observer/pkg/storage"
+	"github.com/stanterprise/observer/pkg/version"
 	"github.com/stanterprise/observer/pkg/websocket"
 )
 
@@ -104,6 +105,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "OK\n")
 	})
+	router.Get("/api/version", version.Handler)
 	router.Get("/ws", func(w http.ResponseWriter, r *http.Request) {
 		hub.ServeWS(w, r)
 	})
@@ -112,6 +114,7 @@ func main() {
 		fmt.Fprintf(w, "Observer API Service\n")
 		fmt.Fprintf(w, "Available endpoints:\n")
 		fmt.Fprintf(w, "  GET /health - Health check\n")
+		fmt.Fprintf(w, "  GET /api/version - Build version info\n")
 		fmt.Fprintf(w, "  GET /ws - WebSocket endpoint for real-time events\n")
 		fmt.Fprintf(w, "\nWebSocket Filters (Query Parameters):\n")
 		fmt.Fprintf(w, "  ?eventTypes=test.begin,test.end    - Filter by event types (comma-separated)\n")
@@ -144,6 +147,8 @@ func main() {
 	}
 
 	logger.Info("api server starting",
+		"version", version.Version,
+		"commit", version.Commit,
 		"addr", addr,
 		"rest_api", "/api/tests, /api/runs")
 

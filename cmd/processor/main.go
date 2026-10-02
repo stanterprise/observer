@@ -16,6 +16,7 @@ import (
 	"github.com/stanterprise/observer/internal/repository/mongodb"
 	"github.com/stanterprise/observer/internal/repository/postgres"
 	"github.com/stanterprise/observer/pkg/consumer"
+	"github.com/stanterprise/observer/pkg/version"
 )
 
 func main() {
@@ -90,6 +91,8 @@ func main() {
 	defer natsConsumer.Close()
 
 	logger.Info("processor service starting",
+		"version", version.Version,
+		"commit", version.Commit,
 		"nats_url", *natsURL,
 		"stream", *streamName,
 		"consumer", *consumerName,

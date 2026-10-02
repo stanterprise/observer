@@ -3,11 +3,25 @@ import { Activity, Moon, Sun, RefreshCw } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useRefresh } from "@/lib/refresh";
 import { useTheme } from "@/lib/theme";
+import { uiVersion, useServerVersion } from "@/lib/version";
 
 export function Layout() {
   const location = useLocation();
   const { autoRefreshEnabled, toggleAutoRefresh } = useRefresh();
   const { isDark, toggleVariant } = useTheme();
+  const serverVersion = useServerVersion();
+  const displayVersion = serverVersion?.version ?? uiVersion;
+  const versionMismatch =
+    serverVersion !== null &&
+    uiVersion !== "dev" &&
+    serverVersion.version !== uiVersion;
+  const versionTitle = [
+    serverVersion &&
+      `Server ${serverVersion.version} (${serverVersion.commit.slice(0, 7)}, built ${serverVersion.buildDate})`,
+    `UI ${uiVersion}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const isActive = (path: string) => {
     if (path === "/") {
@@ -148,7 +162,17 @@ export function Layout() {
               >
                 Support
               </a>
-              <span className="text-(--stitch-on-surface-subtle)">v0.0.11</span>
+              <span
+                className="text-(--stitch-on-surface-subtle)"
+                title={versionTitle}
+              >
+                {displayVersion}
+                {versionMismatch && (
+                  <span className="ml-1 text-(--status-warning)">
+                    (UI {uiVersion})
+                  </span>
+                )}
+              </span>
             </div>
           </div>
         </div>

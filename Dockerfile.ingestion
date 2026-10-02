@@ -22,8 +22,11 @@ COPY pkg/ ./pkg/
 # Build ingestion binary with optimizations
 # TARGETARCH is automatically set by BuildKit for multi-platform builds
 ARG TARGETARCH
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -ldflags='-w -s -extldflags "-static"' \
+    go build -ldflags="-w -s -extldflags '-static' -X github.com/stanterprise/observer/pkg/version.Version=${VERSION} -X github.com/stanterprise/observer/pkg/version.Commit=${COMMIT} -X github.com/stanterprise/observer/pkg/version.BuildDate=${BUILD_DATE}" \
     -o /bin/ingestion ./cmd/ingestion
 
 # ============================================================================
