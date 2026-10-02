@@ -1,3 +1,8 @@
+x-build-args: &build-args
+  VERSION: ${OBSERVER_VERSION:-dev}
+  COMMIT: ${OBSERVER_COMMIT:-unknown}
+  BUILD_DATE: ${OBSERVER_BUILD_DATE:-unknown}
+
 services:
   # ============================================================================
   # AIO Profile - All-in-One single container deployment
@@ -7,6 +12,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.aio
+      args: *build-args
     image: observer:aio
     container_name: observer-aio
     profiles: ["aio"]
@@ -47,6 +53,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ingestion
+      args: *build-args
     image: observer:ingestion
     container_name: observer-ingestion
     profiles: ["dist", "web-dev"]
@@ -74,6 +81,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+      args: *build-args
     image: observer:api
     container_name: observer-migrate
     profiles: ["dist", "web-dev"]
@@ -92,6 +100,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.processor
+      args: *build-args
     image: observer:processor
     container_name: observer-processor
     profiles: ["dist", "web-dev"]
@@ -130,6 +139,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.processor
+      args: *build-args
     image: observer:processor
     container_name: observer-processor-mongo
     profiles: ["mongo"]
@@ -157,6 +167,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+      args: *build-args
     image: observer:api
     container_name: observer-api
     profiles: ["dist", "web-dev"]
@@ -198,6 +209,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+      args: *build-args
     image: observer:api
     container_name: observer-api-mongo
     profiles: ["mongo"]
@@ -229,6 +241,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
+      args: *build-args
     image: observer:web
     container_name: observer-web
     profiles: ["dist"]
@@ -254,6 +267,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
+      args: *build-args
     image: observer:web
     container_name: observer-web-mongo
     profiles: ["mongo"]
