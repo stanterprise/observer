@@ -2,6 +2,8 @@
 
 This guide covers deploying the Observer test observability system using Docker images and Helm charts.
 
+For end-user installation steps, see the [canonical installation guide](https://observer.stanterprise.com/docs/install/). This source-repository guide focuses on Docker/Helm implementation details, chart values, and operator behavior.
+
 ## Table of Contents
 
 1. [Docker Images](#docker-images)
@@ -22,18 +24,18 @@ All images are available at `ghcr.io/stanterprise/observer/`:
 - **aio**: All-in-One image with embedded MongoDB, PostgreSQL, NATS, and application services
 - **ingestion**: gRPC ingestion service
 - **processor**: Event processor service
-- **api**: REST/GraphQL API service with WebSocket support
+- **api**: REST API service with WebSocket support
 - **web**: Web UI (React + Nginx)
 
 ### Image Tags
 
 Images are tagged with:
 
-- `latest` - Latest build from main branch
-- `main` - Main branch build
+- `latest` - Latest build from the default `master` branch
+- `master` - Default branch build
 - `develop` - Develop branch build
 - `v*.*.*` - Semantic version releases
-- `main-<sha>` - Specific commit from main branch
+- `master-<sha>` - Specific commit from the default branch
 
 ### Pulling Images
 

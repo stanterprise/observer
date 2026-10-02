@@ -14,14 +14,16 @@ docker compose --profile dist up -d
 
 ### Services
 
-| Service     | Description                                                 |
-| ----------- | ----------------------------------------------------------- |
-| `aio`       | Single compact container with embedded databases and broker |
-| `nats`      | Message broker                                              |
-| `mongodb`   | Main database                                               |
-| `ingestion` | gRPC endpoint                                               |
-| `processor` | Event consumer                                              |
-| `api`       | Web UI + API service                                        |
+| Service       | Description |
+| ------------- | ----------- |
+| `aio`         | Bundled application, broker, PostgreSQL, MongoDB, and web UI |
+| `nats`        | NATS JetStream event transport |
+| `postgres`    | Authoritative durable run-data database |
+| `mongodb`     | Transient live in-flight step buffer only |
+| `ingestion`   | gRPC event receiver and NATS publisher |
+| `processor`   | Event consumer; persists durable data to PostgreSQL |
+| `api`         | REST API and optional WebSocket event relay |
+| `web`         | Separate UI container for distributed mode |
 
 ### AIO Published Ports
 
@@ -31,3 +33,5 @@ docker compose --profile dist up -d
 - `AIO_NATS_PORT` → NATS client (`4222`)
 - `AIO_NATS_HTTP_PORT` → NATS monitoring (`8222`)
 - `AIO_POSTGRES_PORT` → PostgreSQL for local debugging (`5432`)
+
+The `8080` API mapping is available in the Compose AIO profile. The common `docker run` quick start publishes the Nginx web port, which proxies `/api/` and `/ws` to the internal API. See the [public installation guide](https://observer.stanterprise.com/docs/install/) for end-user instructions.
