@@ -30,6 +30,7 @@ render_matrix() {
   local CHART_INPUT="$chart_input"
   local expected_image_tag
   local rendered_images
+  local external_connection_output
 
   expected_image_tag="$(helm show chart "${chart_input}" | awk '$1 == "appVersion:" { gsub(/"/, "", $2); print $2 }')"
   rendered_images="$(helm template observer "${chart_input}" | sed -n 's/.*image: ghcr.io\/stanterprise\/observer\/[^:]*:\([^" ]*\).*/\1/p' | sort -u)"
@@ -57,6 +58,21 @@ render_matrix() {
   helm template observer "${chart_input}" \
     --set mongodb.enabled=false \
     --set externalDatabase.host=mongo.example.com > /dev/null
+  external_connection_output="$(helm template observer "${chart_input}" \
+    --set postgresql.enabled=false \
+    --set postgres.host=postgres.example.com \
+    --set-string 'postgres.password=p@:/#%' \
+    --set mongodb.enabled=false \
+    --set externalDatabase.host=mongo.example.com \
+    --set-string 'externalDatabase.password=p@:/#%')"
+  if [[ "${external_connection_output}" != *'POSTGRES_DSN: "postgres://observer:p%40%3A%2F%23%25@postgres.example.com:5432/observer?sslmode=disable"'* ]]; then
+    echo "ERROR: generated PostgreSQL DSN is malformed or does not escape credentials"
+    exit 1
+  fi
+  if [[ "${external_connection_output}" != *'MONGODB_URI: "mongodb://observer:p%40%3A%2F%23%25@mongo.example.com:27017/observer?authSource=admin"'* ]]; then
+    echo "ERROR: generated MongoDB URI is malformed or does not escape credentials"
+    exit 1
+  fi
   helm template observer "${chart_input}" \
     --set extraEnvFrom[0].configMapRef.name=chart-test-env \
     --set storage.s3.existingSecret=chart-test-storage > /dev/null

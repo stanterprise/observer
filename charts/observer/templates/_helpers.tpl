@@ -221,11 +221,11 @@ Database connection string (MongoDB URI)
 {{- $user := index .Values.mongodb.auth.usernames 0 | default "observer" | urlquery | replace "+" "%20" }}
 {{- $password := index .Values.mongodb.auth.passwords 0 | default "" | urlquery | replace "+" "%20" }}
 {{- $database := index .Values.mongodb.auth.databases 0 | default "observer" | urlquery | replace "+" "%20" }}
-{{- printf "mongodb://%s-mongodb:27017/%s?authSource=%s" $user $password (include "observer.fullname" .) $database $database }}
+{{- printf "mongodb://%s:%s@%s-mongodb:27017/%s?authSource=%s" $user $password (include "observer.fullname" .) $database $database }}
 {{- else }}
 {{- $host := required "externalDatabase.host is required when mongodb.enabled=false" .Values.externalDatabase.host }}
 {{- $authSource := .Values.externalDatabase.authSource | default "admin" }}
-{{- printf "mongodb://%s:%d/%s?authSource=%s" (.Values.externalDatabase.username | urlquery | replace "+" "%20") (.Values.externalDatabase.password | urlquery | replace "+" "%20") $host (int .Values.externalDatabase.port) (.Values.externalDatabase.database | urlquery | replace "+" "%20") ($authSource | urlquery | replace "+" "%20") }}
+{{- printf "mongodb://%s:%s@%s:%d/%s?authSource=%s" (.Values.externalDatabase.username | urlquery | replace "+" "%20") (.Values.externalDatabase.password | urlquery | replace "+" "%20") $host (int .Values.externalDatabase.port) (.Values.externalDatabase.database | urlquery | replace "+" "%20") ($authSource | urlquery | replace "+" "%20") }}
 {{- end }}
 {{- end }}
 
@@ -308,7 +308,7 @@ PostgreSQL DSN
 {{- if .Values.postgresql.enabled -}}
 {{- $sslmode = "disable" -}}
 {{- end -}}
-{{- printf "postgres://%s:%v/%s?sslmode=%s" ($username | urlquery | replace "+" "%20") ($password | urlquery | replace "+" "%20") $host $port ($database | urlquery | replace "+" "%20") $sslmode -}}
+{{- printf "postgres://%s:%s@%s:%v/%s?sslmode=%s" ($username | urlquery | replace "+" "%20") ($password | urlquery | replace "+" "%20") $host $port ($database | urlquery | replace "+" "%20") $sslmode -}}
 {{- end }}
 
 {{/*
