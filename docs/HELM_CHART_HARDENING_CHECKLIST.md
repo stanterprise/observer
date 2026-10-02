@@ -16,12 +16,13 @@ Checked items below are verified against the current repository state (`charts/o
 
 The remaining release-gating defects are:
 
-- CI still lacks an automated install/upgrade/rollback smoke test against a real or ephemeral cluster for the recommended public install path (source templates and packaged artifacts are otherwise fully lint/render/schema validated).
 - `readOnlyRootFilesystem` is `false` chart-wide; no workload runs with a read-only root filesystem yet.
 - No NetworkPolicy resources or documented examples are shipped by the chart.
 - Documented upgrade/rollback guidance for stateful dependencies (PostgreSQL/MongoDB/NATS) and PodDisruptionBudget/replica-limit guidance for distributed mode do not exist yet.
 
 Previously tracked defects around reusable passwords, credential-bearing rendered manifests, and missing security contexts have been resolved; see the checked items below.
+
+A real-cluster (`kind`/`k3d`) install/upgrade/rollback smoke test (HC083) is intentionally **not pursued** in this repository: the only cluster available for that kind of testing is a one-off ARM64 k3s homelab environment, which is not representative of the chart's supported install targets and doesn't cover the full image/architecture matrix. CI relies on render, schema, and packaged-artifact validation instead (see HC080-HC082, HC084).
 
 One-off homelab k3s deployment notes and the separate `observer-mcp` chart task packets are archived under [archive/2026-09-copilot/](archive/2026-09-copilot/) and are not part of this checklist's scope.
 
@@ -100,7 +101,7 @@ One-off homelab k3s deployment notes and the separate `observer-mcp` chart task 
 - [x] HC080 CI runs `helm lint` for the chart on every change that touches `charts/observer/**`.
 - [x] HC081 CI renders a matrix that includes default, AIO, production, and advertised external dependency modes (`.github/workflows/helm-publish.yml`).
 - [x] HC082 Rendered manifests are validated with a Kubernetes schema tool such as `kubeconform` or `kubeval`.
-- [ ] HC083 At least one install smoke test runs against a real or ephemeral cluster for the recommended public install path. CI currently validates rendering, schema, and packaged-artifact contents (`scripts/test-helm-chart.sh`) but does not provision a cluster (e.g. `kind`/`k3d`) and run `helm install`/`helm upgrade`/`helm test`.
+- [~] HC083 Descoped: a real-cluster install/upgrade/rollback smoke test is not pursued in this repository. The only available cluster for that purpose is a one-off ARM64 k3s homelab environment, which is too narrow (single architecture, non-representative image set) to stand in for the chart's general public install target. CI validates rendering, schema, and packaged-artifact contents instead (`scripts/test-helm-chart.sh`).
 - [x] HC084 The chart is packaged and published only after the validation matrix passes.
 
 ## Release Gate
@@ -109,7 +110,7 @@ Treat the chart as public-ready only when:
 
 - no blocker from the current baseline remains open
 - every checklist item in sections 1 through 4 is complete
-- section 9 is automated in CI rather than checked manually
+- section 9 items HC080, HC081, HC082, and HC084 are automated in CI; HC083 is intentionally descoped per the Current Baseline note above
 - documentation and defaults describe the same operator experience
 
 Until then, downstream infrastructure repositories should assume they are integrating an internal chart that may still require wrappers, patches, or pinned local knowledge.

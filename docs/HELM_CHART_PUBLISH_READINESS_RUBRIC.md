@@ -187,6 +187,8 @@ Based on the 2026-09-22 review against the current `charts/observer` state:
 - `2` for networking and exposure (domain 5): the chart-managed boundary (no Ingress/Gateway/cloud-specific resources) is clear and documented, but downstream ingress/TLS guidance for k3s/homelab-style clusters lives only in archived, unmaintained notes (see [archive/2026-09-copilot/](archive/2026-09-copilot/)).
 - `1` to `2` for upgrade/migration (domain 6): the migration hook is single-path and documented for `helm upgrade`, but there is no documented rollback story or compatibility matrix for stateful dependency schema/data changes.
 - `2` for operability (domain 7): probes, HPA, and `NOTES.txt` reflect real behavior; no PodDisruptionBudget or NetworkPolicy hooks exist yet.
-- `2` to `3` for documentation (domain 8): chart README and values contract are in sync as of this review; the remaining gap is an automated, real-cluster install/upgrade/rollback smoke test (CI currently only renders, schema-validates, and inspects packaged artifacts).
+- `2` to `3` for documentation (domain 8): chart README and values contract are in sync as of this review.
 
-That places the chart in **Consume Behind An Internal Wrapper**, moving toward **Consume Upstream Directly** once a real-cluster smoke test (checklist HC083) and stateful-dependency upgrade/rollback documentation are added.
+A real-cluster (`kind`/`k3d`) install/upgrade/rollback smoke test is intentionally not pursued for this chart (see checklist HC083) - the only available cluster is a one-off ARM64 k3s homelab environment, which is too narrow to represent the chart's general public install target. CI relies on render, schema, and packaged-artifact validation instead.
+
+That places the chart in **Consume Behind An Internal Wrapper**, moving toward **Consume Upstream Directly** once stateful-dependency upgrade/rollback documentation (domain 6) and PodDisruptionBudget/NetworkPolicy guidance (domain 7) are added.

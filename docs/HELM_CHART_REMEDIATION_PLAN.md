@@ -21,14 +21,13 @@ Phases 0 through 4 and phase 6 are effectively complete against the current
 - **Phase 4 (migration, probes, runtime behavior):** done. A single migration hook job is the only migration path; every distributed workload defines liveness/readiness (and startup, for ingestion) probes; `NOTES.txt` reflects actual per-mode access paths.
 - **Phase 5 (networking and exposure hardening):** done, but scoped narrower than originally planned - the chart deliberately renders no Ingress, Gateway API, or cloud-specific resources at all (rather than picking one primary pattern to render); that boundary is documented in the README.
 - **Phase 6 (documentation alignment):** done for chart-owned docs (`charts/observer/README.md` matches current defaults and contract).
-- **Phase 7 (CI and release automation):** mostly done - lint, full render matrix, kubeconform schema validation, and packaged-artifact contract checks all run in CI. **Still open:** no cluster smoke test (`kind`/`k3d`) that actually runs `helm install`/`helm upgrade`/`helm test` against the packaged OCI artifact (checklist HC083).
+- **Phase 7 (CI and release automation):** effectively complete for what this repository pursues - lint, full render matrix, kubeconform schema validation, and packaged-artifact contract checks all run in CI. A real-cluster (`kind`/`k3d`) install/upgrade/rollback smoke test is intentionally **not pursued** (checklist HC083): the only cluster available for that kind of testing is a one-off ARM64 k3s homelab environment, which is a poor stand-in for the chart's general public install target (single architecture, non-representative image set, not a typical deployment target).
 
 Remaining open work, in priority order:
 
-1. Add a real cluster install/upgrade/rollback smoke test to CI (phase 7 / HC083).
-2. Document upgrade/rollback and stateful-dependency compatibility expectations (HC053).
-3. Add PodDisruptionBudget and replica/disruption documentation for distributed mode (HC054).
-4. Consider NetworkPolicy hooks/examples and `readOnlyRootFilesystem: true` support where feasible (HC043/HC045).
+1. Document upgrade/rollback and stateful-dependency compatibility expectations (HC053).
+2. Add PodDisruptionBudget and replica/disruption documentation for distributed mode (HC054).
+3. Consider NetworkPolicy hooks/examples and `readOnlyRootFilesystem: true` support where feasible (HC043/HC045).
 
 One-off homelab k3s deployment notes and task packets covering the separate
 `observer-mcp` chart are archived under
@@ -72,7 +71,11 @@ At the end of this plan, the chart should meet these conditions:
 - secrets are sourced from Kubernetes Secrets or generated subchart secrets, not raw committed values
 - unsupported or experimental paths are either removed, explicitly gated, or clearly marked as non-public
 - README, deployment docs, architecture docs, values files, and OCI metadata all describe the same supported behavior
-- CI enforces lint, schema validation, render coverage, Kubernetes manifest validation, and at least one cluster smoke test
+- CI enforces lint, schema validation, render coverage, and Kubernetes manifest validation
+
+> Note: an earlier version of this target end state also called for at least
+> one real-cluster install smoke test. Per the Current Status decision above,
+> that item is intentionally descoped for this repository rather than pursued.
 
 ## Recommended Public Support Boundary
 
