@@ -20,6 +20,10 @@ This folder contains contributor and implementation documentation for Observer. 
 - Live-step buffer schema (MongoDB): [architecture/07-database-schema.md](architecture/07-database-schema.md)
 - Roadmap / next steps: [architecture/10-next-steps.md](architecture/10-next-steps.md)
 
+## Extending Observer
+
+- Plugin development guide (reporters, storage drivers, API handlers, interceptors, event handlers): [PLUGIN_DEVELOPMENT.md](PLUGIN_DEVELOPMENT.md)
+
 ## Integrations
 
 - Playwright reporter integration (user configuration): [observer.stanterprise.com/docs/integrations/playwright-reporter](https://observer.stanterprise.com/docs/integrations/playwright-reporter/)
