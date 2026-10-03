@@ -168,6 +168,9 @@ Validate distributed-mode configuration before rendering resources.
 {{- define "observer.validateDistributedConfig" -}}
 {{- if and (eq .Values.mode "distributed") .Values.distributed.enabled -}}
 {{- include "observer.validateExternalDependencies" . -}}
+{{- if and .Values.mongodb.enabled (not .Values.runtime.existingSecret) (ne (len (.Values.mongodb.auth.usernames | default list)) 1) -}}
+{{- fail "mongodb.auth.usernames must contain exactly one user when embedded MongoDB credentials are chart-managed" -}}
+{{- end -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.ingestion.env" "env" (.Values.distributed.ingestion.env | default dict)) -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.api.env" "env" (.Values.distributed.api.env | default dict)) -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.processor.env" "env" (.Values.distributed.processor.env | default dict)) -}}

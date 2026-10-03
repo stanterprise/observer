@@ -62,6 +62,11 @@ spec:
         - name: POSTGRES_DSN
           value: {{ include "observer.postgres.dsn" . | quote }}
         {{- end }}
+        {{- include "observer.renderFilteredEnv" (dict "env" .Values.extraEnv) | nindent 8 }}
+        {{- with .Values.extraEnvFrom }}
+        envFrom:
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
         command:
         - /bin/sh
         - -c
@@ -89,5 +94,13 @@ spec:
           requests:
             cpu: 100m
             memory: 128Mi
+        {{- with .Values.extraVolumeMounts }}
+        volumeMounts:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- with .Values.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       restartPolicy: Never
 {{- end }}

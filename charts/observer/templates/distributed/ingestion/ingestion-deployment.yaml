@@ -63,6 +63,11 @@ spec:
               name: {{ include "observer.runtimeSecretName" . }}
               key: NATS_URL
 {{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.ingestion.env "excluded" (list "NATS_URL")) | nindent 8 }}
+{{ include "observer.renderFilteredEnv" (dict "env" .Values.extraEnv) | nindent 8 }}
+        {{- with .Values.extraEnvFrom }}
+        envFrom:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         livenessProbe:
           grpc:
             port: 50051
@@ -85,6 +90,14 @@ spec:
           failureThreshold: 12
         resources:
           {{- toYaml .Values.distributed.ingestion.resources | nindent 10 }}
+        {{- with .Values.extraVolumeMounts }}
+        volumeMounts:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- with .Values.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

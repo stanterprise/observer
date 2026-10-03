@@ -25,6 +25,20 @@ assert_render_fails() {
   fi
 }
 
+assert_render_count() {
+  local name="$1"
+  local text="$2"
+  local expected="$3"
+  local output="$4"
+  local actual
+
+  actual="$(grep -F -c -e "${text}" <<< "${output}" || true)"
+  if [[ "${actual}" -ne "${expected}" ]]; then
+    echo "ERROR: ${name} appeared ${actual} times; expected ${expected}"
+    exit 1
+  fi
+}
+
 render_matrix() {
   local chart_input="$1"
   local CHART_INPUT="$chart_input"
@@ -76,6 +90,39 @@ render_matrix() {
   helm template observer "${chart_input}" \
     --set extraEnvFrom[0].configMapRef.name=chart-test-env \
     --set storage.s3.existingSecret=chart-test-storage > /dev/null
+
+  local extension_values=(
+    --set-string extraEnv.CHART_TEST_GLOBAL=present
+    --set-json 'extraEnvFrom=[{"configMapRef":{"name":"chart-test-env"}}]'
+    --set-json 'extraVolumes=[{"name":"chart-test-volume","emptyDir":{}}]'
+    --set-json 'extraVolumeMounts=[{"name":"chart-test-volume","mountPath":"/chart-test"}]'
+  )
+  local distributed_extensions
+  local aio_extensions
+  distributed_extensions="$(helm template observer "${chart_input}" "${extension_values[@]}")"
+  aio_extensions="$(helm template observer "${chart_input}" --values "${CHART_PATH}/values-aio.yaml" "${extension_values[@]}")"
+  for output in "${distributed_extensions}" "${aio_extensions}"; do
+    if [[ "${output}" == "${distributed_extensions}" ]]; then
+      expected_workloads=5
+    else
+      expected_workloads=1
+    fi
+    assert_render_count "global environment variable" 'name: CHART_TEST_GLOBAL' "${expected_workloads}" "${output}"
+    assert_render_count "global envFrom reference" 'name: chart-test-env' "${expected_workloads}" "${output}"
+    assert_render_count "global volume mount" 'mountPath: /chart-test' "${expected_workloads}" "${output}"
+    assert_render_count "global volume declaration and mount" 'name: chart-test-volume' "$((expected_workloads * 2))" "${output}"
+  done
+
+  assert_render_count "MongoDB application password variables" '- name: MONGO_PASSWORD' 2 "${distributed_extensions}"
+  if ! grep -A 6 -F -e '- name: MONGO_PASSWORD' <<< "${distributed_extensions}" | grep -Fq -e 'key: mongodb-passwords'; then
+    echo "ERROR: API and processor must use the MongoDB application-user password Secret"
+    exit 1
+  fi
+  if [[ "${distributed_extensions}" != *'MONGO_AUTH_SOURCE'*'value: "observer"'* ]]; then
+    echo "ERROR: embedded MongoDB application user must authenticate against its database"
+    exit 1
+  fi
+
   helm template observer "${chart_input}" \
     --set postgresql.auth.existingSecret=chart-test-postgres \
     --set postgresql.auth.secretKeys.userPasswordKey=custom-password \
@@ -97,6 +144,10 @@ render_matrix() {
   assert_render_fails "managed connection variables in extraEnv" \
     "extraEnv.NATS_URL" \
     --set-string extraEnv.NATS_URL=nats://not-allowed.example.com
+  assert_render_fails "multiple embedded MongoDB app users" \
+    "mongodb.auth.usernames must contain exactly one user" \
+    --set-json 'mongodb.auth.usernames=["observer","observer-readonly"]' \
+    --set-json 'mongodb.auth.databases=["observer","observer"]'
 }
 
 if [[ "${CHART_INPUT}" == *.tgz ]]; then

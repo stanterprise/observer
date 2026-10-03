@@ -118,16 +118,16 @@ spec:
         - name: MONGO_PORT
           value: "27017"
         - name: MONGO_USER
-          value: {{ .Values.mongodb.auth.rootUser | default "root" | quote }}
+          value: {{ index .Values.mongodb.auth.usernames 0 | default "observer" | quote }}
         - name: MONGO_PASSWORD
           valueFrom:
             secretKeyRef:
               name: {{ include "mongodb.secretName" .Subcharts.mongodb }}
-              key: mongodb-root-password
+              key: mongodb-passwords
         - name: MONGO_DATABASE
           value: {{ index .Values.mongodb.auth.databases 0 | default "observer" | quote }}
         - name: MONGO_AUTH_SOURCE
-          value: admin
+          value: {{ index .Values.mongodb.auth.databases 0 | default "observer" | quote }}
         {{- end }}
         {{- if or .Values.runtime.existingSecret (not .Values.mongodb.enabled) }}
         - name: MONGODB_URI
