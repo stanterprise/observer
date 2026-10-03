@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/stanterprise/observer/internal/database"
 	embeddedmigrations "github.com/stanterprise/observer/migrations"
 )
 
@@ -18,10 +19,7 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	dsn := os.Getenv("POSTGRES_DSN")
-	if dsn == "" {
-		dsn = os.Getenv("DATABASE_URL")
-	}
+	dsn := database.PostgresDSNFromEnv()
 	if dsn == "" {
 		logger.Error("POSTGRES_DSN / DATABASE_URL not set")
 		os.Exit(1)

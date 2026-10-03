@@ -52,7 +52,6 @@ aio:
     # existingClaim: ""
 
   env:
-    MONGODB_URI: mongodb://root:password@localhost:27017/observer?authSource=admin
     STORAGE_DRIVER: local
     ARTIFACTS_DIR: /data/artifacts
     NATS_URL: nats://localhost:4222
@@ -181,7 +180,8 @@ distributed:
       runAsUser: 0
 
     env:
-      API_BACKEND_HOST: observer-api
+      # The deployment template replaces this with the release-qualified API Service name.
+      API_BACKEND_HOST: ""
       API_BACKEND_PORT: "8080"
 
 postgres:
@@ -189,9 +189,10 @@ postgres:
   host: ""
   port: 5432
   username: observer
-  password: password
+  password: ""  # Use existingSecret to provide credentials in production
   database: observer
   sslmode: disable
+  # existingSecret: ""  # Secret containing postgresql password (optional)
   migration:
     enabled: true
     backoffLimit: 3
@@ -202,11 +203,12 @@ postgresql:
   image:
     registry: docker.io
     repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
   auth:
     username: observer
-    password: password
+    password: ""  # Empty lets the dependency chart generate a credential
     database: observer
-    postgresPassword: password
+    postgresPassword: ""  # Empty lets the dependency chart generate a credential
   architecture: standalone
   primary:
     persistence:
@@ -223,18 +225,21 @@ postgresql:
 # MongoDB configuration
 mongodb:
   enabled: true
+  # The bundled Bitnami legacy image currently supports linux/amd64 only.
+  # Set enabled=false and provide externalDatabase for linux/arm64 clusters.
   image:
     registry: docker.io
     repository: bitnamilegacy/mongodb
+    tag: 8.0.4-debian-12-r0  # linux/amd64 only; use external MongoDB on ARM64
   # Use external MongoDB by setting enabled: false and configuring externalDatabase
   auth:
     enabled: true
     rootUser: root
-    rootPassword: password
+    rootPassword: ""  # Empty lets the dependency chart generate a credential
     usernames:
       - observer
     passwords:
-      - password
+      - ""  # Empty lets the dependency chart generate a credential
     databases:
       - observer
   persistence:
@@ -253,9 +258,10 @@ externalDatabase:
   host: ""
   port: 27017
   username: observer
-  password: ""
+  password: ""  # Use existingSecret to provide credentials in production
   database: observer
   authSource: admin
+  # existingSecret: ""  # Secret containing mongodb password (optional)
 
 # NATS configuration
 nats:
@@ -289,6 +295,40 @@ runtime:
   # Distributed workload env blocks must not set NATS_URL, POSTGRES_DSN, or
   # MONGODB_URI; use this secret or the canonical dependency values instead.
   existingSecret: ""
+
+# Object Storage (S3) Configuration
+storage:
+  s3:
+    existingSecret: ""  # Secret containing S3 environment variables
+    # Keys: STORAGE_DRIVER, STORAGE_S3_ENDPOINT, STORAGE_S3_REGION, STORAGE_S3_BUCKET,
+    #       STORAGE_S3_USE_PATH_STYLE, STORAGE_S3_ACCESS_KEY_ID, STORAGE_S3_SECRET_ACCESS_KEY
+
+# Custom CA Certificate Configuration
+customCA:
+  existingSecret: ""  # Secret containing ca.crt
+  mountPath: /etc/ssl/certs/custom-ca  # Where to mount the CA certificate
+
+# Extension Points for Workload Customization
+# These allow adding environment variables, volumes, and mounts without modifying the chart
+extraEnv: {}
+  # Example:
+  # CUSTOM_VAR: custom_value
+
+extraEnvFrom: []
+  # Example:
+  # - configMapRef:
+  #     name: my-config
+
+extraVolumes: []
+  # Example:
+  # - name: custom-vol
+  #   secret:
+  #     secretName: my-secret
+
+extraVolumeMounts: []
+  # Example:
+  # - name: custom-vol
+  #   mountPath: /custom
 
 # Service Account
 serviceAccount:

@@ -86,7 +86,7 @@ postgres:
   host: ""
   port: 5432
   username: observer
-  password: password
+  password: "" # Use existingSecret to provide credentials in production
   database: observer
   sslmode: disable
 
@@ -95,11 +95,12 @@ postgresql:
   image:
     registry: docker.io
     repository: bitnamilegacy/postgresql
+    tag: 17.6.0-debian-12-r4
   auth:
     username: observer
-    password: password
+    password: "" # Provide through a Secret or deployment-time values
     database: observer
-    postgresPassword: password
+    postgresPassword: "" # Provide through a Secret or deployment-time values
   architecture: standalone
   primary:
     persistence:
@@ -119,6 +120,7 @@ mongodb:
   image:
     registry: docker.io
     repository: bitnamilegacy/mongodb
+    tag: 8.0.4-debian-12-r0 # linux/amd64 only; use external MongoDB on ARM64
   persistence:
     enabled: true
     size: 50Gi

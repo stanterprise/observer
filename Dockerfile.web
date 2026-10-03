@@ -18,7 +18,8 @@ RUN npm ci --ignore-scripts
 COPY web/ ./
 
 # Build the application
-RUN npm run build
+ARG VERSION=dev
+RUN VITE_APP_VERSION=${VERSION} npm run build
 
 # ============================================================================
 # Runtime stage - Nginx for serving static files and proxying

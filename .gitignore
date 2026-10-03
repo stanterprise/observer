@@ -47,3 +47,6 @@ web/node_modules/
 web/dist/
 web/.env
 web/.env.local
+
+
+.archify/

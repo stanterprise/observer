@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -91,14 +93,39 @@ func ConnectPostgresWithConfig(cfg PostgresConfig, logger *slog.Logger) (*Postgr
 	return connection, nil
 }
 
-// ConnectPostgresFromEnv reads POSTGRES_DSN (or DATABASE_URL as a fallback)
-// from the environment and opens a connection. Returns (nil, nil) if neither
-// variable is set so callers can treat Postgres as optional.
-func ConnectPostgresFromEnv(logger *slog.Logger) (*PostgresConnection, error) {
+// PostgresDSNFromEnv reads a configured DSN or builds one from split environment
+// variables, escaping credentials so reserved characters remain valid.
+func PostgresDSNFromEnv() string {
 	dsn := os.Getenv("POSTGRES_DSN")
 	if dsn == "" {
 		dsn = os.Getenv("DATABASE_URL")
 	}
+	if dsn != "" {
+		return dsn
+	}
+
+	host := os.Getenv("POSTGRES_HOST")
+	if host == "" {
+		return ""
+	}
+
+	dsnURL := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(envOr("POSTGRES_USER", "observer"), os.Getenv("POSTGRES_PASSWORD")),
+		Host:   net.JoinHostPort(host, envOr("POSTGRES_PORT", "5432")),
+		Path:   "/" + envOr("POSTGRES_DB", "observer"),
+		RawQuery: url.Values{
+			"sslmode": []string{envOr("POSTGRES_SSLMODE", "disable")},
+		}.Encode(),
+	}
+	return dsnURL.String()
+}
+
+// ConnectPostgresFromEnv reads PostgreSQL connection settings from the
+// environment and opens a connection. Returns (nil, nil) if none are set so
+// callers can treat Postgres as optional.
+func ConnectPostgresFromEnv(logger *slog.Logger) (*PostgresConnection, error) {
+	dsn := PostgresDSNFromEnv()
 	if dsn == "" {
 		return nil, nil
 	}

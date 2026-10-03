@@ -60,6 +60,11 @@ spec:
         - name: {{ $key }}
           value: {{ $value | quote }}
         {{- end }}
+        {{- include "observer.renderFilteredEnv" (dict "env" .Values.extraEnv) | nindent 8 }}
+        {{- with .Values.extraEnvFrom }}
+        envFrom:
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
         livenessProbe:
           grpc:
             port: 50051
@@ -85,6 +90,9 @@ spec:
           mountPath: /var/cache/nginx
         - name: nginx-lib
           mountPath: /var/lib/nginx
+        {{- with .Values.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       volumes:
       - name: data
         {{- if .Values.aio.persistence.enabled }}
@@ -103,6 +111,9 @@ spec:
         emptyDir: {}
       - name: nginx-lib
         emptyDir: {}
+      {{- with .Values.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

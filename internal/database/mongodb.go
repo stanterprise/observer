@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -118,15 +120,17 @@ func buildMongoURIFromSplitEnv() string {
 		authSource = "admin"
 	}
 
-	var uri string
+	uri := url.URL{
+		Scheme: "mongodb",
+		Host:   net.JoinHostPort(host, port),
+		Path:   "/" + database,
+	}
 	if user != "" && password != "" {
-		uri = fmt.Sprintf("mongodb://%s:%s@%s:%s/%s?authSource=%s",
-			user, password, host, port, database, authSource)
-	} else {
-		uri = fmt.Sprintf("mongodb://%s:%s/%s", host, port, database)
+		uri.User = url.UserPassword(user, password)
+		uri.RawQuery = url.Values{"authSource": []string{authSource}}.Encode()
 	}
 
-	return uri
+	return uri.String()
 }
 
 // extractDBName extracts the database name from a MongoDB URI.

@@ -42,10 +42,17 @@ spec:
         - name: http
           containerPort: 80
           protocol: TCP
-        {{- $webEnv := include "observer.renderFilteredEnv" (dict "env" .Values.distributed.web.env "excluded" (list "NGINX_ENVSUBST_TEMPLATE_DIR")) }}
-        {{- if $webEnv }}
+        {{- $webEnv := include "observer.renderFilteredEnv" (dict "env" .Values.distributed.web.env "excluded" (list "API_BACKEND_HOST" "NGINX_ENVSUBST_TEMPLATE_DIR")) }}
         env:
+        {{- if $webEnv }}
 {{ $webEnv | nindent 8 }}
+        {{- end }}
+        - name: API_BACKEND_HOST
+          value: {{ include "observer.fullname" . }}-api
+        {{- include "observer.renderFilteredEnv" (dict "env" .Values.extraEnv) | nindent 8 }}
+        {{- with .Values.extraEnvFrom }}
+        envFrom:
+          {{- toYaml . | nindent 8 }}
         {{- end }}
         livenessProbe:
           httpGet:
@@ -61,6 +68,14 @@ spec:
           periodSeconds: 5
         resources:
           {{- toYaml .Values.distributed.web.resources | nindent 10 }}
+        {{- with .Values.extraVolumeMounts }}
+        volumeMounts:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- with .Values.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

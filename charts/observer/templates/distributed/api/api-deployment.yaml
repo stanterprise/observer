@@ -47,17 +47,78 @@ spec:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: NATS_URL
+        {{- if and (not .Values.runtime.existingSecret) .Values.postgresql.enabled }}
+        - name: POSTGRES_HOST
+          value: {{ include "observer.postgres.host" . | quote }}
+        - name: POSTGRES_PORT
+          value: {{ include "observer.postgres.port" . | quote }}
+        - name: POSTGRES_USER
+          value: {{ include "observer.postgres.user" . | quote }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "postgresql.v1.secretName" .Subcharts.postgresql }}
+              key: {{ include "postgresql.v1.userPasswordKey" .Subcharts.postgresql }}
+        - name: POSTGRES_DB
+          value: {{ include "observer.postgres.db" . | quote }}
+        - name: POSTGRES_SSLMODE
+          value: disable
+        {{- end }}
+        {{- if or .Values.runtime.existingSecret (not .Values.postgresql.enabled) }}
         - name: POSTGRES_DSN
           valueFrom:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: POSTGRES_DSN
+        {{- end }}
+        {{- if and (not .Values.runtime.existingSecret) .Values.mongodb.enabled }}
+        - name: MONGO_HOST
+          value: {{ printf "%s-mongodb" (include "observer.fullname" .) | quote }}
+        - name: MONGO_PORT
+          value: "27017"
+        - name: MONGO_USER
+          value: {{ index .Values.mongodb.auth.usernames 0 | default "observer" | quote }}
+        - name: MONGO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "mongodb.secretName" .Subcharts.mongodb }}
+              key: mongodb-passwords
+        - name: MONGO_DATABASE
+          value: {{ index .Values.mongodb.auth.databases 0 | default "observer" | quote }}
+        - name: MONGO_AUTH_SOURCE
+          value: {{ index .Values.mongodb.auth.databases 0 | default "observer" | quote }}
+        {{- end }}
+        {{- if or .Values.runtime.existingSecret (not .Values.mongodb.enabled) }}
         - name: MONGODB_URI
           valueFrom:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: MONGODB_URI
+        {{- end }}
+        {{- if and .Values.customCA .Values.customCA.existingSecret (not (hasKey (.Values.distributed.api.env | default dict) "AWS_CA_BUNDLE")) (not (hasKey (.Values.extraEnv | default dict) "AWS_CA_BUNDLE")) }}
+        - name: AWS_CA_BUNDLE
+          value: {{ printf "%s/ca.crt" (.Values.customCA.mountPath | default "/etc/ssl/certs/custom-ca") | quote }}
+        {{- end }}
 {{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.api.env "excluded" (list "NATS_URL" "POSTGRES_DSN" "MONGODB_URI")) | nindent 8 }}
+        {{- with .Values.extraEnv }}
+        {{- range $key, $value := . }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if and .Values.storage .Values.storage.s3 .Values.storage.s3.existingSecret }}
+        envFrom:
+        - secretRef:
+            name: {{ .Values.storage.s3.existingSecret }}
+        {{- end }}
+        {{- with .Values.extraEnvFrom }}
+        {{- if and $.Values.storage $.Values.storage.s3 $.Values.storage.s3.existingSecret }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        envFrom:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
         livenessProbe:
           httpGet:
             path: /health
@@ -72,6 +133,28 @@ spec:
           periodSeconds: 5
         resources:
           {{- toYaml .Values.distributed.api.resources | nindent 10 }}
+        {{- if or (and .Values.customCA .Values.customCA.existingSecret) .Values.extraVolumeMounts }}
+        volumeMounts:
+        {{- if and .Values.customCA .Values.customCA.existingSecret }}
+        - name: custom-ca
+          mountPath: {{ .Values.customCA.mountPath | default "/etc/ssl/certs/custom-ca" }}
+          readOnly: true
+        {{- end }}
+        {{- with .Values.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+      {{- if or (and .Values.customCA .Values.customCA.existingSecret) .Values.extraVolumes }}
+      volumes:
+      {{- if and .Values.customCA .Values.customCA.existingSecret }}
+      - name: custom-ca
+        secret:
+          secretName: {{ .Values.customCA.existingSecret }}
+      {{- end }}
+      {{- with .Values.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

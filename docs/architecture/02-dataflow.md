@@ -6,12 +6,13 @@ flowchart TD
   B -->|Publish| C[NATS JetStream]
   C --> D[Processor Service]
   C --> I[WebSocket Consumer]
-  D --> E[(Database)]
-  D --> F[(Object Storage)]
-  E --> G[API Service]
+  D --> E[(PostgreSQL durable run data)]
+  D --> M[(MongoDB live_step_buffers)]
+  D --> F[(Configured Object Storage)]
+  E --> G[REST API]
   F --> G
   I --> G
-  G -->|HTTP/GraphQL| H[Web UI]
+  G -->|HTTP REST| H[Web UI]
   G -->|WebSocket /ws| H
 ```
 
@@ -21,16 +22,17 @@ flowchart TD
 
 1. Reporter sends events over gRPC (`TestStarted`, `Step`, `AttachmentAdded`, etc.).
 2. Ingestion publishes validated events to NATS.
-3. Processor consumes, persists data and artifacts.
-4. **WebSocket consumer (part of API service) relays events to connected web clients in real-time.**
-5. Processor emits summaries → API caches or indexes them.
-6. UI displays data via the API and receives real-time updates via WebSocket.
+3. Processor consumes events and persists durable run data to PostgreSQL; MongoDB is used for the live-step buffer and attachments use configured object storage.
+4. **The WebSocket consumer (part of the API service) relays events to connected web clients in real time when NATS is configured.**
+5. Processor summaries and API caching/indexing were design goals; they are not separate current event streams.
+6. UI displays data via REST and receives real-time updates via WebSocket.
 
 ---
 
 ## Observability & Reliability
 
-- Backpressure managed via NATS JetStream.
-- DLQ (dead letter queue) for failed events.
-- OpenTelemetry spans across all services.
-- Prometheus metrics on `/metrics` endpoints.
+- Backpressure is managed via NATS JetStream.
+- DLQ (dead letter queue) for failed events is planned; there is no current dedicated DLQ flow.
+- OpenTelemetry spans across all services are planned, not implemented.
+- Prometheus metrics on `/metrics` endpoints are planned, not currently registered.
+- Kafka and GraphQL are design options, not current paths.

@@ -1,12 +1,13 @@
 # Observer Documentation
 
-This folder contains the maintained documentation set for Observer.
+This folder contains contributor and implementation documentation for Observer. The canonical source for end-user product guidance is the [Observer documentation website](https://observer.stanterprise.com/).
 
 ## Start here
 
-- Project overview and quick start: [../README.md](../README.md)
-- Detailed quick start (local + Docker): [../QUICKSTART.md](../QUICKSTART.md)
-- Deployment guide (Compose + Helm): [../DEPLOYMENT.md](../DEPLOYMENT.md)
+- Project and contributor overview: [../README.md](../README.md)
+- Build, test, and contribution setup: [../CONTRIBUTING.md](../CONTRIBUTING.md)
+- Helm implementation and operator contract: [../DEPLOYMENT.md](../DEPLOYMENT.md)
+- End-user getting started: [observer.stanterprise.com/docs/getting-started](https://observer.stanterprise.com/docs/getting-started/)
 
 ## Architecture
 
@@ -16,13 +17,13 @@ This folder contains the maintained documentation set for Observer.
 - Deployment modes (AIO vs distributed): [architecture/03-modes.md](architecture/03-modes.md)
 - Docker Compose details: [architecture/04-docker-compose.md](architecture/04-docker-compose.md)
 - Dockerfiles: [architecture/05-dockerfile.md](architecture/05-dockerfile.md)
-- Database schema (MongoDB): [architecture/07-database-schema.md](architecture/07-database-schema.md)
+- Live-step buffer schema (MongoDB): [architecture/07-database-schema.md](architecture/07-database-schema.md)
 - Roadmap / next steps: [architecture/10-next-steps.md](architecture/10-next-steps.md)
 
 ## Integrations
 
-- Playwright reporter integration (practical guide): [PLAYWRIGHT_INTEGRATION.md](PLAYWRIGHT_INTEGRATION.md)
-- Reporter integration (architecture view): [architecture/08-reporter-integration.md](architecture/08-reporter-integration.md)
+- Playwright reporter integration (user configuration): [observer.stanterprise.com/docs/integrations/playwright-reporter](https://observer.stanterprise.com/docs/integrations/playwright-reporter/)
+- Reporter integration internals: [architecture/08-reporter-integration.md](architecture/08-reporter-integration.md)
 
 ## Real-time (WebSocket)
 
@@ -47,9 +48,12 @@ This folder contains the maintained documentation set for Observer.
 
 ## Helm release readiness
 
-- Chart hardening checklist: [HELM_CHART_HARDENING_CHECKLIST.md](HELM_CHART_HARDENING_CHECKLIST.md)
+- Chart hardening checklist (release gate): [HELM_CHART_HARDENING_CHECKLIST.md](HELM_CHART_HARDENING_CHECKLIST.md)
 - Detailed remediation plan: [HELM_CHART_REMEDIATION_PLAN.md](HELM_CHART_REMEDIATION_PLAN.md)
 - Publish-readiness rubric: [HELM_CHART_PUBLISH_READINESS_RUBRIC.md](HELM_CHART_PUBLISH_READINESS_RUBRIC.md)
+
+One-off homelab k3s deployment notes and the separate `observer-mcp` chart task
+packets have been archived; see [archive/2026-09-copilot/](archive/2026-09-copilot/).
 
 ## Historical documents
 

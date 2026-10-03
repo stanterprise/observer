@@ -2,68 +2,30 @@
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/stanterprise/observer?quickstart=1)
 
-A test observability system that collects test execution events via gRPC. The system can operate in two modes:
+A test observability system for automated test execution. Observer currently integrates with Playwright and operates in two deployment modes:
 
 - 🧩 **All-in-One (AIO)** — Single container with embedded MongoDB, PostgreSQL, and NATS for local/dev use
 - ⚙️ **Distributed Mode** — Multi-container deployment for production/CI
 
 > 💡 **Quick Start with Codespaces:** Click the badge above to launch a fully configured development environment in seconds! See [CODESPACES.md](CODESPACES.md) for details.
 
-## Quick Start
+## Use Observer
 
-Get Observer running in 2 minutes! Choose your preferred method:
+The [Observer documentation website](https://observer.stanterprise.com/) is the canonical source for end-user guidance:
 
-**Docker (Fastest)**
+- [Getting Started](https://observer.stanterprise.com/docs/getting-started/)
+- [Installation and deployment](https://observer.stanterprise.com/docs/install/)
+- [Playwright reporter integration](https://observer.stanterprise.com/docs/integrations/playwright-reporter/)
+- [Hosted demo](https://observer.rocks)
 
-```bash
-docker run -d -p 3000:80 -p 50051:50051 -p 5432:5432 -v observer-data:/data \
-  ghcr.io/stanterprise/observer/aio:latest
-```
+## Architecture at a glance
 
-**Kubernetes/Helm**
+- Ingestion receives reporter events over gRPC and publishes them to NATS JetStream.
+- The processor persists durable run data to PostgreSQL and uses MongoDB only for live in-flight step buffering.
+- The API provides REST queries and an optional NATS-backed WebSocket event relay.
+- The web UI consumes the API and live event stream.
 
-```bash
-helm install observer oci://ghcr.io/stanterprise/observer/charts/observer --version 0.1.0
-kubectl port-forward svc/observer-web 3000:80
-```
-
-Access the Web UI at http://localhost:3000, gRPC at localhost:50051, and PostgreSQL at localhost:5432 for local inspection.
-
-📖 See [QUICKSTART.md](QUICKSTART.md) for detailed instructions and more deployment options.
-
-## Architecture
-
-The Observer system is composed of three main components:
-
-### 1. **Ingestion Service** (`cmd/ingestion`)
-
-- gRPC endpoint for test event collection
-- Stateless and horizontally scalable
-- Validates protobuf payloads
-- **Phase 1 Complete**: Publishes to NATS JetStream (dual-write with optional DB)
-
-### 2. **Processor Service** (`cmd/processor`)
-
-- **Phase 2 Complete**: NATS JetStream consumer for event processing
-- Persists events to database with idempotent upsert pattern
-- Handles database migrations
-- Supports horizontal scaling via durable consumer groups
-- Future: artifact storage, summary generation
-
-### 3. **API Service** (`cmd/api`)
-
-- HTTP REST/GraphQL API for web UI and integrations (✅ Implemented)
-- **WebSocket endpoint for real-time event streaming** (`/ws`)
-- NATS JetStream consumer for event relay to WebSocket clients
-- REST endpoints for test listing, run statistics, and details
-- GraphQL support with interactive playground
-- Read-only database access
-
-See detailed documentation in each component's README:
-
-- [Ingestion Service](./cmd/ingestion/README.md)
-- [Processor Service](./cmd/processor/README.md)
-- [API Service](./cmd/api/README.md)
+For component internals, see [`docs/architecture/`](docs/architecture/) and the service READMEs in `cmd/`. GraphQL, authentication/OIDC, metrics, Kafka, and non-Playwright reporters are not currently supported interfaces; see the [public roadmap](https://observer.stanterprise.com/docs/roadmap/) for planned work.
 
 ## Development Environment
 
@@ -224,13 +186,13 @@ make docker-buildx-aio      # Fast cached builds
 
 ### Processor Service
 
-| Variable        | Default                 | Description                                  |
-| --------------- | ----------------------- | -------------------------------------------- |
-| `POSTGRES_DSN` | -                       | PostgreSQL connection string for relational writes |
-| `MONGODB_URI`   | -                       | MongoDB connection string for live step buffering |
-| `NATS_URL`      | `nats://localhost:4222` | NATS server URL                              |
-| `NATS_STREAM`   | `tests_events`          | JetStream stream name                        |
-| `NATS_CONSUMER` | `processor`             | Durable consumer name for JetStream consumer |
+| Variable        | Default                 | Description                                        |
+| --------------- | ----------------------- | -------------------------------------------------- |
+| `POSTGRES_DSN`  | -                       | PostgreSQL connection string for relational writes |
+| `MONGODB_URI`   | -                       | MongoDB connection string for live step buffering  |
+| `NATS_URL`      | `nats://localhost:4222` | NATS server URL                                    |
+| `NATS_STREAM`   | `tests_events`          | JetStream stream name                              |
+| `NATS_CONSUMER` | `processor`             | Durable consumer name for JetStream consumer       |
 
 ### API Service
 
@@ -264,24 +226,9 @@ mongodb://[user:pass@]host[:port]/database[?options]
 mongodb+srv://[user:pass@]host/database[?options]
 ```
 
-## Database Backends
+## Data Stores
 
-The Observer service supports two database backends:
-
-### MongoDB (Recommended for new deployments)
-
-MongoDB provides a document-based data model that aligns well with test run hierarchies:
-
-- **Test runs are stored as single documents** containing embedded tests, suites, and steps
-- **Flexible schema** for storing metadata and custom attributes
-- **Efficient queries** for retrieving complete test run data
-- **Better suited** for hierarchical test structures (suites → tests → steps)
-
-**Docker Compose with MongoDB:**
-
-```bash
-docker compose --profile dist up -d
-```
+PostgreSQL is the authoritative store for durable run data and API queries. MongoDB is limited to transient in-flight step buffering (`live_step_buffers`). Deployment-specific connection and storage configuration is documented in the [deployment guide](DEPLOYMENT.md).
 
 ## WebSocket Real-Time Events
 
@@ -326,14 +273,9 @@ Uses Go 1.21+ `slog` with text handler. Interceptors log RPC method, duration, p
 
 Handlers validate presence of `TestId`. Missing / empty IDs return `InvalidArgument`.
 
-## Migration from Monolithic to Distributed
+## Service Architecture
 
-The repository maintains backward compatibility with the monolithic `server/main.go` deployment while supporting the new distributed architecture:
-
-1. **Legacy Mode**: Run `./bin/observer` for single-process deployment
-2. **Distributed Mode**: Run `ingestion`, `processor`, and `api` services independently
-
-**Phase 2 Complete**: The system now supports full NATS JetStream integration with both publisher (ingestion) and consumer (processor, WebSocket) services. The processor service runs as a pure NATS consumer with database persistence, enabling fully distributed event-driven architecture. The API service includes WebSocket support for real-time event streaming to web clients, and the Web UI provides a modern React-based interface with live updates.
+The current event path is gRPC ingestion → NATS JetStream → processor. PostgreSQL stores durable run data; MongoDB is limited to live in-flight step buffering. The API reads from PostgreSQL and can relay live events over WebSocket when NATS is configured. The AIO image bundles services for local evaluation; distributed mode runs them separately. A legacy monolithic binary is retained for compatibility.
 
 ## Architecture Documentation
 
@@ -388,62 +330,11 @@ The development server includes proxying for API and WebSocket endpoints to `loc
 
 ## Deployment
 
-### Docker Images
-
-Pre-built Docker images are available on GitHub Container Registry:
-
-```bash
-# Pull AIO image
-docker pull ghcr.io/stanterprise/observer/aio:latest
-
-# Pull distributed mode images
-docker pull ghcr.io/stanterprise/observer/ingestion:latest
-docker pull ghcr.io/stanterprise/observer/processor:latest
-docker pull ghcr.io/stanterprise/observer/api:latest
-docker pull ghcr.io/stanterprise/observer/web:latest
-```
-
-### Kubernetes / Helm
-
-Install Observer on Kubernetes using Helm:
-
-```bash
-# Install from OCI registry
-helm install observer oci://ghcr.io/stanterprise/observer/charts/observer --version 0.1.0
-
-# Or add the Helm repository
-helm repo add observer https://stanterprise.github.io/observer/
-helm install observer observer/observer
-```
-
-See the [Deployment Guide](DEPLOYMENT.md) for detailed instructions on:
-
-- Docker image usage
-- Helm chart installation and configuration
-- Production deployment
-- AIO vs Distributed mode selection
-- Ingress configuration
-- Scaling and monitoring
+For end-user installation and supported deployment paths, use the [public installation guide](https://observer.stanterprise.com/docs/install/). This repository retains chart implementation and operator details in [DEPLOYMENT.md](DEPLOYMENT.md) and [charts/observer/README.md](charts/observer/README.md).
 
 ## Roadmap
 
-- [x] Separate components into distinct services
-- [x] **Phase 1**: NATS JetStream publisher integration (dual-write)
-- [x] **Phase 2**: Processor service NATS consumer with database persistence
-- [x] **WebSocket component**: Real-time event streaming to web clients
-- [x] **Web UI**: React + TypeScript + Tailwind CSS interface
-- [x] **REST API**: Test listing, run statistics, and detail endpoints
-- [x] Docker Compose profiles (AIO and distributed)
-- [x] Comprehensive test suite with E2E NATS integration
-- [x] Playwright reporter integration validation
-- [x] **Docker image publishing**: GitHub Container Registry
-- [x] **Kubernetes Helm charts**: Deployment templates for AIO and distributed modes
-- [ ] **Phase 3**: Remove DB from ingestion (NATS-only, fully stateless)
-- [ ] **Phase 4**: Complete GraphQL API implementation
-- [ ] Enhanced Web UI features (test details, artifact viewer, filtering)
-- [ ] Object storage for artifacts (MinIO/S3)
-- [ ] Authentication layer (dev token, OIDC)
-- [ ] Metrics (Prometheus) and tracing (OpenTelemetry)
+Current product capability and integration status is maintained in the [public roadmap](https://observer.stanterprise.com/docs/roadmap/). Implementation-specific work remains in this repository's `docs/` and issue tracker.
 
 ## CI/CD & Build Optimization
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"sort"
 	"testing"
 
@@ -14,6 +15,30 @@ import (
 	"github.com/stanterprise/observer/internal/models"
 	embeddedmigrations "github.com/stanterprise/observer/migrations"
 )
+
+func TestPostgresDSNFromEnvEscapesReservedCredentials(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "")
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("POSTGRES_HOST", "postgres.example.com")
+	t.Setenv("POSTGRES_PORT", "5432")
+	t.Setenv("POSTGRES_USER", "observer")
+	t.Setenv("POSTGRES_PASSWORD", "p@ss:/#%?&")
+	t.Setenv("POSTGRES_DB", "observer")
+	t.Setenv("POSTGRES_SSLMODE", "disable")
+
+	parsed, err := url.Parse(PostgresDSNFromEnv())
+	if err != nil {
+		t.Fatalf("parse generated DSN: %v", err)
+	}
+	username := parsed.User.Username()
+	password, ok := parsed.User.Password()
+	if !ok || username != "observer" || password != "p@ss:/#%?&" {
+		t.Fatalf("generated credentials = (%q, %q), want (observer, reserved password)", username, password)
+	}
+	if parsed.Host != "postgres.example.com:5432" || parsed.Path != "/observer" {
+		t.Fatalf("generated DSN target = %q%s, want postgres.example.com:5432/observer", parsed.Host, parsed.Path)
+	}
+}
 
 func TestValidatePostgresConfigRejectsSharedDBAutoMigrate(t *testing.T) {
 	err := validatePostgresConfig(PostgresConfig{

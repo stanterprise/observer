@@ -84,6 +84,9 @@ Get the image repository
 
 {{/*
 Get the image tag
+
+The chart appVersion is the exact published image tag. No prefix or suffix is
+added here; use image.tag when an explicit override is required.
 */}}
 {{- define "observer.image.tag" -}}
 {{- .Values.image.tag | default .Chart.AppVersion }}
@@ -131,9 +134,30 @@ Distributed workloads must not override chart-managed connection env vars.
 {{- define "observer.validateNoManagedConnectionEnv" -}}
 {{- $path := .path -}}
 {{- $env := .env | default dict -}}
-{{- range $key := list "NATS_URL" "POSTGRES_DSN" "MONGODB_URI" -}}
+{{- range $key := list "NATS_URL" "POSTGRES_DSN" "MONGODB_URI" "POSTGRES_HOST" "POSTGRES_PORT" "POSTGRES_USER" "POSTGRES_PASSWORD" "POSTGRES_DB" "POSTGRES_SSLMODE" "MONGO_HOST" "MONGO_PORT" "MONGO_USER" "MONGO_PASSWORD" "MONGO_DATABASE" "MONGO_AUTH_SOURCE" -}}
 {{- if hasKey $env $key -}}
-{{- fail (printf "%s.%s is not supported in distributed mode; use runtime.existingSecret or canonical dependency values (externalNats.url, postgres.*, externalDatabase.*, or embedded dependency settings)" $path $key) -}}
+{{- fail (printf "%s.%s is managed by the chart in distributed mode; use runtime.existingSecret or canonical dependency values" $path $key) -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Validate external dependencies are configured when embedded services are disabled.
+*/}}
+{{- define "observer.validateExternalDependencies" -}}
+{{- if not .Values.postgresql.enabled -}}
+{{- if not .Values.postgres.host -}}
+{{- fail "postgresql.enabled=false requires postgres.host to be set" -}}
+{{- end -}}
+{{- end -}}
+{{- if not .Values.mongodb.enabled -}}
+{{- if not .Values.externalDatabase.host -}}
+{{- fail "mongodb.enabled=false requires externalDatabase.host to be set" -}}
+{{- end -}}
+{{- end -}}
+{{- if not .Values.nats.enabled -}}
+{{- if not .Values.externalNats.url -}}
+{{- fail "nats.enabled=false requires externalNats.url to be set" -}}
 {{- end -}}
 {{- end -}}
 {{- end }}
@@ -143,9 +167,14 @@ Validate distributed-mode configuration before rendering resources.
 */}}
 {{- define "observer.validateDistributedConfig" -}}
 {{- if and (eq .Values.mode "distributed") .Values.distributed.enabled -}}
+{{- include "observer.validateExternalDependencies" . -}}
+{{- if and .Values.mongodb.enabled (not .Values.runtime.existingSecret) (ne (len (.Values.mongodb.auth.usernames | default list)) 1) -}}
+{{- fail "mongodb.auth.usernames must contain exactly one user when embedded MongoDB credentials are chart-managed" -}}
+{{- end -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.ingestion.env" "env" (.Values.distributed.ingestion.env | default dict)) -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.api.env" "env" (.Values.distributed.api.env | default dict)) -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.processor.env" "env" (.Values.distributed.processor.env | default dict)) -}}
+{{- include "observer.validateNoManagedConnectionEnv" (dict "path" "extraEnv" "env" (.Values.extraEnv | default dict)) -}}
 {{- end -}}
 {{- end }}
 
@@ -192,14 +221,14 @@ Database connection string (MongoDB URI)
 */}}
 {{- define "observer.database.url" -}}
 {{- if .Values.mongodb.enabled }}
-{{- $user := index .Values.mongodb.auth.usernames 0 | default "observer" }}
-{{- $password := index .Values.mongodb.auth.passwords 0 | default "password" }}
-{{- $database := index .Values.mongodb.auth.databases 0 | default "observer" }}
+{{- $user := index .Values.mongodb.auth.usernames 0 | default "observer" | urlquery | replace "+" "%20" }}
+{{- $password := index .Values.mongodb.auth.passwords 0 | default "" | urlquery | replace "+" "%20" }}
+{{- $database := index .Values.mongodb.auth.databases 0 | default "observer" | urlquery | replace "+" "%20" }}
 {{- printf "mongodb://%s:%s@%s-mongodb:27017/%s?authSource=%s" $user $password (include "observer.fullname" .) $database $database }}
 {{- else }}
 {{- $host := required "externalDatabase.host is required when mongodb.enabled=false" .Values.externalDatabase.host }}
 {{- $authSource := .Values.externalDatabase.authSource | default "admin" }}
-{{- printf "mongodb://%s:%s@%s:%d/%s?authSource=%s" .Values.externalDatabase.username .Values.externalDatabase.password $host (int .Values.externalDatabase.port) .Values.externalDatabase.database $authSource }}
+{{- printf "mongodb://%s:%s@%s:%d/%s?authSource=%s" (.Values.externalDatabase.username | urlquery | replace "+" "%20") (.Values.externalDatabase.password | urlquery | replace "+" "%20") $host (int .Values.externalDatabase.port) (.Values.externalDatabase.database | urlquery | replace "+" "%20") ($authSource | urlquery | replace "+" "%20") }}
 {{- end }}
 {{- end }}
 
@@ -252,9 +281,9 @@ PostgreSQL Password
 */}}
 {{- define "observer.postgres.password" -}}
 {{- if .Values.postgresql.enabled -}}
-{{- .Values.postgresql.auth.password | default "password" -}}
+{{- .Values.postgresql.auth.password | default "" -}}
 {{- else -}}
-{{- .Values.postgres.password | default "password" -}}
+{{- .Values.postgres.password | default "" -}}
 {{- end -}}
 {{- end }}
 
@@ -282,5 +311,22 @@ PostgreSQL DSN
 {{- if .Values.postgresql.enabled -}}
 {{- $sslmode = "disable" -}}
 {{- end -}}
-{{- printf "postgres://%s:%s@%s:%v/%s?sslmode=%s" ($username | urlquery) ($password | urlquery) $host $port ($database | urlquery) $sslmode -}}
+{{- printf "postgres://%s:%s@%s:%v/%s?sslmode=%s" ($username | urlquery | replace "+" "%20") ($password | urlquery | replace "+" "%20") $host $port ($database | urlquery | replace "+" "%20") $sslmode -}}
+{{- end }}
+
+{{/*
+Embedded dependency DSNs use passwords generated and stored by the dependency charts.
+Kubernetes expands the referenced password variables when it builds the container env.
+*/}}
+{{- define "observer.embeddedPostgresDsn" -}}
+{{- $host := include "observer.postgres.host" . -}}
+{{- $port := include "observer.postgres.port" . -}}
+{{- $username := include "observer.postgres.user" . -}}
+{{- $database := include "observer.postgres.db" . -}}
+{{- printf "postgres://%s:$(POSTGRES_PASSWORD)@%s:%v/%s?sslmode=disable" ($username | urlquery) $host $port ($database | urlquery) -}}
+{{- end }}
+
+{{- define "observer.embeddedMongoDbUri" -}}
+{{- $database := index .Values.mongodb.auth.databases 0 | default "observer" -}}
+{{- printf "mongodb://root:$(MONGODB_ROOT_PASSWORD)@%s-mongodb:27017/%s?authSource=admin" (include "observer.fullname" .) $database -}}
 {{- end }}

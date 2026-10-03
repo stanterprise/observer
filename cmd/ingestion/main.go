@@ -14,6 +14,7 @@ import (
 	"github.com/stanterprise/observer/pkg/healthhttp"
 	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/stanterprise/observer/pkg/server"
+	"github.com/stanterprise/observer/pkg/version"
 )
 
 func main() {
@@ -66,7 +67,7 @@ func main() {
 	} else {
 		server.RegisterServices(grpcServer, logger, nil)
 	}
-	logger.Info("ingestion server starting", "addr", lis.Addr().String())
+	logger.Info("ingestion server starting", "version", version.Version, "commit", version.Commit, "addr", lis.Addr().String())
 
 	// Run server in separate goroutine and capture fatal serve errors.
 	errChan := make(chan error, 1)

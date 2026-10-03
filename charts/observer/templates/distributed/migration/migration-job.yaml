@@ -42,9 +42,30 @@ spec:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: POSTGRES_DSN
+        {{- else if .Values.postgresql.enabled }}
+        - name: POSTGRES_HOST
+          value: {{ include "observer.postgres.host" . | quote }}
+        - name: POSTGRES_PORT
+          value: {{ include "observer.postgres.port" . | quote }}
+        - name: POSTGRES_USER
+          value: {{ include "observer.postgres.user" . | quote }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "postgresql.v1.secretName" .Subcharts.postgresql }}
+              key: {{ include "postgresql.v1.userPasswordKey" .Subcharts.postgresql }}
+        - name: POSTGRES_DB
+          value: {{ include "observer.postgres.db" . | quote }}
+        - name: POSTGRES_SSLMODE
+          value: disable
         {{- else }}
         - name: POSTGRES_DSN
           value: {{ include "observer.postgres.dsn" . | quote }}
+        {{- end }}
+        {{- include "observer.renderFilteredEnv" (dict "env" .Values.extraEnv) | nindent 8 }}
+        {{- with .Values.extraEnvFrom }}
+        envFrom:
+          {{- toYaml . | nindent 8 }}
         {{- end }}
         command:
         - /bin/sh
@@ -73,5 +94,13 @@ spec:
           requests:
             cpu: 100m
             memory: 128Mi
+        {{- with .Values.extraVolumeMounts }}
+        volumeMounts:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- with .Values.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       restartPolicy: Never
 {{- end }}

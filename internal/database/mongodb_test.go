@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"log/slog"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -159,6 +160,28 @@ func TestBuildMongoURIFromSplitEnv(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestBuildMongoURIFromSplitEnvEscapesReservedCredentials(t *testing.T) {
+	t.Setenv("MONGO_HOST", "mongodb.example.com")
+	t.Setenv("MONGO_PORT", "27017")
+	t.Setenv("MONGO_USER", "root")
+	t.Setenv("MONGO_PASSWORD", "p@ss:/#%?&")
+	t.Setenv("MONGO_DATABASE", "observer")
+	t.Setenv("MONGO_AUTH_SOURCE", "admin")
+
+	parsed, err := url.Parse(buildMongoURIFromSplitEnv())
+	if err != nil {
+		t.Fatalf("parse generated MongoDB URI: %v", err)
+	}
+	username := parsed.User.Username()
+	password, ok := parsed.User.Password()
+	if !ok || username != "root" || password != "p@ss:/#%?&" {
+		t.Fatalf("generated credentials = (%q, %q), want (root, reserved password)", username, password)
+	}
+	if parsed.Host != "mongodb.example.com:27017" || parsed.Path != "/observer" || parsed.Query().Get("authSource") != "admin" {
+		t.Fatalf("generated MongoDB URI target is incorrect: %s", parsed.Redacted())
 	}
 }
 

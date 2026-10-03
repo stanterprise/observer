@@ -22,7 +22,8 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY web/ ./
 
 # Build the application
-RUN npm run build
+ARG VERSION=dev
+RUN VITE_APP_VERSION=${VERSION} npm run build
 
 # ============================================================================
 # Go Builder stage - Build Go binaries for Linux
@@ -48,18 +49,22 @@ COPY internal/ ./internal/
 # Build all service binaries for Linux
 # TARGETARCH is automatically set by BuildKit for multi-platform builds
 ARG TARGETARCH
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+ENV GO_LDFLAGS="-w -s -extldflags '-static' -X github.com/stanterprise/observer/pkg/version.Version=${VERSION} -X github.com/stanterprise/observer/pkg/version.Commit=${COMMIT} -X github.com/stanterprise/observer/pkg/version.BuildDate=${BUILD_DATE}"
 
 # Use cache mounts for faster builds across architectures
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo' \
+    go build -ldflags="${GO_LDFLAGS}" -tags 'netgo osusergo' \
     -o /bin/ingestion ./cmd/ingestion && \
     CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo' \
+    go build -ldflags="${GO_LDFLAGS}" -tags 'netgo osusergo' \
     -o /bin/processor ./cmd/processor && \
     CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -ldflags='-w -s -extldflags "-static"' -tags 'netgo osusergo' \
+    go build -ldflags="${GO_LDFLAGS}" -tags 'netgo osusergo' \
     -o /bin/api ./cmd/api
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
