@@ -29,6 +29,10 @@ reviewed. Every control begins as **Not assessed**.
 | [09 - Operations and response](09-operations-and-response.md) | Audit, monitoring, incident response, maintenance, and recovery |
 | [10 - Assessment evidence](10-assessment-evidence.md) | Submission manifest, traceability, evidence records, and sign-off template |
 
+The [remediation task packets](task-packets/README.md) turn the preliminary
+repository gap review into proposed, dependency-aware work items. They do not
+change the assessment status or replace deployment-specific evidence.
+
 ## Architecture anchors
 
 These sources establish terminology and deployment contracts, not security assurance:
