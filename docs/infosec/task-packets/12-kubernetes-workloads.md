@@ -34,7 +34,8 @@ has retry and cleanup settings but no explicit active deadline.
    disable token automount unless a documented workload-identity integration
    requires a scoped token. Prove effective RBAC does not include runtime
    secret listing or cluster administration. Coordinate separate data-service
-   credentials with TP-08.
+   credentials with TP-08 as an early workload-hardening milestone, even if
+   internal dependency TLS is scheduled later under an approved exception.
 3. Bound the migration job's execution, retries, resources, and identity; do
    not reuse its schema-change credential in runtime pods. Document hook
    ordering, upgrade, rollback, and migration compatibility. Support the
@@ -45,7 +46,8 @@ has retry and cleanup settings but no explicit active deadline.
    probe where justified rather than asserting either is universally required.
 5. Test the selected embedded dependency workloads and init containers against
    the same baseline; explicitly record any narrow exceptions. Do not silently
-   break AIO/Compose development or chart Service ports while hardening the
+   break local Docker/AIO or Compose development, require production identity
+   infrastructure locally, or change chart Service ports while hardening the
    distributed production profile.
 6. Extend the existing [Helm contract tests](../../../scripts/test-helm-chart.sh)
    and [chart CI](../../../.github/workflows/helm-publish.yml); do not introduce

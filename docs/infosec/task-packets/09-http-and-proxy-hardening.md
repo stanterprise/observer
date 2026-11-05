@@ -31,17 +31,25 @@ application and the selected gateway.
    Avoid contradictory headers or a CSP that silently breaks the UI.
 3. Define trusted proxy hops, scheme/host handling, and sanitized forwarded
    headers. Reject spoofed identity and forwarded metadata from untrusted
-   sources. Keep public health/debug/version responses minimal and prevent them
-   from creating an alternate application-data route.
+   sources. Validate allowed HTTP Host/authority values at the appropriate web,
+   gateway, and direct API boundaries to mitigate DNS rebinding; do not trust a
+   forwarded host supplied by an untrusted client. Support configured
+   deployment hostnames and ports rather than hardcoding one production name.
+   Keep public health/debug/version responses minimal and prevent them from
+   creating an alternate application-data route.
 4. Document which layer owns each header, timeout, size limit, and origin check.
    Keep general origin/CSRF policy in TP-04 and content-specific artifact
-   handling in TP-05.
+   handling in TP-05. Preserve documented local Docker/AIO, Compose, and
+   web-development hostnames, ports, API, and WebSocket workflows when shared
+   proxy or server code changes.
 
 ## Verification
 
 - Add tests for slow headers, body limits at and above approved thresholds,
-  forwarded-header spoofing, response headers, preflight behavior, health
-  responses, and legitimate WebSocket upgrades/timeouts. Run
+  forwarded-header spoofing, allowed and unapproved Host/authority values,
+  DNS-rebinding to local and private addresses, response headers, preflight
+  behavior, health responses, and legitimate local and distributed WebSocket
+  upgrades/timeouts. Run
   `go test ./cmd/api ./pkg/api ./pkg/websocket`.
 - If UI or nginx configuration changes, run `cd web && npm run build` and test
   the rendered UI plus API/WS paths through the selected gateway. Record V-04,

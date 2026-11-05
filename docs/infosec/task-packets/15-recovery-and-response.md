@@ -1,12 +1,14 @@
 # TP-15 - Prepare Recovery, Rotation, and Incident Response
 
 **Status:** Proposed; no owner assigned.
-**Priority:** P2; operating capabilities are required for final approval.
+**Priority:** P2 for full recovery and response; reporter revocation starts
+with the P0 ingestion gate.
 **Accountable roles:** Operations, data, identity, and InfoSec owners.
 **Findings:** 28.
 **Controls:** OPS-05 through OPS-09, DATA-07/08, ING-06; tests V-10/11/14.
-**Prerequisites:** D-03/D-05/D-06/D-08/D-09. Exercises require the relevant implementations
-from [TP-07](07-replay-and-event-delivery.md),
+**Prerequisites:** D-03 and [TP-01](01-machine-identity.md) for early reporter
+revocation. Full exercises require D-05/D-06/D-08/D-09 and the relevant
+implementations from [TP-07](07-replay-and-event-delivery.md),
 [TP-08](08-dependency-tls-and-credentials.md),
 [TP-10](10-retention-and-deletion.md), and
 [TP-11](11-audit-and-monitoring.md).
@@ -17,6 +19,12 @@ Turn the [operations requirements](../09-operations-and-response.md) into
 approved, executable runbooks and tested recovery procedures for the selected
 deployment. The package currently states that contacts and runbook evidence are
 pending; it is not proof that backups, alerts, or response exercises exist.
+
+Establish and verify the minimum reporter credential issuance, revocation,
+compromise containment, and escalation needed by TP-01 before public ingestion.
+Schedule the broader backup, restore, and incident exercises under D-05/D-08;
+elevate them if data policy, operational risk, or an approval gate requires it.
+This sequencing does not waive the package's operating requirements.
 
 ## Work and acceptance criteria
 
@@ -50,3 +58,5 @@ pending; it is not proof that backups, alerts, or response exercises exist.
 - Execute the applicable portions of V-10/11/14 and the three OPS-09 scenarios.
   Link restricted runbooks and sanitized evidence in
   [TP-16](16-assessment-and-approval.md); planned exercises are not passes.
+  Record the early reporter-revocation result separately from full packet
+  completion.

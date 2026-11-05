@@ -6,8 +6,9 @@
 **Findings:** 8 and 10.
 **Controls:** ING-03/05/06/07/08, K8S-10, SCP-04; tests V-06/07.
 **Prerequisites:** Approved D-07 limits; [TP-01](01-machine-identity.md) and
-[TP-02](02-project-ownership.md) for identity/project enforcement. Coordinate stream capacity with
-[TP-07](07-replay-and-event-delivery.md), workload quotas with
+[TP-02](02-project-ownership.md) for identity/project enforcement. Global
+validation and capacity foundations can proceed independently. Coordinate
+stream capacity with [TP-07](07-replay-and-event-delivery.md), workload quotas with
 [TP-12](12-kubernetes-workloads.md), and gateway limits with
 [TP-14](14-network-and-platform.md).
 
@@ -40,7 +41,9 @@ complete package limits, and production reflection is registered by
    Stream/backlog limits and existing-stream behavior are owned by TP-07.
 5. Disable or tightly restrict production reflection/debug services and protect
    health endpoints. Preserve HTTP/2, deadlines, status codes, and supported
-   reporter behavior through the gateway.
+   reporter behavior through the gateway. Configure and test the distributed
+   protection without silently breaking supported local Docker/AIO and Compose
+   reporters or requiring production identity infrastructure locally.
 
 ## Verification
 
@@ -53,3 +56,5 @@ complete package limits, and production reflection is registered by
   status; a single small request is not evidence of a maximum.
 - Execute V-06/07 through the selected gateway and broker. Record unavailable
   integration tests as blocked or skipped, not passed.
+- Exercise an existing local demo reporter and normal payloads after shared
+  validation or server-configuration changes.

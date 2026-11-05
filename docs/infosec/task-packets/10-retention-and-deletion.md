@@ -1,7 +1,7 @@
 # TP-10 - Implement Retention and Cross-Store Deletion
 
 **Status:** Proposed; no owner assigned.
-**Priority:** P1.
+**Priority:** P2; elevate if data policy, legal obligations, or risk require it.
 **Accountable roles:** Data, application, and operations owners.
 **Findings:** 13.
 **Controls:** DATA-01/07/08, OPS-07/08; test V-11.
@@ -20,6 +20,12 @@ which removes the relational run graph but does not coordinate object deletion.
 MongoDB has a [TTL index](../../../internal/database/mongodb.go#L232) for live
 buffers; that index alone does not establish an approved orphan lifetime or
 cross-store deletion guarantee.
+
+Schedule the full lifecycle work after D-05/D-08 are decided, without assuming
+the current behavior meets retention or deletion requirements. Document the
+existing partial deletion and its residual risk in the interim; a later priority
+is not permission to disregard a legal hold, data policy, or an approval gate.
+Independent design and inventory can begin before human authorization exists.
 
 ## Work and acceptance criteria
 
@@ -41,7 +47,8 @@ cross-store deletion guarantee.
    reversible SQL migrations for relational changes.
 5. Document status, retries, alerts, reconciliation, and failure recovery
    without logging sensitive artifacts. Preserve MongoDB's transient role and
-   PostgreSQL's authoritative role.
+   PostgreSQL's authoritative role. Preserve supported local development
+   workflows when shared deletion or storage code changes.
 
 ## Verification
 

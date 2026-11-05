@@ -1,10 +1,10 @@
 # TP-03 - Protect Human Access and REST Operations
 
 **Status:** Proposed; no owner assigned.
-**Priority:** P0.
+**Priority:** Deferred future work; package requirements remain applicable.
 **Accountable roles:** Application and identity owners.
 **Findings:** 3 and 4.
-**Controls:** IAM-01/02/03/07, DATA-05, SCP-04; tests V-03/04/05.
+**Controls:** IAM-01/02/03/07, DATA-05; tests V-03/04/05.
 **Prerequisites:** D-04 and the project/run contract from
 [TP-02](02-project-ownership.md). Coordinate browser/session handling with
 [TP-04](04-browser-and-websocket.md), artifacts with
@@ -19,6 +19,16 @@ every application route, not only at a gateway. The
 application auth layer. [REST routes](../../../pkg/api/rest_postgres.go#L31)
 include list/detail/statistics queries and delete/marker mutations. Current
 project-name columns alone do not provide a role or grant model.
+
+The intended interim deployment restricts web/API access at the organizational
+network boundary. That does not identify a human, enforce project grants, or
+prevent a reachable user from reading and mutating out-of-scope data. Gateway
+SSO may be assessed as an interim human-authentication control, but it does not
+by itself establish resource authorization. Record each gap and any required
+owner-approved, time-bounded exception in [TP-16](16-assessment-and-approval.md);
+do not treat this packet as complete or its controls as **Met** while deferred.
+Machine authentication and project/run authorization for public ingestion remain
+separate P0 work in TP-01/02.
 
 ## Work and acceptance criteria
 
@@ -40,7 +50,8 @@ project-name columns alone do not provide a role or grant model.
 5. Provide an owner-approved migration/access plan for existing data and
    operators. Add corresponding SQL migrations for relational changes; do not
    invent a local identity schema if the approved authoritative grant model does
-   not require one.
+   not require one. Preserve supported local demos without requiring an
+   enterprise identity provider.
 
 ## Verification
 
