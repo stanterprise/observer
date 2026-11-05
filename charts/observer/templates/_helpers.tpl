@@ -142,6 +142,19 @@ Distributed workloads must not override chart-managed connection env vars.
 {{- end }}
 
 {{/*
+Prevent distributed settings from overriding the ingestion authentication boundary.
+*/}}
+{{- define "observer.validateNoManagedIngestionAuthEnv" -}}
+{{- $path := .path -}}
+{{- $env := .env | default dict -}}
+{{- range $key := list "OBSERVER_MODE" "INGESTION_AUTH_KEY" "GRPC_REFLECTION" -}}
+{{- if hasKey $env $key -}}
+{{- fail (printf "%s.%s is managed by the chart; configure the ingestion auth Secret instead" $path $key) -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Validate external dependencies are configured when embedded services are disabled.
 */}}
 {{- define "observer.validateExternalDependencies" -}}
@@ -171,10 +184,15 @@ Validate distributed-mode configuration before rendering resources.
 {{- if and .Values.mongodb.enabled (not .Values.runtime.existingSecret) (ne (len (.Values.mongodb.auth.usernames | default list)) 1) -}}
 {{- fail "mongodb.auth.usernames must contain exactly one user when embedded MongoDB credentials are chart-managed" -}}
 {{- end -}}
+{{- if not .Values.distributed.ingestion.auth.existingSecret -}}
+{{- fail "distributed.ingestion.auth.existingSecret must reference a Secret containing INGESTION_AUTH_KEY" -}}
+{{- end -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.ingestion.env" "env" (.Values.distributed.ingestion.env | default dict)) -}}
+{{- include "observer.validateNoManagedIngestionAuthEnv" (dict "path" "distributed.ingestion.env" "env" (.Values.distributed.ingestion.env | default dict)) -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.api.env" "env" (.Values.distributed.api.env | default dict)) -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "distributed.processor.env" "env" (.Values.distributed.processor.env | default dict)) -}}
 {{- include "observer.validateNoManagedConnectionEnv" (dict "path" "extraEnv" "env" (.Values.extraEnv | default dict)) -}}
+{{- include "observer.validateNoManagedIngestionAuthEnv" (dict "path" "extraEnv" "env" (.Values.extraEnv | default dict)) -}}
 {{- end -}}
 {{- end }}
 

@@ -1,6 +1,8 @@
 # InfoSec Remediation Task Packets
 
-**Status:** Proposed; all packets are unstarted and owners are unassigned.
+**Status:** Proposed; no packet is approved or closed. TP-01 shared-key
+authentication and TP-06 reflection changes are partially implemented; their
+remaining controls and deployment evidence are open. Owners are unassigned.
 **Baseline:** Repository revision `f03b3511135400efe61bc9077c9ab805c69d9aa7`,
 chart `0.8.3` / app version `v0.8.3`, reviewed 2026-11-04.
 **Scope:** Distributed Observer deployed with Helm, plus the operator-owned
@@ -22,8 +24,11 @@ control, and final status remains pending until explicitly recorded and reviewed
   controls rather than assuming a namespace or `ClusterIP` provides that restriction.
 - Cloud-hosted CI runners may need a public gRPC endpoint. Protect that path with
   authenticated reporters, project/run authorization, TLS, gateway-bypass prevention,
-  and abuse limits as required by SCP-04. The choice of application or
-  platform-provided machine identity and authorization remains open.
+  and abuse limits as required by SCP-04. The selected initial authentication
+  mechanism is a deployment-wide shared bearer key, intended only as an
+  ingestion gate; any holder may submit under any client-supplied project name.
+  It is not reporter identity or project authorization, so it does not alone
+  satisfy the public-ingestion gate.
 - Product AuthN/AuthZ is planned for future work. Defer human sign-in and
   per-user/project access in TP-03, while treating the machine protections above
   as a separate exposure requirement. Private network access is not human identity
@@ -34,11 +39,12 @@ control, and final status remains pending until explicitly recorded and reviewed
   authorization. Record affected controls and obtain any required, explicitly
   approved, time-bounded exceptions before the applicable deployment or exposure
   gate; an exception does not make an unmet control **Met**.
-- Do not impose a new identity provider, enterprise gateway, mandatory reporter
-  credentials, or production dependency-TLS setup on currently supported local
-  demos. Test local ingestion and UI/API/WebSocket flows when shared components
-  change; keep development configuration separate from the protected distributed
-  profile. Local mode is outside assessment, not automatically isolated: the
+- Do not impose an identity provider, enterprise gateway, or ingestion key on
+  supported local AIO/Docker/Compose demos. AIO/local mode remains keyless;
+  distributed mode requires an operator-managed key. Test local ingestion and
+  UI/API/WebSocket flows when shared components change; keep development
+  configuration separate from the protected distributed profile. Local mode is
+  outside assessment, not automatically isolated: the
   existing [Compose configuration](../../../docker-compose.yml) publishes
   several ports, including ingestion, on `0.0.0.0`. Loopback-only publishing may
   be documented as an opt-in safety measure, but do not silently change
@@ -84,7 +90,7 @@ tests. A gateway or CORS is not a substitute for server-side authorization.
 | Packet | Work | Priority | Accountable roles | Primary prerequisites |
 | --- | --- | --- | --- | --- |
 | [TP-00](00-decisions-and-scope.md) | Deployment decisions and ownership | P0 | Application, platform, identity, data, InfoSec | None |
-| [TP-01](01-machine-identity.md) | Authenticate ingestion callers | P0 | Application, identity | D-03, D-06 |
+| [TP-01](01-machine-identity.md) | Authenticate ingestion callers | P0; shared-key limitations remain | Application, identity | D-03 key provision, D-06 TLS |
 | [TP-02](02-project-ownership.md) | Bind trusted project/run ownership across events | P0 machine binding; P2 broader scope | Application, data | D-03; TP-01 principal, TP-08 trusted broker path; D-04 for human grants |
 | [TP-03](03-human-access-and-authorization.md) | Human identity, REST authorization and mutations | Deferred | Application, identity | D-04; TP-02 ownership; risk disposition |
 | [TP-04](04-browser-and-websocket.md) | Browser, CORS, CSRF and live-event access | P1 baseline; access enforcement deferred | Application, identity | D-02; D-04 and TP-02/03 for full enforcement |

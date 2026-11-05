@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CHART_PATH="${ROOT_DIR}/charts/observer"
 CHART_DEPS_PATH="${CHART_PATH}/charts"
 CHART_INPUT="${1:-${CHART_PATH}}"
+distributed_auth_args=(--set distributed.ingestion.auth.existingSecret=chart-test-ingestion-auth)
 
 assert_render_fails() {
   local name="$1"
@@ -47,7 +48,7 @@ render_matrix() {
   local external_connection_output
 
   expected_image_tag="$(helm show chart "${chart_input}" | awk '$1 == "appVersion:" { gsub(/"/, "", $2); print $2 }')"
-  rendered_images="$(helm template observer "${chart_input}" | sed -n 's/.*image: ghcr.io\/stanterprise\/observer\/[^:]*:\([^" ]*\).*/\1/p' | sort -u)"
+  rendered_images="$(helm template observer "${chart_input}" "${distributed_auth_args[@]}" | sed -n 's/.*image: ghcr.io\/stanterprise\/observer\/[^:]*:\([^" ]*\).*/\1/p' | sort -u)"
   if [[ -z "${expected_image_tag}" || "${rendered_images}" != "${expected_image_tag}" ]]; then
     echo "ERROR: rendered Observer image tags do not match appVersion"
     echo "Expected: ${expected_image_tag}"
@@ -56,23 +57,27 @@ render_matrix() {
   fi
 
   echo "==> Helm lint (${chart_input})"
-  helm lint "${chart_input}"
+  helm lint "${chart_input}" "${distributed_auth_args[@]}"
 
   echo "==> Helm template matrix (${chart_input})"
-  helm template observer "${chart_input}" > /dev/null
+  helm template observer "${chart_input}" "${distributed_auth_args[@]}" > /dev/null
   helm template observer "${chart_input}" --values "${CHART_PATH}/values-aio.yaml" > /dev/null
-  helm template observer "${chart_input}" --values "${CHART_PATH}/values-production.yaml" > /dev/null
+  helm template observer "${chart_input}" --values "${CHART_PATH}/values-production.yaml" "${distributed_auth_args[@]}" > /dev/null
   helm template observer "${chart_input}" --values "${CHART_PATH}/values-aio-gateway.yaml" > /dev/null
   helm template observer "${chart_input}" \
+    "${distributed_auth_args[@]}" \
     --set nats.enabled=false \
     --set externalNats.url=nats://nats.example.com:4222 > /dev/null
   helm template observer "${chart_input}" \
+    "${distributed_auth_args[@]}" \
     --set postgresql.enabled=false \
     --set postgres.host=postgres.example.com > /dev/null
   helm template observer "${chart_input}" \
+    "${distributed_auth_args[@]}" \
     --set mongodb.enabled=false \
     --set externalDatabase.host=mongo.example.com > /dev/null
   external_connection_output="$(helm template observer "${chart_input}" \
+    "${distributed_auth_args[@]}" \
     --set postgresql.enabled=false \
     --set postgres.host=postgres.example.com \
     --set-string 'postgres.password=p@:/#%' \
@@ -88,6 +93,7 @@ render_matrix() {
     exit 1
   fi
   helm template observer "${chart_input}" \
+    "${distributed_auth_args[@]}" \
     --set extraEnvFrom[0].configMapRef.name=chart-test-env \
     --set storage.s3.existingSecret=chart-test-storage > /dev/null
 
@@ -99,7 +105,7 @@ render_matrix() {
   )
   local distributed_extensions
   local aio_extensions
-  distributed_extensions="$(helm template observer "${chart_input}" "${extension_values[@]}")"
+  distributed_extensions="$(helm template observer "${chart_input}" "${distributed_auth_args[@]}" "${extension_values[@]}")"
   aio_extensions="$(helm template observer "${chart_input}" --values "${CHART_PATH}/values-aio.yaml" "${extension_values[@]}")"
   for output in "${distributed_extensions}" "${aio_extensions}"; do
     if [[ "${output}" == "${distributed_extensions}" ]]; then
@@ -114,6 +120,21 @@ render_matrix() {
   done
 
   assert_render_count "MongoDB application password variables" '- name: MONGO_PASSWORD' 2 "${distributed_extensions}"
+  assert_render_count "distributed ingestion authentication key" '- name: INGESTION_AUTH_KEY' 1 "${distributed_extensions}"
+  assert_render_count "distributed mode setting" '- name: OBSERVER_MODE' 1 "${distributed_extensions}"
+  if ! grep -A 4 -F -e '- name: INGESTION_AUTH_KEY' <<< "${distributed_extensions}" | grep -Fq -e 'name: chart-test-ingestion-auth'; then
+    echo "ERROR: ingestion authentication key must come from the configured Secret"
+    exit 1
+  fi
+  if ! grep -A 1 -F -e '- name: GRPC_REFLECTION' <<< "${distributed_extensions}" | grep -Fq -e 'value: "false"'; then
+    echo "ERROR: gRPC reflection must be disabled in distributed mode"
+    exit 1
+  fi
+  if [[ "${aio_extensions}" == *'name: INGESTION_AUTH_KEY'* || "${aio_extensions}" != *'name: OBSERVER_MODE
+          value: "local"'* ]]; then
+    echo "ERROR: AIO must remain keyless and explicitly use local mode"
+    exit 1
+  fi
   if ! grep -A 6 -F -e '- name: MONGO_PASSWORD' <<< "${distributed_extensions}" | grep -Fq -e 'key: mongodb-passwords'; then
     echo "ERROR: API and processor must use the MongoDB application-user password Secret"
     exit 1
@@ -124,28 +145,41 @@ render_matrix() {
   fi
 
   helm template observer "${chart_input}" \
+    "${distributed_auth_args[@]}" \
     --set postgresql.auth.existingSecret=chart-test-postgres \
     --set postgresql.auth.secretKeys.userPasswordKey=custom-password \
     --set mongodb.auth.existingSecret=chart-test-mongodb \
     --set mongodb.auth.rootUser=chart-test-root > /dev/null
   helm template observer "${chart_input}" \
+    "${distributed_auth_args[@]}" \
     --set-json 'distributed.web.env.API_BACKEND_PORT=null' > /dev/null
 
   echo "==> Expected external-dependency failures (${chart_input})"
+  assert_render_fails "missing ingestion auth Secret" \
+    "distributed.ingestion.auth.existingSecret"
   assert_render_fails "missing external NATS URL" \
     "externalNats.url" \
+    "${distributed_auth_args[@]}" \
     --set nats.enabled=false
   assert_render_fails "missing external PostgreSQL host" \
     "postgres.host" \
+    "${distributed_auth_args[@]}" \
     --set postgresql.enabled=false
   assert_render_fails "missing external MongoDB host" \
     "externalDatabase.host" \
+    "${distributed_auth_args[@]}" \
     --set mongodb.enabled=false
   assert_render_fails "managed connection variables in extraEnv" \
     "extraEnv.NATS_URL" \
+    "${distributed_auth_args[@]}" \
     --set-string extraEnv.NATS_URL=nats://not-allowed.example.com
+  assert_render_fails "inline ingestion auth key in extraEnv" \
+    "extraEnv.INGESTION_AUTH_KEY" \
+    "${distributed_auth_args[@]}" \
+    --set-string extraEnv.INGESTION_AUTH_KEY=not-allowed
   assert_render_fails "multiple embedded MongoDB app users" \
     "mongodb.auth.usernames must contain exactly one user" \
+    "${distributed_auth_args[@]}" \
     --set-json 'mongodb.auth.usernames=["observer","observer-readonly"]' \
     --set-json 'mongodb.auth.databases=["observer","observer"]'
 }

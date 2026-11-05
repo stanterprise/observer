@@ -49,6 +49,7 @@ POSTGRES_DSN='postgres://observer:password@localhost:5432/observer?sslmode=disab
 # Start services in background
 echo -e "${YELLOW}6. Starting Ingestion service...${NC}"
 NATS_URL='nats://localhost:4222' \
+OBSERVER_MODE=local \
     ./bin/ingestion > /tmp/observer-ingestion.log 2>&1 &
 INGESTION_PID=$!
 echo "Ingestion PID: $INGESTION_PID"

@@ -38,6 +38,9 @@ Shipped presets:
 - Distributed workloads consume connection strings from Kubernetes Secrets.
 - Set `runtime.existingSecret` to reuse a pre-created Secret containing `NATS_URL`, `POSTGRES_DSN`, and `MONGODB_URI`.
 - If `runtime.existingSecret` is empty, the chart renders a generated Secret for non-production installs.
+- Distributed ingestion requires `distributed.ingestion.auth.existingSecret` to reference an operator-managed Secret containing `INGESTION_AUTH_KEY` (at least 32 bytes). Do not put the key in Helm values, `extraEnv`, or release metadata.
+- Ingestion uses one shared bearer key per deployment. This authenticates possession only; it does not identify individual reporters or authorize project/run ownership. Do not treat it as satisfying the public-ingestion gate until machine project authorization is implemented or an authorized exception is recorded.
+- AIO/local mode does not use or generate an ingestion key.
 - `distributed.ingestion.env`, `distributed.api.env`, and `distributed.processor.env` must not set `NATS_URL`, `POSTGRES_DSN`, or `MONGODB_URI`; the chart rejects those keys at validation time.
 
 **External Dependencies:**
@@ -130,14 +133,25 @@ helm install observer observer/observer --version <chart-version>
 Distributed mode is the default. It deploys separate ingestion, processor, API, and web workloads, and it can run with embedded or external PostgreSQL, MongoDB, and NATS.
 
 ```bash
-helm install observer ./charts/observer
+helm install observer ./charts/observer \
+  --set distributed.ingestion.auth.existingSecret=observer-ingestion-auth
 ```
+
+Create `observer-ingestion-auth` through the organization's approved secret
+manager before installation. It must contain a high-entropy
+`INGESTION_AUTH_KEY`; the chart intentionally fails to render when no auth
+Secret is configured. Reporters send it as gRPC metadata:
+`authorization: Bearer <key>`. Use the TLS-protected public gateway for every
+request. Share this deployment-wide key only with trusted reporters; rotation
+requires updating the Secret and coordinating reporter configuration.
 
 When `postgres.migration.enabled=true`, install and upgrade runs include a dedicated migration hook job. The API and processor workloads do not run migrations themselves.
 
 ### AIO Mode
 
 AIO mode runs Observer in a single container for development and evaluation.
+It intentionally runs in keyless local mode; do not expose it as a production
+public ingestion service.
 
 From source, use the shipped preset:
 

@@ -1,6 +1,8 @@
 # TP-06 - Validate and Bound Ingestion
 
-**Status:** Proposed; no owner assigned.
+**Status:** Partially implemented; reflection is disabled by default and
+development-only opt-in is wired. Numeric limits and remaining validation are
+open. No owner assigned.
 **Priority:** P0; part of the public-ingestion gate.
 **Accountable roles:** Application and operations owners.
 **Findings:** 8 and 10.
@@ -18,8 +20,9 @@ Reject invalid input and constrain work before an external reporter can exhaust
 the application or dependencies. [Ingestion handlers](../../../pkg/server/server.go#L57)
 already validate some nil fields and required IDs, but the
 [gRPC constructor](../../../pkg/server/server.go#L338) does not configure the
-complete package limits, and production reflection is registered by
-[service registration](../../../pkg/server/server.go#L401).
+complete package limits. Reflection is available only when explicitly enabled
+by `GRPC_REFLECTION`; the distributed Helm deployment leaves it disabled by
+default.
 
 ## Work and acceptance criteria
 
@@ -39,9 +42,10 @@ complete package limits, and production reflection is registered by
 4. Document precisely what a successful RPC acknowledges. A required publisher
    being unavailable or a failed JetStream publish must not appear successful.
    Stream/backlog limits and existing-stream behavior are owned by TP-07.
-5. Disable or tightly restrict production reflection/debug services and protect
-   health endpoints. Preserve HTTP/2, deadlines, status codes, and supported
-   reporter behavior through the gateway. Configure and test the distributed
+5. Keep gRPC reflection disabled in the distributed deployment and enable it
+   only through an explicit local-development setting. Protect health endpoints.
+   Preserve HTTP/2, deadlines, status codes, and supported reporter behavior
+   through the gateway. Configure and test the distributed
    protection without silently breaking supported local Docker/AIO and Compose
    reporters or requiring production identity infrastructure locally.
 

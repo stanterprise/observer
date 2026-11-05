@@ -52,6 +52,7 @@ aio:
     # existingClaim: ""
 
   env:
+    OBSERVER_MODE: local
     STORAGE_DRIVER: local
     ARTIFACTS_DIR: /data/artifacts
     NATS_URL: nats://localhost:4222
@@ -73,6 +74,9 @@ distributed:
   # Ingestion service configuration
   ingestion:
     replicaCount: 1
+    # Required Secret containing a random, high-entropy INGESTION_AUTH_KEY.
+    # Set existingSecret to the operator-managed Secret name.
+    auth: {}
 
     resources:
       limits:

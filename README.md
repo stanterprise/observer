@@ -86,7 +86,7 @@ docker compose up -d postgres
 make nats-up       # Start NATS
 
 # Ingestion (stateless, publishes to NATS)
-NATS_URL='nats://localhost:4222' ./bin/ingestion
+OBSERVER_MODE=local NATS_URL='nats://localhost:4222' ./bin/ingestion
 
 # API (requires PostgreSQL)
 POSTGRES_DSN='postgres://observer:password@localhost:5432/observer?sslmode=disable' \

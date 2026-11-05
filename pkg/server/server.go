@@ -2,9 +2,11 @@ package server
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"log/slog"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/stanterprise/observer/pkg/publisher"
@@ -14,6 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
@@ -335,17 +338,89 @@ func (s *EventServer) ReportRunStart(ctx context.Context, in *events.ReportRunSt
 	return &observer.AckResponse{Success: true, Message: "Map test run received"}, nil
 }
 
-// NewGRPCServer creates a gRPC server with panic recovery and logging interceptors.
+// NewGRPCServer creates an unauthenticated gRPC server for local mode.
 func NewGRPCServer(logger *slog.Logger) *grpc.Server {
+	return newGRPCServer(logger, "")
+}
+
+// NewAuthenticatedGRPCServer creates a gRPC server that requires a shared
+// bearer key for non-health, non-reflection RPCs.
+func NewAuthenticatedGRPCServer(logger *slog.Logger, key string) (*grpc.Server, error) {
+	if !validIngestionAuthKey(key) {
+		return nil, errors.New("ingestion auth key must be at least 32 printable, non-whitespace bytes")
+	}
+	return newGRPCServer(logger, key), nil
+}
+
+func validIngestionAuthKey(key string) bool {
+	if len(key) < 32 || strings.TrimSpace(key) != key || len(strings.Fields(key)) != 1 {
+		return false
+	}
+	for _, char := range key {
+		if char < 0x21 || char > 0x7e {
+			return false
+		}
+	}
+	return true
+}
+
+func newGRPCServer(logger *slog.Logger, key string) *grpc.Server {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(&noopWriter{}, nil))
 	}
+	unaryInterceptors := []grpc.UnaryServerInterceptor{
+		recoveryInterceptor(logger),
+		loggingInterceptor(logger),
+	}
+	streamInterceptors := []grpc.StreamServerInterceptor{}
+	if key != "" {
+		unaryInterceptors = append(unaryInterceptors, ingestionAuthUnaryInterceptor(key))
+		streamInterceptors = append(streamInterceptors, ingestionAuthStreamInterceptor(key))
+	}
 	return grpc.NewServer(
-		grpc.ChainUnaryInterceptor(
-			recoveryInterceptor(logger),
-			loggingInterceptor(logger),
-		),
+		grpc.ChainUnaryInterceptor(unaryInterceptors...),
+		grpc.ChainStreamInterceptor(streamInterceptors...),
 	)
+}
+
+func ingestionAuthUnaryInterceptor(key string) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if !requiresIngestionAuth(info.FullMethod) || hasValidBearerKey(ctx, key) {
+			return handler(ctx, req)
+		}
+		return nil, status.Error(codes.Unauthenticated, "valid bearer token required")
+	}
+}
+
+func ingestionAuthStreamInterceptor(key string) grpc.StreamServerInterceptor {
+	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		if !requiresIngestionAuth(info.FullMethod) || hasValidBearerKey(stream.Context(), key) {
+			return handler(srv, stream)
+		}
+		return status.Error(codes.Unauthenticated, "valid bearer token required")
+	}
+}
+
+func requiresIngestionAuth(fullMethod string) bool {
+	return !strings.HasPrefix(fullMethod, "/grpc.health.v1.Health/") &&
+		!strings.HasPrefix(fullMethod, "/grpc.reflection.v1.ServerReflection/") &&
+		!strings.HasPrefix(fullMethod, "/grpc.reflection.v1alpha.ServerReflection/")
+}
+
+func hasValidBearerKey(ctx context.Context, key string) bool {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return false
+	}
+	values := md.Get("authorization")
+	if len(values) != 1 {
+		return false
+	}
+	parts := strings.Fields(values[0])
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") || len(parts[1]) != len(key) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(parts[1]), []byte(key)) == 1
 }
 
 // recoveryInterceptor catches panics in gRPC handlers and returns Internal error.
@@ -388,7 +463,7 @@ func loggingInterceptor(logger *slog.Logger) grpc.UnaryServerInterceptor {
 }
 
 // RegisterServices registers the gRPC services without database or publisher.
-// Kept for backward compatibility with ingestion service.
+// Kept for backward compatibility with ingestion service. Reflection is opt-in.
 func RegisterServices(s *grpc.Server, logger *slog.Logger, _ interface{}) *EventServer {
 	srv := New(logger)
 	observer.RegisterTestEventCollectorServer(s, srv)
@@ -398,10 +473,13 @@ func RegisterServices(s *grpc.Server, logger *slog.Logger, _ interface{}) *Event
 	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 	healthpb.RegisterHealthServer(s, healthServer)
 
-	// Register reflection for grpcurl
-	reflection.Register(s)
-
 	return srv
+}
+
+// RegisterReflection enables gRPC reflection for explicitly configured
+// development environments. Do not enable it on publicly exposed services.
+func RegisterReflection(s *grpc.Server) {
+	reflection.Register(s)
 }
 
 // RegisterServicesWithPublisher registers the gRPC services with NATS publisher support.
@@ -413,9 +491,6 @@ func RegisterServicesWithPublisher(s *grpc.Server, logger *slog.Logger, _ interf
 	healthServer := health.NewServer()
 	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 	healthpb.RegisterHealthServer(s, healthServer)
-
-	// Register reflection for grpcurl
-	reflection.Register(s)
 
 	return srv
 }

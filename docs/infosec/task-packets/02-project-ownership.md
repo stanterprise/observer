@@ -1,6 +1,8 @@
 # TP-02 - Bind Project and Run Ownership End to End
 
-**Status:** Proposed; no owner assigned.
+**Status:** Not implemented; the deployment-wide key is intentionally an
+ingestion gate only and does not scope project submissions. The P0 InfoSec
+control remains open. No owner assigned.
 **Priority:** P0 for minimum machine project/run binding; P2 for broader scope.
 **Accountable roles:** Application and data owners.
 **Findings:** 2, plus the ownership prerequisite for 3, 6, and 7.
@@ -27,6 +29,12 @@ permitted runs, with trusted scope carried through to the authoritative write.
 This minimum is part of SCP-04 even if product AuthN/AuthZ is otherwise planned
 for later. The enforcement location and grant source remain open; a gateway that
 only authenticates a caller does not by itself satisfy project/run authorization.
+The selected single shared bearer key identifies only possession of the
+deployment-wide key; all holders are indistinguishable and may claim any
+client-supplied project name. This is the intended product behavior, but it
+cannot satisfy this P0 binding. Project/run authorization remains deferred
+product work or requires an explicitly approved, time-bounded risk exception
+before public ingestion.
 Broader human-facing enforcement is later work and does not become complete
 merely because machine submission is protected.
 

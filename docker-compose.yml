@@ -18,6 +18,8 @@ services:
     profiles: ["aio"]
     restart: unless-stopped
     environment:
+      OBSERVER_MODE: local
+      GRPC_REFLECTION: "true"
       MONGODB_URI: mongodb://127.0.0.1:27017/observer
       POSTGRES_USER: ${POSTGRES_USER:-observer}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
@@ -59,7 +61,9 @@ services:
     profiles: ["dist", "web-dev"]
     restart: unless-stopped
     environment:
+      OBSERVER_MODE: local
       PORT: "50051"
+      GRPC_REFLECTION: "true"
       NATS_URL: nats://nats:4222
       NATS_STREAM: tests_events
       NATS_SUBJECT_PREFIX: tests.events.v1
