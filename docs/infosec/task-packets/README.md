@@ -1,8 +1,10 @@
 # InfoSec Remediation Task Packets
 
-**Status:** Proposed; no packet is approved or closed. TP-01 shared-key
-authentication and TP-06 reflection changes are partially implemented; their
-remaining controls and deployment evidence are open. Owners are unassigned.
+**Status:** Proposed; no packet is approved or closed. TP-01 distributed
+shared-key enforcement, reporter environment-variable support, and TP-06
+reflection changes are partially implemented; remaining controls and deployment
+evidence are open. Reporter package releases and CI secret injection still need
+verification. Owners are unassigned.
 **Baseline:** Repository revision `f03b3511135400efe61bc9077c9ab805c69d9aa7`,
 chart `0.8.3` / app version `v0.8.3`, reviewed 2026-11-04.
 **Scope:** Distributed Observer deployed with Helm, plus the operator-owned
@@ -27,8 +29,11 @@ control, and final status remains pending until explicitly recorded and reviewed
   and abuse limits as required by SCP-04. The selected initial authentication
   mechanism is a deployment-wide shared bearer key, intended only as an
   ingestion gate; any holder may submit under any client-supplied project name.
-  It is not reporter identity or project authorization, so it does not alone
-  satisfy the public-ingestion gate.
+  The current Playwright and pytest reporter sources can send this key through
+  `STANTERPRISE_INGESTION_AUTH_KEY`; this does not establish that deployed
+  package versions or CI secret injection are verified. The key is not reporter
+  identity or project authorization, so it does not alone satisfy the
+  public-ingestion gate.
 - Product AuthN/AuthZ is planned for future work. Defer human sign-in and
   per-user/project access in TP-03, while treating the machine protections above
   as a separate exposure requirement. Private network access is not human identity
@@ -90,7 +95,7 @@ tests. A gateway or CORS is not a substitute for server-side authorization.
 | Packet | Work | Priority | Accountable roles | Primary prerequisites |
 | --- | --- | --- | --- | --- |
 | [TP-00](00-decisions-and-scope.md) | Deployment decisions and ownership | P0 | Application, platform, identity, data, InfoSec | None |
-| [TP-01](01-machine-identity.md) | Authenticate ingestion callers | P0; shared-key limitations remain | Application, identity | D-03 key provision, D-06 TLS |
+| [TP-01](01-machine-identity.md) | Authenticate ingestion callers | P0; server/reporter wiring partial; deployment evidence and shared-key limitations remain | Application, identity | D-03 key provision, D-06 TLS |
 | [TP-02](02-project-ownership.md) | Bind trusted project/run ownership across events | P0 machine binding; P2 broader scope | Application, data | D-03; TP-01 principal, TP-08 trusted broker path; D-04 for human grants |
 | [TP-03](03-human-access-and-authorization.md) | Human identity, REST authorization and mutations | Deferred | Application, identity | D-04; TP-02 ownership; risk disposition |
 | [TP-04](04-browser-and-websocket.md) | Browser, CORS, CSRF and live-event access | P1 baseline; access enforcement deferred | Application, identity | D-02; D-04 and TP-02/03 for full enforcement |
