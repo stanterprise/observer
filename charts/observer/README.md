@@ -369,13 +369,23 @@ helm uninstall observer
 
 ## Testing The Chart
 
+Distributed rendering requires a Secret name. The name below is a test
+placeholder; rendering does not require the Secret or its key to exist. For an
+installation, use an operator-managed Secret as described under Distributed
+Mode.
+
 ```bash
-helm lint ./charts/observer
-helm template observer ./charts/observer
+helm lint ./charts/observer --set-string distributed.ingestion.auth.existingSecret=chart-test-ingestion-auth
+helm template observer ./charts/observer --set-string distributed.ingestion.auth.existingSecret=chart-test-ingestion-auth
 helm template observer ./charts/observer -f ./charts/observer/values-aio.yaml
-helm template observer ./charts/observer -f ./charts/observer/values-production.yaml
+helm template observer ./charts/observer -f ./charts/observer/values-production.yaml --set-string distributed.ingestion.auth.existingSecret=chart-test-ingestion-auth
 helm template observer ./charts/observer -f ./charts/observer/values-aio-gateway.yaml
 ```
+
+For the Make targets, pass the same flag with
+`HELM_ARGS='--set-string distributed.ingestion.auth.existingSecret=chart-test-ingestion-auth'`.
+For distributed install dry runs, supply the operator-managed Secret name;
+Helm does not verify that the Secret or its key exists.
 
 ## Accessing The Application
 

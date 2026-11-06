@@ -78,6 +78,8 @@ render_matrix() {
     --set externalDatabase.host=mongo.example.com > /dev/null
   external_connection_output="$(helm template observer "${chart_input}" \
     "${distributed_auth_args[@]}" \
+    --set nats.enabled=false \
+    --set externalNats.url=nats://nats.example.com:4222 \
     --set postgresql.enabled=false \
     --set postgres.host=postgres.example.com \
     --set-string 'postgres.password=p@:/#%' \
@@ -90,6 +92,10 @@ render_matrix() {
   fi
   if [[ "${external_connection_output}" != *'MONGODB_URI: "mongodb://observer:p%40%3A%2F%23%25@mongo.example.com:27017/observer?authSource=admin"'* ]]; then
     echo "ERROR: generated MongoDB URI is malformed or does not escape credentials"
+    exit 1
+  fi
+  if [[ "${external_connection_output}" != *'NATS_URL: "nats://nats.example.com:4222"'* ]]; then
+    echo "ERROR: generated NATS URL is malformed"
     exit 1
   fi
   helm template observer "${chart_input}" \
