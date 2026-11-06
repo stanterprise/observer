@@ -272,6 +272,9 @@ nats:
   enabled: true
   # Use external NATS by setting enabled: false and configuring externalNats
   config:
+    merge:
+      # Maximum NATS message payload in bytes (16 MiB).
+      max_payload: 16777216
     jetstream:
       enabled: true
       fileStore:

@@ -64,6 +64,23 @@ render_matrix() {
   helm template observer "${chart_input}" --values "${CHART_PATH}/values-aio.yaml" > /dev/null
   helm template observer "${chart_input}" --values "${CHART_PATH}/values-production.yaml" "${distributed_auth_args[@]}" > /dev/null
   helm template observer "${chart_input}" --values "${CHART_PATH}/values-aio-gateway.yaml" > /dev/null
+
+  local nats_default_config
+  local nats_production_config
+  local nats_override_config
+  nats_default_config="$(helm template observer "${chart_input}" "${distributed_auth_args[@]}" \
+    --show-only charts/nats/templates/config-map.yaml)"
+  nats_production_config="$(helm template observer "${chart_input}" "${distributed_auth_args[@]}" \
+    --values "${CHART_PATH}/values-production.yaml" \
+    --show-only charts/nats/templates/config-map.yaml)"
+  nats_override_config="$(helm template observer "${chart_input}" "${distributed_auth_args[@]}" \
+    --set nats.config.merge.max_payload=25165824 \
+    --show-only charts/nats/templates/config-map.yaml)"
+  assert_render_count "default NATS maximum payload" '"max_payload": 16777216,' 1 "${nats_default_config}"
+  assert_render_count "production NATS maximum payload" '"max_payload": 16777216,' 1 "${nats_production_config}"
+  assert_render_count "overridden NATS maximum payload" '"max_payload": 25165824,' 1 "${nats_override_config}"
+  assert_render_count "default NATS maximum payload after override" '"max_payload": 16777216,' 0 "${nats_override_config}"
+
   helm template observer "${chart_input}" \
     "${distributed_auth_args[@]}" \
     --set nats.enabled=false \
@@ -98,6 +115,7 @@ render_matrix() {
     echo "ERROR: generated NATS URL is malformed"
     exit 1
   fi
+  assert_render_count "external NATS server configuration" '"max_payload"' 0 "${external_connection_output}"
   helm template observer "${chart_input}" \
     "${distributed_auth_args[@]}" \
     --set extraEnvFrom[0].configMapRef.name=chart-test-env \
@@ -141,6 +159,7 @@ render_matrix() {
     echo "ERROR: AIO must remain keyless and explicitly use local mode"
     exit 1
   fi
+  assert_render_count "AIO NATS subchart configuration" '"max_payload"' 0 "${aio_extensions}"
   if ! grep -A 6 -F -e '- name: MONGO_PASSWORD' <<< "${distributed_extensions}" | grep -Fq -e 'key: mongodb-passwords'; then
     echo "ERROR: API and processor must use the MongoDB application-user password Secret"
     exit 1

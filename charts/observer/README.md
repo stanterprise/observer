@@ -191,6 +191,7 @@ helm install observer ./charts/observer -f ./charts/observer/values-aio-gateway.
 | `mongodb.enabled`                    | Deploy embedded MongoDB                                                      | `true`        |
 | `externalDatabase.host`              | External MongoDB host when `mongodb.enabled=false` in distributed mode       | `""`          |
 | `nats.enabled`                       | Deploy embedded NATS                                                         | `true`        |
+| `nats.config.merge.max_payload`      | Maximum message payload in bytes for bundled distributed NATS                | `16777216` (16 MiB) |
 | `externalNats.url`                   | External NATS URL when `nats.enabled=false` in distributed mode              | `""`          |
 | `runtime.existingSecret`             | Existing Secret with `NATS_URL`, `POSTGRES_DSN`, and `MONGODB_URI`           | `""`          |
 | `postgres.migration.enabled`         | Run the dedicated migration hook job in distributed mode                     | `true`        |
@@ -202,6 +203,27 @@ helm install observer ./charts/observer -f ./charts/observer/values-aio-gateway.
 | `imagePullSecrets`                   | Image pull secrets applied to workload pods and the migration job            | `[]`          |
 
 For shared or production environments, pin `image.tag` to an immutable image tag.
+
+### NATS Payload Limit
+
+The bundled distributed NATS server accepts messages up to 16 MiB by default.
+Override the limit in bytes with `nats.config.merge.max_payload`, for example:
+
+```bash
+helm upgrade observer ./charts/observer \
+  --set distributed.ingestion.auth.existingSecret=observer-ingestion-auth \
+  --set nats.config.merge.max_payload=25165824
+```
+
+This value configures only the distributed NATS subchart. External NATS servers
+must be configured separately. The AIO image uses the same 16 MiB default from
+its bundled [NATS configuration](../../nats-server.conf); changing the AIO
+limit requires mounting a replacement configuration. NATS warns that payloads
+larger than 8 MiB may affect performance. JetStream stream and storage limits
+are independent. The ingestion server's separate gRPC receive limit is 16 MiB
+per serialized protobuf message in both deployment modes; the NATS Helm value
+does not control it. NATS counts the JSON-encoded event including its envelope,
+so encoding overhead can cause an accepted gRPC message to exceed the NATS limit.
 
 ## Service And Exposure Contract
 

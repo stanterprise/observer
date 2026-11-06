@@ -378,6 +378,7 @@ func newGRPCServer(logger *slog.Logger, key string) *grpc.Server {
 		streamInterceptors = append(streamInterceptors, ingestionAuthStreamInterceptor(key))
 	}
 	return grpc.NewServer(
+		grpc.MaxRecvMsgSize(16*1024*1024),
 		grpc.ChainUnaryInterceptor(unaryInterceptors...),
 		grpc.ChainStreamInterceptor(streamInterceptors...),
 	)
