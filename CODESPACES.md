@@ -241,6 +241,10 @@ Codespaces automatically forwards ports. Click the **Ports** panel at the bottom
 
 ### Testing gRPC Endpoints
 
+Local development mode is keyless. Start ingestion with
+`OBSERVER_MODE=local GRPC_REFLECTION=true` to enable service discovery.
+Reflection is disabled by default and cannot be enabled in distributed mode.
+
 ```bash
 # Install grpcurl
 go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest

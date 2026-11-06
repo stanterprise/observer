@@ -29,6 +29,17 @@ make build-ingestion && ./bin/ingestion
 
 Default port: `50051`
 
+### Message size limit
+
+The gRPC server accepts serialized protobuf messages up to 16 MiB (16,777,216
+bytes) in both local and authenticated distributed modes. Larger messages are
+rejected with `ResourceExhausted`. Client and proxy message-size limits must be
+configured separately.
+
+The NATS payload limit applies independently to the JSON-encoded event,
+including its envelope. JSON escaping and base64 encoding can increase the
+event size, so a message within the gRPC limit can still exceed the NATS limit.
+
 ### Custom port
 
 ```bash

@@ -24,6 +24,9 @@ env:
 jobs:
   lint-test:
     runs-on: ubuntu-latest
+    env:
+      # Rendering needs a Secret name, not the ingestion key itself.
+      DISTRIBUTED_TEST_AUTH_ARG: --set-string=distributed.ingestion.auth.existingSecret=chart-test-ingestion-auth
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,16 +51,18 @@ jobs:
 
       - name: Lint Helm chart
         run: |
-          helm lint charts/observer
+          helm lint charts/observer "$DISTRIBUTED_TEST_AUTH_ARG"
           helm lint charts/observer -f charts/observer/values-aio.yaml
-          helm lint charts/observer -f charts/observer/values-production.yaml
+          helm lint charts/observer -f charts/observer/values-production.yaml "$DISTRIBUTED_TEST_AUTH_ARG"
           helm lint charts/observer -f charts/observer/values-aio-gateway.yaml
 
       - name: Set up chart-testing
         uses: helm/chart-testing-action@v2
 
       - name: Run chart-testing (lint)
-        run: ct lint --config .github/ct.yaml --charts charts/observer
+        run: |
+          ct lint --config .github/ct.yaml --charts charts/observer \
+            --helm-lint-extra-args="$DISTRIBUTED_TEST_AUTH_ARG"
 
       - name: Install kubeconform
         run: |
@@ -83,20 +88,24 @@ jobs:
             kubeconform -summary -ignore-missing-schemas "/tmp/observer-renders/${name}.yaml"
           }
 
-          render_and_validate default
+          render_and_validate default "$DISTRIBUTED_TEST_AUTH_ARG"
           render_and_validate aio -f charts/observer/values-aio.yaml
-          render_and_validate production -f charts/observer/values-production.yaml
+          render_and_validate production -f charts/observer/values-production.yaml "$DISTRIBUTED_TEST_AUTH_ARG"
           render_and_validate aio-gateway -f charts/observer/values-aio-gateway.yaml
           render_and_validate external-nats \
+            "$DISTRIBUTED_TEST_AUTH_ARG" \
             --set nats.enabled=false \
             --set externalNats.url=nats://nats.example.com:4222
           render_and_validate external-postgres \
+            "$DISTRIBUTED_TEST_AUTH_ARG" \
             --set postgresql.enabled=false \
             --set postgres.host=postgres.example.com
           render_and_validate external-mongodb \
+            "$DISTRIBUTED_TEST_AUTH_ARG" \
             --set mongodb.enabled=false \
             --set externalDatabase.host=mongo.example.com
           render_and_validate all-external \
+            "$DISTRIBUTED_TEST_AUTH_ARG" \
             --set postgresql.enabled=false \
             --set postgres.host=postgres.example.com \
             --set mongodb.enabled=false \

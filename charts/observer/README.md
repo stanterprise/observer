@@ -38,6 +38,9 @@ Shipped presets:
 - Distributed workloads consume connection strings from Kubernetes Secrets.
 - Set `runtime.existingSecret` to reuse a pre-created Secret containing `NATS_URL`, `POSTGRES_DSN`, and `MONGODB_URI`.
 - If `runtime.existingSecret` is empty, the chart renders a generated Secret for non-production installs.
+- Distributed ingestion requires `distributed.ingestion.auth.existingSecret` to reference an operator-managed Secret containing `INGESTION_AUTH_KEY` (at least 32 bytes). Do not put the key in Helm values, `extraEnv`, or release metadata.
+- Ingestion uses one shared bearer key per deployment. This authenticates possession only; it does not identify individual reporters or authorize project/run ownership. Do not treat it as satisfying the public-ingestion gate until machine project authorization is implemented or an authorized exception is recorded.
+- AIO/local mode does not use or generate an ingestion key.
 - `distributed.ingestion.env`, `distributed.api.env`, and `distributed.processor.env` must not set `NATS_URL`, `POSTGRES_DSN`, or `MONGODB_URI`; the chart rejects those keys at validation time.
 
 **External Dependencies:**
@@ -130,14 +133,25 @@ helm install observer observer/observer --version <chart-version>
 Distributed mode is the default. It deploys separate ingestion, processor, API, and web workloads, and it can run with embedded or external PostgreSQL, MongoDB, and NATS.
 
 ```bash
-helm install observer ./charts/observer
+helm install observer ./charts/observer \
+  --set distributed.ingestion.auth.existingSecret=observer-ingestion-auth
 ```
+
+Create `observer-ingestion-auth` through the organization's approved secret
+manager before installation. It must contain a high-entropy
+`INGESTION_AUTH_KEY`; the chart intentionally fails to render when no auth
+Secret is configured. Reporters send it as gRPC metadata:
+`authorization: Bearer <key>`. Use the TLS-protected public gateway for every
+request. Share this deployment-wide key only with trusted reporters; rotation
+requires updating the Secret and coordinating reporter configuration.
 
 When `postgres.migration.enabled=true`, install and upgrade runs include a dedicated migration hook job. The API and processor workloads do not run migrations themselves.
 
 ### AIO Mode
 
 AIO mode runs Observer in a single container for development and evaluation.
+It intentionally runs in keyless local mode; do not expose it as a production
+public ingestion service.
 
 From source, use the shipped preset:
 
@@ -177,6 +191,7 @@ helm install observer ./charts/observer -f ./charts/observer/values-aio-gateway.
 | `mongodb.enabled`                    | Deploy embedded MongoDB                                                      | `true`        |
 | `externalDatabase.host`              | External MongoDB host when `mongodb.enabled=false` in distributed mode       | `""`          |
 | `nats.enabled`                       | Deploy embedded NATS                                                         | `true`        |
+| `nats.config.merge.max_payload`      | Maximum message payload in bytes for bundled distributed NATS                | `16777216` (16 MiB) |
 | `externalNats.url`                   | External NATS URL when `nats.enabled=false` in distributed mode              | `""`          |
 | `runtime.existingSecret`             | Existing Secret with `NATS_URL`, `POSTGRES_DSN`, and `MONGODB_URI`           | `""`          |
 | `postgres.migration.enabled`         | Run the dedicated migration hook job in distributed mode                     | `true`        |
@@ -188,6 +203,27 @@ helm install observer ./charts/observer -f ./charts/observer/values-aio-gateway.
 | `imagePullSecrets`                   | Image pull secrets applied to workload pods and the migration job            | `[]`          |
 
 For shared or production environments, pin `image.tag` to an immutable image tag.
+
+### NATS Payload Limit
+
+The bundled distributed NATS server accepts messages up to 16 MiB by default.
+Override the limit in bytes with `nats.config.merge.max_payload`, for example:
+
+```bash
+helm upgrade observer ./charts/observer \
+  --set distributed.ingestion.auth.existingSecret=observer-ingestion-auth \
+  --set nats.config.merge.max_payload=25165824
+```
+
+This value configures only the distributed NATS subchart. External NATS servers
+must be configured separately. The AIO image uses the same 16 MiB default from
+its bundled [NATS configuration](../../nats-server.conf); changing the AIO
+limit requires mounting a replacement configuration. NATS warns that payloads
+larger than 8 MiB may affect performance. JetStream stream and storage limits
+are independent. The ingestion server's separate gRPC receive limit is 16 MiB
+per serialized protobuf message in both deployment modes; the NATS Helm value
+does not control it. NATS counts the JSON-encoded event including its envelope,
+so encoding overhead can cause an accepted gRPC message to exceed the NATS limit.
 
 ## Service And Exposure Contract
 
@@ -355,13 +391,23 @@ helm uninstall observer
 
 ## Testing The Chart
 
+Distributed rendering requires a Secret name. The name below is a test
+placeholder; rendering does not require the Secret or its key to exist. For an
+installation, use an operator-managed Secret as described under Distributed
+Mode.
+
 ```bash
-helm lint ./charts/observer
-helm template observer ./charts/observer
+helm lint ./charts/observer --set-string distributed.ingestion.auth.existingSecret=chart-test-ingestion-auth
+helm template observer ./charts/observer --set-string distributed.ingestion.auth.existingSecret=chart-test-ingestion-auth
 helm template observer ./charts/observer -f ./charts/observer/values-aio.yaml
-helm template observer ./charts/observer -f ./charts/observer/values-production.yaml
+helm template observer ./charts/observer -f ./charts/observer/values-production.yaml --set-string distributed.ingestion.auth.existingSecret=chart-test-ingestion-auth
 helm template observer ./charts/observer -f ./charts/observer/values-aio-gateway.yaml
 ```
+
+For the Make targets, pass the same flag with
+`HELM_ARGS='--set-string distributed.ingestion.auth.existingSecret=chart-test-ingestion-auth'`.
+For distributed install dry runs, supply the operator-managed Secret name;
+Helm does not verify that the Secret or its key exists.
 
 ## Accessing The Application
 

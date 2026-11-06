@@ -52,6 +52,13 @@ This folder contains contributor and implementation documentation for Observer. 
 - Detailed remediation plan: [HELM_CHART_REMEDIATION_PLAN.md](HELM_CHART_REMEDIATION_PLAN.md)
 - Publish-readiness rubric: [HELM_CHART_PUBLISH_READINESS_RUBRIC.md](HELM_CHART_PUBLISH_READINESS_RUBRIC.md)
 
+## InfoSec review
+
+- [Distributed Kubernetes target-state security package](infosec/README.md):
+  C4 diagrams, deployment/network boundaries, identity and public ingestion,
+  data handling, hardening, threats, supply chain, operations, and assessment templates.
+  These are expected capabilities; implementation assessment and approval are pending.
+
 One-off homelab k3s deployment notes and the separate `observer-mcp` chart task
 packets have been archived; see [archive/2026-09-copilot/](archive/2026-09-copilot/).
 

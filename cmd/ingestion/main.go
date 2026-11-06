@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/stanterprise/observer/pkg/publisher"
 	"github.com/stanterprise/observer/pkg/server"
 	"github.com/stanterprise/observer/pkg/version"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -25,6 +27,23 @@ func main() {
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	mode := envOr("OBSERVER_MODE", "distributed")
+	grpcServer, err := newIngestionGRPCServer(logger, mode, os.Getenv("INGESTION_AUTH_KEY"))
+	if err != nil {
+		logger.Error("invalid ingestion authentication configuration", "error", err)
+		os.Exit(1)
+	}
+
+	reflectionEnabled, err := strconv.ParseBool(envOr("GRPC_REFLECTION", "false"))
+	if err != nil {
+		logger.Error("invalid GRPC_REFLECTION value", "error", err)
+		os.Exit(1)
+	}
+	if reflectionEnabled && mode != "local" {
+		logger.Error("GRPC_REFLECTION can only be enabled in local mode")
+		os.Exit(1)
+	}
+
 	addr := ":" + *port
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -59,13 +78,16 @@ func main() {
 		}
 	}()
 
-	grpcServer := server.NewGRPCServer(logger)
 	// Ingestion service does not use database directly - it publishes to NATS
 	// For now, we run without DB to maintain stateless ingestion pattern
 	if pub != nil {
 		server.RegisterServicesWithPublisher(grpcServer, logger, nil, pub)
 	} else {
 		server.RegisterServices(grpcServer, logger, nil)
+	}
+	if reflectionEnabled {
+		logger.Warn("gRPC reflection is enabled; use only in local development")
+		server.RegisterReflection(grpcServer)
 	}
 	logger.Info("ingestion server starting", "version", version.Version, "commit", version.Commit, "addr", lis.Addr().String())
 
@@ -119,6 +141,23 @@ func main() {
 			os.Exit(1)
 		}
 	default:
+	}
+}
+
+func newIngestionGRPCServer(logger *slog.Logger, mode, authKey string) (*grpc.Server, error) {
+	switch mode {
+	case "local":
+		if authKey != "" {
+			return nil, fmt.Errorf("INGESTION_AUTH_KEY must not be set in local mode")
+		}
+		return server.NewGRPCServer(logger), nil
+	case "distributed":
+		if authKey == "" {
+			return nil, fmt.Errorf("INGESTION_AUTH_KEY is required in distributed mode")
+		}
+		return server.NewAuthenticatedGRPCServer(logger, authKey)
+	default:
+		return nil, fmt.Errorf("OBSERVER_MODE must be either local or distributed")
 	}
 }
 

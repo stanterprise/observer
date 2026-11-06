@@ -86,7 +86,7 @@ docker compose up -d postgres
 make nats-up       # Start NATS
 
 # Ingestion (stateless, publishes to NATS)
-NATS_URL='nats://localhost:4222' ./bin/ingestion
+OBSERVER_MODE=local NATS_URL='nats://localhost:4222' ./bin/ingestion
 
 # API (requires PostgreSQL)
 POSTGRES_DSN='postgres://observer:password@localhost:5432/observer?sslmode=disable' \
@@ -157,6 +157,15 @@ make docker-buildx-aio      # Fast cached builds
 - `make nats-up` – Start NATS container
 - `make nats-down` – Stop NATS container
 - `make nats-logs` – Tail NATS logs
+
+The bundled NATS server defaults to a 16 MiB message payload limit.
+Docker Compose and the AIO image use [nats-server.conf](nats-server.conf);
+the distributed Helm deployment exposes
+[`nats.config.merge.max_payload`](charts/observer/README.md#nats-payload-limit).
+External NATS servers must be configured separately. The ingestion server also
+accepts serialized protobuf messages up to 16 MiB over gRPC. NATS counts the
+JSON-encoded event including its envelope, so encoding overhead can cause an
+accepted gRPC message to exceed the NATS payload limit.
 
 ### Testing & Quality
 

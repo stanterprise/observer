@@ -324,29 +324,31 @@ docker-web-dev-down: ## Stop web development profile services
 web-dev-mode: docker-web-dev-down docker-clean-images docker-build-all docker-dev-web web-dev ## Rebuild and restart all services in Docker and start web UI in development mode
 
 # Helm chart management
+HELM_ARGS ?=
+
 helm-deps: ## Update Helm chart dependencies
 	helm dependency update charts/observer/
 
 helm-lint: ## Lint the Helm chart
-	helm lint charts/observer/
+	helm lint charts/observer/ $(HELM_ARGS)
 
 helm-template: ## Render Helm templates with default values
-	helm template observer charts/observer/
+	helm template observer charts/observer/ $(HELM_ARGS)
 
 helm-template-aio: ## Render Helm templates with AIO mode
-	helm template observer charts/observer/ --values charts/observer/values-aio.yaml
+	helm template observer charts/observer/ --values charts/observer/values-aio.yaml $(HELM_ARGS)
 
 helm-template-prod: ## Render Helm templates with production values
-	helm template observer charts/observer/ --values charts/observer/values-production.yaml
+	helm template observer charts/observer/ --values charts/observer/values-production.yaml $(HELM_ARGS)
 
 helm-dry-run: ## Dry-run Helm install with default values
-	helm install observer-test charts/observer/ --dry-run --debug
+	helm install observer-test charts/observer/ --dry-run --debug $(HELM_ARGS)
 
 helm-dry-run-aio: ## Dry-run Helm install with AIO mode
-	helm install observer-test charts/observer/ --values charts/observer/values-aio.yaml --dry-run --debug
+	helm install observer-test charts/observer/ --values charts/observer/values-aio.yaml --dry-run --debug $(HELM_ARGS)
 
 helm-dry-run-prod: ## Dry-run Helm install with production values
-	helm install observer-test charts/observer/ --values charts/observer/values-production.yaml --dry-run --debug
+	helm install observer-test charts/observer/ --values charts/observer/values-production.yaml --dry-run --debug $(HELM_ARGS)
 
 helm-test: ## Run comprehensive Helm chart tests
 	./scripts/test-helm-chart.sh
