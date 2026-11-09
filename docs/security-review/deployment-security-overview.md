@@ -1,7 +1,40 @@
-# Observer — Kubernetes Deployment and Security Overview
+# Observer — Current Implementation and Helm State
 
-**Scope:** the default distributed Helm deployment and current implementation;
-cluster-specific controls and reachability have not been assessed.
+**Scope:** current application behavior and default distributed Helm resources.
+This is the current-state view, not the intended security target or evidence of
+cluster enforcement. The VPN/private Web route and public gRPC gateway described
+below are operator-provided deployment assumptions; neither is installed by Helm.
+See the [current-vs-target comparison](../infosec/02-c4-architecture.md#current-implementation-vs-target)
+and [deployment/network target](../infosec/03-deployment-and-network.md) for
+required controls.
+
+The accompanying [container diagram](architecture/container-architecture.drawio)
+and [Kubernetes deployment diagram](architecture/kubernetes-deployment.drawio)
+are current-state views. The deployment diagram shows the intended operator
+entry paths as external, non-chart resources; it does not assert that any
+particular cluster has configured them.
+
+## Current-state C4 Level 1 — System Context
+
+The routes below show the intended operator-managed exposure for a distributed
+Kubernetes deployment. The gateways are not provisioned by Helm; actual exposure
+and backend encryption must be verified for each assessment environment.
+
+```mermaid
+flowchart LR
+  reporter["External system: CI runners and test reporters"]
+  grpc["Operator-managed public gRPC gateway<br/>TLS / HTTP2 :443; not chart-provisioned"]
+  engineer["Person: engineer using Observer"]
+  vpn["Operator-managed VPN / private web gateway<br/>HTTPS / WSS :443; not chart-provisioned"]
+  observer["Software system: Observer distributed deployment<br/>Ingestion, UI, REST/WebSocket, and persistence"]
+  platform["Kubernetes platform and dependencies<br/>Routing, Secrets, NetworkPolicy, NATS, PostgreSQL, MongoDB"]
+
+  reporter -->|"gRPC over TLS; shared bearer key"| grpc
+  grpc -->|"Private route to Ingestion :50051;<br/>backend TLS is deployment-specific"| observer
+  engineer -->|"HTTPS / WSS via VPN/private access"| vpn
+  vpn -->|"Web and API route;<br/>no application user AuthN/AuthZ"| observer
+  observer -->|"Configured services and dependencies;<br/>protection varies by deployment"| platform
+```
 
 ## 1. System overview
 
@@ -21,8 +54,7 @@ By default, Helm installs four single-replica Deployments (ingestion,
 processor, API, web), three ClusterIP Services, and a migration Job. It also
 deploys NATS and PostgreSQL StatefulSets and a MongoDB Deployment, each with
 a **10 GiB** persistent claim. External equivalents can replace them;
-S3-compatible storage is optional and not provisioned. AIO is separate
-local/evaluation packaging without an ingestion key.
+S3-compatible storage is optional and not provisioned.
 ([Chart dependencies](../../charts/observer/Chart.yaml),
 [defaults](../../charts/observer/values.yaml),
 [migration Job](../../charts/observer/templates/distributed/migration/migration-job.yaml))
@@ -31,8 +63,8 @@ local/evaluation packaging without an ingestion key.
 
 | Source | Destination | Protocol/port | Purpose | Exposure |
 | --- | --- | --- | --- | --- |
-| CI/test runner | Ingestion Service | gRPC/TCP `50051` | Submit events | ClusterIP; operator selects external route/port. |
-| Engineer's browser | Web Service | HTTP `80` | UI and same-origin REST | ClusterIP; HTTP(S) entry is operator-selected. |
+| CI/test runner | Operator-managed public gRPC gateway → Ingestion Service | gRPC/TLS `443` externally; gRPC `50051` to Service | Submit events with the shared bearer key | Helm creates no gateway; private backend reachability and TLS re-encryption are operator/deployment decisions. |
+| Engineer on organization VPN/private network | Operator-managed private gateway → Web Service | HTTPS `443` externally; HTTP `80` to Service | UI and same-origin REST | Intended restricted route; neither VPN access nor gateway is chart-enforced. |
 | Optional WebSocket client | Web proxy → API | HTTP upgrade `/ws` | Live events | Same entry; the UI itself polls REST. |
 | Web | API Service | HTTP/TCP `8080` | Proxy `/api/*` and `/ws` | ClusterIP; direct API exposure is configurable. |
 | Ingestion | NATS | NATS/TCP `4222` | Publish `tests.events.v1.<type>` subjects | Bundled Service is cluster-internal. |
@@ -58,7 +90,9 @@ Distributed ingestion requires a Secret referenced by
 `INGESTION_AUTH_KEY` as gRPC `authorization: Bearer …` metadata. The key must
 be at least 32 printable, non-whitespace bytes. This shared key proves
 possession, not reporter identity or project/run authorization. Health is
-exempt; reflection is disabled. Reporter compatibility remains to be verified.
+exempt; reflection is disabled. The Playwright and pytest reporters support
+the configured key variable; compatibility was exercised in the test
+deployment.
 ([Server authentication](../../pkg/server/server.go#L341),
 [Helm validation](../../charts/observer/templates/_helpers.tpl#L181))
 

@@ -4,10 +4,10 @@
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <mxCell id="title" value="Observer: Kubernetes deployment and network boundaries" style="text;html=0;align=left;verticalAlign=middle;fontSize=26;fontStyle=1;fontColor=#172033;" vertex="1" parent="1">
+        <mxCell id="title" value="Observer: current Helm deployment and network boundaries" style="text;html=0;align=left;verticalAlign=middle;fontSize=26;fontStyle=1;fontColor=#172033;" vertex="1" parent="1">
           <mxGeometry x="20" y="15" width="1300" height="45" as="geometry"/>
         </mxCell>
-        <mxCell id="subtitle" value="Default distributed Helm resources. ClusterIP is not an isolation guarantee; reachability and TLS depend on the cluster and operator." style="text;html=0;align=left;verticalAlign=middle;fontSize=14;fontColor=#475569;" vertex="1" parent="1">
+        <mxCell id="subtitle" value="Current distributed Helm resources plus intended operator-managed entry paths; VPN, gateways, and TLS are not installed or enforced by the chart." style="text;html=0;align=left;verticalAlign=middle;fontSize=14;fontColor=#475569;" vertex="1" parent="1">
           <mxGeometry x="20" y="60" width="1750" height="30" as="geometry"/>
         </mxCell>
         <mxCell id="cluster" value="Company-managed Kubernetes cluster (logical boundary)" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;fontSize=15;fontStyle=1;fillColor=#F8FAFC;strokeColor=#64748B;" vertex="1" parent="1">
@@ -16,16 +16,16 @@
         <mxCell id="release" value="Observer Helm release: bundled dependency defaults" style="rounded=1;whiteSpace=wrap;html=0;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;fontSize=15;fontStyle=1;fillColor=#FFFFFF;strokeColor=#94A3B8;dashed=1;" vertex="1" parent="1">
           <mxGeometry x="540" y="155" width="1085" height="805" as="geometry"/>
         </mxCell>
-        <mxCell id="runner" value="CI / test runners&#xa;outside or inside cluster" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fontStyle=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;" vertex="1" parent="1">
+        <mxCell id="runner" value="CI / test runners&#xa;may be outside cluster" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fontStyle=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;" vertex="1" parent="1">
           <mxGeometry x="20" y="220" width="200" height="90" as="geometry"/>
         </mxCell>
-        <mxCell id="browser" value="Engineer / browser&#xa;and optional /ws clients" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fontStyle=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;" vertex="1" parent="1">
+        <mxCell id="browser" value="Engineer on organization VPN&#xa;Browser and optional /ws clients&#xa;(no application user auth)" style="rounded=1;whiteSpace=wrap;html=0;fontSize=15;fontStyle=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;" vertex="1" parent="1">
           <mxGeometry x="20" y="610" width="200" height="90" as="geometry"/>
         </mxCell>
-        <mxCell id="grpc-entry" value="Operator-selected entry&#xa;gRPC Ingress / Gateway&#xa;or exposed Service" style="rounded=1;whiteSpace=wrap;html=0;fontSize=14;fontStyle=1;fillColor=#FFFBEB;strokeColor=#D97706;fontColor=#78350F;dashed=1;" vertex="1" parent="1">
+        <mxCell id="grpc-entry" value="Public gRPC gateway&#xa;Operator-managed TLS/HTTP2 :443&#xa;not rendered by Helm" style="rounded=1;whiteSpace=wrap;html=0;fontSize=14;fontStyle=1;fillColor=#FFFBEB;strokeColor=#D97706;fontColor=#78350F;dashed=1;" vertex="1" parent="1">
           <mxGeometry x="285" y="220" width="210" height="90" as="geometry"/>
         </mxCell>
-        <mxCell id="web-entry" value="Operator-selected entry&#xa;web Ingress / Gateway&#xa;or exposed Service" style="rounded=1;whiteSpace=wrap;html=0;fontSize=14;fontStyle=1;fillColor=#FFFBEB;strokeColor=#D97706;fontColor=#78350F;dashed=1;" vertex="1" parent="1">
+        <mxCell id="web-entry" value="VPN / private web gateway&#xa;Operator-managed HTTPS :443&#xa;not rendered by Helm" style="rounded=1;whiteSpace=wrap;html=0;fontSize=14;fontStyle=1;fillColor=#FFFBEB;strokeColor=#D97706;fontColor=#78350F;dashed=1;" vertex="1" parent="1">
           <mxGeometry x="285" y="610" width="210" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="ingestion" value="Ingestion Deployment&#xa;ClusterIP Service :50051&#xa;gRPC health probe" style="rounded=1;whiteSpace=wrap;html=0;fontSize=14;fontStyle=1;fillColor=#DBEAFE;strokeColor=#2563EB;fontColor=#1E3A8A;" vertex="1" parent="1">
@@ -67,13 +67,13 @@
         <mxCell id="platform" value="Hosting platform / outside chart&#xa;DNS, routing and TLS; PV provisioner;&#xa;image registry access; Secret delivery;&#xa;monitoring and network controls&#xa;(may be provided inside the cluster)" style="rounded=1;whiteSpace=wrap;html=0;align=left;spacing=10;fontSize=13;fillColor=#FFFBEB;strokeColor=#D97706;fontColor=#78350F;dashed=1;" vertex="1" parent="1">
           <mxGeometry x="1680" y="760" width="230" height="145" as="geometry"/>
         </mxCell>
-        <mxCell id="legend" value="Blue: workload + Service   |   Cylinders: bundled messaging / stores and PVCs   |   Grey: Secret/config   |   Dashed: optional / operator-provided&#xa;Connections point from the initiating client. No Ingress/Gateway is created; a directly exposed API Service can bypass the web proxy." style="text;whiteSpace=wrap;html=0;align=left;verticalAlign=middle;fontSize=13;fontColor=#334155;" vertex="1" parent="1">
-          <mxGeometry x="285" y="965" width="1320" height="42" as="geometry"/>
+        <mxCell id="legend" value="Blue: workload + Service   |   Cylinders: bundled messaging / stores and PVCs   |   Grey: Secret/config   |   Dashed: operator-provided, not chart-enforced&#xa;Public gRPC uses the shared bearer key at Ingestion; it is not project/run authorization. Prevent gateway bypass and rate-limit at the edge.&#xa;Web/API are intended to be VPN/private-only, but have no application user AuthN/AuthZ. A directly exposed API Service bypasses the web route." style="text;whiteSpace=wrap;html=0;align=left;verticalAlign=middle;fontSize=13;fontColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="285" y="955" width="1320" height="65" as="geometry"/>
         </mxCell>
-        <mxCell id="runner-entry" value="gRPC&#xa;port varies" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;endFill=1;html=0;fontSize=12;labelBackgroundColor=#FFFFFF;strokeColor=#64748B;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="runner" target="grpc-entry">
+        <mxCell id="runner-entry" value="gRPC / TLS :443" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;endFill=1;html=0;fontSize=12;labelBackgroundColor=#FFFFFF;strokeColor=#64748B;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="runner" target="grpc-entry">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="entry-ingestion" value="gRPC&#xa;:50051" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;endFill=1;html=0;fontSize=12;labelBackgroundColor=#FFFFFF;strokeColor=#64748B;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="grpc-entry" target="ingestion">
+        <mxCell id="entry-ingestion" value="gRPC :50051&#xa;backend TLS is deployment-specific" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;endFill=1;html=0;fontSize=12;labelBackgroundColor=#FFFFFF;strokeColor=#64748B;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="grpc-entry" target="ingestion">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="ingestion-nats" value="publish&#xa;TCP :4222" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;endFill=1;html=0;fontSize=12;labelBackgroundColor=#FFFFFF;strokeColor=#334155;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="ingestion" target="nats">
@@ -88,10 +88,10 @@
         <mxCell id="processor-postgres" value="write results&#xa;TCP :5432" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;endFill=1;html=0;fontSize=12;labelBackgroundColor=#FFFFFF;strokeColor=#334155;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="processor" target="postgres">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="browser-entry" value="HTTP(S)&#xa;port varies" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;endFill=1;html=0;fontSize=12;labelBackgroundColor=#FFFFFF;strokeColor=#64748B;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="browser" target="web-entry">
+        <mxCell id="browser-entry" value="HTTPS :443&#xa;VPN/private access" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;endFill=1;html=0;fontSize=12;labelBackgroundColor=#FFFFFF;strokeColor=#64748B;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="browser" target="web-entry">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="entry-web" value="HTTP&#xa;:80" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;endFill=1;html=0;fontSize=12;labelBackgroundColor=#FFFFFF;strokeColor=#64748B;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="web-entry" target="web">
+        <mxCell id="entry-web" value="HTTP :80&#xa;backend TLS not chart-configured" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;endFill=1;html=0;fontSize=12;labelBackgroundColor=#FFFFFF;strokeColor=#64748B;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="web-entry" target="web">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="web-api" value="proxy&#xa;HTTP :8080" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;endFill=1;html=0;fontSize=12;labelBackgroundColor=#FFFFFF;strokeColor=#334155;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="web" target="api">

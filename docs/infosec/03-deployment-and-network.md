@@ -1,18 +1,20 @@
 # 03 - Kubernetes Deployment and Network
 
-**Status:** Proposed topology; actual endpoints and enforcement evidence pending.
+**Status:** Intended distributed deployment target; actual endpoints and
+enforcement evidence pending. This topology assumes Web/API access is restricted
+to the organization's VPN or private network. That is a platform control, not
+application AuthN/AuthZ.
 
 ## Deployment view
 
 ```mermaid
 flowchart TB
   ci["Untrusted network<br/>External CI reporters"]
-  users["Corporate users / approved remote access"]
-  issuer["Trusted identity provider"]
+  users["Engineers on organization VPN / private network"]
 
   subgraph cluster["Kubernetes cluster - platform trust boundary"]
-    public["Platform gateway<br/>Public gRPC TLS 443"]
-    private["Platform web gateway<br/>Private / SSO-protected HTTPS 443"]
+    public["Operator-managed public gRPC gateway<br/>TLS / HTTP2 443; abuse limits required"]
+    private["Operator-managed VPN/private web gateway<br/>HTTPS / WSS 443; no SSO assumed"]
     subgraph ns["Observer namespace - default-deny network policy"]
       isvc["ingestion ClusterIP :50051"]
       wsvc["web ClusterIP :80"]
@@ -45,8 +47,6 @@ flowchart TB
 
   ci --> public --> isvc
   users --> private --> wsvc
-  public -.-> issuer
-  private -.-> issuer
   ing --> nats
   nats --> proc
   nats --> api
@@ -62,10 +62,15 @@ flowchart TB
 ```
 
 Service ports reflect the chart's stable distributed contract, not a declaration
-that these ports natively terminate TLS. TLS listeners/proxies and re-encryption
-must be implemented and documented. Certificates must validate the destination
-identity; encryption without certificate verification does not satisfy this target.
-The dependency tier box is a logical private boundary, not a fixed location.
+that these ports natively terminate TLS. The chart creates no gateway, VPN route,
+or TLS listener. The intended public gRPC route terminates TLS at the
+operator-managed gateway; the gateway-to-Ingestion path must be private and use
+TLS/re-encryption where required by policy. The web gateway must only be reachable
+through approved VPN/private access, and direct Web/API service exposure must be
+prevented. VPN access does not provide application user identity or authorization.
+Certificates must validate the destination identity; encryption without certificate
+verification does not satisfy this target. The dependency tier box is a logical
+private boundary, not a fixed location.
 
 ## Network flow matrix
 
@@ -74,10 +79,10 @@ assessed deployment must record its actual ports and endpoints.
 
 | ID | Source -> destination | Protocol/port | Purpose and required protection | Enforcement owner |
 | --- | --- | --- | --- | --- |
-| NET-01 | CI reporter -> public gateway | gRPC over TLS/TCP 443, HTTP/2 | Authenticated machine submission; quotas and optional source allowlist | Platform + application |
-| NET-02 | Public gateway -> ingestion | gRPC/TLS TCP 50051 or approved TLS listener | Re-encryption; gateway-only reachability; trustworthy caller identity | Platform + application |
-| NET-03 | User -> web gateway | HTTPS/WSS TCP 443 | SSO; approved corporate/private access policy | Platform + identity |
-| NET-04 | Web gateway -> web -> API | HTTPS/WSS; Services 80/8080 or approved TLS listeners | No unprotected alternate route; verified upstream TLS; authorization at API | Platform + application |
+| NET-01 | CI reporter -> public gateway | gRPC over TLS/TCP 443, HTTP/2 | Shared bearer key is currently enforced by Ingestion; add quotas/abuse limits and project/run authorization | Platform + application |
+| NET-02 | Public gateway -> ingestion | Private gRPC route to TCP 50051; TLS/re-encryption per policy | Gateway-only reachability; prevent direct Service bypass; validate certificates where TLS is used | Platform + application |
+| NET-03 | VPN user -> web gateway | HTTPS/WSS TCP 443 | VPN/private access restriction; no application SSO is implemented or assumed | Platform |
+| NET-04 | Web gateway -> web -> API | HTTPS/WSS at the edge; chart Services 80/8080 | No alternate public route; secure the web-to-API hop (currently HTTP); application authorization remains required | Platform + application |
 | NET-05 | Ingestion -> NATS | TLS TCP 4222 | Publish-only credentials for required subjects | Platform + application |
 | NET-06 | Processor/API -> NATS | TLS TCP 4222 | Separate identities; limited consumers, subjects, and stream operations | Platform + application |
 | NET-07 | Processor/API -> PostgreSQL | PostgreSQL TLS TCP 5432 | Separate write/read roles; API gets only required mutation privileges | Platform + data |
@@ -105,3 +110,9 @@ assessed deployment must record its actual ports and endpoints.
 
 Record TLS minimum versions/ciphers per organizational policy, certificate issuer,
 expiry alerts, backend trust roots, and enforcement manifests in the evidence appendix.
+
+The current Helm chart uses HTTP from Web to API, bundled NATS without
+authentication by default, and PostgreSQL with `sslmode=disable` by default.
+These are implementation gaps against the target above, not controls provided by
+the VPN. See the [current-state vs target comparison](02-c4-architecture.md#current-implementation-vs-target)
+and [current implementation overview](../security-review/deployment-security-overview.md).
