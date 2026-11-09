@@ -62,6 +62,15 @@ spec:
             secretKeyRef:
               name: {{ include "observer.runtimeSecretName" . }}
               key: NATS_URL
+        - name: OBSERVER_MODE
+          value: "distributed"
+        - name: INGESTION_AUTH_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.distributed.ingestion.auth.existingSecret }}
+              key: INGESTION_AUTH_KEY
+        - name: GRPC_REFLECTION
+          value: "false"
 {{ include "observer.renderFilteredEnv" (dict "env" .Values.distributed.ingestion.env "excluded" (list "NATS_URL")) | nindent 8 }}
 {{ include "observer.renderFilteredEnv" (dict "env" .Values.extraEnv) | nindent 8 }}
         {{- with .Values.extraEnvFrom }}
