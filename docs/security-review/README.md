@@ -16,7 +16,7 @@ The diagrams are editable in draw.io/diagrams.net. Solid arrows describe a
 normal connection; dashed arrows or boxes indicate optional or
 operator-provided paths. Ports are defaults unless otherwise labeled.
 
-The source baseline is repository revision `11b5cf7` (chart `0.8.3`); actual
+The source baseline is repository revision `4c65589` (chart `0.10.0`); actual
 cluster configuration, installed reporter versions, and organizational
 controls have not been verified. In particular, a Kubernetes `ClusterIP` is
 not by itself evidence of network isolation.
