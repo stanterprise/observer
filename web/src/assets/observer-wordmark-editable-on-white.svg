@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2448" height="840" viewBox="0 0 2448 840" role="img" aria-label="Observer editable wordmark">
+  <title>Observer editable wordmark</title>
+  <desc>Live typography needs locally installed Inter Display Bold.</desc>
+  <rect width="2448" height="840" fill="#FFFFFF"/><g id="observer-mark" fill="none" stroke="#0B1220" stroke-linejoin="miter" stroke-linecap="butt">
+    <g id="connector-lines" stroke-width="27.280"><line x1="437.000" y1="109.000" x2="437.000" y2="264.000"/>
+<line x1="705.468" y1="264.000" x2="571.234" y2="341.500"/>
+<line x1="705.468" y1="574.000" x2="571.234" y2="496.500"/>
+<line x1="437.000" y1="729.000" x2="437.000" y2="574.000"/>
+<line x1="168.532" y1="574.000" x2="302.766" y2="496.500"/>
+<line x1="168.532" y1="264.000" x2="302.766" y2="341.500"/></g>
+    <polygon id="outer-hexagon" stroke-width="38.750" points="437.000,109.000 705.468,264.000 705.468,574.000 437.000,729.000 168.532,574.000 168.532,264.000"/>
+    <polygon id="inner-hexagon" stroke-width="27.280" points="437.000,264.000 571.234,341.500 571.234,496.500 437.000,574.000 302.766,496.500 302.766,341.500"/>
+    </g><text id="editable-bserver" x="839" y="577" fill="#0B1220" font-family="Inter Display, Inter, sans-serif" font-weight="700" font-size="390">bserver</text>
+</svg>

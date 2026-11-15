@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1600" viewBox="0 0 1600 1600" role="img" aria-label="Observer symbol">
+  <title>Observer symbol</title>
+  <desc>Two concentric regular hexagons connected by six radial structural lines; editable vector elements.</desc>
+  <g id="observer-mark" fill="none" stroke="#0B1220" stroke-linejoin="miter" stroke-linecap="butt">
+    <g id="connector-lines" stroke-width="44.000"><line x1="800.000" y1="300.000" x2="800.000" y2="550.000"/>
+<line x1="1233.013" y1="550.000" x2="1016.506" y2="675.000"/>
+<line x1="1233.013" y1="1050.000" x2="1016.506" y2="925.000"/>
+<line x1="800.000" y1="1300.000" x2="800.000" y2="1050.000"/>
+<line x1="366.987" y1="1050.000" x2="583.494" y2="925.000"/>
+<line x1="366.987" y1="550.000" x2="583.494" y2="675.000"/></g>
+    <polygon id="outer-hexagon" stroke-width="62.500" points="800.000,300.000 1233.013,550.000 1233.013,1050.000 800.000,1300.000 366.987,1050.000 366.987,550.000"/>
+    <polygon id="inner-hexagon" stroke-width="44.000" points="800.000,550.000 1016.506,675.000 1016.506,925.000 800.000,1050.000 583.494,925.000 583.494,675.000"/>
+    </g>
+</svg>
