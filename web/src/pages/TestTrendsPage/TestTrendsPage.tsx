@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/Card";
+import { PageTitle } from "@/components/PageTitle";
 import { Badge } from "@/components/Badge";
 import { ArrowLeft, TrendingUp, Clock, AlertCircle } from "lucide-react";
 import type { TestStatus } from "@/types/common";
@@ -193,17 +194,25 @@ export function TestTrendsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-(--stitch-on-surface-muted)">
-          Loading test trends...
+      <>
+        <PageTitle
+          title={testId ? `Test Trends · ${testId.slice(0, 8)}` : "Test Trends"}
+        />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-(--stitch-on-surface-muted)">
+            Loading test trends...
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error || !trendsData) {
     return (
       <div className="space-y-4">
+        <PageTitle
+          title={`Test Trends Unavailable${testId ? ` · ${testId.slice(0, 8)}` : ""}`}
+        />
         <Link
           to="/runs"
           className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md px-2 py-1"
@@ -237,6 +246,9 @@ export function TestTrendsPage() {
 
   return (
     <div className="space-y-6">
+      <PageTitle
+        title={`Test Trends · ${(trendsData.testId || testId || "Unknown test").slice(0, 8)}`}
+      />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">

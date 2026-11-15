@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/Card";
+import { PageTitle } from "@/components/PageTitle";
 import { ArrowLeft, BarChart3, AlertCircle, TrendingUp } from "lucide-react";
 import {
   LineChart,
@@ -217,17 +218,29 @@ export function MarkerStatsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-(--stitch-on-surface-muted)">
-          Loading marker statistics...
+      <>
+        <PageTitle
+          title={
+            markerValue
+              ? `Marker Statistics · ${markerValue}`
+              : "Marker Statistics"
+          }
+        />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-(--stitch-on-surface-muted)">
+            Loading marker statistics...
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error || !statsData) {
     return (
       <div className="space-y-4">
+        <PageTitle
+          title={`Marker Statistics Unavailable${markerValue ? ` · ${markerValue}` : ""}`}
+        />
         <Link
           to="/"
           className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md px-2 py-1"
@@ -260,6 +273,9 @@ export function MarkerStatsPage() {
 
   return (
     <div className="space-y-6">
+      <PageTitle
+        title={`Marker Statistics · ${statsData.marker || markerValue || "Unknown marker"}`}
+      />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">

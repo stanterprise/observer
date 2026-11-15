@@ -25,6 +25,7 @@ import { getRunCompletionStatus } from "./utils";
 import type { TestStatus } from "@/types/common";
 import Dialog from "@/components/Dialog";
 import { humanizeMilliseconds } from "@/utils/duration";
+import { PageTitle } from "@/components/PageTitle";
 
 export function TestRunsPage() {
   const pollIntervalMs = config.pollingIntervalMs;
@@ -224,19 +225,25 @@ export function TestRunsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-(--stitch-on-surface-muted)">
-          Loading test runs...
+      <>
+        <PageTitle title="Test Suite Runs" />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-(--stitch-on-surface-muted)">
+            Loading test runs...
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-(--status-failure)">Error: {error}</div>
-      </div>
+      <>
+        <PageTitle title="Test Runs Unavailable" />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-(--status-failure)">Error: {error}</div>
+        </div>
+      </>
     );
   }
 
@@ -253,6 +260,7 @@ export function TestRunsPage() {
 
   return (
     <div className="space-y-6">
+      <PageTitle title="Test Suite Runs" />
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-(--stitch-on-surface)">
           Test Suite Runs

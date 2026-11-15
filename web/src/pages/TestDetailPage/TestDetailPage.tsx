@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
+import { PageTitle } from "@/components/PageTitle";
 import { useRefresh } from "@/lib/refresh";
 import type { TestStatus } from "@/types/common";
 import { ArrowLeft, AlertCircle, TrendingUp } from "lucide-react";
@@ -84,17 +85,25 @@ export function TestDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-(--stitch-on-surface-muted)">
-          Loading test details...
+      <>
+        <PageTitle
+          title={testId ? `Test · ${testId.slice(0, 8)}` : "Test Details"}
+        />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-(--stitch-on-surface-muted)">
+            Loading test details...
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error || !testDetail) {
     return (
       <div className="space-y-4">
+        <PageTitle
+          title={`${error ? "Test Unavailable" : "Test Not Found"}${testId ? ` · ${testId.slice(0, 8)}` : ""}`}
+        />
         <Link
           to="/runs"
           className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md px-2 py-1"
@@ -141,6 +150,9 @@ export function TestDetailPage() {
   if (!test) {
     return (
       <div className="space-y-4">
+        <PageTitle
+          title={`Test Not Found${testId ? ` · ${testId.slice(0, 8)}` : ""}`}
+        />
         <Link
           to="/runs"
           className="inline-flex items-center text-(--stitch-primary) hover:text-(--stitch-primary) focus:outline-none focus:ring-2 focus:ring-(--stitch-primary) focus:ring-offset-2 rounded-md px-2 py-1"
@@ -185,6 +197,7 @@ export function TestDetailPage() {
   );
   return (
     <div className="space-y-6">
+      <PageTitle title={`Test · ${test.title}`} />
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link

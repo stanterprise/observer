@@ -7,6 +7,7 @@ import type {
   RawMessagesRunListResponse,
   RawMessagesRunSummary,
 } from "@/types/rawMessages";
+import { PageTitle } from "@/components/PageTitle";
 
 export function RawMessagesRunsPage() {
   const [runs, setRuns] = useState<RawMessagesRunSummary[]>([]);
@@ -55,41 +56,50 @@ export function RawMessagesRunsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold text-(--stitch-on-surface)">
-          Raw Message Runs
-        </h1>
-        <div className="space-y-2">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="h-16 bg-(--stitch-surface-low) rounded-lg animate-pulse"
-            />
-          ))}
+      <>
+        <PageTitle title="Raw Message Runs" />
+        <div className="space-y-4">
+          <h1 className="text-3xl font-bold text-(--stitch-on-surface)">
+            Raw Message Runs
+          </h1>
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="h-16 bg-(--stitch-surface-low) rounded-lg animate-pulse"
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (notEnabled) {
     return (
-      <Card className="border border-(--status-warning-border) bg-(--status-warning-soft)/50">
-        <CardContent className="py-10 text-center">
-          <h2 className="text-lg font-semibold text-(--stitch-on-surface) mb-2">
-            Message Retention Not Enabled
-          </h2>
-          <p className="text-sm text-(--stitch-on-surface-muted)">
-            Start the processor with{" "}
-            <span className="font-mono">RETAIN_MESSAGES=true</span> to populate
-            this directory.
-          </p>
-        </CardContent>
-      </Card>
+      <>
+        <PageTitle title="Raw Message Runs Unavailable" />
+        <Card className="border border-(--status-warning-border) bg-(--status-warning-soft)/50">
+          <CardContent className="py-10 text-center">
+            <h2 className="text-lg font-semibold text-(--stitch-on-surface) mb-2">
+              Message Retention Not Enabled
+            </h2>
+            <p className="text-sm text-(--stitch-on-surface-muted)">
+              Start the processor with{" "}
+              <span className="font-mono">RETAIN_MESSAGES=true</span> to
+              populate this directory.
+            </p>
+          </CardContent>
+        </Card>
+      </>
     );
   }
 
   return (
     <div className="space-y-6">
+      <PageTitle
+        title={error ? "Raw Message Runs Unavailable" : "Raw Message Runs"}
+      />
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold text-(--stitch-on-surface)">
