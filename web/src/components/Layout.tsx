@@ -1,9 +1,13 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { Activity, Moon, Sun, RefreshCw } from "lucide-react";
+import { Moon, Sun, RefreshCw } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useRefresh } from "@/lib/refresh";
 import { useTheme } from "@/lib/theme";
 import { uiVersion, useServerVersion } from "@/lib/version";
+import darkMark from "@/assets/observer-mark-dark.svg";
+import whiteMark from "@/assets/observer-mark-white.svg";
+import darkWordmark from "@/assets/observer-wordmark-dark.svg";
+import whiteWordmark from "@/assets/observer-wordmark-white.svg";
 
 export function Layout() {
   const location = useLocation();
@@ -41,10 +45,11 @@ export function Layout() {
                 className="flex items-center group"
                 aria-label="Observer Home"
               >
-                <Activity className="mr-3 h-8 w-8 text-(--stitch-primary) transition-colors" />
-                <span className="text-xl font-bold font-headline text-(--stitch-on-surface) transition-colors group-hover:text-(--stitch-primary)">
-                  Observer
-                </span>
+                <img
+                  src={isDark ? whiteWordmark : darkWordmark}
+                  alt=""
+                  className="h-8 w-auto transition-opacity group-hover:opacity-80"
+                />
               </Link>
             </div>
             <div className="flex items-center space-x-1 md:space-x-4">
@@ -139,9 +144,10 @@ export function Layout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex items-center space-x-2 text-sm text-(--stitch-on-surface-muted)">
-              <Activity
-                className="h-4 w-4 text-(--stitch-primary)"
-                aria-hidden="true"
+              <img
+                src={isDark ? whiteMark : darkMark}
+                alt=""
+                className="h-4 w-4"
               />
               <span>Observer - Test Observability Platform</span>
             </div>

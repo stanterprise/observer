@@ -9,6 +9,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Clock, Map as MapIcon } from "lucide-react";
 import { Badge } from "@/components/Badge";
 import { Card, CardContent } from "@/components/Card";
+import { PageTitle } from "@/components/PageTitle";
 import { config } from "@/lib/config";
 import { useRefresh } from "@/lib/refresh";
 import { fetchRunDetailData } from "@/lib/runDetail";
@@ -121,32 +122,44 @@ export function TestRunTimelinePage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-300">
-        <div className="flex items-center gap-4">
-          <div className="h-10 w-10 rounded-lg bg-(--stitch-surface-highest) animate-pulse" />
-          <div className="space-y-2">
-            <div className="h-8 w-56 rounded bg-(--stitch-surface-highest) animate-pulse" />
-            <div className="h-4 w-64 rounded bg-(--stitch-surface-low) animate-pulse" />
+      <>
+        <PageTitle
+          title={
+            runId
+              ? `Test Run Timeline · ${runId.slice(0, 8)}`
+              : "Test Run Timeline"
+          }
+        />
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex items-center gap-4">
+            <div className="h-10 w-10 rounded-lg bg-(--stitch-surface-highest) animate-pulse" />
+            <div className="space-y-2">
+              <div className="h-8 w-56 rounded bg-(--stitch-surface-highest) animate-pulse" />
+              <div className="h-4 w-64 rounded bg-(--stitch-surface-low) animate-pulse" />
+            </div>
           </div>
-        </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
-          {[1, 2, 3, 4].map((item) => (
-            <div
-              key={item}
-              className="h-28 rounded-lg bg-(--stitch-surface-low) animate-pulse"
-            />
-          ))}
-        </div>
+          <div className="grid gap-4 md:grid-cols-4">
+            {[1, 2, 3, 4].map((item) => (
+              <div
+                key={item}
+                className="h-28 rounded-lg bg-(--stitch-surface-low) animate-pulse"
+              />
+            ))}
+          </div>
 
-        <div className="h-[480px] rounded-xl bg-(--stitch-surface-low) animate-pulse" />
-      </div>
+          <div className="h-[480px] rounded-xl bg-(--stitch-surface-low) animate-pulse" />
+        </div>
+      </>
     );
   }
 
   if (error || !runDetail) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
+        <PageTitle
+          title={`Timeline Unavailable${runId ? ` · ${runId.slice(0, 8)}` : ""}`}
+        />
         <Link
           to={runId ? `/runs/${runId}` : "/runs"}
           className="group inline-flex items-center gap-2 rounded-md px-2 py-1 text-(--stitch-primary) transition-colors hover:bg-(--stitch-primary-soft) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
@@ -193,6 +206,9 @@ export function TestRunTimelinePage() {
   if (!timeline || timeline.totalAttempts === 0) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
+        <PageTitle
+          title={`Test Run Timeline · ${runDetail.name || runDetail.id}`}
+        />
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link
@@ -233,6 +249,9 @@ export function TestRunTimelinePage() {
 
   return (
     <div className="space-y-6 pb-8 animate-in fade-in duration-300">
+      <PageTitle
+        title={`Test Run Timeline · ${runDetail.name || runDetail.id}`}
+      />
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex items-center gap-4">
           <Link

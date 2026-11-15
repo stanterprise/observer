@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/Card";
 import { Tag, AlertCircle, TrendingUp, ArrowRight } from "lucide-react";
+import { PageTitle } from "@/components/PageTitle";
 
 interface MarkerInfo {
   marker: string;
@@ -45,34 +46,43 @@ export function MarkerBrowsePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-(--stitch-on-surface-muted)">Loading markers...</div>
-      </div>
+      <>
+        <PageTitle title="Test Markers" />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-(--stitch-on-surface-muted)">
+            Loading markers...
+          </div>
+        </div>
+      </>
     );
   }
 
   if (error) {
     return (
-      <div className="space-y-4">
-        <Card>
-          <CardContent className="py-12">
-            <div className="flex flex-col items-center justify-center space-y-4">
-              <AlertCircle className="h-16 w-16 text-(--status-failure)" />
-              <div className="text-(--status-failure) text-center">
-                <p className="font-semibold">Error: {error}</p>
-                <p className="text-sm mt-1">
-                  Unable to fetch markers. Please try again later.
-                </p>
+      <>
+        <PageTitle title="Test Markers Unavailable" />
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="py-12">
+              <div className="flex flex-col items-center justify-center space-y-4">
+                <AlertCircle className="h-16 w-16 text-(--status-failure)" />
+                <div className="text-(--status-failure) text-center">
+                  <p className="font-semibold">Error: {error}</p>
+                  <p className="text-sm mt-1">
+                    Unable to fetch markers. Please try again later.
+                  </p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      </>
     );
   }
 
   return (
     <div className="space-y-6">
+      <PageTitle title="Test Markers" />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">

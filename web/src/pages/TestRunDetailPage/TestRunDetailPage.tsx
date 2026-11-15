@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
+import { PageTitle } from "@/components/PageTitle";
 import { useRefresh } from "@/lib/refresh";
 import { fetchRunDetailData } from "@/lib/runDetail";
 import {
@@ -260,42 +261,50 @@ export function TestRunDetailPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-300">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="h-10 w-10 bg-(--stitch-surface-highest) rounded-lg animate-pulse" />
-            <div className="h-8 w-48 bg-(--stitch-surface-highest) rounded animate-pulse" />
-          </div>
-        </div>
-        <div className="bg-(--stitch-surface-card) rounded-lg shadow-md border border-(--stitch-outline) overflow-hidden">
-          <div className="h-8 bg-(--stitch-surface-highest) animate-pulse" />
-          <div className="p-6 space-y-4">
-            <div className="h-6 bg-(--stitch-surface-highest) rounded w-3/4 animate-pulse" />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className="h-32 bg-(--stitch-surface-low) rounded-lg animate-pulse"
-                />
-              ))}
+      <>
+        <PageTitle
+          title={runId ? `Test Run · ${runId.slice(0, 8)}` : "Test Run"}
+        />
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="h-10 w-10 bg-(--stitch-surface-highest) rounded-lg animate-pulse" />
+              <div className="h-8 w-48 bg-(--stitch-surface-highest) rounded animate-pulse" />
             </div>
           </div>
+          <div className="bg-(--stitch-surface-card) rounded-lg shadow-md border border-(--stitch-outline) overflow-hidden">
+            <div className="h-8 bg-(--stitch-surface-highest) animate-pulse" />
+            <div className="p-6 space-y-4">
+              <div className="h-6 bg-(--stitch-surface-highest) rounded w-3/4 animate-pulse" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {[1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="h-32 bg-(--stitch-surface-low) rounded-lg animate-pulse"
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-24 bg-(--stitch-surface-low) rounded-lg animate-pulse"
+              />
+            ))}
+          </div>
         </div>
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-24 bg-(--stitch-surface-low) rounded-lg animate-pulse"
-            />
-          ))}
-        </div>
-      </div>
+      </>
     );
   }
 
   if (error || !runDetail) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
+        <PageTitle
+          title={`${error ? "Test Run Unavailable" : "Test Run Not Found"}${runId ? ` · ${runId.slice(0, 8)}` : ""}`}
+        />
         <Link
           to="/runs"
           className="group inline-flex items-center gap-2 rounded-md px-2 py-1 text-(--stitch-primary) transition-colors hover:bg-(--stitch-primary-soft) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--stitch-primary) focus-visible:ring-offset-2 focus-visible:ring-offset-(--stitch-background)"
@@ -404,6 +413,7 @@ export function TestRunDetailPage() {
 
   return (
     <div className="space-y-6 pb-8 animate-in fade-in duration-300">
+      <PageTitle title={`Test Run · ${runDetail.name || runDetail.id}`} />
       {/* Header with improved visual design */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

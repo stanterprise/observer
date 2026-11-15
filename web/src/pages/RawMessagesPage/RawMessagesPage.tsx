@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiUrl } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
+import { PageTitle } from "@/components/PageTitle";
 import {
   ArrowLeft,
   Download,
@@ -296,20 +297,29 @@ export function RawMessagesPage() {
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-300">
-        <div className="flex items-center gap-4">
-          <div className="h-10 w-10 bg-(--stitch-surface-low) rounded-lg animate-pulse" />
-          <div className="h-8 w-48 bg-(--stitch-surface-low) rounded animate-pulse" />
+      <>
+        <PageTitle
+          title={
+            runId
+              ? `Raw Message Audit · ${runId.slice(0, 8)}`
+              : "Raw Message Audit"
+          }
+        />
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex items-center gap-4">
+            <div className="h-10 w-10 bg-(--stitch-surface-low) rounded-lg animate-pulse" />
+            <div className="h-8 w-48 bg-(--stitch-surface-low) rounded animate-pulse" />
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="h-16 bg-(--stitch-surface-low) rounded-lg animate-pulse"
+              />
+            ))}
+          </div>
         </div>
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div
-              key={i}
-              className="h-16 bg-(--stitch-surface-low) rounded-lg animate-pulse"
-            />
-          ))}
-        </div>
-      </div>
+      </>
     );
   }
 
@@ -317,6 +327,9 @@ export function RawMessagesPage() {
   if (notEnabled) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
+        <PageTitle
+          title={`Raw Message Retention Unavailable${runId ? ` · ${runId.slice(0, 8)}` : ""}`}
+        />
         <Link
           to={`/runs/${runId}`}
           className="inline-flex items-center gap-2 text-(--stitch-primary) hover:text-(--stitch-primary) transition-colors group"
@@ -355,6 +368,9 @@ export function RawMessagesPage() {
   if (error || !doc) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
+        <PageTitle
+          title={`Raw Messages Unavailable${runId ? ` · ${runId.slice(0, 8)}` : ""}`}
+        />
         <Link
           to={`/runs/${runId}`}
           className="inline-flex items-center gap-2 text-(--stitch-primary) hover:text-(--stitch-primary) transition-colors group"
@@ -385,6 +401,7 @@ export function RawMessagesPage() {
   // ── Main content ──────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 pb-8 animate-in fade-in duration-300">
+      <PageTitle title={`Raw Message Audit · ${doc.runId.slice(0, 8)}`} />
       {/* Page header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">

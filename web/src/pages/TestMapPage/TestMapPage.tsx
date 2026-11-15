@@ -10,6 +10,7 @@ import {
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { apiUrl, config } from "@/lib/config";
 import { Card, CardContent } from "@/components/Card";
+import { PageTitle } from "@/components/PageTitle";
 import { useRefresh } from "@/lib/refresh";
 import { ArrowLeft, Map, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -503,38 +504,46 @@ export function TestMapPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-300">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="h-10 w-10 bg-(--stitch-surface-low) rounded-lg animate-pulse" />
-            <div className="h-8 w-48 bg-(--stitch-surface-low) rounded animate-pulse" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            <div className="relative h-96 overflow-hidden rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-low)">
-              <div
-                className="absolute inset-0"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(to right, color-mix(in srgb, var(--stitch-surface-highest) 75%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--stitch-surface-highest) 75%, transparent) 1px, transparent 1px)",
-                  backgroundSize: "28px 28px",
-                }}
-              />
-              <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/35 to-transparent animate-shimmer" />
+      <>
+        <PageTitle
+          title={runId ? `Test Map · ${runId.slice(0, 8)}` : "Test Map"}
+        />
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="h-10 w-10 bg-(--stitch-surface-low) rounded-lg animate-pulse" />
+              <div className="h-8 w-48 bg-(--stitch-surface-low) rounded animate-pulse" />
             </div>
           </div>
-          <div className="lg:col-span-1">
-            <div className="h-96 bg-(--stitch-surface-low) rounded-lg animate-pulse" />
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-3">
+              <div className="relative h-96 overflow-hidden rounded-lg border border-(--stitch-outline) bg-(--stitch-surface-low)">
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(to right, color-mix(in srgb, var(--stitch-surface-highest) 75%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--stitch-surface-highest) 75%, transparent) 1px, transparent 1px)",
+                    backgroundSize: "28px 28px",
+                  }}
+                />
+                <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/35 to-transparent animate-shimmer" />
+              </div>
+            </div>
+            <div className="lg:col-span-1">
+              <div className="h-96 bg-(--stitch-surface-low) rounded-lg animate-pulse" />
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error || !runDetail) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
+        <PageTitle
+          title={`Test Map Unavailable${runId ? ` · ${runId.slice(0, 8)}` : ""}`}
+        />
         <Link
           to={`/runs/${runId}`}
           className="inline-flex items-center gap-2 text-(--stitch-primary) hover:text-(--stitch-primary) transition-colors group"
@@ -569,6 +578,7 @@ export function TestMapPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      <PageTitle title={`Test Map · ${runDetail.name || runDetail.id}`} />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

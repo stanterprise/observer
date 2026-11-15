@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiUrl } from "../lib/config";
+import { useTheme } from "@/lib/theme";
 import { Card, CardHeader, CardTitle, CardContent } from "./Card";
 import {
   Activity,
@@ -10,6 +11,8 @@ import {
   TrendingUp,
   AlertTriangle,
 } from "lucide-react";
+import darkMark from "@/assets/observer-mark-dark.svg";
+import whiteMark from "@/assets/observer-mark-white.svg";
 
 interface RunStats {
   runId: string;
@@ -33,6 +36,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
+  const { isDark } = useTheme();
   const [stats, setStats] = useState<DashboardStats>({
     totalRuns: 0,
     totalTests: 0,
@@ -144,7 +148,12 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
-              <Activity className="mx-auto h-16 w-16 text-(--stitch-on-surface-subtle)" />
+              <img
+                src={isDark ? whiteMark : darkMark}
+                alt=""
+                className="mx-auto h-16 w-16"
+                aria-hidden="true"
+              />
               <h3 className="mt-4 text-lg font-medium text-(--stitch-on-surface)">
                 Welcome to Observer
               </h3>

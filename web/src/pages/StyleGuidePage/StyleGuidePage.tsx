@@ -1,6 +1,7 @@
 import { CheckCircle2, ExternalLink, Moon, Sun } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/Card";
+import { PageTitle } from "@/components/PageTitle";
 import { useTheme } from "@/lib/theme";
 import { stitchStyleGuide, stitchGuideVariants } from "@/lib/styleGuide";
 
@@ -69,6 +70,7 @@ export function StyleGuidePage() {
 
   return (
     <div className="space-y-8" style={{ fontFamily: bodyFontFamily }}>
+      <PageTitle title={guide.displayName} />
       <header
         className="rounded-xl px-6 py-8 shadow-sm"
         style={{
